@@ -2,7 +2,6 @@
 
 let activeSenderId = null;
 let currentMemory = null;
-let personaConfig = null;
 
 // DOM Elements
 const navBtns = document.querySelectorAll('.nav-btn');
@@ -14,13 +13,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   await loadStatus();
   await loadConversations();
-  await loadPersona();
   setupEventListeners();
   setupSimulator();
 });
 
 // Toast notification helper
 function showToast(msg, isError = false) {
+  if (!toastEl) return;
   toastEl.textContent = msg;
   toastEl.style.borderColor = isError ? '#ef4444' : 'var(--border-glass)';
   toastEl.classList.add('show');
@@ -49,23 +48,21 @@ async function loadStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
 
-    document.getElementById('creatorHandle').textContent = data.instagramHandle || '@chipichappa.daily';
-    document.getElementById('displayCreatorName').textContent = data.creatorName || 'Sam Joshua';
-    document.getElementById('displayModelName').textContent = data.azureModel || 'GPT-4o';
-    document.getElementById('globalBotToggle').checked = data.globalBotActive ?? true;
+    const handleEl = document.getElementById('creatorHandle');
+    if (handleEl) handleEl.textContent = data.instagramHandle || '@catovidz';
 
-    // Webhook setup info
-    document.getElementById('verifyTokenDisplay').textContent = data.webhookVerifyToken;
-    document.getElementById('webhookCallbackDisplay').textContent = `${window.location.origin}/webhook`;
-    document.getElementById('displayAppId').textContent = `Meta App: chatter (${data.appId})`;
+    const nameEl = document.getElementById('displayCreatorName');
+    if (nameEl) nameEl.textContent = data.creatorName || 'Sam Joshua';
 
-    const tokenBadge = document.getElementById('tokenStatusBadge');
-    if (data.hasPageAccessToken) {
-      tokenBadge.textContent = 'Token Connected';
-      tokenBadge.className = 'status-pill status-success';
-    } else {
-      tokenBadge.textContent = 'Page Access Token Needed';
-      tokenBadge.className = 'status-pill status-warning';
+    const modelEl = document.getElementById('displayModelName');
+    if (modelEl) modelEl.textContent = data.azureModel || 'GPT-4o';
+
+    const botToggle = document.getElementById('globalBotToggle');
+    if (botToggle) botToggle.checked = data.globalBotActive ?? true;
+
+    const sysStatus = document.getElementById('systemStatusText');
+    if (sysStatus) {
+      sysStatus.textContent = (data.globalBotActive ?? true) ? 'Auto-Pilot Active' : 'Auto-Pilot Paused';
     }
   } catch (err) {
     console.error('Error loading status:', err);
@@ -73,7 +70,7 @@ async function loadStatus() {
 }
 
 // Global Bot Toggle
-document.getElementById('globalBotToggle').addEventListener('change', async (e) => {
+document.getElementById('globalBotToggle')?.addEventListener('change', async (e) => {
   const active = e.target.checked;
   try {
     await fetch('/api/persona', {
@@ -81,7 +78,10 @@ document.getElementById('globalBotToggle').addEventListener('change', async (e) 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ globalBotActive: active })
     });
-    document.getElementById('systemStatusText').textContent = active ? 'Auto-Pilot Active' : 'Auto-Pilot Paused';
+    const sysStatus = document.getElementById('systemStatusText');
+    if (sysStatus) {
+      sysStatus.textContent = active ? 'Auto-Pilot Active' : 'Auto-Pilot Paused';
+    }
     showToast(active ? 'AI Auto-Pilot activated' : 'AI Auto-Pilot paused');
   } catch (err) {
     showToast('Failed to toggle AI auto-pilot', true);
@@ -97,21 +97,16 @@ async function loadConversations() {
     const convos = await res.json();
 
     const container = document.getElementById('convoListContainer');
-    document.getElementById('inboxCountBadge').textContent = convos.length;
+    const badge = document.getElementById('inboxCountBadge');
+    if (badge) badge.textContent = Array.isArray(convos) ? convos.length : 0;
 
-    if (convos.length === 0) {
+    if (!Array.isArray(convos) || convos.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
-          <p>No messages yet. Send a test message in the <b>AI Simulator</b> or connect your webhook!</p>
+          <p>No messages yet. Send a DM on Instagram or test in the <b>AI Simulator</b>!</p>
         </div>`;
       return;
     }
-
-    container.innerHTML = '';
-    convos.forEach(item => {
-      const u = item.user;
-      const lastMsg = item.lastMessage;
-      const initial = (u.name || u.username || 'U')[0].toUpperCase();
 
     container.innerHTML = '';
     convos.forEach(item => {
@@ -157,6 +152,11 @@ async function loadConversations() {
       div.addEventListener('click', () => selectConversation(u.senderId));
       container.appendChild(div);
     });
+
+    // Auto-select first conversation if none selected yet
+    if (!activeSenderId && convos.length > 0) {
+      selectConversation(convos[0].user.senderId);
+    }
   } catch (err) {
     console.error('Error fetching conversations:', err);
   }
@@ -185,11 +185,11 @@ async function selectConversation(senderId) {
     // Update Person Rules UI
     updatePersonRulesUI(currentMemory);
 
-    // Messages
+    // Messages stream
     const stream = document.getElementById('messagesStream');
     stream.innerHTML = '';
 
-    if (data.messages.length === 0) {
+    if (!data.messages || data.messages.length === 0) {
       stream.innerHTML = '<div class="empty-state">No messages in this conversation yet.</div>';
     } else {
       data.messages.forEach(msg => {
@@ -290,8 +290,8 @@ async function savePersonPreferences(updates) {
 }
 
 // Manual reply as Sam Joshua
-document.getElementById('sendManualReplyBtn').addEventListener('click', sendManualReply);
-document.getElementById('manualReplyText').addEventListener('keydown', (e) => {
+document.getElementById('sendManualReplyBtn')?.addEventListener('click', sendManualReply);
+document.getElementById('manualReplyText')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     sendManualReply();
@@ -324,34 +324,41 @@ async function sendManualReply() {
 }
 
 // Memory Drawer Handlers
-document.getElementById('viewMemoryBtn').addEventListener('click', () => {
-  document.getElementById('memoryPanel').classList.toggle('open');
+document.getElementById('viewMemoryBtn')?.addEventListener('click', () => {
+  document.getElementById('memoryPanel')?.classList.toggle('open');
 });
-document.getElementById('closeMemoryBtn').addEventListener('click', () => {
-  document.getElementById('memoryPanel').classList.remove('open');
+document.getElementById('closeMemoryBtn')?.addEventListener('click', () => {
+  document.getElementById('memoryPanel')?.classList.remove('open');
 });
 
 function renderMemoryPanel(memory) {
   if (!memory) return;
-  document.getElementById('memRelation').textContent = memory.relationshipType || 'Stranger';
-  document.getElementById('memStyle').textContent = memory.conversationStyle || 'Casual';
-  document.getElementById('memSummary').textContent = memory.rollingSummary || 'New conversation';
+  const relEl = document.getElementById('memRelation');
+  if (relEl) relEl.textContent = memory.relationshipType || 'Stranger';
+
+  const styleEl = document.getElementById('memStyle');
+  if (styleEl) styleEl.textContent = memory.conversationStyle || 'Casual';
+
+  const sumEl = document.getElementById('memSummary');
+  if (sumEl) sumEl.textContent = memory.rollingSummary || 'New conversation';
 
   const factsUl = document.getElementById('memFactsList');
-  factsUl.innerHTML = '';
-  if (memory.facts && memory.facts.length > 0) {
-    memory.facts.forEach(f => {
-      const li = document.createElement('li');
-      li.textContent = f.fact;
-      factsUl.appendChild(li);
-    });
-  } else {
-    factsUl.innerHTML = '<li>No specific facts learned yet.</li>';
+  if (factsUl) {
+    factsUl.innerHTML = '';
+    if (memory.facts && memory.facts.length > 0) {
+      memory.facts.forEach(f => {
+        const li = document.createElement('li');
+        li.textContent = f.fact;
+        factsUl.appendChild(li);
+      });
+    } else {
+      factsUl.innerHTML = '<li>No specific facts learned yet.</li>';
+    }
   }
 }
 
 // Add custom fact manually
-document.getElementById('addFactBtn').addEventListener('click', async () => {
+document.getElementById('addFactBtn')?.addEventListener('click', async () => {
   const input = document.getElementById('customFactInput');
   const newFact = input.value.trim();
   if (!newFact || !activeSenderId || !currentMemory) return;
@@ -374,141 +381,41 @@ document.getElementById('addFactBtn').addEventListener('click', async () => {
 });
 
 // Refresh button
-document.getElementById('refreshConvosBtn').addEventListener('click', () => {
+document.getElementById('refreshConvosBtn')?.addEventListener('click', () => {
   loadConversations();
   if (activeSenderId) selectConversation(activeSenderId);
   showToast('Refreshed conversations');
 });
 
 // -------------------------------------------------------------
-// 3. AI Persona & Style Studio
-// -------------------------------------------------------------
-async function loadPersona() {
-  try {
-    const res = await fetch('/api/persona');
-    personaConfig = await res.json();
-
-    document.getElementById('cfgCreatorName').value = personaConfig.creatorName || 'Sam Joshua';
-    document.getElementById('cfgInstagramHandle').value = personaConfig.instagramHandle || '@chipichappa.daily';
-    document.getElementById('cfgPersonaBio').value = personaConfig.personaBio || '';
-    document.getElementById('cfgToneGuidelines').value = personaConfig.toneGuidelines || '';
-    document.getElementById('cfgTypingDelay').value = personaConfig.typingDelaySeconds || 1.5;
-    document.getElementById('cfgKnowledge').value = personaConfig.customKnowledge || '';
-    document.getElementById('cfgForbidden').value = (personaConfig.forbiddenWords || []).join(', ');
-    
-    if (personaConfig.instagramPageAccessToken) {
-      document.getElementById('inputPageToken').value = personaConfig.instagramPageAccessToken;
-    }
-
-    renderSampleConversations(personaConfig.sampleConversations || []);
-  } catch (err) {
-    console.error('Error loading persona:', err);
-  }
-}
-
-function renderSampleConversations(samples) {
-  const container = document.getElementById('samplesContainer');
-  container.innerHTML = '';
-
-  samples.forEach((sample, idx) => {
-    const div = document.createElement('div');
-    div.className = 'sample-pair';
-    div.innerHTML = `
-      <div class="form-group" style="margin:0;">
-        <label>User Says:</label>
-        <input type="text" class="sample-user" value="${escapeHtml(sample.userMessage || '')}">
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label>Sam Joshua Replies:</label>
-        <input type="text" class="sample-sam" value="${escapeHtml(sample.myReply || '')}">
-      </div>
-      <button class="btn-delete" title="Delete" onclick="removeSample(${idx})">🗑️</button>
-    `;
-    container.appendChild(div);
-  });
-}
-
-window.removeSample = function(idx) {
-  personaConfig.sampleConversations.splice(idx, 1);
-  renderSampleConversations(personaConfig.sampleConversations);
-};
-
-document.getElementById('addSampleBtn').addEventListener('click', () => {
-  personaConfig.sampleConversations = personaConfig.sampleConversations || [];
-  personaConfig.sampleConversations.push({
-    userMessage: 'hey, how are you doing?',
-    myReply: 'all good bro! just working on some new edits 🙌'
-  });
-  renderSampleConversations(personaConfig.sampleConversations);
-});
-
-document.getElementById('savePersonaBtn').addEventListener('click', async () => {
-  // Collect sample pairs
-  const pairs = [];
-  document.querySelectorAll('.sample-pair').forEach(el => {
-    const u = el.querySelector('.sample-user').value.trim();
-    const s = el.querySelector('.sample-sam').value.trim();
-    if (u && s) pairs.push({ userMessage: u, myReply: s });
-  });
-
-  const forbidden = document.getElementById('cfgForbidden').value
-    .split(',')
-    .map(w => w.trim().toLowerCase())
-    .filter(Boolean);
-
-  const payload = {
-    creatorName: document.getElementById('cfgCreatorName').value.trim(),
-    instagramHandle: document.getElementById('cfgInstagramHandle').value.trim(),
-    personaBio: document.getElementById('cfgPersonaBio').value.trim(),
-    toneGuidelines: document.getElementById('cfgToneGuidelines').value.trim(),
-    typingDelaySeconds: parseFloat(document.getElementById('cfgTypingDelay').value) || 1.5,
-    customKnowledge: document.getElementById('cfgKnowledge').value.trim(),
-    forbiddenWords: forbidden,
-    sampleConversations: pairs,
-  };
-
-  try {
-    const res = await fetch('/api/persona', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast('🎉 Persona and Tone Rules saved!');
-      loadStatus();
-    }
-  } catch (err) {
-    showToast('Failed to save persona: ' + err.message, true);
-  }
-});
-
-// -------------------------------------------------------------
-// 4. Simulator / Live Sandbox
+// 3. Simulator / Live Sandbox
 // -------------------------------------------------------------
 function setupSimulator() {
   const userSelect = document.getElementById('simUserSelect');
   const simCurrentUsername = document.getElementById('simCurrentUsername');
 
-  userSelect.addEventListener('change', () => {
+  userSelect?.addEventListener('change', () => {
     const selected = userSelect.options[userSelect.selectedIndex].text;
-    simCurrentUsername.textContent = selected.split(' ')[1] || selected;
+    if (simCurrentUsername) simCurrentUsername.textContent = selected.split(' ')[1] || selected;
     clearSimulator();
   });
 
-  document.getElementById('sendSimMsgBtn').addEventListener('click', sendSimMessage);
-  document.getElementById('simInputText').addEventListener('keydown', (e) => {
+  document.getElementById('sendSimMsgBtn')?.addEventListener('click', sendSimMessage);
+  document.getElementById('simInputText')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendSimMessage();
   });
-  document.getElementById('clearSimBtn').addEventListener('click', clearSimulator);
+  document.getElementById('clearSimBtn')?.addEventListener('click', clearSimulator);
 }
 
 function clearSimulator() {
   const stream = document.getElementById('simMessagesStream');
-  stream.innerHTML = '<div class="bubble bubble-system">Simulated conversation cleared. Send a new message!</div>';
-  document.getElementById('simStyleVal').textContent = 'Analyzing...';
-  document.getElementById('simSummaryVal').textContent = 'First interaction initiated.';
-  document.getElementById('simFactsVal').innerHTML = '<li>Send a message to see facts dynamically extracted!</li>';
+  if (stream) stream.innerHTML = '<div class="bubble bubble-system">Simulated conversation cleared. Send a new message!</div>';
+  const styleEl = document.getElementById('simStyleVal');
+  if (styleEl) styleEl.textContent = 'Analyzing...';
+  const sumEl = document.getElementById('simSummaryVal');
+  if (sumEl) sumEl.textContent = 'First interaction initiated.';
+  const factsEl = document.getElementById('simFactsVal');
+  if (factsEl) factsEl.innerHTML = '<li>Send a message to see facts dynamically extracted!</li>';
 }
 
 async function sendSimMessage() {
@@ -560,20 +467,25 @@ async function sendSimMessage() {
       // Update Live Intel Box
       if (data.userMemory) {
         const mem = data.userMemory;
-        document.getElementById('simStyleVal').textContent = mem.conversationStyle || 'Casual';
-        document.getElementById('simRelationVal').textContent = mem.relationshipType || 'User';
-        document.getElementById('simSummaryVal').textContent = mem.rollingSummary || 'In progress';
+        const sVal = document.getElementById('simStyleVal');
+        if (sVal) sVal.textContent = mem.conversationStyle || 'Casual';
+        const rVal = document.getElementById('simRelationVal');
+        if (rVal) rVal.textContent = mem.relationshipType || 'User';
+        const sumVal = document.getElementById('simSummaryVal');
+        if (sumVal) sumVal.textContent = mem.rollingSummary || 'In progress';
 
         const factsList = document.getElementById('simFactsVal');
-        factsList.innerHTML = '';
-        if (mem.facts && mem.facts.length > 0) {
-          mem.facts.forEach(f => {
-            const li = document.createElement('li');
-            li.textContent = f.fact;
-            factsList.appendChild(li);
-          });
-        } else {
-          factsList.innerHTML = '<li>Chatting with Sam...</li>';
+        if (factsList) {
+          factsList.innerHTML = '';
+          if (mem.facts && mem.facts.length > 0) {
+            mem.facts.forEach(f => {
+              const li = document.createElement('li');
+              li.textContent = f.fact;
+              factsList.appendChild(li);
+            });
+          } else {
+            factsList.innerHTML = '<li>Chatting with Sam...</li>';
+          }
         }
       }
 
@@ -585,57 +497,6 @@ async function sendSimMessage() {
     showToast('Simulation error: ' + err.message, true);
   }
 }
-
-// -------------------------------------------------------------
-// 5. Meta Token Management
-// -------------------------------------------------------------
-document.getElementById('saveTokenBtn').addEventListener('click', async () => {
-  const token = document.getElementById('inputPageToken').value.trim();
-  if (!token) return showToast('Please enter an Access Token', true);
-
-  try {
-    const res = await fetch('/api/persona', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instagramPageAccessToken: token })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast('Page Access Token saved securely!');
-      loadStatus();
-    }
-  } catch (err) {
-    showToast('Error saving token', true);
-  }
-});
-
-document.getElementById('testTokenBtn').addEventListener('click', async () => {
-  const token = document.getElementById('inputPageToken').value.trim();
-  const resultDiv = document.getElementById('tokenTestResult');
-  resultDiv.style.display = 'block';
-  resultDiv.textContent = 'Verifying token with Meta Graph API...';
-  resultDiv.className = 'test-result-box status-warning';
-
-  try {
-    const res = await fetch('/api/test-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      resultDiv.className = 'test-result-box status-success';
-      resultDiv.innerHTML = `✅ Token Valid! Connected to: <b>${escapeHtml(data.data.name || data.data.id)}</b>`;
-    } else {
-      resultDiv.className = 'test-result-box status-warning';
-      resultDiv.innerHTML = `❌ Meta Error: ${escapeHtml(JSON.stringify(data.error))}`;
-    }
-  } catch (err) {
-    resultDiv.className = 'test-result-box status-warning';
-    resultDiv.innerHTML = `❌ Request failed: ${err.message}`;
-  }
-});
 
 function setupEventListeners() {
   document.getElementById('convoSearchInput')?.addEventListener('input', (e) => {
