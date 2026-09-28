@@ -21,13 +21,13 @@ class ReminderService {
 
       const reminderHours = config?.reminderAfterHours || 5;
       const minInactiveMs = reminderHours * 60 * 60 * 1000; // 5 hours
-      const maxInactiveMs = 23 * 60 * 60 * 1000; // 23 hours (strictly within Meta's 24h standard messaging window)
+      const maxInactiveMs = 10 * 60 * 60 * 1000; // Strictly capped at 10 hours max (if idle for 1 day or >=10h, do NOT remind them - wait until they text)
 
       const now = Date.now();
       const cutoffTime = new Date(now - minInactiveMs);
       const policyCutoff = new Date(now - maxInactiveMs);
 
-      // Find candidates who interacted between 5 hours and 23 hours ago
+      // Find candidates who interacted between 5 hours and 10 hours ago
       const candidateUsers = await UserMemory.find({
         aiEnabled: true,
         lastInteraction: { $gte: policyCutoff, $lte: cutoffTime },
@@ -51,18 +51,26 @@ class ReminderService {
           $or: [{ senderId: user.senderId }, { recipientId: user.senderId }]
         }).sort({ createdAt: -1 });
 
-        // If the last message was already a reminder, do not send another one
-        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.isReminder) {
+        // If the last message was from the bot/assistant (user left on seen/read), DO NOT double-text like a bot
+        if (lastMsg && lastMsg.role === 'assistant') {
           continue;
         }
 
         // Fetch recent conversation history for context
         const history = await Message.find({
           $or: [{ senderId: user.senderId }, { recipientId: user.senderId }]
-        }).sort({ createdAt: -1 }).limit(6);
+        }).sort({ createdAt: -1 }).limit(8);
         history.reverse();
 
-        console.log(`⏰ [Reminder Service] Generating 5-6h follow-up check-in for @${user.username} (${user.senderId})...`);
+        // Effort check: do not remind low-effort / dry responders
+        const userMsgs = history.filter(m => m.role === 'user');
+        const lastUserMsg = userMsgs[userMsgs.length - 1];
+        if (!lastUserMsg || (lastUserMsg.text && lastUserMsg.text.trim().length <= 5 && !lastUserMsg.text.includes('?'))) {
+          console.log(`⏸️ [Reminder Service] Skipping @${user.username}: low effort or dry message.`);
+          continue;
+        }
+
+        console.log(`⏰ [Reminder Service] Generating genuine follow-up for engaged user @${user.username} (${user.senderId})...`);
 
         // Generate warm, casual follow-up
         const reminderText = await azureOpenAI.generateFollowUpReminder({

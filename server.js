@@ -14,6 +14,7 @@ const instagramService = require('./services/instagramService');
 const azureOpenAI = require('./services/azureOpenAI');
 const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
+const stickerService = require('./services/stickerService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,6 +33,10 @@ const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secr
 
 // Cache for recent message IDs to prevent duplicate processing
 const processedMids = new Set();
+
+// Anti-spam debounce queue: aggregates rapid-fire/spam messages and replies once
+const userDebounceQueues = new Map();
+const DEBOUNCE_WAIT_MS = 3500; // Hold on for 3.5s to see if user is typing multiple quick messages / spamming
 
 /**
  * ---------------------------------------------------------------------
@@ -59,13 +64,15 @@ app.get('/webhook', (req, res) => {
   res.sendStatus(400);
 });
 
-// Helper to parse message text, reels, story replies, notes, and media attachments
+// Helper to parse message text, reels, posts, story replies, notes, and media attachments
 function parseIncomingEventMessage(msg) {
   if (!msg || msg.is_echo) return null;
 
   let text = (msg.text || '').trim();
   let isReelOrShare = false;
-  let reelTitle = '';
+  let isPost = false;
+  let isMedia = false;
+  let mediaTitle = '';
   let isStoryReply = false;
   let isNoteReply = false;
 
@@ -81,12 +88,37 @@ function parseIncomingEventMessage(msg) {
 
   if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
     for (const att of msg.attachments) {
-      if (att.type === 'share' || att.type === 'ig_reel' || att.type === 'reel') {
+      const type = (att.type || '').toLowerCase();
+      const url = att.payload?.url || '';
+      const title = att.payload?.title || att.payload?.caption || att.payload?.name || '';
+
+      if (type === 'ig_reel' || type === 'reel' || url.includes('/reel/') || url.includes('/reels/')) {
         isReelOrShare = true;
-        reelTitle = att.payload?.title || att.payload?.caption || '';
-      } else if (att.type === 'story_mention' || att.type === 'story') {
+        mediaTitle = title;
+      } else if (type === 'ig_post' || type === 'post' || url.includes('/p/') || url.includes('/tv/')) {
+        isPost = true;
+        isReelOrShare = true;
+        mediaTitle = title;
+      } else if (type === 'share') {
+        if (url.includes('/reel/') || url.includes('/reels/')) {
+          isReelOrShare = true;
+        } else {
+          isPost = true;
+          isReelOrShare = true;
+        }
+        mediaTitle = title;
+      } else if (type === 'story_mention' || type === 'story') {
         isStoryReply = true;
-        reelTitle = 'Mentioned you in their Story';
+        mediaTitle = 'Mentioned you in their Story';
+      } else if (type === 'image') {
+        isMedia = true;
+        mediaTitle = 'Photo';
+      } else if (type === 'video') {
+        isMedia = true;
+        mediaTitle = 'Video';
+      } else if (type === 'audio') {
+        isMedia = true;
+        mediaTitle = 'Voice message';
       }
     }
   }
@@ -96,16 +128,22 @@ function parseIncomingEventMessage(msg) {
     text = text ? `[Replied to your Instagram Story: "${text}"]` : `[Reacted to your Instagram Story with an emoji]`;
   } else if (isNoteReply) {
     text = text ? `[Replied to your Instagram Note: "${text}"]` : `[Reacted to your Instagram Note]`;
-  } else if (!text && isReelOrShare) {
-    text = reelTitle ? `[Shared an Instagram Reel: "${reelTitle}"]` : `[Shared an Instagram Reel]`;
-  } else if (text && isReelOrShare) {
-    text = `${text} [Shared an Instagram Reel: "${reelTitle || 'Reel'}"]`;
+  } else if (isPost) {
+    text = text
+      ? `${text} [Shared an Instagram Post: "${mediaTitle || 'Post'}"]`
+      : (mediaTitle ? `[Shared an Instagram Post: "${mediaTitle}"]` : `[Shared an Instagram Post]`);
+  } else if (isReelOrShare) {
+    text = text
+      ? `${text} [Shared an Instagram Reel: "${mediaTitle || 'Reel'}"]`
+      : (mediaTitle ? `[Shared an Instagram Reel: "${mediaTitle}"]` : `[Shared an Instagram Reel]`);
+  } else if (isMedia) {
+    text = text ? `${text} [Sent a ${mediaTitle}]` : `[Sent a ${mediaTitle}]`;
   }
 
-  // If there's neither text nor reel/story, skip
+  // If there's neither text nor post/reel/story, skip
   if (!text) return null;
 
-  return { text, isReelOrShare, reelTitle, isStoryReply, isNoteReply };
+  return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply };
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
@@ -242,9 +280,63 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     return;
   }
 
-  // 5. If user shared a Reel or media, react with an emoji first!
+  // 5. If user shared a Reel/Post or media, react with an emoji first!
   if (isReelOrShare && mid && mid !== 'random_mid') {
     instagramService.sendMessageReaction(senderId, mid, '😂').catch(() => {});
+  }
+
+  // 6. Anti-Spam / Debounce Logic:
+  // If the user is rapid-firing messages or spamming, hold on until they stop typing!
+  // This aggregates their messages, saves tokens, and replies once naturally like a human.
+  if (userDebounceQueues.has(senderId)) {
+    const existing = userDebounceQueues.get(senderId);
+    clearTimeout(existing.timer);
+    existing.messages.push({ text: messageText, mid });
+    existing.lastMid = mid;
+    existing.isReelOrShare = existing.isReelOrShare || isReelOrShare;
+
+    console.log(`⏳ [Anti-Spam / Debounce]: User ${senderId} sent another message (${existing.messages.length} queued). Holding on for ${DEBOUNCE_WAIT_MS / 1000}s...`);
+
+    existing.timer = setTimeout(() => {
+      userDebounceQueues.delete(senderId);
+      dispatchDebouncedReply(existing).catch(err => {
+        console.error('❌ Error dispatching debounced reply:', err);
+      });
+    }, DEBOUNCE_WAIT_MS);
+    return;
+  }
+
+  // First message in a potential cluster: start debounce window
+  const queueEntry = {
+    senderId,
+    recipientId,
+    userMemory,
+    config,
+    messages: [{ text: messageText, mid }],
+    lastMid: mid,
+    isReelOrShare,
+    timer: null,
+  };
+
+  userDebounceQueues.set(senderId, queueEntry);
+  queueEntry.timer = setTimeout(() => {
+    userDebounceQueues.delete(senderId);
+    dispatchDebouncedReply(queueEntry).catch(err => {
+      console.error('❌ Error dispatching debounced reply:', err);
+    });
+  }, DEBOUNCE_WAIT_MS);
+}
+
+/**
+ * Dispatches a single, smart AI reply after user finishes typing their message(s)
+ */
+async function dispatchDebouncedReply(queueEntry) {
+  const { senderId, recipientId, userMemory, config, messages, lastMid } = queueEntry;
+
+  // Combine multiple messages if user sent a cluster
+  const combinedText = messages.map(m => m.text).join('\n');
+  if (messages.length > 1) {
+    console.log(`🧠 [Anti-Spam Batching]: Aggregated ${messages.length} messages from ${senderId}:\n"${combinedText}"`);
   }
 
   // Send typing indicator to Instagram
@@ -255,7 +347,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const delayMs = (config.typingDelaySeconds || 1.5) * 1000;
   await new Promise(resolve => setTimeout(resolve, delayMs));
 
-  // 6. Fetch recent conversation history
+  // Fetch recent conversation history
   const history = await Message.find({
     $or: [
       { senderId, recipientId },
@@ -267,34 +359,61 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   history.reverse();
 
-  // 7. Generate response mimicking Sam Joshua
+  // Generate response mimicking Sam Joshua
   console.log(`🤖 Generating Sam's response via Azure OpenAI...`);
-  const replyText = await azureOpenAI.generateReply({
+  let replyText = await azureOpenAI.generateReply({
     userMemory,
     messageHistory: history,
-    incomingText: messageText,
+    incomingText: combinedText,
   });
 
-  console.log(`✨ [Sam's AI Reply]: "${replyText}"`);
+  // Extract optional sticker tag
+  const stickerMatch = replyText.match(/\[STICKER:\s*([a-zA-Z0-9_-]+)\]/i);
+  let stickerType = null;
+  if (stickerMatch) {
+    stickerType = stickerMatch[1].toLowerCase();
+    replyText = replyText.replace(/\[STICKER:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+  }
 
-  // 8. Send reply via Instagram Graph API (swipe-to-reply quoting the specific message)
-  const sendResult = await instagramService.sendTextMessage(senderId, replyText, null, mid);
+  console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Sticker: ${stickerType}]` : ''}`);
 
-  // 9. Save outgoing message in DB
+  // Send reply via Instagram Graph API (swipe-to-reply quoting the last message in the batch)
+  let sendResult = null;
+  if (replyText && replyText.trim().length > 0) {
+    sendResult = await instagramService.sendTextMessage(senderId, replyText, null, lastMid);
+  }
+
+  // If a sticker was chosen, send the sticker image directly to Instagram DM!
+  if (stickerType && stickerService.hasSticker(stickerType)) {
+    const stickerUrl = stickerService.getStickerUrl(stickerType);
+    if (stickerUrl) {
+      const delay = (replyText && replyText.trim().length > 0) ? 600 : 0;
+      setTimeout(async () => {
+        try {
+          console.log(`🖼️ [Sticker Dispatch]: Sending ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
+          await instagramService.sendImageMessage(senderId, stickerUrl);
+        } catch (e) {
+          console.error(`❌ [Sticker Error]: Failed to send sticker:`, e.message);
+        }
+      }, delay);
+    }
+  }
+
+  // Save outgoing message in DB
   await Message.create({
     senderId: recipientId,
     recipientId: senderId,
     role: 'assistant',
-    text: replyText,
+    text: replyText || (stickerType ? `[Sent ${stickerType} sticker]` : ''),
     mid: sendResult?.data?.message_id || `out_${Date.now()}`,
     sentByAI: true,
     timestamp: new Date(),
   });
 
-  // 10. Turn off typing
+  // Turn off typing
   await instagramService.sendSenderAction(senderId, 'typing_off');
 
-  // 11. Update memory, extracted facts, and summary in background
+  // Update memory, extracted facts, and summary in background
   memoryService.updateMemoryAsync(senderId).catch(err => {
     console.error('Failed to update memory in background:', err.message);
   });
