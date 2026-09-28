@@ -113,6 +113,32 @@ async function loadConversations() {
       const lastMsg = item.lastMessage;
       const initial = (u.name || u.username || 'U')[0].toUpperCase();
 
+    container.innerHTML = '';
+    convos.forEach(item => {
+      const u = item.user;
+      const lastMsg = item.lastMessage;
+      const initial = (u.name || u.username || 'U')[0].toUpperCase();
+
+      let badgesHtml = '';
+      if (!u.aiEnabled) {
+        badgesHtml += `<span class="badge-pill pill-paused">⏸️ AI Paused</span>`;
+      } else {
+        const textOn = u.replyToMessages !== false;
+        const reelsOn = u.replyToReelsAndPosts !== false;
+        if (textOn && reelsOn) {
+          badgesHtml += `<span class="badge-pill pill-active">💬 Text + 🎬 Reels</span>`;
+        } else if (textOn) {
+          badgesHtml += `<span class="badge-pill pill-text">💬 Messages Only</span>`;
+        } else if (reelsOn) {
+          badgesHtml += `<span class="badge-pill pill-reels">🎬 Reels Only</span>`;
+        } else {
+          badgesHtml += `<span class="badge-pill pill-paused">⏸️ Paused</span>`;
+        }
+        if (u.remindersEnabled !== false) {
+          badgesHtml += `<span class="badge-pill pill-remind">⏰ Remind</span>`;
+        }
+      }
+
       const div = document.createElement('div');
       div.className = `convo-item ${activeSenderId === u.senderId ? 'active' : ''}`;
       div.setAttribute('data-id', u.senderId);
@@ -124,6 +150,7 @@ async function loadConversations() {
             <span class="convo-time">${lastMsg ? formatTime(lastMsg.timestamp) : ''}</span>
           </div>
           <p class="convo-snippet">${lastMsg ? (lastMsg.role === 'assistant' ? 'Sam: ' : '') + escapeHtml(lastMsg.text) : 'No messages'}</p>
+          <div class="convo-badges">${badgesHtml}</div>
         </div>
       `;
 
@@ -155,10 +182,8 @@ async function selectConversation(senderId) {
     document.getElementById('chatHeaderActions').style.display = 'flex';
     document.getElementById('chatInputBar').style.display = 'flex';
 
-    // AI Switch for this user
-    const toggle = document.getElementById('userAiToggle');
-    toggle.checked = currentMemory.aiEnabled;
-    document.getElementById('aiStatusLabel').textContent = currentMemory.aiEnabled ? 'AI Active' : 'AI Paused';
+    // Update Person Rules UI
+    updatePersonRulesUI(currentMemory);
 
     // Messages
     const stream = document.getElementById('messagesStream');
@@ -189,18 +214,80 @@ async function selectConversation(senderId) {
   }
 }
 
-// User-specific AI toggle
-document.getElementById('userAiToggle').addEventListener('change', async (e) => {
+function updatePersonRulesUI(memory) {
+  if (!memory) return;
+  const aiMaster = memory.aiEnabled !== false;
+  const replyMsg = memory.replyToMessages !== false;
+  const replyReels = memory.replyToReelsAndPosts !== false;
+  const reminders = memory.remindersEnabled !== false;
+
+  // Drawer toggles
+  const masterToggle = document.getElementById('ruleAiMasterToggle');
+  const msgToggle = document.getElementById('ruleReplyMessagesToggle');
+  const reelsToggle = document.getElementById('ruleReplyReelsToggle');
+  const remindToggle = document.getElementById('ruleRemindersToggle');
+
+  if (masterToggle) masterToggle.checked = aiMaster;
+  if (msgToggle) msgToggle.checked = replyMsg;
+  if (reelsToggle) reelsToggle.checked = replyReels;
+  if (remindToggle) remindToggle.checked = reminders;
+
+  const nickInput = document.getElementById('prefNicknameInput');
+  const genderSelect = document.getElementById('prefGenderSelect');
+  const notesText = document.getElementById('prefPersonalNotes');
+
+  if (nickInput) nickInput.value = memory.nickname || '';
+  if (genderSelect) genderSelect.value = memory.gender || 'unknown';
+  if (notesText) notesText.value = memory.personalNotes || '';
+
+  const statusPill = document.getElementById('personRulesStatus');
+  if (statusPill) {
+    if (!aiMaster) {
+      statusPill.textContent = 'AI Paused';
+      statusPill.className = 'live-pill paused';
+    } else {
+      statusPill.textContent = 'AI Active';
+      statusPill.className = 'live-pill';
+    }
+  }
+
+  // Quick Mode Pills in Header
+  const qmAll = document.getElementById('qmAll');
+  const qmMsg = document.getElementById('qmMsg');
+  const qmReels = document.getElementById('qmReels');
+  const qmPause = document.getElementById('qmPause');
+  const qmRemind = document.getElementById('qmRemind');
+
+  if (qmAll) qmAll.classList.toggle('active', aiMaster && replyMsg && replyReels);
+  if (qmMsg) qmMsg.classList.toggle('active', aiMaster && replyMsg && !replyReels);
+  if (qmReels) qmReels.classList.toggle('active', aiMaster && !replyMsg && replyReels);
+  if (qmPause) qmPause.classList.toggle('active', !aiMaster);
+
+  if (qmRemind) {
+    qmRemind.textContent = reminders ? '⏰ Reminders: ON' : '⏰ Reminders: OFF';
+    qmRemind.classList.toggle('active', reminders);
+  }
+}
+
+async function savePersonPreferences(updates) {
   if (!activeSenderId) return;
   try {
-    const res = await fetch(`/api/conversations/${activeSenderId}/toggle-ai`, { method: 'POST' });
+    const res = await fetch(`/api/conversations/${activeSenderId}/preferences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
     const data = await res.json();
-    document.getElementById('aiStatusLabel').textContent = data.aiEnabled ? 'AI Active' : 'AI Paused';
-    showToast(data.aiEnabled ? 'AI resumed for this user' : 'AI paused for this user');
+    if (data.success) {
+      currentMemory = data.memory;
+      updatePersonRulesUI(currentMemory);
+      loadConversations();
+      showToast('Updated rules for @' + (currentMemory.username || 'user'));
+    }
   } catch (err) {
-    showToast('Failed to update toggle', true);
+    showToast('Failed to save rules: ' + err.message, true);
   }
-});
+}
 
 // Manual reply as Sam Joshua
 document.getElementById('sendManualReplyBtn').addEventListener('click', sendManualReply);
@@ -557,6 +644,66 @@ function setupEventListeners() {
       const name = el.querySelector('.convo-name')?.textContent.toLowerCase() || '';
       const snip = el.querySelector('.convo-snippet')?.textContent.toLowerCase() || '';
       el.style.display = (name.includes(q) || snip.includes(q)) ? 'flex' : 'none';
+    });
+  });
+
+  // Quick Mode Pills (Chat Header)
+  document.getElementById('qmAll')?.addEventListener('click', () => {
+    savePersonPreferences({ aiEnabled: true, replyToMessages: true, replyToReelsAndPosts: true });
+  });
+
+  document.getElementById('qmMsg')?.addEventListener('click', () => {
+    savePersonPreferences({ aiEnabled: true, replyToMessages: true, replyToReelsAndPosts: false });
+  });
+
+  document.getElementById('qmReels')?.addEventListener('click', () => {
+    savePersonPreferences({ aiEnabled: true, replyToMessages: false, replyToReelsAndPosts: true });
+  });
+
+  document.getElementById('qmPause')?.addEventListener('click', () => {
+    savePersonPreferences({ aiEnabled: false });
+  });
+
+  document.getElementById('qmRemind')?.addEventListener('click', () => {
+    const current = currentMemory ? currentMemory.remindersEnabled !== false : true;
+    savePersonPreferences({ remindersEnabled: !current });
+  });
+
+  // Memory Drawer Custom Toggles
+  document.getElementById('ruleAiMasterToggle')?.addEventListener('change', (e) => {
+    savePersonPreferences({ aiEnabled: e.target.checked });
+  });
+
+  document.getElementById('ruleReplyMessagesToggle')?.addEventListener('change', (e) => {
+    savePersonPreferences({ replyToMessages: e.target.checked });
+  });
+
+  document.getElementById('ruleReplyReelsToggle')?.addEventListener('change', (e) => {
+    savePersonPreferences({ replyToReelsAndPosts: e.target.checked });
+  });
+
+  document.getElementById('ruleRemindersToggle')?.addEventListener('change', (e) => {
+    savePersonPreferences({ remindersEnabled: e.target.checked });
+  });
+
+  // Save Person Preferences button
+  document.getElementById('savePreferencesBtn')?.addEventListener('click', () => {
+    const nickname = document.getElementById('prefNicknameInput')?.value;
+    const gender = document.getElementById('prefGenderSelect')?.value;
+    const personalNotes = document.getElementById('prefPersonalNotes')?.value;
+    const aiEnabled = document.getElementById('ruleAiMasterToggle')?.checked;
+    const replyToMessages = document.getElementById('ruleReplyMessagesToggle')?.checked;
+    const replyToReelsAndPosts = document.getElementById('ruleReplyReelsToggle')?.checked;
+    const remindersEnabled = document.getElementById('ruleRemindersToggle')?.checked;
+
+    savePersonPreferences({
+      aiEnabled,
+      replyToMessages,
+      replyToReelsAndPosts,
+      remindersEnabled,
+      nickname,
+      gender,
+      personalNotes,
     });
   });
 }

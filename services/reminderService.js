@@ -30,6 +30,7 @@ class ReminderService {
       // Find candidates who interacted between 5 hours and 10 hours ago
       const candidateUsers = await UserMemory.find({
         aiEnabled: true,
+        remindersEnabled: { $ne: false },
         lastInteraction: { $gte: policyCutoff, $lte: cutoffTime },
       });
 
