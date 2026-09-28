@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatter AI - Instagram DM Automation & Persona Studio</title>
+  <meta name="description" content="AI-powered Instagram DM automation mimicking Sam Joshua's authentic style with personalized memory and Azure OpenAI GPT-4o.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Background Glow Accents -->
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  <div class="glow-orb orb-3"></div>
+
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2>chatter<span>.ai</span></h2>
+          <p id="creatorHandle">@chipichappa.daily</p>
+        </div>
+      </div>
+
+      <!-- Live Status Badge -->
+      <div class="status-widget">
+        <div class="status-indicator">
+          <span class="pulse-dot"></span>
+          <span id="systemStatusText">Auto-Pilot Active</span>
+        </div>
+        <label class="switch" title="Global Auto-Reply Toggle">
+          <input type="checkbox" id="globalBotToggle" checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="inboxTab" id="navInbox">
+          <span class="icon">💬</span>
+          <span>Live DM Inbox</span>
+          <span class="badge" id="inboxCountBadge">0</span>
+        </button>
+        <button class="nav-btn" data-tab="simulatorTab" id="navSimulator">
+          <span class="icon">⚡</span>
+          <span>AI Simulator</span>
+          <span class="pill-hot">Test Live</span>
+        </button>
+        <button class="nav-btn" data-tab="personaTab" id="navPersona">
+          <span class="icon">🎭</span>
+          <span>My Persona & Tone</span>
+        </button>
+        <button class="nav-btn" data-tab="setupTab" id="navSetup">
+          <span class="icon">⚙️</span>
+          <span>Meta & Webhooks</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="ai-model-tag">
+          <span class="azure-badge">Azure OpenAI</span>
+          <span class="model-name" id="displayModelName">GPT-4o</span>
+        </div>
+        <div class="user-chip">
+          <div class="avatar" id="creatorAvatar">SJ</div>
+          <div class="user-info">
+            <span class="name" id="displayCreatorName">Sam Joshua</span>
+            <span class="role">Admin & Creator</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- ================= 1. LIVE DM INBOX TAB ================= -->
+      <section id="inboxTab" class="tab-pane active">
+        <div class="inbox-layout">
+          <!-- Conversations List Column -->
+          <div class="convos-panel">
+            <div class="panel-header">
+              <h3>Instagram DMs</h3>
+              <button class="btn-icon" id="refreshConvosBtn" title="Refresh chats">🔄</button>
+            </div>
+            <div class="search-box">
+              <input type="text" id="convoSearchInput" placeholder="Search conversations...">
+            </div>
+            <div class="convo-list" id="convoListContainer">
+              <div class="empty-state">
+                <p>No messages yet. Send a test message in the <b>AI Simulator</b> or connect your webhook!</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Chat Window -->
+          <div class="chat-panel" id="chatPanel">
+            <!-- Chat Header -->
+            <div class="chat-header" id="chatHeader">
+              <div class="chat-user-meta">
+                <div class="avatar" id="activeChatAvatar">?</div>
+                <div>
+                  <h4 id="activeChatUsername">Select a conversation</h4>
+                  <p id="activeChatRelation" class="sub-text">Click a chat from the left to view messages</p>
+                </div>
+              </div>
+              <div class="chat-actions" id="chatHeaderActions" style="display: none;">
+                <div class="user-ai-toggle">
+                  <span class="toggle-label" id="aiStatusLabel">AI Auto-Reply</span>
+                  <label class="switch sm">
+                    <input type="checkbox" id="userAiToggle" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <button class="btn-subtle" id="viewMemoryBtn">🧠 Memory Intel</button>
+              </div>
+            </div>
+
+            <!-- Messages Stream -->
+            <div class="messages-stream" id="messagesStream">
+              <div class="welcome-box">
+                <div class="welcome-icon">💬</div>
+                <h3>Instagram Auto-Pilot Inbox</h3>
+                <p>Messages received on your Instagram page will arrive here in real-time. Sam's AI will automatically draft and reply mimicking your authentic voice while tracking user preferences.</p>
+              </div>
+            </div>
+
+            <!-- Chat Input (Manual Sam Joshua Reply) -->
+            <div class="chat-input-bar" id="chatInputBar" style="display: none;">
+              <textarea id="manualReplyText" placeholder="Reply manually as Sam Joshua (bypasses AI)..." rows="1"></textarea>
+              <button class="btn-primary" id="sendManualReplyBtn">
+                <span>Send</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Memory Intelligence Drawer -->
+          <div class="memory-panel" id="memoryPanel">
+            <div class="panel-header">
+              <h3>Memory & Persona Intel</h3>
+              <button class="btn-close" id="closeMemoryBtn">✕</button>
+            </div>
+            <div class="memory-content" id="memoryContent">
+              <div class="memory-section">
+                <label>Relationship Type</label>
+                <span class="badge-tag" id="memRelation">Unknown</span>
+              </div>
+              <div class="memory-section">
+                <label>Detected Conversation Style</label>
+                <p class="intel-text" id="memStyle">Casual, asking quick questions</p>
+              </div>
+              <div class="memory-section">
+                <label>Rolling Context Summary</label>
+                <p class="intel-text" id="memSummary">First conversation.</p>
+              </div>
+              <div class="memory-section">
+                <label>Remembered Facts About This Person</label>
+                <ul class="facts-list" id="memFactsList">
+                  <li>No facts recorded yet.</li>
+                </ul>
+              </div>
+              <div class="memory-section">
+                <label>Add Custom Memory Note</label>
+                <div class="add-fact-box">
+                  <input type="text" id="customFactInput" placeholder="e.g. Likes video editing, based in NY">
+                  <button class="btn-sm" id="addFactBtn">Add Fact</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 2. AI SIMULATOR TAB ================= -->
+      <section id="simulatorTab" class="tab-pane">
+        <div class="simulator-wrapper">
+          <div class="simulator-info-bar">
+            <div>
+              <h2>Instant AI Clone Simulator</h2>
+              <p>Test how Sam's AI reacts, matches conversational style, and remembers facts—without touching your live Instagram account yet!</p>
+            </div>
+            <div class="sim-user-switch">
+              <label>Simulate Person:</label>
+              <select id="simUserSelect">
+                <option value="test_user_fan">Alex (@alex_creates) - Hype Fan</option>
+                <option value="test_user_collab">Sarah (@sarah_films) - Collab Request</option>
+                <option value="test_user_client">David (@brand_agency) - Business Client</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="sim-chat-container">
+            <div class="sim-phone-frame">
+              <div class="phone-notch"></div>
+              <div class="phone-header">
+                <div class="phone-user">
+                  <div class="avatar-sm">SJ</div>
+                  <div>
+                    <h5>Sam Joshua</h5>
+                    <span>Active now • chatter.ai</span>
+                  </div>
+                </div>
+                <button class="btn-clear-sim" id="clearSimBtn">Clear</button>
+              </div>
+
+              <div class="sim-messages" id="simMessagesStream">
+                <div class="bubble bubble-system">
+                  Try texting Sam Joshua! E.g. "hey bro loved your latest reel!", or "do you do collaborations?"
+                </div>
+              </div>
+
+              <div class="sim-input-box">
+                <input type="text" id="simInputText" placeholder="Type a message as the Instagram user...">
+                <button id="sendSimMsgBtn" class="btn-primary">
+                  <span>Send</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Simulator Live Memory Inspector -->
+            <div class="sim-intel-card">
+              <div class="intel-header">
+                <h4>🧠 Real-Time Memory Brain</h4>
+                <span class="badge-accent">Azure GPT-4o</span>
+              </div>
+              <div class="intel-body">
+                <div class="intel-item">
+                  <span class="label">User Talking:</span>
+                  <span class="val" id="simCurrentUsername">@alex_creates</span>
+                </div>
+                <div class="intel-item">
+                  <span class="label">Detected Style:</span>
+                  <span class="val highlight" id="simStyleVal">Hype, uses slang & fire emojis</span>
+                </div>
+                <div class="intel-item">
+                  <span class="label">Relationship:</span>
+                  <span class="val" id="simRelationVal">fan</span>
+                </div>
+                <div class="intel-item">
+                  <span class="label">Memory Summary:</span>
+                  <p class="summary-box" id="simSummaryVal">First interaction initiated.</p>
+                </div>
+                <div class="intel-item">
+                  <span class="label">Remembered Facts:</span>
+                  <ul class="facts-pill-list" id="simFactsVal">
+                    <li>Send a message to see facts dynamically extracted!</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 3. MY PERSONA & TONE STUDIO ================= -->
+      <section id="personaTab" class="tab-pane">
+        <div class="studio-header">
+          <div>
+            <h2>Persona & Style Studio</h2>
+            <p>Teach the AI exactly how you talk so no one can tell it's not you.</p>
+          </div>
+          <button class="btn-primary" id="savePersonaBtn">Save Persona Changes</button>
+        </div>
+
+        <div class="studio-grid">
+          <!-- Card 1: Identity & Bio -->
+          <div class="card glass-card">
+            <h3>Identity & Core Bio</h3>
+            <div class="form-group">
+              <label>Your Display Name</label>
+              <input type="text" id="cfgCreatorName" value="Sam Joshua">
+            </div>
+            <div class="form-group">
+              <label>Instagram Handle</label>
+              <input type="text" id="cfgInstagramHandle" value="@chipichappa.daily">
+            </div>
+            <div class="form-group">
+              <label>Your Bio & Personality Summary</label>
+              <textarea id="cfgPersonaBio" rows="4"></textarea>
+            </div>
+          </div>
+
+          <!-- Card 2: Tone & Slang Guidelines -->
+          <div class="card glass-card">
+            <h3>Tone & Slang Guidelines</h3>
+            <div class="form-group">
+              <label>Rules for your AI Clone</label>
+              <textarea id="cfgToneGuidelines" rows="8" placeholder="Enter bullet points on how to text..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>Typing Delay Simulation (Seconds)</label>
+              <input type="number" id="cfgTypingDelay" min="0" max="10" step="0.5" value="1.5">
+              <span class="sub-help">Simulates realistic typing time so it doesn't look instantly robotic.</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Real Chat Examples (How You Talk) -->
+          <div class="card glass-card full-width">
+            <div class="card-title-bar">
+              <div>
+                <h3>Sample Dialogues (Few-Shot Style Teaching)</h3>
+                <p>Provide 2-4 real examples of how you reply to DMs. The AI studies these patterns.</p>
+              </div>
+              <button class="btn-subtle" id="addSampleBtn">+ Add Sample Dialogue</button>
+            </div>
+
+            <div class="samples-container" id="samplesContainer">
+              <!-- Dynamically populated sample chat pairs -->
+            </div>
+          </div>
+
+          <!-- Card 4: Knowledge Base & Forbidden Words -->
+          <div class="card glass-card">
+            <h3>Personal Knowledge Base & FAQs</h3>
+            <p class="sub-help">Facts about your work, editing tools, portfolio links, pricing, or FAQ answers.</p>
+            <div class="form-group">
+              <textarea id="cfgKnowledge" rows="6"></textarea>
+            </div>
+          </div>
+
+          <div class="card glass-card">
+            <h3>Forbidden Words & Bot Tells</h3>
+            <p class="sub-help">Phrases the AI must NEVER say (comma separated).</p>
+            <div class="form-group">
+              <textarea id="cfgForbidden" rows="6"></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 4. META & WEBHOOK SETUP TAB ================= -->
+      <section id="setupTab" class="tab-pane">
+        <div class="setup-container">
+          <div class="setup-header">
+            <h2>Meta & Instagram Graph API Setup</h2>
+            <p>Connect your Meta App <b>chatter</b> to listen for Instagram DMs and reply automatically.</p>
+          </div>
+
+          <!-- Connection Status Card -->
+          <div class="card glass-card">
+            <div class="meta-status-row">
+              <div class="meta-app-badge">
+                <span class="app-icon">⚡</span>
+                <div>
+                  <h4 id="displayAppId">Meta App: chatter (1037131122693653)</h4>
+                  <p>Business: chipichappa.daily</p>
+                </div>
+              </div>
+              <div id="tokenStatusBadge" class="status-pill status-warning">Access Token Needed</div>
+            </div>
+          </div>
+
+          <!-- Step-by-Step Meta Checklist -->
+          <div class="setup-steps">
+            <!-- Step 1 -->
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <div class="step-content">
+                <h4>Expose Local Server or Host Webhook</h4>
+                <p>Meta requires an HTTPS endpoint to send incoming DMs to. You can use <b>ngrok</b> or <b>cloudflared</b> on your machine:</p>
+                <div class="code-box">
+                  <code>npx ngrok http 3000</code>
+                  <button class="btn-copy" onclick="navigator.clipboard.writeText('npx ngrok http 3000')">Copy</button>
+                </div>
+                <p class="sub-help">This will give you a public URL like <code>https://xxxx.ngrok-free.app</code>.</p>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <div class="step-content">
+                <h4>Configure Webhook in Meta Developer Portal</h4>
+                <p>In your Meta App Dashboard for <b>chatter</b>:</p>
+                <ol>
+                  <li>Go to <b>Instagram</b> or <b>Webhooks</b> → Select <b>Instagram</b>.</li>
+                  <li>Click <b>Edit Subscription</b> and paste:</li>
+                </ol>
+                <div class="config-pair">
+                  <label>Callback URL:</label>
+                  <div class="code-box">
+                    <code id="webhookCallbackDisplay">https://YOUR_NGROK_DOMAIN/webhook</code>
+                  </div>
+                </div>
+                <div class="config-pair">
+                  <label>Verify Token:</label>
+                  <div class="code-box">
+                    <code id="verifyTokenDisplay">chatter_instagram_secret_2025</code>
+                    <button class="btn-copy" onclick="navigator.clipboard.writeText('chatter_instagram_secret_2025')">Copy</button>
+                  </div>
+                </div>
+                <p>3. Subscribe to <code>messages</code> and <code>messaging_postbacks</code>.</p>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <div class="step-content">
+                <h4>Instagram Page Access Token</h4>
+                <p>Generate a Page Access Token with <code>instagram_basic</code> and <code>instagram_manage_messages</code> permissions and paste it below:</p>
+                <div class="form-group">
+                  <input type="password" id="inputPageToken" placeholder="EAAxxxxxxxxxxxxxxxxxxxx...">
+                </div>
+                <div class="btn-row">
+                  <button class="btn-primary" id="saveTokenBtn">Save Access Token</button>
+                  <button class="btn-secondary" id="testTokenBtn">Verify Token with Meta</button>
+                </div>
+                <div id="tokenTestResult" class="test-result-box" style="display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="step-card">
+              <div class="step-num">4</div>
+              <div class="step-content">
+                <h4>Instagram Tester Invitation (Screenshot)</h4>
+                <p>In your Meta App Roles (as seen in your screenshot), you invited <b>catovidz</b> as an Instagram Tester. To test DMs:</p>
+                <ol>
+                  <li>Log into the Instagram account <b>@catovidz</b>.</li>
+                  <li>Go to <b>Settings → Apps and Websites → Tester Invitations</b>.</li>
+                  <li>Click <b>Accept</b>.</li>
+                  <li>Now send a DM to your Instagram page <b>@chipichappa.daily</b>!</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast" id="toast">Saved successfully!</div>
+
+  <script src="app.js"></script>
+</body>
+</html>
