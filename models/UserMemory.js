@@ -71,6 +71,18 @@ const UserMemorySchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  replyToMessages: {
+    type: Boolean,
+    default: true,
+  },
+  replyToReelsAndPosts: {
+    type: Boolean,
+    default: true,
+  },
+  remindersEnabled: {
+    type: Boolean,
+    default: true,
+  },
   messageCount: {
     type: Number,
     default: 0,
