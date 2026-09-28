@@ -52,6 +52,10 @@ const UserMemorySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  lastReminderSentAt: {
+    type: Date,
+    default: null,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('UserMemory', UserMemorySchema);
