@@ -28,6 +28,28 @@ const UserMemorySchema = new mongoose.Schema({
     enum: ['stranger', 'fan', 'client', 'collaborator', 'friend'],
     default: 'stranger',
   },
+  nickname: {
+    type: String,
+    default: '',
+  },
+  importantDates: [{
+    title: { type: String, required: true },
+    date: { type: String, default: '' },
+    details: { type: String, default: '' },
+  }],
+  favoriteThings: [{
+    category: { type: String, default: 'general' },
+    item: { type: String, required: true },
+  }],
+  lifeEvents: [{
+    title: { type: String, required: true },
+    details: { type: String, default: '' },
+    dateOrTime: { type: String, default: '' },
+  }],
+  personalNotes: {
+    type: String,
+    default: '',
+  },
   facts: [{
     fact: { type: String, required: true },
     addedAt: { type: Date, default: Date.now },

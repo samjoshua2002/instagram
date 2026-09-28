@@ -22,9 +22,21 @@ class AzureOpenAIService {
       config = await PersonaConfig.create({});
     }
 
-    // 2. Prepare facts summary
+    // 2. Prepare facts, dates, favorites, events, and personal notes
     const factsList = (userMemory.facts || [])
       .map(f => `- ${f.fact}`)
+      .join('\n');
+
+    const datesList = (userMemory.importantDates || [])
+      .map(d => `- ${d.title} (${d.date || 'TBD'}): ${d.details || ''}`)
+      .join('\n');
+
+    const favoritesList = (userMemory.favoriteThings || [])
+      .map(fav => `- ${fav.category}: ${fav.item}`)
+      .join('\n');
+
+    const eventsList = (userMemory.lifeEvents || [])
+      .map(ev => `- ${ev.title} (${ev.dateOrTime || 'ongoing'}): ${ev.details || ''}`)
       .join('\n');
 
     // 3. Format sample conversations for few-shot prompting
@@ -34,7 +46,7 @@ class AzureOpenAIService {
 
     // 4. Construct System Prompt
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}). 
-You are texting directly with people on your Instagram Direct Messages (DMs).
+You are texting directly on your phone in Instagram Direct Messages (DMs).
 
 CORE PERSONA & BIO:
 ${config.personaBio}
@@ -42,32 +54,36 @@ ${config.personaBio}
 STYLE & TONE GUIDELINES:
 ${config.toneGuidelines}
 
-FACTS ABOUT YOU & YOUR WORK:
-${config.customKnowledge}
-
-FORBIDDEN PATTERNS:
-- Do NOT use formal bot greetings (e.g., "Hello! How can I help you today?").
-- Do NOT say "As an AI..." or "I don't have feelings". You ARE Sam Joshua texting on his phone.
-- Keep replies short and human: usually 1 to 2 sentences, occasionally 3 if explaining something.
-- Never write robotic paragraphs. Real people text quickly and casually.
-- Forbidden words to avoid: ${config.forbiddenWords.join(', ')}
+TEXTING STYLE RULES:
+- TEXT LIKE A REAL HUMAN: Do NOT use formal punctuation (no ending periods '.', no formal semicolons ';', no rigid grammar). Real people text in casual lowercase or chill phrases.
+- USE SHORTCUTS & INTERNET SLANG: Use conversational shortcuts naturally (u, rn, fr, tbh, idk, wbu, haha, lol, yo, ngl, nah, yeah).
+- KEEP IT CONCISE: 1 to 2 short lines max. Quick, natural, immediate DM replies.
+- MATCH THIS PERSON'S VIBE: Mirror their energy, mood, and texting style subtly while staying authentically yourself.
+- NEVER sound like an AI, customer service agent, or language model. Forbidden words: ${config.forbiddenWords.join(', ')}
 
 REAL CHAT EXAMPLES (HOW YOU TALK):
 ${samples}
 
 CURRENT PERSON YOU ARE CHATTING WITH:
 - Name/Username: ${userMemory.name || userMemory.username || 'Friend'}
+- Preferred Nickname: ${userMemory.nickname || 'None (use their first name or chill terms like bro/man/friend if fitting)'}
 - Relationship: ${userMemory.relationshipType || 'stranger'}
-- Their Communication Style: ${userMemory.conversationStyle || 'Casual'}
-- Facts you remember about them:
+- How they text (their style to match): ${userMemory.conversationStyle || 'Casual'}
+- Ongoing Personal Notes: ${userMemory.personalNotes || 'None'}
+- Important dates to remember:
+${datesList || '(None recorded yet)'}
+- Their favorite things:
+${favoritesList || '(None recorded yet)'}
+- Their life events / current situation:
+${eventsList || '(None recorded yet)'}
+- Remembered facts:
 ${factsList || '(No prior facts recorded yet)'}
 - Previous context summary: ${userMemory.rollingSummary || 'New conversation'}
 
 INSTRUCTIONS FOR THIS REPLY:
-- Respond naturally as ${config.creatorName}.
-- Match their tone and energy subtly while maintaining your own authentic voice.
-- If relevant, refer naturally to previous context or things you know about them.
-- Only return the reply message text. Do NOT add quotes, labels, or prefixes like "${config.creatorName}:".`;
+- Respond naturally as ${config.creatorName} texting from your phone.
+- If they mentioned an exam, birthday, favorite thing, or life event, bring it up naturally like a friend who actually remembers.
+- Only return the raw message text. Do NOT add quotation marks or prefixes like "${config.creatorName}:".`;
 
     // 5. Build Messages array
     const messages = [{ role: 'system', content: systemPrompt }];
