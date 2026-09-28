@@ -92,6 +92,7 @@ ${formattedChat}
 Return a valid JSON object with EXACTLY this structure:
 {
   "nickname": "Extracted nickname or what they prefer to be called (leave empty if none)",
+  "gender": "one of: female, male, neutral, unknown (infer accurately from their name e.g. Mikasa/Priya is female, Alex/Sam/User is neutral/unknown unless stated, bio, pronouns, or how they speak)",
   "conversationStyle": "Short description of how they text: shortcuts they use (e.g. u, rn, fr, idk, wbu), lowercase or caps, energy level, emojis, slang",
   "relationshipType": "one of: stranger, fan, client, collaborator, friend",
   "newFacts": ["fact 1", "fact 2"],
@@ -122,6 +123,9 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
 
       if (parsed.nickname && parsed.nickname.trim() !== '') {
         memory.nickname = parsed.nickname.trim();
+      }
+      if (parsed.gender && ['female', 'male', 'neutral', 'unknown'].includes(parsed.gender)) {
+        memory.gender = parsed.gender;
       }
       if (parsed.conversationStyle) {
         memory.conversationStyle = parsed.conversationStyle;

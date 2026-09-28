@@ -32,6 +32,11 @@ const UserMemorySchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  gender: {
+    type: String,
+    enum: ['female', 'male', 'neutral', 'unknown'],
+    default: 'unknown',
+  },
   importantDates: [{
     title: { type: String, required: true },
     date: { type: String, default: '' },
