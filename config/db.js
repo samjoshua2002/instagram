@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    const mongoUri = (process.env.MONGODB_URI || '').trim().replace(/^["']|["']$/g, '');
+    const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 8000,
     });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
