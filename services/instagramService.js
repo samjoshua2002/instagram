@@ -104,6 +104,40 @@ class InstagramService {
   }
 
   /**
+   * React to a message with an emoji (e.g. '😂', '❤️', '🔥')
+   */
+  async sendMessageReaction(recipientId, messageId, emoji = '😂') {
+    const token = await this.getAccessToken();
+    if (!token || !messageId) return;
+
+    const isInstagramToken = token.startsWith('IG');
+    const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
+    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const url = `${baseUrl}/${accountId}/messages`;
+
+    try {
+      await axios.post(
+        url,
+        {
+          recipient: { id: recipientId },
+          sender_action: 'react',
+          reaction: {
+            message_id: messageId,
+            reaction: emoji,
+          },
+        },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          params: { access_token: token },
+        }
+      );
+      console.log(`❤️ [Reaction Sent] ${emoji} to message ${messageId}`);
+    } catch (err) {
+      // Catch silently if reaction endpoint has scope restrictions
+    }
+  }
+
+  /**
    * Fetch user profile (username, name, profile pic) from Graph API
    */
   async getUserProfile(senderId) {
