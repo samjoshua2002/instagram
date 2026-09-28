@@ -261,8 +261,8 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   console.log(`✨ [Sam's AI Reply]: "${replyText}"`);
 
-  // 8. Send reply via Instagram Graph API
-  const sendResult = await instagramService.sendTextMessage(senderId, replyText);
+  // 8. Send reply via Instagram Graph API (swipe-to-reply quoting the specific message)
+  const sendResult = await instagramService.sendTextMessage(senderId, replyText, null, mid);
 
   // 9. Save outgoing message in DB
   await Message.create({
