@@ -59,37 +59,53 @@ app.get('/webhook', (req, res) => {
   res.sendStatus(400);
 });
 
-// Helper to parse message text, reels, and media attachments
+// Helper to parse message text, reels, story replies, notes, and media attachments
 function parseIncomingEventMessage(msg) {
   if (!msg || msg.is_echo) return null;
 
   let text = (msg.text || '').trim();
   let isReelOrShare = false;
   let reelTitle = '';
+  let isStoryReply = false;
+  let isNoteReply = false;
+
+  // Check if replying to a Story
+  if (msg.reply_to?.story || msg.story) {
+    isStoryReply = true;
+  }
+
+  // Check if replying to a Note
+  if (msg.reply_to?.note || msg.note) {
+    isNoteReply = true;
+  }
 
   if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
     for (const att of msg.attachments) {
       if (att.type === 'share' || att.type === 'ig_reel' || att.type === 'reel') {
         isReelOrShare = true;
         reelTitle = att.payload?.title || att.payload?.caption || '';
-      } else if (att.type === 'story_mention') {
-        isReelOrShare = true;
+      } else if (att.type === 'story_mention' || att.type === 'story') {
+        isStoryReply = true;
         reelTitle = 'Mentioned you in their Story';
       }
     }
   }
 
-  // If user only sent a reel without typing text
-  if (!text && isReelOrShare) {
+  // Format incoming text with context
+  if (isStoryReply) {
+    text = text ? `[Replied to your Instagram Story: "${text}"]` : `[Reacted to your Instagram Story with an emoji]`;
+  } else if (isNoteReply) {
+    text = text ? `[Replied to your Instagram Note: "${text}"]` : `[Reacted to your Instagram Note]`;
+  } else if (!text && isReelOrShare) {
     text = reelTitle ? `[Shared an Instagram Reel: "${reelTitle}"]` : `[Shared an Instagram Reel]`;
   } else if (text && isReelOrShare) {
     text = `${text} [Shared an Instagram Reel: "${reelTitle || 'Reel'}"]`;
   }
 
-  // If there's neither text nor reel, skip
+  // If there's neither text nor reel/story, skip
   if (!text) return null;
 
-  return { text, isReelOrShare, reelTitle };
+  return { text, isReelOrShare, reelTitle, isStoryReply, isNoteReply };
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
