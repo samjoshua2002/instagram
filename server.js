@@ -548,6 +548,17 @@ app.all('/data-deletion', (req, res) => {
 });
 
 
+// Endpoint to manually trigger 3-day message cleanup and view freed space
+app.post('/api/cleanup', async (req, res) => {
+  try {
+    const days = parseInt(req.body.days) || 3;
+    const deletedCount = await memoryService.cleanOldMessages(days);
+    res.json({ success: true, deletedCount, message: `Deleted ${deletedCount} messages older than ${days} days` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
@@ -559,4 +570,7 @@ app.listen(PORT, '0.0.0.0', () => {
 
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
+
+  // Start automatic 3-day old chat cleanup scheduler to conserve DB storage
+  memoryService.startDailyCleanup(3);
 });
