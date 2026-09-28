@@ -146,6 +146,42 @@ function parseIncomingEventMessage(msg) {
   return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply };
 }
 
+// Helper to record messages sent manually by the creator from the Instagram phone app
+function handleCreatorEcho(event, accountId) {
+  const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+  const contactId = event.recipient?.id;
+  if (!contactId || contactId === botAccountId) return;
+
+  const text = event.message?.text || (event.message?.attachments?.length ? '[Shared Media / Sticker]' : '');
+  const mid = event.message?.mid || `echo_${Date.now()}`;
+  console.log(`📱 [Creator Echo]: Sam manually replied to ${contactId}: "${text}"`);
+
+  // Cancel any active AI debounce queue so the bot doesn't reply over the creator
+  if (userDebounceQueues.has(contactId)) {
+    clearTimeout(userDebounceQueues.get(contactId).timer);
+    userDebounceQueues.delete(contactId);
+    console.log(`🛑 [Creator Intervened]: Cancelled pending AI auto-reply for ${contactId}`);
+  }
+
+  // Record outgoing message in DB
+  Message.create({
+    senderId: botAccountId,
+    recipientId: contactId,
+    role: 'assistant',
+    text: text || '[Media]',
+    mid,
+    sentByAI: false,
+    timestamp: new Date(),
+  }).catch(() => {});
+
+  // Update contact's memory: fresh interaction reactivates the conversation & resets reminder cycle
+  UserMemory.updateOne({ senderId: contactId }, {
+    lastInteraction: new Date(),
+    lastReminderSentAt: null,
+    $inc: { messageCount: 1 }
+  }).catch(() => {});
+}
+
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
 app.post('/webhook', async (req, res) => {
   const body = req.body;
@@ -158,6 +194,11 @@ app.post('/webhook', async (req, res) => {
     // Format 1: Classic entry.messaging format
     if (Array.isArray(entry.messaging)) {
       for (const event of entry.messaging) {
+        if (event.message?.is_echo) {
+          handleCreatorEcho(event, entry.id);
+          continue;
+        }
+
         const parsed = parseIncomingEventMessage(event.message);
         if (parsed) {
           event.message.text = parsed.text;
@@ -175,6 +216,11 @@ app.post('/webhook', async (req, res) => {
       for (const change of entry.changes) {
         if (change.field === 'messages' && change.value) {
           const val = change.value;
+          if (val.message?.is_echo) {
+            handleCreatorEcho({ sender: val.sender, recipient: val.recipient, message: val.message }, entry.id);
+            continue;
+          }
+
           const parsed = parseIncomingEventMessage(val.message);
           if (parsed) {
             val.message.text = parsed.text;
@@ -268,15 +314,32 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     timestamp: msgTime,
   });
 
+  // Re-activate conversation: update lastInteraction and clear lastReminderSentAt
+  userMemory.lastInteraction = msgTime;
+  userMemory.lastReminderSentAt = null; // Sending a message re-activates reminder eligibility for future idle moments
+  userMemory.messageCount = (userMemory.messageCount || 0) + 1;
+  await userMemory.save();
 
-  // 4. Check if Bot is enabled (both globally and for this specific user)
+  // 4. Check if Bot is enabled globally
   if (!config.globalBotActive) {
     console.log(`⏸️ Global Bot is paused. Message saved to inbox, skipping auto-reply.`);
     return;
   }
 
+  // Check if AI is enabled for this specific user
   if (!userMemory.aiEnabled) {
     console.log(`⏸️ AI is paused for user ${userMemory.username} (${senderId}). Skipping auto-reply.`);
+    return;
+  }
+
+  // Check per-person custom reply toggles:
+  if (isReelOrShare && userMemory.replyToReelsAndPosts === false) {
+    console.log(`⏸️ Reel & Post auto-reply disabled for user @${userMemory.username} (${senderId}). Skipping reply.`);
+    return;
+  }
+
+  if (!isReelOrShare && userMemory.replyToMessages === false) {
+    console.log(`⏸️ Text message auto-reply disabled for user @${userMemory.username} (${senderId}). Skipping reply.`);
     return;
   }
 
@@ -529,10 +592,57 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
       timestamp: new Date(),
     });
 
-    // Update memory interaction time
-    await UserMemory.updateOne({ senderId }, { lastInteraction: new Date() });
+    // Cancel any active AI debounce queue so the bot doesn't reply over the creator
+    if (userDebounceQueues.has(senderId)) {
+      clearTimeout(userDebounceQueues.get(senderId).timer);
+      userDebounceQueues.delete(senderId);
+    }
+
+    // Update memory interaction time & reset reminder cycle to reactivate conversation
+    await UserMemory.updateOne({ senderId }, { 
+      lastInteraction: new Date(),
+      lastReminderSentAt: null,
+      $inc: { messageCount: 1 }
+    });
 
     res.json({ success: true, message: newMsg, graphResult: sendResult });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update custom per-person AI reply toggles and preferences
+app.post('/api/conversations/:senderId/preferences', async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    const { 
+      aiEnabled, 
+      replyToMessages, 
+      replyToReelsAndPosts, 
+      remindersEnabled, 
+      nickname, 
+      gender, 
+      personalNotes,
+      conversationStyle,
+      relationshipType
+    } = req.body;
+
+    const memory = await UserMemory.findOne({ senderId });
+    if (!memory) return res.status(404).json({ error: 'User not found' });
+
+    if (typeof aiEnabled === 'boolean') memory.aiEnabled = aiEnabled;
+    if (typeof replyToMessages === 'boolean') memory.replyToMessages = replyToMessages;
+    if (typeof replyToReelsAndPosts === 'boolean') memory.replyToReelsAndPosts = replyToReelsAndPosts;
+    if (typeof remindersEnabled === 'boolean') memory.remindersEnabled = remindersEnabled;
+    if (typeof nickname === 'string') memory.nickname = nickname.trim();
+    if (typeof gender === 'string') memory.gender = gender;
+    if (typeof personalNotes === 'string') memory.personalNotes = personalNotes;
+    if (typeof conversationStyle === 'string') memory.conversationStyle = conversationStyle;
+    if (typeof relationshipType === 'string') memory.relationshipType = relationshipType;
+
+    await memory.save();
+
+    res.json({ success: true, memory });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

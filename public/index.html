@@ -115,14 +115,15 @@
                 </div>
               </div>
               <div class="chat-actions" id="chatHeaderActions" style="display: none;">
-                <div class="user-ai-toggle">
-                  <span class="toggle-label" id="aiStatusLabel">AI Auto-Reply</span>
-                  <label class="switch sm">
-                    <input type="checkbox" id="userAiToggle" checked>
-                    <span class="slider round"></span>
-                  </label>
+                <!-- Quick Mode Segmented Bar -->
+                <div class="quick-modes-bar" id="quickModesBar">
+                  <button class="mode-pill active" id="qmAll" title="Reply to all messages & reels">🌟 All</button>
+                  <button class="mode-pill" id="qmMsg" title="Reply to text messages only">💬 Messages Only</button>
+                  <button class="mode-pill" id="qmReels" title="Reply to reels and posts only">🎬 Reels Only</button>
+                  <button class="mode-pill" id="qmRemind" title="Toggle follow-up reminders">⏰ Reminders: ON</button>
+                  <button class="mode-pill pill-danger" id="qmPause" title="Pause AI for this user">⏸️ Paused</button>
                 </div>
-                <button class="btn-subtle" id="viewMemoryBtn">🧠 Memory Intel</button>
+                <button class="btn-subtle" id="viewMemoryBtn">⚙️ Person Intel & Rules</button>
               </div>
             </div>
 
@@ -147,13 +148,91 @@
             </div>
           </div>
 
-          <!-- Memory Intelligence Drawer -->
+          <!-- Memory & Person Intel Drawer -->
           <div class="memory-panel" id="memoryPanel">
             <div class="panel-header">
-              <h3>Memory & Persona Intel</h3>
+              <h3>Custom AI Rules & Intel</h3>
               <button class="btn-close" id="closeMemoryBtn">✕</button>
             </div>
             <div class="memory-content" id="memoryContent">
+              <!-- Custom Per-Person Reply Rules Card -->
+              <div class="memory-section custom-rules-card">
+                <div class="section-title-row">
+                  <h4>⚡ Custom AI Reply Rules</h4>
+                  <span class="live-pill" id="personRulesStatus">Active</span>
+                </div>
+                <p class="section-desc">Customize what Sam's AI should automatically respond to for this specific person.</p>
+                
+                <div class="custom-toggle-row">
+                  <div class="toggle-info">
+                    <span class="toggle-name">🤖 AI Auto-Reply (Master)</span>
+                    <span class="toggle-sub">Master switch for AI replies to this contact</span>
+                  </div>
+                  <label class="switch sm">
+                    <input type="checkbox" id="ruleAiMasterToggle" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <div class="custom-toggle-row">
+                  <div class="toggle-info">
+                    <span class="toggle-name">💬 Reply to Text Messages</span>
+                    <span class="toggle-sub">Respond to regular DM chat texts</span>
+                  </div>
+                  <label class="switch sm">
+                    <input type="checkbox" id="ruleReplyMessagesToggle" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <div class="custom-toggle-row">
+                  <div class="toggle-info">
+                    <span class="toggle-name">🎬 Reply to Reels & Posts</span>
+                    <span class="toggle-sub">Respond when they share Reels, Posts, Photos</span>
+                  </div>
+                  <label class="switch sm">
+                    <input type="checkbox" id="ruleReplyReelsToggle" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <div class="custom-toggle-row">
+                  <div class="toggle-info">
+                    <span class="toggle-name">⏰ Follow-up Reminders (5–10h)</span>
+                    <span class="toggle-sub">Send friendly check-in if paused mid-chat</span>
+                  </div>
+                  <label class="switch sm">
+                    <input type="checkbox" id="ruleRemindersToggle" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <!-- Granular Person Persona Details -->
+                <div class="person-meta-fields">
+                  <div class="field-group">
+                    <label>Preferred Nickname</label>
+                    <input type="text" id="prefNicknameInput" placeholder="e.g. Bro, Mavis, Joshua">
+                  </div>
+                  <div class="field-group">
+                    <label>Identified Gender</label>
+                    <select id="prefGenderSelect">
+                      <option value="unknown">Unknown (Neutral)</option>
+                      <option value="female">Female (Never call da/bro)</option>
+                      <option value="male">Male (Casual bro/da)</option>
+                      <option value="neutral">Neutral</option>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label>Personal Notes & Highlights</label>
+                    <textarea id="prefPersonalNotes" rows="2" placeholder="Life events, favorites, context..."></textarea>
+                  </div>
+                  <button class="btn-primary btn-block" id="savePreferencesBtn">
+                    <span>💾 Save Person Preferences</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Memory Intel Details -->
               <div class="memory-section">
                 <label>Relationship Type</label>
                 <span class="badge-tag" id="memRelation">Unknown</span>
