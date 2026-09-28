@@ -13,6 +13,7 @@ const PersonaConfig = require('./models/PersonaConfig');
 const instagramService = require('./services/instagramService');
 const azureOpenAI = require('./services/azureOpenAI');
 const memoryService = require('./services/memoryService');
+const reminderService = require('./services/reminderService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -555,4 +556,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 Webhook URL: http://localhost:${PORT}/webhook`);
   console.log(`🔑 Webhook Verify Token: ${VERIFY_TOKEN}`);
   console.log(`======================================================\n`);
+
+  // Start 5-6 hr follow-up reminder scheduler
+  reminderService.startScheduler(15);
 });

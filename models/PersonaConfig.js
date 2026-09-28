@@ -68,7 +68,15 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
   instagramAccountId: {
     type: String,
     default: '',
-  }
+  },
+  followUpReminderEnabled: {
+    type: Boolean,
+    default: true,
+  },
+  reminderAfterHours: {
+    type: Number,
+    default: 5,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);

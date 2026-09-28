@@ -109,6 +109,65 @@ INSTRUCTIONS FOR THIS REPLY:
       throw err;
     }
   }
+
+  /**
+   * Generates a natural, friendly follow-up check-in when a conversation has been inactive for 5-6 hours
+   */
+  async generateFollowUpReminder({ userMemory, messageHistory }) {
+    let config = await PersonaConfig.findOne();
+    if (!config) {
+      config = await PersonaConfig.create({});
+    }
+
+    const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}).
+You are sending a thoughtful, casual follow-up or check-in to someone on Instagram DM because your previous conversation stopped 5 to 6 hours ago.
+
+CORE PERSONA & BIO:
+${config.personaBio}
+
+STYLE & TONE GUIDELINES:
+${config.toneGuidelines}
+
+RULES:
+- Keep it concise: 1 short sentence, max 2.
+- Feel natural, friendly, and authentic (e.g. checking how they are doing, checking in on what they were working on, or a chill emoji).
+- Never sound robotic or pushy.
+- Return ONLY the reply message text.`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+
+    if (messageHistory && messageHistory.length > 0) {
+      for (const msg of messageHistory) {
+        messages.push({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.text,
+        });
+      }
+    }
+
+    messages.push({
+      role: 'user',
+      content: `[System Note: 5-6 hours have passed since our last message. Send a casual, authentic check-in / follow-up message to ${userMemory.name || userMemory.username}.]`,
+    });
+
+    try {
+      const response = await this.client.chat.completions.create({
+        messages,
+        temperature: 0.75,
+        max_tokens: 150,
+      });
+
+      let reply = response.choices[0].message.content.trim();
+      reply = reply.replace(/^"|"$/g, '').trim();
+      if (reply.startsWith(`${config.creatorName}:`)) {
+        reply = reply.replace(`${config.creatorName}:`, '').trim();
+      }
+      return reply;
+    } catch (err) {
+      console.error('❌ Azure OpenAI reminder generation error:', err.message);
+      return null;
+    }
+  }
 }
 
 module.exports = new AzureOpenAIService();
