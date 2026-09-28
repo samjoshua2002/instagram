@@ -109,6 +109,19 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const messageText = event.message.text;
   const mid = event.message.mid;
 
+  const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+
+  // Only your account should respond with AI: ignore events for other accounts (e.g. moi)
+  if (accountId && accountId !== botAccountId && recipientId !== botAccountId) {
+    console.log(`⏸️ Skipping: event is for account ${accountId || recipientId}, not primary bot ${botAccountId}`);
+    return;
+  }
+
+  // Prevent bot from replying to itself
+  if (senderId === botAccountId) {
+    return;
+  }
+
   // Deduplication check (bypass for test random_mid)
   if (mid && mid !== 'random_mid' && processedMids.has(mid)) {
     console.log(`⚠️ Duplicate mid detected: ${mid}, skipping.`);
@@ -200,16 +213,8 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   console.log(`✨ [Sam's AI Reply]: "${replyText}"`);
 
-  // Determine appropriate token for sending
-  let replyToken = null;
-  if (accountId === '17841445731016310') {
-    replyToken = process.env.M4VISYZX_TOKEN || process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
-  } else if (accountId === '17841446877896232') {
-    replyToken = process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
-  }
-
   // 8. Send reply via Instagram Graph API
-  const sendResult = await instagramService.sendTextMessage(senderId, replyText, replyToken);
+  const sendResult = await instagramService.sendTextMessage(senderId, replyText);
 
   // 9. Save outgoing message in DB
   await Message.create({
