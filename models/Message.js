@@ -29,6 +29,10 @@ const MessageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isReminder: {
+    type: Boolean,
+    default: false,
+  },
   timestamp: {
     type: Date,
     default: Date.now,
