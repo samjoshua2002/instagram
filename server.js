@@ -59,7 +59,40 @@ app.get('/webhook', (req, res) => {
   res.sendStatus(400);
 });
 
-// POST /webhook: Incoming Instagram Events (DMs, echoes, etc.)
+// Helper to parse message text, reels, and media attachments
+function parseIncomingEventMessage(msg) {
+  if (!msg || msg.is_echo) return null;
+
+  let text = (msg.text || '').trim();
+  let isReelOrShare = false;
+  let reelTitle = '';
+
+  if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+    for (const att of msg.attachments) {
+      if (att.type === 'share' || att.type === 'ig_reel' || att.type === 'reel') {
+        isReelOrShare = true;
+        reelTitle = att.payload?.title || att.payload?.caption || '';
+      } else if (att.type === 'story_mention') {
+        isReelOrShare = true;
+        reelTitle = 'Mentioned you in their Story';
+      }
+    }
+  }
+
+  // If user only sent a reel without typing text
+  if (!text && isReelOrShare) {
+    text = reelTitle ? `[Shared an Instagram Reel: "${reelTitle}"]` : `[Shared an Instagram Reel]`;
+  } else if (text && isReelOrShare) {
+    text = `${text} [Shared an Instagram Reel: "${reelTitle || 'Reel'}"]`;
+  }
+
+  // If there's neither text nor reel, skip
+  if (!text) return null;
+
+  return { text, isReelOrShare, reelTitle };
+}
+
+// POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
 app.post('/webhook', async (req, res) => {
   const body = req.body;
   console.log(`📥 [Webhook Event Received]:`, JSON.stringify(body));
@@ -71,7 +104,11 @@ app.post('/webhook', async (req, res) => {
     // Format 1: Classic entry.messaging format
     if (Array.isArray(entry.messaging)) {
       for (const event of entry.messaging) {
-        if (event.message && !event.message.is_echo && event.message.text) {
+        const parsed = parseIncomingEventMessage(event.message);
+        if (parsed) {
+          event.message.text = parsed.text;
+          event.isReelOrShare = parsed.isReelOrShare;
+          event.reelTitle = parsed.reelTitle;
           handleIncomingInstagramMessage(event, entry.id).catch(err => {
             console.error('Error handling incoming Instagram message:', err);
           });
@@ -84,12 +121,16 @@ app.post('/webhook', async (req, res) => {
       for (const change of entry.changes) {
         if (change.field === 'messages' && change.value) {
           const val = change.value;
-          if (val.message && !val.message.is_echo && val.message.text) {
+          const parsed = parseIncomingEventMessage(val.message);
+          if (parsed) {
+            val.message.text = parsed.text;
             handleIncomingInstagramMessage({
               sender: val.sender,
               recipient: val.recipient,
               timestamp: val.timestamp,
               message: val.message,
+              isReelOrShare: parsed.isReelOrShare,
+              reelTitle: parsed.reelTitle,
             }, entry.id).catch(err => {
               console.error('Error handling incoming Instagram change event:', err);
             });
@@ -109,6 +150,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const recipientId = event.recipient.id;
   const messageText = event.message.text;
   const mid = event.message.mid;
+  const isReelOrShare = event.isReelOrShare;
 
   const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
 
@@ -184,7 +226,12 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     return;
   }
 
-  // 5. Send typing indicator to Instagram
+  // 5. If user shared a Reel or media, react with an emoji first!
+  if (isReelOrShare && mid && mid !== 'random_mid') {
+    instagramService.sendMessageReaction(senderId, mid, '😂').catch(() => {});
+  }
+
+  // Send typing indicator to Instagram
   await instagramService.sendSenderAction(senderId, 'mark_seen');
   await instagramService.sendSenderAction(senderId, 'typing_on');
 
