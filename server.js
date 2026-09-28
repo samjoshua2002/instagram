@@ -543,7 +543,7 @@ app.all('/data-deletion', (req, res) => {
 
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(`🚀 Instagram AI Automation Server Running!`);
   console.log(`🌐 Dashboard: http://localhost:${PORT}`);
