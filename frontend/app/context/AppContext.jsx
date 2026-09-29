@@ -23,7 +23,8 @@ export const DEFAULT_GRAPH_DATA = [
     handle: '@yk_bhavani._.xo',
     senderId: '29005624469042002',
     relationship: 'Closest Online Friend / Medicine Student',
-    category: 'close_friend',
+    category: 'online_friend',
+    dob: 'March 12, 2007',
     gender: 'female',
     personalNotes: `Bhanvani is one of my closest online friends. Her dad is in the Indian Army, and she is currently studying medicine. We used to send each other reels every day, and she has always been very supportive of me.
 
@@ -63,7 +64,8 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
     handle: '@annies_hepsiba',
     senderId: '2173928080193783',
     relationship: 'Sister',
-    category: 'relative',
+    category: 'family',
+    dob: '',
     gender: 'female',
     personalNotes: 'Sam\'s sister. Currently talking and close with Bhavani.',
     rollingSummary: 'Sam\'s sister.',
@@ -370,9 +372,10 @@ export function AppProvider({ children }) {
             replyToMessages: n.replyToMessages !== false,
             replyToReelsAndPosts: n.replyToReelsAndPosts !== false,
             relationship: n.relationshipToSam || defaultMatch?.relationship || 'Friend',
-            category: defaultMatch?.category || 'close_friend',
+            category: n.category || defaultMatch?.category || 'online_friend',
+            dob: n.dob || defaultMatch?.dob || (defaultMatch?.importantDates?.[0]?.date) || '',
             gender: n.gender || defaultMatch?.gender || 'unknown',
-            personalNotes: defaultMatch?.personalNotes || (n.lore || []).join('\n'),
+            personalNotes: n.personalNotes || defaultMatch?.personalNotes || (n.lore || []).join('\n'),
             rollingSummary: defaultMatch?.rollingSummary || n.relationshipToSam,
             conversationStyle: defaultMatch?.conversationStyle || 'Casual banter',
             importantDates: defaultMatch?.importantDates || [],
@@ -443,7 +446,8 @@ export function AppProvider({ children }) {
       senderId: accumulatedNode.senderId || '',
       profilePic: accumulatedNode.profilePic || '',
       relationship: accumulatedNode.relationshipToSam || accumulatedNode.relationship || 'Friend',
-      category: accumulatedNode.category || 'close_friend',
+      category: accumulatedNode.category || 'online_friend',
+      dob: accumulatedNode.dob || accumulatedNode.dateOfBirth || '',
       gender: accumulatedNode.gender || 'unknown',
       personalNotes: accumulatedNode.personalNotes || (accumulatedNode.lore || []).join('\n'),
       rollingSummary: accumulatedNode.rollingSummary || accumulatedNode.relationshipToSam || 'Friend in circle',
@@ -499,6 +503,9 @@ export function AppProvider({ children }) {
           instagramHandle: formattedNode.handle,
           senderId: formattedNode.senderId,
           relationshipToSam: formattedNode.relationship,
+          category: formattedNode.category,
+          dob: formattedNode.dob,
+          personalNotes: formattedNode.personalNotes,
           gender: formattedNode.gender,
           lore: formattedNode.lore,
           roastStyle: formattedNode.roastStyle,
@@ -722,6 +729,23 @@ export function AppProvider({ children }) {
     setIsAiModalOpen(true);
   };
 
+  // AI Autofill fields for a person based on chat history
+  const aiAutofillPerson = async (personName) => {
+    if (!personName) return null;
+    try {
+      const res = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(personName)}/ai-autofill`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success && data.autofill) {
+        return data.autofill;
+      }
+    } catch (e) {
+      console.warn('AI autofill failed:', e.message);
+    }
+    return null;
+  };
+
   // Link Instagram ID & Merge chatter records
   const linkContactId = async (personName, instagramHandle, senderId) => {
     if (!personName) return false;
@@ -807,6 +831,7 @@ export function AppProvider({ children }) {
         setIsAiModalOpen,
         editingNode,
         startAiInterview,
+        aiAutofillPerson,
         linkingTargetPerson,
         setLinkingTargetPerson,
         linkContactId,
