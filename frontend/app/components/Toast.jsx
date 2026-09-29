@@ -2,35 +2,37 @@
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Sparkles } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 export default function Toast() {
   const { toastMessage } = useApp();
   if (!toastMessage) return null;
 
+  // Clean away any emojis in toast message
+  const cleanMsg = toastMessage.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+
   return (
     <div
       style={{
         position: 'fixed',
-        top: '24px',
-        right: '28px',
+        top: '20px',
+        right: '24px',
         background: '#09090b',
-        border: '1px solid #10b981',
-        color: '#10b981',
-        padding: '12px 20px',
-        borderRadius: '10px',
-        fontSize: '0.85rem',
+        border: '1px solid #27272a',
+        color: '#ffffff',
+        padding: '10px 18px',
+        borderRadius: '8px',
+        fontSize: '0.82rem',
         fontWeight: '600',
-        fontFamily: "'JetBrains Mono', monospace",
         zIndex: 9999,
-        boxShadow: '0 10px 40px rgba(16, 185, 129, 0.25)',
+        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
         display: 'flex',
         alignItems: 'center',
-        gap: '10px'
+        gap: '8px'
       }}
     >
-      <Sparkles size={16} />
-      <span>{toastMessage}</span>
+      <Check size={14} />
+      <span>{cleanMsg}</span>
     </div>
   );
 }

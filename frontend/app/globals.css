@@ -1,17 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg: #000000;
-  --bg-card: #0a0a0a;
-  --bg-hover: #141414;
-  --border: #222222;
-  --border-focus: #555555;
-  --text: #ffffff;
-  --text-muted: #888888;
-  --text-dim: #444444;
-  --accent: #ffffff;
-  --dot-active: #ffffff;
-  --dot-sam: #ffffff;
+  --bg: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f4f4f5;
+  --bg-subtle: #fafafa;
+  --border: #e4e4e7;
+  --border-focus: #09090b;
+  --text: #09090b;
+  --text-muted: #71717a;
+  --text-dim: #a1a1aa;
+  --accent: #000000;
 }
 
 * {
@@ -21,9 +20,9 @@
 }
 
 html, body {
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #ffffff;
+  color: #09090b;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   height: 100%;
   width: 100%;
   overflow-x: hidden;
@@ -31,13 +30,13 @@ html, body {
 }
 
 .app-main-content {
-  margin-left: 305px;
-  width: calc(100vw - 305px);
+  margin-left: 280px;
+  width: calc(100vw - 280px);
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  background: #000000;
+  background: #ffffff;
 }
 
 @media (max-width: 768px) {
@@ -49,153 +48,79 @@ html, body {
   }
 }
 
-
-/* Custom Scrollbar */
+/* Custom Clean Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: #ffffff;
 }
 ::-webkit-scrollbar-thumb {
-  background: #222222;
+  background: #e4e4e7;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #444444;
+  background: #a1a1aa;
 }
 
-/* Monospace fonts for tags / code */
 .mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Minimalist Button */
+/* Shadcn-Style Button Utilities */
 .btn {
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid var(--border);
+  background: #ffffff;
+  color: #09090b;
+  border: 1px solid #e4e4e7;
   padding: 8px 16px;
   border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.82rem;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .btn:hover {
-  background: #ffffff;
-  color: #000000;
-  border-color: #ffffff;
+  background: #f4f4f5;
+  border-color: #d4d4d8;
 }
 
 .btn-primary {
-  background: #ffffff;
-  color: #000000;
-  border: 1px solid #ffffff;
+  background: #09090b;
+  color: #ffffff;
+  border: 1px solid #09090b;
 }
 
 .btn-primary:hover {
-  background: #cccccc;
-  border-color: #cccccc;
+  background: #27272a;
+  border-color: #27272a;
 }
 
-.btn-sm {
-  padding: 4px 10px;
-  font-size: 0.75rem;
-}
-
-/* Minimalist Inputs */
+/* Form Inputs */
 input, textarea, select {
-  background: #000000;
-  color: #ffffff;
-  border: 1px solid var(--border);
-  padding: 10px 14px;
+  background: #ffffff;
+  color: #09090b;
+  border: 1px solid #e4e4e7;
+  padding: 9px 12px;
   border-radius: 6px;
   font-family: inherit;
   font-size: 0.85rem;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   width: 100%;
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: var(--border-focus);
+  border-color: #09090b;
+  box-shadow: 0 0 0 1px #09090b;
 }
 
-/* Dot Tree Canvas Container */
-.canvas-wrapper {
-  position: relative;
-  width: 100%;
-  height: calc(100vh - 140px);
-  background: radial-gradient(circle at center, #080808 0%, #000000 100%);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-/* Pulsing Dots */
-@keyframes pulse {
-  0% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 20px rgba(255, 255, 255, 0.4); }
-  100% { transform: scale(1); opacity: 0.8; }
-}
-
-.dot-pulse {
-  animation: pulse 3s infinite ease-in-out;
-}
-
-/* Inspector Drawer */
-.inspector-drawer {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 440px;
-  max-width: 90vw;
-  background: #000000;
-  border-left: 1px solid var(--border);
-  padding: 28px;
-  overflow-y: auto;
-  z-index: 50;
-  transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.9);
-}
-
-.inspector-drawer.open {
-  transform: translateX(0);
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 20px;
-}
-
-.modal-box {
-  background: #000000;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  width: 100%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 24px;
-}
-
+/* Spinner */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -204,4 +129,3 @@ input:focus, textarea:focus, select:focus {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
-
