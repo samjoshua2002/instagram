@@ -1037,6 +1037,135 @@ app.post('/api/social-graph/node', async (req, res) => {
   }
 });
 
+// Link an Instagram ID / handle to an existing friend node and merge records
+app.post('/api/social-graph/link-id', async (req, res) => {
+  try {
+    const { personName, instagramHandle, senderId } = req.body;
+    if (!personName) return res.status(400).json({ error: 'Person name is required' });
+
+    const cleanName = personName.trim();
+    const cleanHandle = instagramHandle ? `@${instagramHandle.replace(/^@/, '').trim()}` : '';
+    const cleanUsername = cleanHandle ? cleanHandle.replace(/^@/, '').toLowerCase() : '';
+
+    // 1. Find the target SocialGraph node
+    let node = await SocialGraph.findOne({
+      $or: [
+        { name: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') },
+        { aliases: cleanName.toLowerCase() }
+      ]
+    });
+
+    if (!node) {
+      return res.status(404).json({ error: `Person "${cleanName}" not found in Social Knowledge Tree.` });
+    }
+
+    // 2. Check if a UserMemory exists with this senderId or username
+    let memory = null;
+    if (senderId) {
+      memory = await UserMemory.findOne({ senderId });
+    }
+    if (!memory && cleanUsername) {
+      memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanUsername)}$`, 'i') });
+    }
+
+    // 3. Check if there was another node created automatically from UserMemory for this handle/senderId that should be merged
+    const otherNode = await SocialGraph.findOne({
+      _id: { $ne: node._id },
+      $or: [
+        ...(senderId ? [{ senderId }] : []),
+        ...(cleanHandle ? [{ instagramHandle: cleanHandle }] : []),
+        ...(cleanUsername ? [{ aliases: cleanUsername }] : [])
+      ]
+    });
+
+    if (otherNode) {
+      console.log(`🔗 [Merge Nodes]: Merging node "${otherNode.name}" into "${node.name}"`);
+      // Combine lore
+      const combinedLore = new Set([...(node.lore || []), ...(otherNode.lore || [])]);
+      node.lore = Array.from(combinedLore);
+
+      // Combine aliases
+      const combinedAliases = new Set([...(node.aliases || []), ...(otherNode.aliases || []), cleanUsername]);
+      node.aliases = Array.from(combinedAliases);
+
+      // Combine connections
+      const targetSet = new Set((node.connections || []).map(c => c.targetName.toLowerCase()));
+      (otherNode.connections || []).forEach(c => {
+        if (!targetSet.has(c.targetName.toLowerCase())) {
+          node.connections.push(c);
+          targetSet.add(c.targetName.toLowerCase());
+        }
+      });
+
+      // Delete the duplicate auto-discovered node
+      await SocialGraph.deleteOne({ _id: otherNode._id });
+    }
+
+    // 4. Update the canonical node with handle, senderId, profilePic
+    if (cleanHandle) node.instagramHandle = cleanHandle;
+    if (senderId || memory?.senderId) node.senderId = senderId || memory?.senderId;
+    if (memory?.profilePic && !node.profilePic) node.profilePic = memory.profilePic;
+
+    if (cleanUsername && !node.aliases.includes(cleanUsername)) {
+      node.aliases.push(cleanUsername);
+    }
+    node.updatedAt = new Date();
+    await node.save();
+
+    // 5. Update or link UserMemory so AI recognizes them in live DMs
+    if (memory) {
+      memory.nickname = node.name;
+      if (!memory.name || memory.name.startsWith('User_')) memory.name = node.name;
+      await memory.save();
+    } else if (cleanUsername && node.senderId) {
+      await UserMemory.findOneAndUpdate(
+        { senderId: node.senderId },
+        {
+          $set: {
+            username: cleanUsername,
+            name: node.name,
+            nickname: node.name
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    socialGraphService.clearCache();
+    console.log(`✅ [Link ID Success]: Linked ${node.name} to ${cleanHandle} (senderId: ${node.senderId})`);
+
+    res.json({
+      success: true,
+      message: `Linked ${node.name} with ${cleanHandle || node.senderId}`,
+      node
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get recent chatters from UserMemory to suggest when linking handles
+app.get('/api/social-graph/unlinked-chatters', async (req, res) => {
+  try {
+    const memories = await UserMemory.find({
+      username: { $not: /^(test_|ig_tester_|catovidz$|me$|user_\d+)/i },
+      senderId: { $ne: 'me' }
+    }).sort({ lastInteraction: -1 }).limit(30);
+
+    const chatters = memories.map(m => ({
+      senderId: m.senderId,
+      username: m.username ? `@${m.username.replace(/^@/, '')}` : '',
+      name: m.name || m.nickname || m.username,
+      profilePic: m.profilePic || '',
+      lastInteraction: m.lastInteraction
+    }));
+
+    res.json({ success: true, chatters });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a friend node from the tree and database
 app.delete('/api/social-graph/node/:name', async (req, res) => {
   try {
