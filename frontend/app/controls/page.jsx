@@ -2,12 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import ContactAvatar from '../components/ContactAvatar';
 import {
-  Sliders, Search, Check, RefreshCw, Shield, Users, AlertCircle, Sparkles
+  Sliders, Search, Check, RefreshCw, Shield, Users, AlertCircle, Sparkles, Film, MessageSquare, PauseCircle
 } from 'lucide-react';
 
 export default function ControlsPage() {
-  const { nodes, routingConfig, saveRouting, setRoutingConfig } = useApp();
+  const { nodes, routingConfig, saveRouting, setRoutingConfig, updateContactPreferences } = useApp();
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -23,28 +24,81 @@ export default function ControlsPage() {
     );
   }, [friendNodes, search]);
 
-  const handleToggleExclude = (senderId) => {
-    const current = routingConfig.excludedContactIds || [];
-    const next = current.includes(senderId)
-      ? current.filter(id => id !== senderId)
-      : [...current, senderId];
+  // Reliable unique identifier generator for each contact
+  const getContactKey = (c) => {
+    if (c.senderId && c.senderId.trim()) return c.senderId.trim();
+    if (c.handle && c.handle.trim()) return c.handle.replace(/^@/, '').toLowerCase().trim();
+    if (c.id && c.id.trim()) return c.id.trim();
+    return (c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '_').trim();
+  };
+
+  const isExcluded = (contact) => {
+    const key = getContactKey(contact);
+    const excluded = (routingConfig.excludedContactIds || []).filter(Boolean);
+    return (
+      excluded.includes(key) ||
+      (contact.senderId && excluded.includes(contact.senderId)) ||
+      (contact.handle && excluded.includes(contact.handle.replace(/^@/, '').toLowerCase())) ||
+      (contact.id && excluded.includes(contact.id)) ||
+      contact.aiEnabled === false
+    );
+  };
+
+  const isIncluded = (contact) => {
+    const key = getContactKey(contact);
+    const included = (routingConfig.includedContactIds || []).filter(Boolean);
+    return (
+      included.includes(key) ||
+      (contact.senderId && included.includes(contact.senderId)) ||
+      (contact.handle && included.includes(contact.handle.replace(/^@/, '').toLowerCase())) ||
+      (contact.id && included.includes(contact.id))
+    );
+  };
+
+  const handleToggleExclude = (contact) => {
+    const key = getContactKey(contact);
+    const current = (routingConfig.excludedContactIds || []).filter(Boolean);
+    const alreadyExcluded = isExcluded(contact);
+
+    let next;
+    if (alreadyExcluded) {
+      next = current.filter(id =>
+        id !== key &&
+        id !== contact.senderId &&
+        id !== (contact.handle ? contact.handle.replace(/^@/, '').toLowerCase() : '') &&
+        id !== contact.id
+      );
+    } else {
+      next = [...current, key];
+    }
     setRoutingConfig(prev => ({ ...prev, excludedContactIds: next }));
   };
 
-  const handleToggleInclude = (senderId) => {
-    const current = routingConfig.includedContactIds || [];
-    const next = current.includes(senderId)
-      ? current.filter(id => id !== senderId)
-      : [...current, senderId];
+  const handleToggleInclude = (contact) => {
+    const key = getContactKey(contact);
+    const current = (routingConfig.includedContactIds || []).filter(Boolean);
+    const alreadyIncluded = isIncluded(contact);
+
+    let next;
+    if (alreadyIncluded) {
+      next = current.filter(id =>
+        id !== key &&
+        id !== contact.senderId &&
+        id !== (contact.handle ? contact.handle.replace(/^@/, '').toLowerCase() : '') &&
+        id !== contact.id
+      );
+    } else {
+      next = [...current, key];
+    }
     setRoutingConfig(prev => ({ ...prev, includedContactIds: next }));
   };
 
   const handleSelectAll = () => {
-    const allIds = friendNodes.filter(n => n.senderId).map(n => n.senderId);
+    const allKeys = friendNodes.map(n => getContactKey(n)).filter(Boolean);
     if (routingConfig.chatMode === 'everyone_except') {
-      setRoutingConfig(prev => ({ ...prev, excludedContactIds: allIds }));
+      setRoutingConfig(prev => ({ ...prev, excludedContactIds: allKeys }));
     } else {
-      setRoutingConfig(prev => ({ ...prev, includedContactIds: allIds }));
+      setRoutingConfig(prev => ({ ...prev, includedContactIds: allKeys }));
     }
   };
 
@@ -63,8 +117,8 @@ export default function ControlsPage() {
   };
 
   const activeCount = routingConfig.chatMode === 'everyone_except'
-    ? (routingConfig.excludedContactIds || []).length
-    : (routingConfig.chatMode === 'only_selected' ? (routingConfig.includedContactIds || []).length : 0);
+    ? friendNodes.filter(n => isExcluded(n)).length
+    : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : 0);
 
   return (
     <div style={{ padding: '36px 32px 60px 32px', maxWidth: '1050px', margin: '0 auto' }}>
@@ -77,7 +131,7 @@ export default function ControlsPage() {
           Chat Control Rules
         </h1>
         <p style={{ color: '#a1a1aa', fontSize: '0.88rem', marginTop: '6px' }}>
-          Configure who receives automated Instagram AI replies and who is reserved exclusively for Sam&apos;s manual texting.
+          Configure who receives automated Instagram AI replies, who is reserved for Sam&apos;s manual texting, and who gets reel-only reactions.
         </p>
       </div>
 
@@ -182,93 +236,99 @@ export default function ControlsPage() {
         </button>
       </div>
 
-      {/* Contacts Checkbox Grid */}
-      {(routingConfig.chatMode === 'everyone_except' || routingConfig.chatMode === 'only_selected') && (
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>
-                {routingConfig.chatMode === 'everyone_except' ? 'Checkbox Friends to Exclude' : 'Checkbox Friends to Whitelist'}
-              </h3>
-              <p style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '2px' }}>
-                {routingConfig.chatMode === 'everyone_except'
-                  ? 'Checked contacts will NEVER get automated AI replies. Sam can chat with them manually.'
-                  : 'Only the checked contacts below will receive AI auto-replies.'}
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={handleSelectAll}
-                style={{ background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
-              >
-                Select All
-              </button>
-              <button
-                onClick={handleClearAll}
-                style={{ background: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
-              >
-                Clear
-              </button>
-            </div>
+      {/* Contacts Grid & Per-Person Controls */}
+      <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>
+              {routingConfig.chatMode === 'everyone_except' ? 'Checkbox Friends to Exclude' : 'All Circle Contacts & AI Reply Modes'}
+            </h3>
+            <p style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '2px' }}>
+              Toggle global exclusion checkbox or fine-tune individual AI modes (⚡ Full AI, 🎬 Only Reels, or ⏸️ Sam Manual).
+            </p>
           </div>
 
-          {/* Search Input */}
-          <div style={{ marginBottom: '16px', position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
-            <input
-              type="text"
-              placeholder="Search contacts by name, handle, or relationship..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                background: '#121214',
-                border: '1px solid #27272a',
-                padding: '10px 14px 10px 36px',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.82rem',
-                width: '100%',
-                outline: 'none'
-              }}
-            />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleSelectAll}
+              style={{ background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+            >
+              Select All
+            </button>
+            <button
+              onClick={handleClearAll}
+              style={{ background: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+            >
+              Clear
+            </button>
           </div>
+        </div>
 
-          {/* Contact Checkbox Items */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
-            {filteredFriends.map(contact => {
-              const isChecked = routingConfig.chatMode === 'everyone_except'
-                ? (routingConfig.excludedContactIds || []).includes(contact.senderId)
-                : (routingConfig.includedContactIds || []).includes(contact.senderId);
+        {/* Search Input */}
+        <div style={{ marginBottom: '16px', position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+          <input
+            type="text"
+            placeholder="Search contacts by name, handle (@annies_hepsiba), or relationship..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              background: '#121214',
+              border: '1px solid #27272a',
+              padding: '10px 14px 10px 36px',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '0.82rem',
+              width: '100%',
+              outline: 'none'
+            }}
+          />
+        </div>
 
-              return (
-                <div
-                  key={contact.id}
-                  onClick={() => {
-                    if (routingConfig.chatMode === 'everyone_except') {
-                      handleToggleExclude(contact.senderId);
-                    } else {
-                      handleToggleInclude(contact.senderId);
-                    }
-                  }}
-                  style={{
-                    background: isChecked ? '#18181b' : '#0e0e11',
-                    border: isChecked ? '1px solid #ffffff' : '1px solid #27272a',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Contact Cards Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+          {filteredFriends.map(contact => {
+            const isChecked = routingConfig.chatMode === 'everyone_except'
+              ? isExcluded(contact)
+              : isIncluded(contact);
+
+            const isPaused = contact.aiEnabled === false;
+            const isReelsOnly = !isPaused && contact.replyToMessages === false && contact.replyToReelsAndPosts !== false;
+            const isFullAi = !isPaused && !isReelsOnly;
+
+            return (
+              <div
+                key={contact.id || contact.name}
+                style={{
+                  background: isChecked ? '#141416' : '#0c0c0e',
+                  border: isChecked ? '1px solid #52525b' : '1px solid #27272a',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {/* Top Row: Checkbox + DP Avatar + Name + Handle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div
+                    onClick={() => {
+                      if (routingConfig.chatMode === 'everyone_except') {
+                        handleToggleExclude(contact);
+                      } else {
+                        handleToggleInclude(contact);
+                      }
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', flex: 1 }}
+                  >
+                    {/* Checkbox */}
                     <div
                       style={{
                         width: '20px',
                         height: '20px',
-                        borderRadius: '4px',
+                        minWidth: '20px',
+                        borderRadius: '5px',
                         background: isChecked ? '#ffffff' : 'transparent',
                         border: isChecked ? '1px solid #ffffff' : '1.5px solid #52525b',
                         display: 'flex',
@@ -279,44 +339,116 @@ export default function ControlsPage() {
                     >
                       {isChecked && <Check size={14} strokeWidth={3} />}
                     </div>
-                    <div>
-                      <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#ffffff' }}>
+
+                    {/* DP Avatar */}
+                    <ContactAvatar contact={contact} size={38} showStatus={true} />
+
+                    {/* Info */}
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#ffffff', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         {contact.name}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                        {contact.handle || contact.relationship}
+                      <div style={{ fontSize: '0.72rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {contact.handle || contact.relationship || 'Friend'}
                       </div>
                     </div>
                   </div>
 
+                  {/* Status Badge */}
                   <span
                     style={{
-                      fontSize: '0.65rem',
+                      fontSize: '0.64rem',
                       padding: '3px 8px',
                       borderRadius: '4px',
                       fontFamily: "'JetBrains Mono', monospace",
-                      background: isChecked
-                        ? (routingConfig.chatMode === 'everyone_except' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)')
-                        : '#18181b',
-                      color: isChecked
-                        ? (routingConfig.chatMode === 'everyone_except' ? '#ef4444' : '#10b981')
-                        : '#71717a',
+                      fontWeight: '700',
+                      background: isPaused ? 'rgba(239, 68, 68, 0.15)' : (isReelsOnly ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
+                      color: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981'),
                       border: '1px solid',
-                      borderColor: isChecked
-                        ? (routingConfig.chatMode === 'everyone_except' ? '#ef4444' : '#10b981')
-                        : '#27272a'
+                      borderColor: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981'),
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    {isChecked
-                      ? (routingConfig.chatMode === 'everyone_except' ? 'SAM CHATS (EXCLUDED)' : 'AI REPLIES')
-                      : (routingConfig.chatMode === 'everyone_except' ? 'AI AUTO-REPLIES' : 'IGNORED BY AI')}
+                    {isPaused ? 'SAM MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
                   </span>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Bottom Row: Granular Per-Person AI Mode Quick Selector */}
+                <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid #1f1f23' }}>
+                  <button
+                    onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' })}
+                    title="AI replies to both text messages and shared reels"
+                    style={{
+                      flex: 1,
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.7rem',
+                      fontWeight: isFullAi ? '700' : '500',
+                      cursor: 'pointer',
+                      background: isFullAi ? '#ffffff' : '#18181b',
+                      color: isFullAi ? '#000000' : '#a1a1aa',
+                      border: isFullAi ? '1px solid #ffffff' : '1px solid #27272a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Sparkles size={11} />
+                    <span>Full AI</span>
+                  </button>
+
+                  <button
+                    onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'reels_only' })}
+                    title="Only react when this person shares a reel. Sam chats manually for normal texts."
+                    style={{
+                      flex: 1,
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.7rem',
+                      fontWeight: isReelsOnly ? '700' : '500',
+                      cursor: 'pointer',
+                      background: isReelsOnly ? '#f59e0b' : '#18181b',
+                      color: isReelsOnly ? '#000000' : '#a1a1aa',
+                      border: isReelsOnly ? '1px solid #f59e0b' : '1px solid #27272a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Film size={11} />
+                    <span>Only Reels</span>
+                  </button>
+
+                  <button
+                    onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' })}
+                    title="Stop AI for this person. Sam chats 100% manually."
+                    style={{
+                      flex: 1,
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.7rem',
+                      fontWeight: isPaused ? '700' : '500',
+                      cursor: 'pointer',
+                      background: isPaused ? '#ef4444' : '#18181b',
+                      color: isPaused ? '#ffffff' : '#a1a1aa',
+                      border: isPaused ? '1px solid #ef4444' : '1px solid #27272a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <PauseCircle size={11} />
+                    <span>Stop AI</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 }

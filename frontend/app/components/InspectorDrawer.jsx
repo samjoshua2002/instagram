@@ -2,15 +2,29 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Sparkles, Clock, Check } from 'lucide-react';
+import ContactAvatar from './ContactAvatar';
+import { X, Sparkles, Clock, Check, Film, PauseCircle, Trash2 } from 'lucide-react';
 
 export default function InspectorDrawer() {
-  const { selectedNode, setSelectedNode, addFact, startAiInterview, API_BASE, showToast } = useApp();
+  const {
+    selectedNode,
+    setSelectedNode,
+    addFact,
+    startAiInterview,
+    deleteNode,
+    updateContactPreferences,
+    API_BASE,
+    showToast
+  } = useApp();
   const [drawerTab, setDrawerTab] = useState('highlights');
   const [newFact, setNewFact] = useState('');
   const [isLearning, setIsLearning] = useState(false);
 
   if (!selectedNode) return null;
+
+  const isPaused = selectedNode.aiEnabled === false;
+  const isReelsOnly = !isPaused && selectedNode.replyToMessages === false && selectedNode.replyToReelsAndPosts !== false;
+  const isFullAi = !isPaused && !isReelsOnly;
 
   const handleAddCustomFact = (e) => {
     e?.preventDefault();
@@ -60,19 +74,114 @@ export default function InspectorDrawer() {
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #27272a' }}>
-        <div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#ffffff' }}>{selectedNode.name}</h2>
-          <span style={{ fontSize: '0.78rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
-            {selectedNode.handle || 'No Instagram handle'}
-          </span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #27272a' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <ContactAvatar contact={selectedNode} size={44} showStatus={true} />
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#ffffff' }}>{selectedNode.name}</h2>
+            <span style={{ fontSize: '0.78rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
+              {selectedNode.handle || 'No Instagram handle'}
+            </span>
+          </div>
         </div>
         <button
           onClick={() => setSelectedNode(null)}
-          style={{ background: 'transparent', border: 'none', color: '#a1a1aa', cursor: 'pointer' }}
+          style={{ background: 'transparent', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '6px' }}
         >
           <X size={18} />
         </button>
+      </div>
+
+      {/* Per-Person AI Behavior Controller */}
+      <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+            AI AUTOMATION FOR {selectedNode.name.toUpperCase()}
+          </span>
+          <span
+            style={{
+              fontSize: '0.62rem',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: '700',
+              background: isPaused ? 'rgba(239, 68, 68, 0.15)' : (isReelsOnly ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
+              color: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981'),
+              border: '1px solid',
+              borderColor: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981')
+            }}
+          >
+            {isPaused ? 'SAM MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'full_ai' })}
+            style={{
+              flex: 1,
+              padding: '7px 6px',
+              borderRadius: '6px',
+              fontSize: '0.72rem',
+              fontWeight: isFullAi ? '700' : '500',
+              cursor: 'pointer',
+              background: isFullAi ? '#ffffff' : '#18181b',
+              color: isFullAi ? '#000000' : '#a1a1aa',
+              border: isFullAi ? '1px solid #ffffff' : '1px solid #27272a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+          >
+            <Sparkles size={11} />
+            <span>Full AI</span>
+          </button>
+
+          <button
+            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'reels_only' })}
+            style={{
+              flex: 1,
+              padding: '7px 6px',
+              borderRadius: '6px',
+              fontSize: '0.72rem',
+              fontWeight: isReelsOnly ? '700' : '500',
+              cursor: 'pointer',
+              background: isReelsOnly ? '#f59e0b' : '#18181b',
+              color: isReelsOnly ? '#000000' : '#a1a1aa',
+              border: isReelsOnly ? '1px solid #f59e0b' : '1px solid #27272a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+          >
+            <Film size={11} />
+            <span>Only Reels</span>
+          </button>
+
+          <button
+            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'paused' })}
+            style={{
+              flex: 1,
+              padding: '7px 6px',
+              borderRadius: '6px',
+              fontSize: '0.72rem',
+              fontWeight: isPaused ? '700' : '500',
+              cursor: 'pointer',
+              background: isPaused ? '#ef4444' : '#18181b',
+              color: isPaused ? '#ffffff' : '#a1a1aa',
+              border: isPaused ? '1px solid #ef4444' : '1px solid #27272a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+          >
+            <PauseCircle size={11} />
+            <span>Stop AI</span>
+          </button>
+        </div>
       </div>
 
       {/* Drawer Tabs */}
@@ -233,6 +342,31 @@ export default function InspectorDrawer() {
           >
             <Sparkles size={16} />
             <span>Clarify & Edit with AI</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (window.confirm(`Delete ${selectedNode.name} from Database & Knowledge Tree?`)) {
+                deleteNode(selectedNode.id || selectedNode.name);
+              }
+            }}
+            style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              color: '#ef4444',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              padding: '10px',
+              borderRadius: '8px',
+              fontWeight: '600',
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <Trash2 size={14} />
+            <span>Delete Person from Database</span>
           </button>
         </div>
       )}

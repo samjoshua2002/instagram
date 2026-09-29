@@ -4,11 +4,12 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   List, LayoutGrid, Search, Sparkles, ChevronDown, ChevronRight,
-  Plus, Users, ArrowRight
+  Plus, Users, ArrowRight, Trash2, Film, PauseCircle
 } from 'lucide-react';
+import ContactAvatar from '../components/ContactAvatar';
 
 export default function RelationshipsPage() {
-  const { nodes, setSelectedNode, startAiInterview, addFact } = useApp();
+  const { nodes, setSelectedNode, startAiInterview, addFact, deleteNode, updateContactPreferences } = useApp();
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'chart'
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState(new Set(['bhavani', 'rajveer', 'fami']));
@@ -206,9 +207,7 @@ export default function RelationshipsPage() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#18181b', border: '1px solid #27272a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem', color: '#ffffff' }}>
-                      {initials}
-                    </div>
+                    <ContactAvatar contact={friend} size={42} showStatus={true} />
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontWeight: '800', fontSize: '1rem', color: '#ffffff' }}>{friend.name}</span>
@@ -224,6 +223,44 @@ export default function RelationshipsPage() {
 
                   {/* Middle Badges */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* Per-Person AI Mode Badge */}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextMode = friend.aiEnabled === false
+                          ? 'full_ai'
+                          : (friend.replyToMessages === false && friend.replyToReelsAndPosts !== false ? 'paused' : 'reels_only');
+                        updateContactPreferences(friend.senderId || friend.id, { aiMode: nextMode });
+                      }}
+                      title="Click to toggle: Full AI ➔ Reels Only ➔ Stop AI"
+                      style={{
+                        fontSize: '0.66rem',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        background: friend.aiEnabled === false
+                          ? 'rgba(239, 68, 68, 0.15)'
+                          : (friend.replyToMessages === false && friend.replyToReelsAndPosts !== false
+                              ? 'rgba(245, 158, 11, 0.15)'
+                              : 'rgba(16, 185, 129, 0.15)'),
+                        color: friend.aiEnabled === false
+                          ? '#ef4444'
+                          : (friend.replyToMessages === false && friend.replyToReelsAndPosts !== false
+                              ? '#f59e0b'
+                              : '#10b981'),
+                        border: '1px solid',
+                        borderColor: friend.aiEnabled === false
+                          ? '#ef4444'
+                          : (friend.replyToMessages === false && friend.replyToReelsAndPosts !== false
+                              ? '#f59e0b'
+                              : '#10b981')
+                      }}
+                    >
+                      {friend.aiEnabled === false ? 'SAM MANUAL' : (friend.replyToMessages === false && friend.replyToReelsAndPosts !== false ? '🎬 REELS ONLY' : '⚡ FULL AI')}
+                    </span>
+
                     {(friend.connections || []).map((c, i) => (
                       <span key={i} style={{ fontSize: '0.7rem', background: '#121214', color: '#38bdf8', border: '1px solid #0284c7', padding: '3px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
                         🔗 {c.targetName}
@@ -254,6 +291,17 @@ export default function RelationshipsPage() {
                       Edit Lore
                     </button>
                     <button
+                      onClick={() => {
+                        if (window.confirm(`Delete ${friend.name} from Database & Knowledge Tree?`)) {
+                          deleteNode(friend.id || friend.name);
+                        }
+                      }}
+                      title="Delete from Database"
+                      style={{ background: 'transparent', border: '1px solid #3f3f46', color: '#ef4444', padding: '7px 9px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                    <button
                       onClick={() => toggleExpand(friend.id)}
                       style={{ background: 'transparent', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px' }}
                     >
@@ -265,6 +313,77 @@ export default function RelationshipsPage() {
                 {/* Expanded Details Body */}
                 {isExpanded && (
                   <div style={{ padding: '20px', borderTop: '1px solid #27272a', background: '#09090b', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {/* Individual AI Behavior Quick Bar */}
+                    <div style={{ gridColumn: '1 / -1', background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                          ⚙️ INDIVIDUAL AI REPLY RULE
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#a1a1aa', marginTop: '2px' }}>
+                          Set AI behavior specifically for {friend.name}:
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          onClick={() => updateContactPreferences(friend.senderId || friend.id, { aiMode: 'full_ai' })}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            fontWeight: (friend.aiEnabled !== false && friend.replyToMessages !== false) ? '700' : '500',
+                            cursor: 'pointer',
+                            background: (friend.aiEnabled !== false && friend.replyToMessages !== false) ? '#ffffff' : '#18181b',
+                            color: (friend.aiEnabled !== false && friend.replyToMessages !== false) ? '#000000' : '#a1a1aa',
+                            border: (friend.aiEnabled !== false && friend.replyToMessages !== false) ? '1px solid #ffffff' : '1px solid #27272a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Sparkles size={12} />
+                          <span>Full AI</span>
+                        </button>
+                        <button
+                          onClick={() => updateContactPreferences(friend.senderId || friend.id, { aiMode: 'reels_only' })}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            fontWeight: (friend.aiEnabled !== false && friend.replyToMessages === false && friend.replyToReelsAndPosts !== false) ? '700' : '500',
+                            cursor: 'pointer',
+                            background: (friend.aiEnabled !== false && friend.replyToMessages === false && friend.replyToReelsAndPosts !== false) ? '#f59e0b' : '#18181b',
+                            color: (friend.aiEnabled !== false && friend.replyToMessages === false && friend.replyToReelsAndPosts !== false) ? '#000000' : '#a1a1aa',
+                            border: (friend.aiEnabled !== false && friend.replyToMessages === false && friend.replyToReelsAndPosts !== false) ? '1px solid #f59e0b' : '1px solid #27272a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Film size={12} />
+                          <span>🎬 Only Reels</span>
+                        </button>
+                        <button
+                          onClick={() => updateContactPreferences(friend.senderId || friend.id, { aiMode: 'paused' })}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            fontWeight: friend.aiEnabled === false ? '700' : '500',
+                            cursor: 'pointer',
+                            background: friend.aiEnabled === false ? '#ef4444' : '#18181b',
+                            color: friend.aiEnabled === false ? '#ffffff' : '#a1a1aa',
+                            border: friend.aiEnabled === false ? '1px solid #ef4444' : '1px solid #27272a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <PauseCircle size={12} />
+                          <span>⏸️ Stop AI (Sam Manual)</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Notes */}
                     <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '14px' }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -382,11 +501,16 @@ export default function RelationshipsPage() {
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff' }}>
-                    {node.name}
-                  </h3>
-                  <div style={{ fontSize: '0.74rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>
-                    {node.handle || 'No handle'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <ContactAvatar contact={node} size={36} showStatus={true} />
+                    <div>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff' }}>
+                        {node.name}
+                      </h3>
+                      <div style={{ fontSize: '0.74rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {node.handle || 'No handle'}
+                      </div>
+                    </div>
                   </div>
 
                   {node.facts?.length > 0 && (
