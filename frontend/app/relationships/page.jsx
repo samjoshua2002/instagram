@@ -546,8 +546,8 @@ export default function RelationshipsPage() {
                 gap: '8px'
               }}
             >
-              <ArrowLeft size={16} />
-              <span>Back to Directory</span>
+              <ArrowLeft size={26} />
+             
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
