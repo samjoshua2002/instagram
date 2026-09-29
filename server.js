@@ -874,6 +874,87 @@ app.post('/api/social-graph/sync', async (req, res) => {
   }
 });
 
+// Add or edit a friend node in the social knowledge tree
+app.post('/api/social-graph/node', async (req, res) => {
+  try {
+    const { name, aliases, instagramHandle, senderId, gender, relationshipToSam, lore, roastStyle, connections } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+
+    let parsedAliases = [];
+    if (Array.isArray(aliases)) {
+      parsedAliases = aliases;
+    } else if (typeof aliases === 'string') {
+      parsedAliases = aliases.split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
+    }
+
+    let parsedLore = [];
+    if (Array.isArray(lore)) {
+      parsedLore = lore;
+    } else if (typeof lore === 'string') {
+      parsedLore = lore.split('\n').map(l => l.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean);
+    }
+
+    let parsedConnections = [];
+    if (Array.isArray(connections)) {
+      parsedConnections = connections;
+    } else if (typeof connections === 'string') {
+      parsedConnections = connections.split(',').map(c => {
+        const match = c.trim().match(/^([^(]+)(?:\(([^)]+)\))?/);
+        if (match) {
+          return {
+            targetName: match[1].trim(),
+            relationship: (match[2] || 'friend').trim(),
+            notes: ''
+          };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
+    const updated = await SocialGraph.findOneAndUpdate(
+      { name: new RegExp(`^${name.trim()}$`, 'i') },
+      {
+        $set: {
+          name: name.trim(),
+          aliases: parsedAliases,
+          instagramHandle: instagramHandle ? (instagramHandle.startsWith('@') ? instagramHandle : `@${instagramHandle}`) : '',
+          senderId: senderId || '',
+          gender: gender || 'unknown',
+          relationshipToSam: relationshipToSam || 'friend',
+          lore: parsedLore,
+          roastStyle: roastStyle || 'Banter back naturally matching their energy.',
+          connections: parsedConnections,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    if (senderId) {
+      await UserMemory.findOneAndUpdate(
+        { senderId },
+        { $set: { name: name.trim(), nickname: name.trim() } }
+      );
+    }
+
+    socialGraphService.clearCache();
+    res.json({ success: true, node: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a friend node from the tree
+app.delete('/api/social-graph/node/:name', async (req, res) => {
+  try {
+    await SocialGraph.deleteOne({ name: new RegExp(`^${req.params.name}$`, 'i') });
+    socialGraphService.clearCache();
+    res.json({ success: true, message: `Deleted ${req.params.name}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
