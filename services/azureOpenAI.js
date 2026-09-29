@@ -265,6 +265,84 @@ RULES:
       return null;
     }
   }
+
+  /**
+   * Conversational AI Assistant that interviews the user when adding/editing a friend
+   * to get full clarity on relationships, connections, lore, and roast style.
+   */
+  async interviewPersonForSocialTree({ conversationHistory = [], userInput = '', existingNode = null }) {
+    const systemPrompt = `You are Sam Joshua's intelligent Social Knowledge Graph Architect.
+Sam is adding or updating a person in his personal Instagram circle knowledge graph.
+Your job is to have a short, natural, intelligent interview with Sam to get 100% clarity about this person before saving them to the database.
+
+EXISTING KNOWN CIRCLE:
+- Sam Joshua (Creator)
+- Bhavani (@yk_bhavani._.xo) - Closest online friend, Indian Army dad, medicine student, hamster obsession 🐹, shares Netflix, talks with sister Annie, bday 12 March 2007.
+- Annie - Sam's sister, talks with Bhavani.
+- Rajveer (@unpredictable_2k26) - Day-one homie / brother, trolls Roni uncle, shares account with Moksha.
+- Roni - Running joke legend (fake legal team, bank account, axe of justice, anime protagonist).
+- Moksha (@1fyz_2) - Sister figure / drama queen, hardcore Hindi cussing banter (bkl, lovde), ragebaits Fami.
+- Fami (@m4visyzx) - Close friend ("moi"), easily ragebaited.
+- Arun (@graphicsbyarun) - Tamil homie, shipped with Rubesh.
+- Rubesh - Inside joke couple with Arun.
+
+${existingNode ? `CURRENT PERSON BEING EDITED:\n${JSON.stringify(existingNode, null, 2)}` : 'THIS IS A NEW PERSON.'}
+
+YOUR TASK:
+- Analyze what Sam said.
+- If key details are missing (e.g. name, relationship to Sam, whether they connect to any existing friend like Annie/Rajveer/Bhavani/Fami, handle, gender, or shared inside jokes/roast style), ask 1 or 2 sharp, friendly follow-up questions to clarify.
+- If Sam has provided enough details OR explicitly says "save it" / "that's all" / "done", set "isComplete": true.
+- Always build up the complete accumulated "node" data with the information gathered so far.
+
+RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
+{
+  "isComplete": boolean,
+  "question": "Your friendly, conversational follow-up question asking for whatever clarity is still needed (or a congratulatory summary if isComplete is true)",
+  "node": {
+    "name": "Friend's name",
+    "aliases": ["alias1", "alias2"],
+    "instagramHandle": "@handle or empty",
+    "gender": "female" | "male" | "neutral" | "unknown",
+    "relationshipToSam": "e.g. Day-one Homie / Brother, Sister figure, Medicine student, etc.",
+    "connections": [
+      { "targetName": "Name of existing friend", "relationship": "how they connect", "notes": "context" }
+    ],
+    "lore": ["fact 1", "fact 2"],
+    "roastStyle": "how to banter or cuss back"
+  },
+  "summary": "Short 1-sentence recap of who this person is"
+}`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+
+    // Append prior conversation history
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      for (const m of conversationHistory) {
+        messages.push({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content
+        });
+      }
+    }
+
+    if (userInput) {
+      messages.push({ role: 'user', content: userInput });
+    }
+
+    try {
+      const response = await this.client.chat.completions.create({
+        messages,
+        temperature: 0.4,
+        response_format: { type: 'json_object' }
+      });
+
+      const parsed = JSON.parse(response.choices[0].message.content.trim());
+      return parsed;
+    } catch (err) {
+      console.error('❌ Azure OpenAI interview error:', err.message);
+      throw err;
+    }
+  }
 }
 
 module.exports = new AzureOpenAIService();
