@@ -16,10 +16,9 @@ export default function Sidebar() {
 
   const navItems = [
     { href: '/', label: 'Analytics Dashboard', icon: LayoutDashboard, code: '01' },
-    { href: '/relationships', label: 'Relationship Menu', icon: Users, code: '02' },
-    { href: '/memories', label: 'Learned Memories', icon: Brain, code: '03' },
-    { href: '/controls', label: 'Chat Control Rules', icon: Sliders, code: '04' },
-    { href: '/simulator', label: 'DM Simulator', icon: MessageSquare, code: '05' }
+    { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
+    { href: '/controls', label: 'Chat Control Rules', icon: Sliders, code: '03' },
+    { href: '/simulator', label: 'DM Simulator', icon: MessageSquare, code: '04' }
   ];
 
   const activeModeCount = routingConfig.chatMode === 'everyone_except'

@@ -40,6 +40,19 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: 'friend', // 'bro', 'sister', 'close friend', 'lover', 'relative', 'homie'
   },
+  category: {
+    type: String,
+    enum: ['close_friend', 'online_friend', 'offline_friend', 'family', 'professional', 'business', 'relative', 'homie', 'group_icon', 'other'],
+    default: 'online_friend',
+  },
+  dob: {
+    type: String,
+    default: '',
+  },
+  personalNotes: {
+    type: String,
+    default: '',
+  },
   connections: [ConnectionSchema], // Tree chain linking to other friends
   lore: [{
     type: String,

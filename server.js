@@ -929,8 +929,13 @@ app.get('/api/social-graph', async (req, res) => {
         memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
       }
 
+      const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
+
       return {
         ...n.toObject(),
+        category: n.category || (memory?.relationshipType ? (memory.relationshipType === 'collaborator' || memory.relationshipType === 'client' ? 'professional' : 'online_friend') : 'online_friend'),
+        dob: n.dob || memoryDob || '',
+        personalNotes: n.personalNotes || (n.lore || []).join('\n'),
         profilePic: memory?.profilePic || n.profilePic || '',
         aiEnabled: memory ? memory.aiEnabled !== false : true,
         replyToMessages: memory ? memory.replyToMessages !== false : true,
@@ -960,9 +965,31 @@ app.post('/api/social-graph/sync', async (req, res) => {
 // Add or edit a friend node in the social knowledge tree
 app.post('/api/social-graph/node', async (req, res) => {
   try {
-    const finalRelationship = relationshipToSam || req.body.relationship || 'friend';
+    const {
+      name,
+      aliases,
+      instagramHandle,
+      senderId,
+      gender,
+      relationshipToSam,
+      lore,
+      roastStyle,
+      connections,
+      category,
+      dob,
+      personalNotes
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const finalRelationship = relationshipToSam || req.body.relationship || 'Friend';
     const rawHandle = instagramHandle || req.body.handle || '';
     const finalHandle = rawHandle ? (rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`) : '';
+    const finalCategory = category || req.body.category || 'online_friend';
+    const finalDob = dob || req.body.dateOfBirth || '';
+    const finalPersonalNotes = personalNotes || '';
 
     let parsedAliases = [];
     if (Array.isArray(aliases)) {
@@ -1005,7 +1032,7 @@ app.post('/api/social-graph/node', async (req, res) => {
     }
 
     const updated = await SocialGraph.findOneAndUpdate(
-      { name: new RegExp(`^${name.trim()}$`, 'i') },
+      { name: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') },
       {
         $set: {
           name: name.trim(),
@@ -1014,6 +1041,9 @@ app.post('/api/social-graph/node', async (req, res) => {
           senderId: senderId || '',
           gender: gender || 'unknown',
           relationshipToSam: finalRelationship,
+          category: finalCategory,
+          dob: finalDob,
+          personalNotes: finalPersonalNotes,
           lore: parsedLore,
           roastStyle: roastStyle || 'Banter back naturally matching their energy.',
           connections: parsedConnections,
@@ -1026,13 +1056,78 @@ app.post('/api/social-graph/node', async (req, res) => {
     if (senderId) {
       await UserMemory.findOneAndUpdate(
         { senderId },
-        { $set: { name: name.trim(), nickname: name.trim() } }
+        {
+          $set: {
+            name: name.trim(),
+            nickname: name.trim(),
+            ...(finalDob ? { importantDates: [{ title: 'Birthday', date: finalDob }] } : {})
+          }
+        }
       );
     }
 
     socialGraphService.clearCache();
     res.json({ success: true, node: updated });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// AI Autofill fields for a person based on chat history & existing memory
+app.post('/api/social-graph/node/:name/ai-autofill', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const cleanName = name.trim();
+    const node = await SocialGraph.findOne({
+      $or: [
+        { name: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') },
+        { aliases: cleanName.toLowerCase() }
+      ]
+    });
+
+    let recentMessages = [];
+    let memory = null;
+    if (node?.senderId) {
+      recentMessages = await Message.find({ senderId: node.senderId }).sort({ timestamp: -1 }).limit(40);
+      memory = await UserMemory.findOne({ senderId: node.senderId });
+    } else if (node?.instagramHandle) {
+      const u = node.instagramHandle.replace(/^@/, '').toLowerCase();
+      memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(u)}$`, 'i') });
+      if (memory?.senderId) {
+        recentMessages = await Message.find({ senderId: memory.senderId }).sort({ timestamp: -1 }).limit(40);
+      }
+    }
+
+    const conversationText = recentMessages.reverse().map(m => `${m.sender === 'user' ? (node?.name || cleanName) : 'Sam'}: ${m.text || '[reel/media]'}`).join('\n');
+
+    const prompt = `Analyze this Instagram conversation and existing memory for a friend of Sam Joshua named "${node?.name || cleanName}".
+Existing Lore: ${JSON.stringify(node?.lore || [])}
+Existing Personal Notes: ${JSON.stringify(node?.personalNotes || '')}
+Existing Memory: ${JSON.stringify(memory || {})}
+Recent Messages:
+${conversationText || '(No recent DM text found, extrapolate from existing lore)'}
+
+Generate a JSON object with:
+1. "category": Choose one of ["close_friend", "online_friend", "offline_friend", "family", "professional", "business"]
+2. "relationshipToSam": Concise relationship title (e.g. "Closest Online Friend / Medicine Student", "Day-One Homie / Brother", "Sister", "Professional Collaborator")
+3. "dob": Birthday or Date of Birth if known (e.g. "March 12, 2007"), or ""
+4. "personalNotes": Multi-line rich summary of who they are, their family, habits, studies, inside jokes, and connection with Sam
+5. "banterStyle": Recommended cussing/banter tone (e.g. "Gentle playful teasing", "Savage Hindi bro banter", "Tamil roast insults", "Sweet caring shortcuts")
+6. "facts": Array of 3-6 concise factual strings
+
+Return ONLY raw JSON.`;
+
+    const completion = await azureOpenAI.client.getChatCompletions(azureOpenAI.deployment, [
+      { role: 'system', content: 'You are an expert social intelligence analyzer. Output valid JSON only without markdown formatting.' },
+      { role: 'user', content: prompt }
+    ], { temperature: 0.3, maxTokens: 800 });
+
+    const raw = completion.choices[0].message.content.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();
+    const parsed = JSON.parse(raw);
+
+    res.json({ success: true, autofill: parsed });
+  } catch (err) {
+    console.error('AI autofill error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
