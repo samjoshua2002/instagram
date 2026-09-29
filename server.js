@@ -1196,6 +1196,56 @@ app.post('/api/social-graph/extract-from-chat', async (req, res) => {
   }
 });
 
+// Delete a person from the social knowledge tree & MongoDB
+app.delete('/api/social-graph/node/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const clean = decodeURIComponent(identifier).trim();
+
+    // 1. Find matching node
+    const isObjectId = mongoose.Types.ObjectId.isValid(clean);
+    const node = await SocialGraph.findOne({
+      $or: [
+        { name: new RegExp(`^${escapeRegex(clean)}$`, 'i') },
+        { senderId: clean },
+        { instagramHandle: new RegExp(`^@?${escapeRegex(clean.replace(/^@/, ''))}$`, 'i') },
+        ...(isObjectId ? [{ _id: clean }] : [])
+      ]
+    });
+
+    const targetName = node ? node.name : clean;
+    const targetSenderId = node ? node.senderId : (clean.match(/^\d+$/) ? clean : '');
+
+    // 2. Delete SocialGraph document(s)
+    await SocialGraph.deleteMany({
+      $or: [
+        { name: new RegExp(`^${escapeRegex(targetName)}$`, 'i') },
+        ...(targetSenderId ? [{ senderId: targetSenderId }] : []),
+        ...(isObjectId ? [{ _id: clean }] : [])
+      ]
+    });
+
+    // 3. Remove from other nodes' connections
+    await SocialGraph.updateMany(
+      { 'connections.targetName': new RegExp(`^${escapeRegex(targetName)}$`, 'i') },
+      { $pull: { connections: { targetName: new RegExp(`^${escapeRegex(targetName)}$`, 'i') } } }
+    );
+
+    // 4. Delete corresponding UserMemory if exists
+    if (targetSenderId) {
+      await UserMemory.deleteMany({ senderId: targetSenderId });
+    }
+
+    socialGraphService.clearCache();
+    console.log(`🗑️ Successfully deleted person "${targetName}" from MongoDB`);
+    res.json({ success: true, message: `Deleted ${targetName} from database` });
+  } catch (err) {
+    console.error('Delete node error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 // AI Autofill fields for a person based on chat history & existing memory
 app.post('/api/social-graph/node/:name/ai-autofill', async (req, res) => {

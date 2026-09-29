@@ -528,13 +528,31 @@ export function AppProvider({ children }) {
   };
 
   // Delete a Person from Knowledge Tree & MongoDB
-  const deleteNode = async (nodeNameOrId) => {
-    if (!nodeNameOrId) return;
-    const target = nodes.find(n => n.id === nodeNameOrId || n.name.toLowerCase() === nodeNameOrId.toLowerCase());
-    const targetName = target ? target.name : nodeNameOrId;
+  const deleteNode = async (nodeOrId) => {
+    if (!nodeOrId) return;
 
+    let targetObj = typeof nodeOrId === 'object' ? nodeOrId : null;
+    if (!targetObj) {
+      targetObj = nodes.find(n =>
+        n.id === nodeOrId ||
+        n._id === nodeOrId ||
+        (n.senderId && n.senderId === nodeOrId) ||
+        (n.name && n.name.toLowerCase() === String(nodeOrId).toLowerCase())
+      );
+    }
+
+    const targetName = targetObj?.name || (typeof nodeOrId === 'string' ? nodeOrId : '');
+    const targetSenderId = targetObj?.senderId || '';
+    const targetId = targetObj?.id || targetObj?._id || '';
+
+    // Optimistically update local nodes state
     setNodes(prev => {
-      const updated = prev.filter(n => n.id !== nodeNameOrId && n.name.toLowerCase() !== targetName.toLowerCase());
+      const updated = prev.filter(n => {
+        if (targetId && (n.id === targetId || n._id === targetId)) return false;
+        if (targetSenderId && n.senderId && n.senderId === targetSenderId) return false;
+        if (targetName && n.name && n.name.toLowerCase() === targetName.toLowerCase()) return false;
+        return true;
+      });
       const rootIdx = updated.findIndex(n => n.isRoot);
       if (rootIdx >= 0) {
         updated[rootIdx] = {
@@ -548,14 +566,19 @@ export function AppProvider({ children }) {
       return updated;
     });
 
-    if (selectedNode && (selectedNode.id === nodeNameOrId || selectedNode.name.toLowerCase() === targetName.toLowerCase())) {
+    if (selectedNode && (
+      (targetId && (selectedNode.id === targetId || selectedNode._id === targetId)) ||
+      (targetName && selectedNode.name?.toLowerCase() === targetName.toLowerCase()) ||
+      (targetSenderId && selectedNode.senderId === targetSenderId)
+    )) {
       setSelectedNode(null);
     }
 
-    showToast(`🗑️ Deleted ${targetName} from Knowledge Tree & DB`);
+    showToast(`Deleted ${targetName || 'contact'} from Directory`);
 
     try {
-      await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(targetName)}`, {
+      const param = encodeURIComponent(targetName || targetSenderId || targetId);
+      await fetch(`${API_BASE}/api/social-graph/node/${param}`, {
         method: 'DELETE'
       });
     } catch (err) {

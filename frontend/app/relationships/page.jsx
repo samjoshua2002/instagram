@@ -124,6 +124,40 @@ export default function RelationshipsPage() {
     }
   }, [selectedPerson, nodes]);
 
+  // Auto-fetch & live sync intel from DMs when a person is opened
+  useEffect(() => {
+    if (!selectedPerson) return;
+    let isCancelled = false;
+
+    const autoSyncFromDMs = async () => {
+      try {
+        const autofill = await aiAutofillPerson(selectedPerson.name);
+        if (autofill && !isCancelled) {
+          setFormData(prev => ({
+            ...prev,
+            category: prev.category === 'online_friend' && autofill.category ? autofill.category : prev.category,
+            relationship: !prev.relationship && autofill.relationshipToSam ? autofill.relationshipToSam : prev.relationship,
+            dob: !prev.dob && autofill.dob ? autofill.dob : prev.dob,
+            personalNotes: prev.personalNotes ? (prev.personalNotes.includes(autofill.personalNotes) ? prev.personalNotes : `${prev.personalNotes}\n${autofill.personalNotes}`) : (autofill.personalNotes || ''),
+            roastStyle: !prev.roastStyle && autofill.banterStyle ? autofill.banterStyle : prev.roastStyle
+          }));
+
+          if (Array.isArray(autofill.facts)) {
+            autofill.facts.forEach(f => addFact(selectedPerson.id, f));
+          }
+        }
+      } catch (e) {
+        // silent background sync
+      }
+    };
+
+    autoSyncFromDMs();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedPerson?.name, selectedPerson?.senderId, aiAutofillPerson, addFact]);
+
   // Overall Dashboard Metrics
   const dashboardStats = useMemo(() => {
     let totalPeople = 0;
@@ -564,28 +598,6 @@ export default function RelationshipsPage() {
 
             <button
               type="button"
-              onClick={handleTriggerAutofill}
-              disabled={isAutofilling}
-              style={{
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
-                color: '#09090b',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '700',
-                cursor: isAutofilling ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <RefreshCw size={13} className={isAutofilling ? 'animate-spin' : ''} />
-              <span>{isAutofilling ? 'Scanning DMs...' : 'Scan DMs with AI'}</span>
-            </button>
-
-            <button
-              type="button"
               onClick={handleSaveInnerForm}
               style={{
                 background: '#09090b',
@@ -603,6 +615,29 @@ export default function RelationshipsPage() {
             >
               <Save size={14} />
               <span>Save Profile Changes</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Delete ${selectedPerson.name} from Database?`)) {
+                  deleteNode(selectedPerson);
+                  setSelectedPerson(null);
+                }
+              }}
+              title="Delete Person"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #e4e4e7',
+                color: '#71717a',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <Trash2 size={14} />
             </button>
           </div>
         </div>
@@ -1828,7 +1863,7 @@ export default function RelationshipsPage() {
                           <button
                             onClick={() => {
                               if (window.confirm(`Delete ${person.name} from Database?`)) {
-                                deleteNode(person.id || person.name);
+                                deleteNode(person);
                               }
                             }}
                             title="Delete Person"
