@@ -124,17 +124,43 @@ class SocialGraphService {
         },
         {
           name: 'Bhavani',
-          aliases: ['bhavani', 'yk_bhavani._.xo', 'bhavani🐹'],
+          aliases: ['bhavani', 'bhanvani', 'yk_bhavani._.xo', 'bhavani🐹', 'yk_bhavani'],
           instagramHandle: '@yk_bhavani._.xo',
           senderId: '29005624469042002',
           gender: 'female',
-          relationshipToSam: 'Close female friend',
-          connections: [],
+          relationshipToSam: 'Closest online friend / Medicine student',
+          connections: [
+            { targetName: 'Annie', relationship: 'talking with Sam\'s sister Annie', notes: 'Currently talking with Sam\'s sister Annie.' }
+          ],
           lore: [
-            'Close female friend. Strictly NEVER call her "bro", "da", or "man". Be warm, casual, and friendly.'
+            'Bhanvani / Bhavani is one of Sam\'s closest online friends.',
+            'Her dad is in the Indian Army, and she is studying medicine.',
+            'Shares a Netflix subscription with Sam (she recently added one of her new friends to their plan).',
+            'Currently talking with Sam\'s sister Annie.',
+            'Loves hamsters (hamster obsession 🐹) and is obsessed with reading books.',
+            'Birthday is on 12th March 2007.',
+            'Loves teasing Sam and joking around with playful personality.',
+            'Strictly NEVER call her bro, da, or man. Speak warmly, tease back gently.'
           ],
           languages: ['English', 'Tamil'],
-          roastStyle: 'Playful and gentle, no hard insults.',
+          roastStyle: 'Playful and gentle teasing, no hard insults. Tease her about her hamster obsession or Netflix password sharing.',
+        },
+        {
+          name: 'Annie',
+          aliases: ['annie', 'ann', 'sister'],
+          instagramHandle: '',
+          senderId: '',
+          gender: 'female',
+          relationshipToSam: 'Sister',
+          connections: [
+            { targetName: 'Bhavani', relationship: 'talking / friends with Bhavani', notes: 'Bhavani is currently talking with Annie.' }
+          ],
+          lore: [
+            'Sam\'s sister.',
+            'Currently talking with Bhavani.'
+          ],
+          languages: ['English', 'Tamil'],
+          roastStyle: 'Sisterly teasing.',
         }
       ];
 
