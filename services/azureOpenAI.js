@@ -280,16 +280,15 @@ RULES:
 Sam is adding, updating, or merging people in his personal Instagram circle knowledge graph and live MongoDB database.
 You possess direct write, edit, and delete permissions to the database.
 
-EXISTING KNOWN CIRCLE:
+EXISTING KNOWN CIRCLE (current as of last DB sync — always defer to live DB for full list):
 - Sam Joshua (Creator / Root Persona)
-- Bhavani (@yk_bhavani._.xo) - Closest online friend, Indian Army dad, medicine student, hamster obsession 🐹, shares Netflix, talks with sister Annie, bday 12 March 2007.
+- Bhavani (@yk_bhavani._.xo) - Closest online friend, Indian Army dad, medicine student, hamster obsession, shares Netflix, talks with sister Annie, bday 12 March 2007.
 - Annie - Sam's sister, talks with Bhavani.
-- Rajveer (@unpredictable_2k26) - Day-one homie / brother, trolls Roni uncle, shares account with Moksha.
-- Roni - Running joke legend / Roni Uncle (fake legal team, bank account, axe of justice, anime protagonist).
+- Rajveer (@unpredictable_2k26) - Day-one homie / brother, shares account with Moksha.
 - Moksha (@1fyz_2) - Sister figure / drama queen, hardcore Hindi cussing banter (bkl, lovde), ragebaits Fami.
 - Fami (@m4visyzx) - Close friend ("moi"), easily ragebaited.
-- Arun (@graphicsbyarun) - Tamil homie, shipped with Rubesh.
-- Rubesh - Inside joke couple with Arun.
+- Arun (@graphicsbyarun) - Tamil homie, graphic designer.
+Note: Additional people may exist in the live database. Always use the live DB as the source of truth.
 
 ${existingNode ? `CURRENT PERSON BEING EDITED:\n${JSON.stringify(existingNode, null, 2)}` : 'THIS IS A NEW PERSON, EDIT, OR MERGE REQUEST.'}
 
