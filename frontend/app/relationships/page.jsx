@@ -14,7 +14,39 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// Robust timezone-agnostic helper to parse date strings into YYYY-MM-DD
+function formatDobForInput(dob) {
+  if (!dob) return '';
+  const isoMatch = dob.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  for (let i = 0; i < MONTH_NAMES.length; i++) {
+    const mName = MONTH_NAMES[i];
+    if (dob.toLowerCase().includes(mName.toLowerCase()) || dob.toLowerCase().includes(mName.slice(0, 3).toLowerCase())) {
+      const yearMatch = dob.match(/\b(19|20)\d{2}\b/);
+      const dayMatch = dob.match(/\b([1-9]|[12]\d|3[01])\b/);
+      if (yearMatch && dayMatch) {
+        const y = yearMatch[0];
+        const m = String(i + 1).padStart(2, '0');
+        const d = String(dayMatch[0]).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+  const d = new Date(dob);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return '';
+}
+
 export default function RelationshipsPage() {
+
 
   const {
     nodes,
@@ -1006,15 +1038,7 @@ export default function RelationshipsPage() {
                   <div>
                     <input
                       type="date"
-                      value={(() => {
-                        if (!formData.dob) return '';
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(formData.dob)) return formData.dob;
-                        const d = new Date(formData.dob);
-                        if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
-                          return d.toISOString().split('T')[0];
-                        }
-                        return '';
-                      })()}
+                      value={formatDobForInput(formData.dob)}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (!val) {
