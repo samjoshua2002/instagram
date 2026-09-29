@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import {
-  LayoutDashboard, Users, Brain, Sliders, MessageSquare,
-  Sparkles, Terminal, Menu, X, Play, Pause
+  LayoutDashboard, Users, Sliders, MessageSquare,
+  Sparkles, Terminal, Menu, X, Play, Pause, Bot
 } from 'lucide-react';
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { routingConfig, toggleGlobalBot, startAiInterview, nodes } = useApp();
+  const { routingConfig, toggleGlobalBot, startAiInterview } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -27,46 +27,46 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Top Header (only on screens < 768px) */}
+      {/* Mobile Top Header (screens < 768px) */}
       <header className="mobile-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.85rem' }}>
-            ⚡
+          <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#09090b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Bot size={16} />
           </div>
-          <span style={{ fontWeight: '800', fontSize: '0.9rem', color: '#ffffff', letterSpacing: '-0.3px' }}>
-            CHATTER<span style={{ color: '#10b981' }}>_OS</span>
+          <span style={{ fontWeight: '800', fontSize: '0.9rem', color: '#09090b', letterSpacing: '-0.3px' }}>
+            CHATTER_OS
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => startAiInterview(null)}
-            style={{ background: '#ffffff', color: '#000000', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{ background: '#09090b', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
             <Sparkles size={12} />
             <span>+ Add</span>
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={{ background: '#18181b', border: '1px solid #27272a', color: '#ffffff', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}
+            style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}
           >
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </header>
 
-      {/* Floating Retro Desktop Sidebar (hidden on mobile, drawer toggled on mobile) */}
+      {/* Floating Light Desktop Sidebar */}
       <aside className={`floating-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         {/* Brand / Header */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: '1px solid #18181b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: '1px solid #e4e4e7' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '1rem' }}>
-                ⚡
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#09090b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Bot size={18} />
               </div>
               <div>
-                <div style={{ fontWeight: '800', fontSize: '0.9rem', letterSpacing: '-0.3px', color: '#ffffff' }}>
-                  CHATTER<span style={{ color: '#10b981' }}>_OS</span>
+                <div style={{ fontWeight: '800', fontSize: '0.9rem', letterSpacing: '-0.3px', color: '#09090b' }}>
+                  CHATTER_OS
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
                   v2.6 // SAM JOSHUA
@@ -74,24 +74,33 @@ export default function Sidebar() {
               </div>
             </div>
 
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: routingConfig.globalBotActive ? '#10b981' : '#ef4444', boxShadow: routingConfig.globalBotActive ? '0 0 8px #10b981' : '0 0 8px #ef4444' }} />
+            <div
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: routingConfig.globalBotActive ? '#09090b' : '#a1a1aa',
+                boxShadow: routingConfig.globalBotActive ? '0 0 0 2px #e4e4e7' : 'none'
+              }}
+              title={routingConfig.globalBotActive ? 'Bot Active' : 'Bot Paused'}
+            />
           </div>
 
           {/* Status Chip */}
-          <div style={{ marginTop: '14px', background: '#121214', border: '1px solid #27272a', borderRadius: '8px', padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ marginTop: '14px', background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-              <Terminal size={12} color="#10b981" style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: '0.68rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <Terminal size={12} style={{ color: '#09090b', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 MODE: {routingConfig.chatMode.toUpperCase()}
               </span>
             </div>
-            <span style={{ fontSize: '0.65rem', background: '#27272a', color: '#ffffff', padding: '2px 6px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
+            <span style={{ fontSize: '0.65rem', background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '1px 6px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, fontWeight: '700' }}>
               {activeModeCount}
             </span>
           </div>
 
           {/* Navigation Items */}
-          <nav style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <nav style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -101,12 +110,12 @@ export default function Sidebar() {
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   style={{
-                    background: isActive ? '#ffffff' : 'transparent',
-                    color: isActive ? '#000000' : '#a1a1aa',
+                    background: isActive ? '#09090b' : 'transparent',
+                    color: isActive ? '#ffffff' : '#71717a',
                     border: '1px solid',
-                    borderColor: isActive ? '#ffffff' : 'transparent',
-                    borderRadius: '10px',
-                    padding: '10px 12px',
+                    borderColor: isActive ? '#09090b' : 'transparent',
+                    borderRadius: '8px',
+                    padding: '9px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -120,7 +129,7 @@ export default function Sidebar() {
                     <Icon size={16} />
                     <span>{item.label}</span>
                   </div>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", opacity: isActive ? 0.7 : 0.4 }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", opacity: isActive ? 0.8 : 0.4 }}>
                     [{item.code}]
                   </span>
                 </Link>
@@ -130,15 +139,15 @@ export default function Sidebar() {
         </div>
 
         {/* Footer in Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '14px', borderTop: '1px solid #18181b' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '14px', borderTop: '1px solid #e4e4e7' }}>
           <button
             onClick={() => {
               setMobileMenuOpen(false);
               startAiInterview(null);
             }}
             style={{
-              background: '#ffffff',
-              color: '#000000',
+              background: '#09090b',
+              color: '#ffffff',
               border: 'none',
               padding: '10px',
               borderRadius: '8px',
@@ -152,15 +161,15 @@ export default function Sidebar() {
             }}
           >
             <Sparkles size={14} />
-            <span>+ Add Person (AI)</span>
+            <span>+ Add Person</span>
           </button>
 
           <button
             onClick={toggleGlobalBot}
             style={{
-              background: routingConfig.globalBotActive ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-              border: `1px solid ${routingConfig.globalBotActive ? '#ef4444' : '#10b981'}`,
-              color: routingConfig.globalBotActive ? '#ef4444' : '#10b981',
+              background: '#ffffff',
+              border: '1px solid #e4e4e7',
+              color: '#09090b',
               padding: '8px',
               borderRadius: '8px',
               fontWeight: '600',
@@ -173,7 +182,17 @@ export default function Sidebar() {
               gap: '6px'
             }}
           >
-            {routingConfig.globalBotActive ? '⏸️ PAUSE BOT' : '▶️ RESUME BOT'}
+            {routingConfig.globalBotActive ? (
+              <>
+                <Pause size={12} />
+                <span>PAUSE BOT</span>
+              </>
+            ) : (
+              <>
+                <Play size={12} />
+                <span>RESUME BOT</span>
+              </>
+            )}
           </button>
         </div>
       </aside>
@@ -185,20 +204,19 @@ export default function Sidebar() {
 
         .floating-sidebar {
           position: fixed;
-          top: 20px;
-          left: 20px;
-          bottom: 20px;
-          width: 270px;
-          background: rgba(9, 9, 11, 0.94);
-          backdrop-filter: blur(20px);
-          border: 1px solid #27272a;
-          border-radius: 18px;
-          padding: 20px 16px;
+          top: 16px;
+          left: 16px;
+          bottom: 16px;
+          width: 250px;
+          background: #ffffff;
+          border: 1px solid #e4e4e7;
+          border-radius: 12px;
+          padding: 18px 14px;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          justifyContent: space-between;
           z-index: 50;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
         }
 
         @media (max-width: 768px) {
@@ -209,11 +227,10 @@ export default function Sidebar() {
             left: 0;
             right: 0;
             height: 56px;
-            background: rgba(9, 9, 11, 0.96);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid #27272a;
+            background: #ffffff;
+            border-bottom: 1px solid #e4e4e7;
             align-items: center;
-            justify-content: space-between;
+            justifyContent: space-between;
             padding: 0 16px;
             z-index: 60;
           }
