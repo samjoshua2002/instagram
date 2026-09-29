@@ -921,18 +921,43 @@ app.get('/api/social-graph', async (req, res) => {
     // 3. Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
     const enrichedNodes = await Promise.all(nodes.map(async (n) => {
       let memory = null;
-      if (n.senderId) {
-        memory = await UserMemory.findOne({ senderId: n.senderId });
+      let effectiveSenderId = n.senderId || '';
+
+      if (effectiveSenderId) {
+        memory = await UserMemory.findOne({ senderId: effectiveSenderId });
       }
       if (!memory && n.instagramHandle) {
         const cleanU = n.instagramHandle.replace(/^@/, '').toLowerCase().trim();
         memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
+        if (memory && !effectiveSenderId) {
+          effectiveSenderId = memory.senderId;
+          // Persist the discovered senderId to social graph node
+          await SocialGraph.updateOne({ _id: n._id }, { senderId: effectiveSenderId });
+        }
       }
 
       const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
 
+      // Compute total chats count and reels count
+      let chatsCount = memory?.messageCount || 0;
+      let reelsCount = 0;
+      if (effectiveSenderId) {
+        try {
+          reelsCount = await Message.countDocuments({
+            $or: [{ senderId: effectiveSenderId }, { recipientId: effectiveSenderId }],
+            text: { $regex: /\[Shared an Instagram Reel|reel/i }
+          });
+          if (chatsCount === 0) {
+            chatsCount = await Message.countDocuments({
+              $or: [{ senderId: effectiveSenderId }, { recipientId: effectiveSenderId }]
+            });
+          }
+        } catch (cntErr) {}
+      }
+
       return {
         ...n.toObject(),
+        senderId: effectiveSenderId,
         category: n.category || (memory?.relationshipType ? (memory.relationshipType === 'collaborator' || memory.relationshipType === 'client' ? 'professional' : 'online_friend') : 'online_friend'),
         dob: n.dob || memoryDob || '',
         personalNotes: n.personalNotes || (n.lore || []).join('\n'),
@@ -940,7 +965,9 @@ app.get('/api/social-graph', async (req, res) => {
         aiEnabled: memory ? memory.aiEnabled !== false : true,
         replyToMessages: memory ? memory.replyToMessages !== false : true,
         replyToReelsAndPosts: memory ? memory.replyToReelsAndPosts !== false : true,
-        messageCount: memory?.messageCount || 0,
+        messageCount: chatsCount,
+        chatsCount,
+        reelsCount,
         lastInteraction: memory?.lastInteraction || n.updatedAt
       };
     }));
@@ -970,6 +997,8 @@ app.get('/api/social-graph', async (req, res) => {
         if (!existing.profilePic && node.profilePic) existing.profilePic = node.profilePic;
         if (!existing.dob && node.dob) existing.dob = node.dob;
         if (!existing.personalNotes && node.personalNotes) existing.personalNotes = node.personalNotes;
+        if ((!existing.chatsCount || existing.chatsCount === 0) && node.chatsCount) existing.chatsCount = node.chatsCount;
+        if ((!existing.reelsCount || existing.reelsCount === 0) && node.reelsCount) existing.reelsCount = node.reelsCount;
       }
     }
 
@@ -978,6 +1007,7 @@ app.get('/api/social-graph', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 app.post('/api/social-graph/sync', async (req, res) => {
   try {
@@ -1059,6 +1089,17 @@ app.post('/api/social-graph/node', async (req, res) => {
       }).filter(Boolean);
     }
 
+    let finalSenderId = senderId || req.body.senderId || '';
+    let finalProfilePic = req.body.profilePic || '';
+    if (!finalSenderId && finalHandle) {
+      const cleanU = finalHandle.replace(/^@/, '').toLowerCase().trim();
+      const matchedMem = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
+      if (matchedMem) {
+        finalSenderId = matchedMem.senderId;
+        if (!finalProfilePic) finalProfilePic = matchedMem.profilePic;
+      }
+    }
+
     const updated = await SocialGraph.findOneAndUpdate(
       { name: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') },
       {
@@ -1066,7 +1107,7 @@ app.post('/api/social-graph/node', async (req, res) => {
           name: name.trim(),
           aliases: parsedAliases,
           instagramHandle: finalHandle,
-          senderId: senderId || '',
+          senderId: finalSenderId || '',
           gender: gender || 'unknown',
           relationshipToSam: finalRelationship,
           category: finalCategory,
@@ -1075,15 +1116,16 @@ app.post('/api/social-graph/node', async (req, res) => {
           lore: parsedLore,
           roastStyle: roastStyle || 'Banter back naturally matching their energy.',
           connections: parsedConnections,
+          ...(finalProfilePic ? { profilePic: finalProfilePic } : {}),
           updatedAt: new Date()
         }
       },
       { upsert: true, returnDocument: 'after' }
     );
 
-    if (senderId) {
+    if (finalSenderId) {
       await UserMemory.findOneAndUpdate(
-        { senderId },
+        { senderId: finalSenderId },
         {
           $set: {
             name: name.trim(),
@@ -1100,6 +1142,60 @@ app.post('/api/social-graph/node', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Quick lookup contact by handle or name to auto-resolve sender ID and avatar
+app.get('/api/contacts/lookup', async (req, res) => {
+  try {
+    const rawQuery = (req.query.handle || req.query.username || req.query.query || '').replace(/^@/, '').trim();
+    if (!rawQuery) return res.json({ found: false });
+
+    const memory = await UserMemory.findOne({
+      $or: [
+        { username: new RegExp(`^${escapeRegex(rawQuery)}$`, 'i') },
+        { name: new RegExp(`^${escapeRegex(rawQuery)}$`, 'i') },
+        { senderId: rawQuery }
+      ]
+    });
+
+    if (memory) {
+      return res.json({
+        found: true,
+        senderId: memory.senderId,
+        username: memory.username,
+        name: memory.name,
+        profilePic: memory.profilePic || '',
+        category: memory.relationshipType,
+        messageCount: memory.messageCount || 0
+      });
+    }
+
+    res.json({ found: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// AI Extract Person Details from Raw Chat with Clarifying Questions
+app.post('/api/social-graph/extract-from-chat', async (req, res) => {
+  try {
+    const { chatText, currentPerson, userClarifications } = req.body;
+    if (!chatText || !chatText.trim()) {
+      return res.status(400).json({ error: 'Chat text is required' });
+    }
+
+    const extraction = await azureOpenAI.extractPersonFromRawChat({
+      chatText,
+      currentPerson,
+      userClarifications
+    });
+
+    res.json({ success: true, extraction });
+  } catch (err) {
+    console.error('Raw chat extraction error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // AI Autofill fields for a person based on chat history & existing memory
 app.post('/api/social-graph/node/:name/ai-autofill', async (req, res) => {
