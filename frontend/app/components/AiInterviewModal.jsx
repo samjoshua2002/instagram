@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Sparkles, X, Send, Check } from 'lucide-react';
+import { Sparkles, X, Send, Check, User, Link2, Calendar, FileText } from 'lucide-react';
+import ContactAvatar from './ContactAvatar';
 
 export default function AiInterviewModal() {
-  const { isAiModalOpen, setIsAiModalOpen, editingNode, saveNode, API_BASE } = useApp();
+  const { isAiModalOpen, setIsAiModalOpen, editingNode, saveNode, API_BASE, lookupContact, showToast } = useApp();
 
   const [aiChat, setAiChat] = useState([]);
   const [aiInput, setAiInput] = useState('');
@@ -17,17 +18,44 @@ export default function AiInterviewModal() {
   useEffect(() => {
     if (isAiModalOpen) {
       const greeting = editingNode
-        ? `Hey Sam! Let's update intel for **${editingNode.name}**. What new life updates, inside jokes, exam dates, or relationship changes happened?`
-        : `Hey Sam! Who is this new person? Tell me their name, how you know them (sister, homie, medicine friend, lover), and their vibe!`;
+        ? `Hey Sam! Let's update intel for ${editingNode.name}. What new life updates, inside jokes, exam dates, or relationship changes happened?`
+        : `Hey Sam! Who is this new person? Tell me their name, Instagram @username, relation to you (sister, homie, medicine friend), and what they're like!`;
 
       setAiChat([{ role: 'assistant', content: greeting }]);
-      setAccumulatedNode(editingNode ? { ...editingNode } : { name: '', relationshipToSam: '', connections: [], lore: [] });
+      setAccumulatedNode(editingNode ? { ...editingNode } : {
+        name: '',
+        instagramHandle: '',
+        senderId: '',
+        relationshipToSam: '',
+        category: 'online_friend',
+        dob: '',
+        connections: [],
+        lore: [],
+        personalNotes: '',
+        roastStyle: ''
+      });
     }
   }, [isAiModalOpen, editingNode]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [aiChat]);
+
+  // When handle is updated in accumulatedNode, auto-lookup senderId and profilePic
+  useEffect(() => {
+    if (accumulatedNode?.instagramHandle && !accumulatedNode.senderId) {
+      lookupContact(accumulatedNode.instagramHandle).then(info => {
+        if (info && info.senderId) {
+          setAccumulatedNode(prev => ({
+            ...prev,
+            senderId: info.senderId,
+            profilePic: info.profilePic || prev.profilePic,
+            name: prev.name || info.name
+          }));
+        }
+      });
+    }
+  }, [accumulatedNode?.instagramHandle, accumulatedNode?.senderId, lookupContact]);
 
   if (!isAiModalOpen) return null;
 
@@ -55,24 +83,57 @@ export default function AiInterviewModal() {
       const data = await res.json();
       if (data.success) {
         if (data.node) {
-          setAccumulatedNode(prev => ({ ...prev, ...data.node }));
+          // If handle was mentioned, check if DB knows them
+          let matchedSenderId = accumulatedNode?.senderId || '';
+          let matchedPic = accumulatedNode?.profilePic || '';
+          const h = data.node.instagramHandle || accumulatedNode?.instagramHandle;
+          if (h && !matchedSenderId) {
+            const lookup = await lookupContact(h);
+            if (lookup?.senderId) {
+              matchedSenderId = lookup.senderId;
+              matchedPic = lookup.profilePic || '';
+            }
+          }
+
+          setAccumulatedNode(prev => ({
+            ...prev,
+            ...data.node,
+            senderId: matchedSenderId || prev.senderId,
+            profilePic: matchedPic || prev.profilePic
+          }));
         }
-        const reply = data.question || (data.isComplete ? `Got it all down! Review the card on the right and click Save!` : data.summary);
+        const reply = data.question || (data.isComplete ? `Got all details saved to preview. Review the attributes and click Save Person!` : data.summary);
         setAiChat(prev => [...prev, { role: 'assistant', content: reply }]);
       }
     } catch (err) {
       setAiChat(prev => [...prev, {
         role: 'assistant',
-        content: `Got that noted! What else should Sam's clone remember about them (handle, connections, or roast style)?`
+        content: `Got that noted! What else should Sam's clone remember about them (handle, connections, or banter style)?`
       }]);
     } finally {
       setIsAiTyping(false);
     }
   };
 
-  const handleSave = () => {
-    if (!accumulatedNode?.name) return;
-    saveNode(accumulatedNode);
+  const handleSave = async () => {
+    if (!accumulatedNode?.name) {
+      showToast('Name is required');
+      return;
+    }
+
+    const payload = {
+      ...accumulatedNode,
+      name: accumulatedNode.name.trim(),
+      handle: accumulatedNode.instagramHandle,
+      relationship: accumulatedNode.relationshipToSam,
+      category: accumulatedNode.category || 'online_friend',
+      dob: accumulatedNode.dob || '',
+      personalNotes: accumulatedNode.personalNotes || (accumulatedNode.lore || []).join('\n')
+    };
+
+    await saveNode(payload);
+    setIsAiModalOpen(false);
+    showToast(`Added ${payload.name} to People Directory`);
   };
 
   return (
@@ -80,8 +141,8 @@ export default function AiInterviewModal() {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.85)',
-        backdropFilter: 'blur(10px)',
+        background: 'rgba(9, 9, 11, 0.4)',
+        backdropFilter: 'blur(4px)',
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -91,131 +152,146 @@ export default function AiInterviewModal() {
     >
       <div
         style={{
-          background: '#09090b',
-          border: '1px solid #27272a',
-          borderRadius: '16px',
+          background: '#ffffff',
+          border: '1px solid #e4e4e7',
+          borderRadius: '14px',
           width: '100%',
-          maxWidth: '850px',
-          height: '80vh',
-          maxHeight: '700px',
+          maxWidth: '860px',
+          height: '82vh',
+          maxHeight: '680px',
           display: 'flex',
           flexDirection: 'row',
           overflow: 'hidden',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.95)'
+          boxShadow: '0 20px 45px rgba(0,0,0,0.1)'
         }}
-        className="modal-inner"
       >
         {/* Left: Chat Interviewer */}
-        <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #27272a' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #27272a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e4e4e7', background: '#ffffff' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e4e4e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={18} color="#ffffff" />
-              <span style={{ fontWeight: '700', color: '#ffffff', fontSize: '0.92rem' }}>
-                AI Knowledge Tree Architect
+              <div style={{ background: '#09090b', color: '#ffffff', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
+                <Sparkles size={14} />
+              </div>
+              <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.92rem' }}>
+                Add Person (AI Interview)
               </span>
             </div>
             <button
               onClick={() => setIsAiModalOpen(false)}
-              style={{ background: 'transparent', border: 'none', color: '#a1a1aa', cursor: 'pointer' }}
+              style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
             >
               <X size={18} />
             </button>
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', background: '#fafafa' }}>
             {aiChat.map((msg, i) => (
               <div
                 key={i}
                 style={{
                   alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
                   maxWidth: '85%',
-                  background: msg.role === 'user' ? '#ffffff' : '#121214',
-                  color: msg.role === 'user' ? '#000000' : '#ffffff',
+                  background: msg.role === 'user' ? '#09090b' : '#ffffff',
+                  color: msg.role === 'user' ? '#ffffff' : '#09090b',
                   padding: '10px 14px',
                   borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                  fontSize: '0.85rem',
+                  fontSize: '0.84rem',
                   lineHeight: '1.45',
-                  border: msg.role === 'user' ? 'none' : '1px solid #27272a'
+                  border: msg.role === 'user' ? 'none' : '1px solid #e4e4e7',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                 }}
               >
                 {msg.content}
               </div>
             ))}
             {isAiTyping && (
-              <div style={{ alignSelf: 'flex-start', background: '#121214', padding: '8px 14px', borderRadius: '12px', color: '#a1a1aa', fontSize: '0.8rem' }}>
-                Thinking & analyzing circle...
+              <div style={{ alignSelf: 'flex-start', background: '#ffffff', border: '1px solid #e4e4e7', padding: '8px 12px', borderRadius: '8px', color: '#71717a', fontSize: '0.78rem' }}>
+                Analyzing attributes & connecting...
               </div>
             )}
             <div ref={chatBottomRef} />
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid #27272a', display: 'flex', gap: '8px', background: '#0e0e11' }}>
+          <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid #e4e4e7', display: 'flex', gap: '8px', background: '#ffffff' }}>
             <input
               type="text"
-              placeholder="Answer AI (e.g. She studies medicine, dad in army, loves hamsters)..."
+              placeholder="Answer AI (e.g. She studies medicine, @handle, loves hamsters)..."
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
-              style={{ flex: 1, background: '#000000', border: '1px solid #27272a', borderRadius: '8px', color: '#ffffff', padding: '10px 14px', fontSize: '0.85rem', outline: 'none' }}
+              style={{ flex: 1, background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#09090b', padding: '10px 14px', fontSize: '0.84rem', outline: 'none' }}
             />
             <button
               type="submit"
               disabled={isAiTyping || !aiInput.trim()}
-              style={{ background: '#ffffff', color: '#000000', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <Send size={16} />
+              <Send size={15} />
             </button>
           </form>
         </div>
 
         {/* Right: Live Preview & Save */}
-        <div style={{ flex: 0.8, padding: '24px', background: '#000000', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ flex: 0.85, padding: '22px', background: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
-            <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 'bold' }}>
-              Live Node Preview
-            </span>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>
-              {accumulatedNode?.name || '(Waiting for name...)'}
-            </h3>
-            <span style={{ fontSize: '0.78rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
-              {accumulatedNode?.instagramHandle || 'No handle specified'}
-            </span>
+            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+              LIVE PROFILE PREVIEW
+            </div>
 
-            <div style={{ marginTop: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ background: '#121214', padding: '10px', borderRadius: '6px', border: '1px solid #27272a', fontSize: '0.78rem', color: '#ffffff' }}>
-                <b>Relation:</b> {accumulatedNode?.relationshipToSam || 'Not clarified yet'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+              <ContactAvatar contact={{ ...accumulatedNode, handle: accumulatedNode?.instagramHandle }} size={44} />
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                  {accumulatedNode?.name || '(Waiting for name...)'}
+                </h3>
+                <span style={{ fontSize: '0.76rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                  {accumulatedNode?.instagramHandle || 'No handle set'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b' }}>
+                <span style={{ fontWeight: '700', color: '#71717a' }}>RELATION: </span>
+                <span>{accumulatedNode?.relationshipToSam || 'Not clarified yet'}</span>
               </div>
 
-              <div style={{ background: '#121214', padding: '10px', borderRadius: '6px', border: '1px solid #27272a', fontSize: '0.78rem', color: '#ffffff' }}>
-                <b>Connections:</b> {(accumulatedNode?.connections || []).map(c => c.targetName).join(', ') || 'None specified'}
+              {accumulatedNode?.dob && (
+                <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b' }}>
+                  <span style={{ fontWeight: '700', color: '#71717a' }}>DATE OF BIRTH: </span>
+                  <span>{accumulatedNode.dob}</span>
+                </div>
+              )}
+
+              <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b' }}>
+                <span style={{ fontWeight: '700', color: '#71717a' }}>CONNECTIONS: </span>
+                <span>{(accumulatedNode?.connections || []).map(c => c.targetName || c).join(', ') || 'None specified'}</span>
               </div>
 
-              {accumulatedNode?.lore?.length > 0 && (
-                <div style={{ background: '#121214', padding: '10px', borderRadius: '6px', border: '1px solid #27272a', fontSize: '0.78rem', color: '#ffffff' }}>
-                  <b>Lore & Notes:</b>
-                  <ul style={{ paddingLeft: '14px', marginTop: '4px' }}>
-                    {accumulatedNode.lore.map((l, i) => (
-                      <li key={i}>{l}</li>
-                    ))}
-                  </ul>
+              {(accumulatedNode?.lore?.length > 0 || accumulatedNode?.personalNotes) && (
+                <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b', maxHeight: '120px', overflowY: 'auto' }}>
+                  <span style={{ fontWeight: '700', color: '#71717a', display: 'block', marginBottom: '4px' }}>LORE & NOTES:</span>
+                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                    {accumulatedNode.personalNotes || (accumulatedNode.lore || []).join('\n')}
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
             <button
               onClick={handleSave}
               disabled={!accumulatedNode?.name}
               style={{
-                background: accumulatedNode?.name ? '#ffffff' : '#27272a',
-                color: accumulatedNode?.name ? '#000000' : '#71717a',
+                background: accumulatedNode?.name ? '#09090b' : '#f4f4f5',
+                color: accumulatedNode?.name ? '#ffffff' : '#a1a1aa',
                 border: 'none',
-                padding: '12px',
+                padding: '11px',
                 borderRadius: '8px',
-                fontWeight: '800',
-                fontSize: '0.9rem',
+                fontWeight: '700',
+                fontSize: '0.84rem',
                 cursor: accumulatedNode?.name ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
@@ -223,12 +299,12 @@ export default function AiInterviewModal() {
                 gap: '6px'
               }}
             >
-              <Check size={16} />
-              <span>Save to Knowledge Tree & DB</span>
+              <Check size={14} />
+              <span>Save Person to Directory</span>
             </button>
             <button
               onClick={() => setIsAiModalOpen(false)}
-              style={{ background: 'transparent', border: '1px solid #27272a', color: '#a1a1aa', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+              style={{ background: 'transparent', border: '1px solid #e4e4e7', color: '#71717a', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '600' }}
             >
               Cancel
             </button>

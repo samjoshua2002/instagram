@@ -5,34 +5,37 @@ import Link from 'next/link';
 import { useApp } from './context/AppContext';
 import {
   Users, Sliders, Brain, Clock, Sparkles, TrendingUp, CheckCircle2,
-  AlertCircle, ArrowRight, ShieldCheck, Calendar, Activity, Zap, MessageSquare
+  AlertCircle, ArrowRight, ShieldCheck, Calendar, Activity, Zap, MessageSquare, Film, Bot
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { nodes, routingConfig, startAiInterview, toggleGlobalBot } = useApp();
+  const { nodes, routingConfig, startAiInterview } = useApp();
 
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
 
   // Breakdown calculations
   const breakdown = useMemo(() => {
     let close = 0;
-    let homies = 0;
+    let online = 0;
+    let offline = 0;
     let relatives = 0;
-    let icons = 0;
-    let pendingReminders = 0;
+    let professional = 0;
+    let totalDMs = 0;
+    let totalReels = 0;
 
     friendNodes.forEach(f => {
-      if (f.category === 'close_friend') close++;
-      else if (f.category === 'homie') homies++;
-      else if (f.category === 'relative') relatives++;
-      else icons++;
+      const cat = f.category || 'online_friend';
+      if (cat === 'close_friend' || f.id === 'fami' || f.id === 'bhavani') close++;
+      else if (cat === 'online_friend') online++;
+      else if (cat === 'offline_friend') offline++;
+      else if (cat === 'family' || cat === 'relative') relatives++;
+      else professional++;
 
-      if (f.idleHours >= 5 && f.idleHours <= 10) {
-        pendingReminders++;
-      }
+      totalDMs += (f.chatsCount || f.messageCount || 0);
+      totalReels += (f.reelsCount || 0);
     });
 
-    return { close, homies, relatives, icons, pendingReminders };
+    return { close, online, offline, relatives, professional, totalDMs, totalReels };
   }, [friendNodes]);
 
   const activeModeCount = routingConfig.chatMode === 'everyone_except'
@@ -40,18 +43,18 @@ export default function DashboardPage() {
     : (routingConfig.chatMode === 'only_selected' ? (routingConfig.includedContactIds || []).length : 0);
 
   return (
-    <div style={{ padding: '36px 32px 60px 32px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ padding: '36px 36px 80px 36px', maxWidth: '1300px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '32px' }}>
         <div>
-          <div style={{ fontSize: '0.72rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace", fontWeight: 'bold' }}>
-            // COMMAND CENTER & DECISION INTELLIGENCE
+          <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+            COMMAND CENTER
           </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px' }}>
-            Sam Joshua // Overview
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px', color: '#09090b' }}>
+            Overview & Intelligence
           </h1>
-          <p style={{ color: '#a1a1aa', fontSize: '0.88rem', marginTop: '4px' }}>
-            Real-time analytics on your mapped circle, pending follow-up triggers, and live Instagram AI routing.
+          <p style={{ color: '#71717a', fontSize: '0.88rem', marginTop: '4px' }}>
+            Real-time analytics on mapped contacts, interaction volume, and live Instagram AI routing.
           </p>
         </div>
 
@@ -59,8 +62,8 @@ export default function DashboardPage() {
           <button
             onClick={() => startAiInterview(null)}
             style={{
-              background: '#ffffff',
-              color: '#000000',
+              background: '#09090b',
+              color: '#ffffff',
               border: 'none',
               padding: '10px 18px',
               borderRadius: '8px',
@@ -73,126 +76,136 @@ export default function DashboardPage() {
             }}
           >
             <Sparkles size={14} />
-            <span>+ Add Person (AI)</span>
+            <span>+ Add Person</span>
           </button>
         </div>
       </div>
 
-      {/* 4 Compact Stat Cards */}
+      {/* 4 Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '28px' }}>
         {/* Stat 1: Total People */}
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase' }}>Total Mapped Friends</span>
-            <Users size={16} color="#10b981" />
+            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700' }}>
+              Total People
+            </span>
+            <Users size={16} style={{ color: '#09090b' }} />
           </div>
           <div style={{ marginTop: '14px' }}>
-            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-1px' }}>
+            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1px' }}>
               {friendNodes.length}
             </div>
-            <div style={{ fontSize: '0.74rem', color: '#10b981', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-              ● 100% Interlinked & Verified
+            <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+              Active directory profiles
             </div>
           </div>
-          <Link href="/relationships" style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#a1a1aa', textDecoration: 'none', fontWeight: '600' }}>
-            <span>View relationship menu</span>
+          <Link href="/relationships" style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#09090b', textDecoration: 'none', fontWeight: '600' }}>
+            <span>Open people directory</span>
             <ArrowRight size={13} />
           </Link>
         </div>
 
-        {/* Stat 2: Active Chat Policy */}
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        {/* Stat 2: Total Chats / DMs */}
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase' }}>Active Routing Mode</span>
-            <Sliders size={16} color="#38bdf8" />
+            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700' }}>
+              Total Chats / DMs
+            </span>
+            <MessageSquare size={16} style={{ color: '#09090b' }} />
           </div>
           <div style={{ marginTop: '14px' }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1px' }}>
+              {breakdown.totalDMs}
+            </div>
+            <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+              Messages recorded in database
+            </div>
+          </div>
+          <Link href="/relationships" style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#09090b', textDecoration: 'none', fontWeight: '600' }}>
+            <span>Review conversations</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        {/* Stat 3: Total Reels Shared */}
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700' }}>
+              Reels Shared
+            </span>
+            <Film size={16} style={{ color: '#09090b' }} />
+          </div>
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1px' }}>
+              {breakdown.totalReels}
+            </div>
+            <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+              Instagram reels exchanged
+            </div>
+          </div>
+          <span style={{ marginTop: '14px', fontSize: '0.75rem', color: '#71717a' }}>
+            Auto-reacted by AI
+          </span>
+        </div>
+
+        {/* Stat 4: Active Chat Policy */}
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700' }}>
+              Active Routing Policy
+            </span>
+            <Sliders size={16} style={{ color: '#09090b' }} />
+          </div>
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#09090b', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
               {routingConfig.chatMode.replace('_', ' ')}
             </div>
-            <div style={{ fontSize: '0.74rem', color: '#38bdf8', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-              {routingConfig.chatMode === 'everyone_except' && `${activeModeCount} contacts excluded for Sam`}
-              {routingConfig.chatMode === 'only_selected' && `${activeModeCount} contacts whitelisted`}
+            <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+              {routingConfig.chatMode === 'everyone_except' && `${activeModeCount} contacts excluded`}
+              {routingConfig.chatMode === 'only_selected' && `${activeModeCount} contacts selected`}
               {routingConfig.chatMode === 'everyone' && 'Global auto-reply active'}
               {routingConfig.chatMode === 'paused' && 'Bot silenced / manual mode'}
             </div>
           </div>
-          <Link href="/controls" style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#a1a1aa', textDecoration: 'none', fontWeight: '600' }}>
-            <span>Adjust chat rules</span>
-            <ArrowRight size={13} />
-          </Link>
-        </div>
-
-        {/* Stat 3: 5-10h Reminder Queue */}
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase' }}>5–10h Reminders Queue</span>
-            <Clock size={16} color="#fbbf24" />
-          </div>
-          <div style={{ marginTop: '14px' }}>
-            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-1px' }}>
-              {breakdown.pendingReminders}
-            </div>
-            <div style={{ fontSize: '0.74rem', color: '#fbbf24', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-              Conversations in warm window
-            </div>
-          </div>
-          <span style={{ marginTop: '14px', fontSize: '0.75rem', color: '#a1a1aa' }}>
-            No double texts if left on read
-          </span>
-        </div>
-
-        {/* Stat 4: Memory Facts Synced */}
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase' }}>Learned Facts & Lore</span>
-            <Brain size={16} color="#a855f7" />
-          </div>
-          <div style={{ marginTop: '14px' }}>
-            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ffffff', letterSpacing: '-1px' }}>
-              {friendNodes.reduce((acc, f) => acc + (f.facts || []).length, 0)}
-            </div>
-            <div style={{ fontSize: '0.74rem', color: '#a855f7', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-              Extracted facts across friends
-            </div>
-          </div>
-          <Link href="/memories" style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#a1a1aa', textDecoration: 'none', fontWeight: '600' }}>
-            <span>Review memory dossiers</span>
+          <Link href="/controls" style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#09090b', textDecoration: 'none', fontWeight: '600' }}>
+            <span>Adjust chat controls</span>
             <ArrowRight size={13} />
           </Link>
         </div>
       </div>
 
-      {/* Main Grid: Circle Category Distribution & Decision Queue */}
+      {/* Main Grid: Circle Distribution & Intelligence Action Queue */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px', marginBottom: '28px' }}>
-        {/* Left: Circle Composition Chart */}
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '24px' }}>
+        {/* Left: Circle Composition */}
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '800' }}>Circle Breakdown & Roles</h3>
-              <p style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '2px' }}>Categorization of friends mapped into AI memory</p>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                Circle Breakdown
+              </h3>
+              <p style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '2px' }}>
+                Relationship categories mapped across contacts
+              </p>
             </div>
-            <Activity size={18} color="#10b981" />
+            <Activity size={18} style={{ color: '#09090b' }} />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
-              { label: 'Closest Friends & Confidantes', count: breakdown.close, color: '#10b981', desc: 'Bhavani, Moksha, Fami' },
-              { label: 'Homies & Bros (Hinglish/Tamil Banter)', count: breakdown.homies, color: '#6366f1', desc: 'Rajveer, Arun' },
-              { label: 'Family & Sister', count: breakdown.relatives, color: '#ec4899', desc: 'Annie (talking with Bhavani)' },
-              { label: 'Group Legends & Running Gags', count: breakdown.icons, color: '#f59e0b', desc: 'Roni Uncle, Rubesh' }
+              { label: 'Close Circle / Fami', count: breakdown.close, desc: 'Highest trust, inside jokes, continuous lore' },
+              { label: 'Online Friends', count: breakdown.online, desc: 'Casual DM interaction, shared reels, tech discussions' },
+              { label: 'Offline Friends', count: breakdown.offline, desc: 'Local circle, college or hometown friends' },
+              { label: 'Family / Relatives', count: breakdown.relatives, desc: 'Sister & family members' },
+              { label: 'Professional / Business', count: breakdown.professional, desc: 'Creators, clients, or collaborative inquiries' }
             ].map((cat, i) => (
-              <div key={i} style={{ background: '#121214', border: '1px solid #1f1f23', borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={i} style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cat.color }} />
-                    <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#ffffff' }}>{cat.label}</span>
-                  </div>
-                  <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#ffffff', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#09090b' }}>{cat.label}</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace" }}>
                     {cat.count}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '4px', marginLeft: '16px' }}>
+                <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '3px' }}>
                   {cat.desc}
                 </div>
               </div>
@@ -200,53 +213,54 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right: Decision Queue & Upcoming Follow-Ups */}
-        <div style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', padding: '24px' }}>
+        {/* Right: Key Intelligence Highlights */}
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '800' }}>Reminders & Action Queue</h3>
-              <p style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '2px' }}>People requests & follow-up opportunities</p>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                Intelligence Highlights
+              </h3>
+              <p style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '2px' }}>
+                Synthesized contact context & rules
+              </p>
             </div>
-            <Clock size={18} color="#fbbf24" />
+            <Clock size={18} style={{ color: '#09090b' }} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* Action 1: Bhavani */}
-            <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ffffff' }}>Bhavani (@yk_bhavani._.xo)</span>
-                <span style={{ fontSize: '0.65rem', background: 'rgba(234,179,8,0.15)', color: '#fef08a', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  6h Idle • Warm Follow-Up
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#09090b' }}>Bhavani (@yk_bhavani._.xo)</span>
+                <span style={{ fontSize: '0.68rem', background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+                  ACTIVE INTEL
                 </span>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '4px' }}>
-                Natural check-in eligible. Inside joke topics: hamster drama 🐹, Netflix watchlist, medicine exams.
+              <p style={{ fontSize: '0.75rem', color: '#71717a', marginTop: '4px' }}>
+                Synthesized facts: Medicine student, exams, hamster updates, Netflix watchlist. Full AI auto-reply active.
               </p>
             </div>
 
-            {/* Action 2: Rajveer */}
-            <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ffffff' }}>Rajveer (@unpredictable_2k26)</span>
-                <span style={{ fontSize: '0.65rem', background: 'rgba(239,68,68,0.15)', color: '#ef4444', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Excluded from AI (Sam Manual)
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#09090b' }}>Rajveer (@unpredictable_2k26)</span>
+                <span style={{ fontSize: '0.68rem', background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+                  SAM MANUAL
                 </span>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '4px' }}>
-                AI is paused for Rajveer so Sam can banter directly about Roni uncle without bot interference.
+              <p style={{ fontSize: '0.75rem', color: '#71717a', marginTop: '4px' }}>
+                AI paused for Rajveer so Sam chats manually about Roni uncle and mutual jokes without bot intervention.
               </p>
             </div>
 
-            {/* Action 3: Upcoming Date */}
-            <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ffffff' }}>Upcoming Milestone</span>
-                <span style={{ fontSize: '0.65rem', background: '#18181b', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  March 12
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#09090b' }}>Annie (@annies_hepsiba)</span>
+                <span style={{ fontSize: '0.68rem', background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+                  SISTER / CIRCLE
                 </span>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '4px' }}>
-                🎂 Bhavani&apos;s Birthday (born 12th March 2007) is stored in persistent memory.
+              <p style={{ fontSize: '0.75rem', color: '#71717a', marginTop: '4px' }}>
+                Connected to Bhavani in circle. AI replies respectfully matching family tone.
               </p>
             </div>
           </div>
