@@ -673,6 +673,36 @@ app.put('/api/conversations/:senderId/memory', async (req, res) => {
   }
 });
 
+// Force AI to analyze conversation history and learn/synthesize memory
+app.post('/api/conversations/:senderId/learn', async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    await memoryService.updateMemoryAsync(senderId);
+    const updatedMemory = await UserMemory.findOne({ senderId });
+    res.json({ success: true, memory: updatedMemory });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add custom fact/memory
+app.post('/api/conversations/:senderId/fact', async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    const { fact } = req.body;
+    if (!fact) return res.status(400).json({ error: 'Fact is required' });
+
+    const memory = await UserMemory.findOne({ senderId });
+    if (!memory) return res.status(404).json({ error: 'User not found' });
+
+    memory.facts.push({ fact: fact.trim() });
+    await memory.save();
+    res.json({ success: true, memory });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get Persona Configuration
 app.get('/api/persona', async (req, res) => {
   try {
