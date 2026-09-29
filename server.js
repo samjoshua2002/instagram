@@ -945,7 +945,35 @@ app.get('/api/social-graph', async (req, res) => {
       };
     }));
 
-    res.json({ success: true, nodes: enrichedNodes });
+    // Authoritative backend deduplication by senderId, instagramHandle, or normalized name
+    const deduplicatedNodes = [];
+    for (const node of enrichedNodes) {
+      const cleanSenderId = (node.senderId || '').trim();
+      const cleanHandle = (node.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
+      const cleanName = (node.name || '').toLowerCase().trim();
+
+      const existingIndex = deduplicatedNodes.findIndex(m => {
+        if (cleanSenderId && m.senderId && m.senderId.trim() === cleanSenderId) return true;
+        const mHandle = (m.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
+        if (cleanHandle && mHandle && cleanHandle === mHandle) return true;
+        const mName = (m.name || '').toLowerCase().trim();
+        if (cleanName && mName && cleanName === mName) return true;
+        return false;
+      });
+
+      if (existingIndex === -1) {
+        deduplicatedNodes.push(node);
+      } else {
+        const existing = deduplicatedNodes[existingIndex];
+        if (!existing.instagramHandle && node.instagramHandle) existing.instagramHandle = node.instagramHandle;
+        if (!existing.senderId && node.senderId) existing.senderId = node.senderId;
+        if (!existing.profilePic && node.profilePic) existing.profilePic = node.profilePic;
+        if (!existing.dob && node.dob) existing.dob = node.dob;
+        if (!existing.personalNotes && node.personalNotes) existing.personalNotes = node.personalNotes;
+      }
+    }
+
+    res.json({ success: true, nodes: deduplicatedNodes });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

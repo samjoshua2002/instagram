@@ -8,15 +8,15 @@ import LinkIdModal from './components/LinkIdModal';
 
 export const metadata = {
   title: 'Chatter OS // Sam Joshua',
-  description: 'AI Instagram DM automation & intelligence dashboard with pure-black retro Shadcn UI',
+  description: 'AI Instagram DM automation & intelligence dashboard with pure monochrome Shadcn UI',
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{ background: '#000000', color: '#ffffff', margin: 0, padding: 0 }}>
+      <body style={{ background: '#ffffff', color: '#09090b', margin: 0, padding: 0 }}>
         <AppProvider>
-          <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: '#ffffff' }}>
             <Sidebar />
             <main className="app-main-content">
               {children}
@@ -24,7 +24,6 @@ export default function RootLayout({ children }) {
           </div>
           <Toast />
           <AiInterviewModal />
-          <InspectorDrawer />
           <LinkIdModal />
         </AppProvider>
       </body>

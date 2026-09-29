@@ -4,8 +4,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
-const STORAGE_NODES_KEY = 'chatter_social_nodes_v4';
-const STORAGE_CONFIG_KEY = 'chatter_persona_config_v4';
+const STORAGE_NODES_KEY = 'chatter_social_nodes_v7';
+const STORAGE_CONFIG_KEY = 'chatter_persona_config_v7';
 
 export const DEFAULT_GRAPH_DATA = [
   {
@@ -240,68 +240,69 @@ export function deduplicateNodes(nodesList) {
   const root = nodesList.find(n => n.isRoot) || DEFAULT_GRAPH_DATA[0];
   const listWithoutRoot = nodesList.filter(n => !n.isRoot);
 
-  const mergedMap = new Map();
+  const merged = [];
 
   for (const node of listWithoutRoot) {
     const rawName = (node.name || '').trim();
     if (!rawName) continue;
 
-    // Check if this is a variant of Roni (e.g. "Roni", "Roni (Roni Uncle)", "Roni Uncle")
-    let canonicalKey = rawName.toLowerCase();
-    if (/^roni(\s*\(.*\))?$/i.test(canonicalKey) || canonicalKey.includes('roni uncle')) {
-      canonicalKey = 'roni';
-    } else if (canonicalKey.includes('annie') || node.handle?.toLowerCase().includes('annies_hepsiba')) {
-      canonicalKey = 'annie';
-    } else if (node.senderId && node.senderId.trim()) {
-      canonicalKey = `sender_${node.senderId.trim()}`;
-    } else if (node.handle && node.handle.trim()) {
-      canonicalKey = `handle_${node.handle.replace(/^@/, '').toLowerCase().trim()}`;
-    }
+    const cleanSenderId = (node.senderId || '').trim();
+    const cleanHandle = (node.handle || '').replace(/^@/, '').toLowerCase().trim();
+    const cleanNameLower = rawName.toLowerCase();
 
-    if (!mergedMap.has(canonicalKey)) {
-      const copy = { ...node };
-      if (canonicalKey === 'roni') {
-        copy.id = 'roni';
-        copy.name = 'Roni';
-        copy.relationship = 'Group Legend & Running Gag ("Roni Uncle")';
-      } else if (canonicalKey === 'annie') {
-        copy.id = 'annie';
-        copy.name = 'Annie';
-        copy.handle = copy.handle || '@annies_hepsiba';
-        copy.senderId = copy.senderId || '2173928080193783';
-      }
-      mergedMap.set(canonicalKey, copy);
+    // Find any existing node in merged that matches authoritatively
+    const existingIndex = merged.findIndex(m => {
+      // 1. Authoritative Sender ID match
+      if (cleanSenderId && m.senderId && m.senderId.trim() === cleanSenderId) return true;
+      // 2. Authoritative Instagram Handle match
+      const mHandle = (m.handle || '').replace(/^@/, '').toLowerCase().trim();
+      if (cleanHandle && mHandle && cleanHandle === mHandle) return true;
+      // 3. Exact name match
+      const mName = (m.name || '').toLowerCase().trim();
+      if (cleanNameLower && mName && cleanNameLower === mName) return true;
+      // 4. Special canonical aliases (Roni, Annie)
+      if (cleanNameLower.includes('roni') && mName.includes('roni')) return true;
+      if (cleanNameLower.includes('annie') && mName.includes('annie')) return true;
+      return false;
+    });
+
+    if (existingIndex === -1) {
+      merged.push({ ...node });
     } else {
-      const existing = mergedMap.get(canonicalKey);
+      const existing = merged[existingIndex];
+      // Merge best non-empty attributes
       if (!existing.handle && node.handle) existing.handle = node.handle;
       if (!existing.senderId && node.senderId) existing.senderId = node.senderId;
       if (!existing.profilePic && node.profilePic) existing.profilePic = node.profilePic;
+      if (!existing.dob && (node.dob || node.dateOfBirth)) existing.dob = node.dob || node.dateOfBirth;
+      if (!existing.category && node.category) existing.category = node.category;
+      if (node.personalNotes && (!existing.personalNotes || node.personalNotes.length > existing.personalNotes.length)) {
+        existing.personalNotes = node.personalNotes;
+      }
       if (typeof node.aiEnabled === 'boolean') existing.aiEnabled = node.aiEnabled;
       if (typeof node.replyToMessages === 'boolean') existing.replyToMessages = node.replyToMessages;
       if (typeof node.replyToReelsAndPosts === 'boolean') existing.replyToReelsAndPosts = node.replyToReelsAndPosts;
 
       // Merge facts
-      const existingFacts = new Set(existing.facts || []);
-      (node.facts || []).forEach(f => existingFacts.add(f));
-      existing.facts = Array.from(existingFacts);
+      const factSet = new Set([...(existing.facts || []), ...(node.facts || [])]);
+      existing.facts = Array.from(factSet);
 
       // Merge lore
-      const existingLore = new Set(existing.lore || []);
-      (node.lore || []).forEach(l => existingLore.add(l));
-      existing.lore = Array.from(existingLore);
+      const loreSet = new Set([...(existing.lore || []), ...(node.lore || [])]);
+      existing.lore = Array.from(loreSet);
 
       // Merge connections
-      const existingTargets = new Set((existing.connections || []).map(c => (c.targetName || '').toLowerCase()));
+      const connTargets = new Set((existing.connections || []).map(c => (c.targetName || '').toLowerCase()));
       (node.connections || []).forEach(c => {
-        if (c.targetName && !existingTargets.has(c.targetName.toLowerCase())) {
+        if (c.targetName && !connTargets.has(c.targetName.toLowerCase())) {
           existing.connections.push(c);
-          existingTargets.add(c.targetName.toLowerCase());
+          connTargets.add(c.targetName.toLowerCase());
         }
       });
     }
   }
 
-  const result = [root, ...Array.from(mergedMap.values())];
+  const result = [root, ...merged];
   root.children = result.filter(n => !n.isRoot).map(n => n.id);
   return result;
 }
