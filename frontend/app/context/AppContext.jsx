@@ -1,11 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
 const STORAGE_NODES_KEY = 'chatter_social_nodes_v7';
 const STORAGE_CONFIG_KEY = 'chatter_persona_config_v7';
+const STORAGE_DELETED_KEY = 'chatter_deleted_names_v1';
 
 export const DEFAULT_GRAPH_DATA = [
   {
@@ -15,7 +16,7 @@ export const DEFAULT_GRAPH_DATA = [
     sub: 'Creator / Core Node',
     isRoot: true,
     relationship: 'Root Persona',
-    children: ['bhavani', 'annie', 'rajveer', 'moksha', 'fami', 'arun', 'roni', 'rubesh']
+    children: ['bhavani', 'annie', 'rajveer', 'moksha', 'fami', 'arun']
   },
   {
     id: 'bhavani',
@@ -107,32 +108,6 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
     reminderEligible: true
   },
   {
-    id: 'roni',
-    name: 'Roni',
-    handle: '',
-    relationship: 'Group Legend & Running Gag',
-    category: 'group_icon',
-    gender: 'male',
-    personalNotes: 'Legendary group meme friend ("Roni Uncle"). Fake legal team on speed dial, area 51 biryani, axe of justice.',
-    rollingSummary: 'Running gag icon of the friend group.',
-    facts: [
-      'Legendary running gag friend ("Roni Uncle")',
-      'Fake legal team on speed dial',
-      'Area 51 research & alien biryani',
-      'Axe of justice & anime protagonist delusions'
-    ],
-    lore: [
-      'Legendary running gag friend ("Roni Uncle")',
-      'Fake legal team on speed dial',
-      'Area 51 research & alien biryani',
-      'Axe of justice & anime protagonist delusions'
-    ],
-    connections: [{ targetName: 'Rajveer', rel: 'Trolled constantly by Rajveer' }],
-    roastStyle: 'Clown his anime delusions, fake legal team, and axe of justice.',
-    idleHours: 14,
-    reminderEligible: false
-  },
-  {
     id: 'moksha',
     name: 'Moksha',
     handle: '@1fyz_2',
@@ -215,22 +190,6 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
     roastStyle: 'Tamil roast: "dei mooditu poda gomma", "otha summa iru da", "ne tha da periya gay lord".',
     idleHours: 9,
     reminderEligible: true
-  },
-  {
-    id: 'rubesh',
-    name: 'Rubesh',
-    handle: '',
-    relationship: 'Friend in Group',
-    category: 'group_icon',
-    gender: 'male',
-    personalNotes: 'Friend shipped with Arun as inside joke running gag.',
-    rollingSummary: 'Running joke couple with Arun.',
-    facts: ['Running joke partner with Arun ("U and Rubesh gay lovers breakup ha")'],
-    lore: ['Running joke partner with Arun ("U and Rubesh gay lovers breakup ha")'],
-    connections: [{ targetName: 'Arun', rel: 'Shipped as a couple with Arun' }],
-    roastStyle: 'Bring up the Arun ship joke.',
-    idleHours: 20,
-    reminderEligible: false
   }
 ];
 
@@ -314,6 +273,20 @@ const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [nodes, setNodes] = useState(DEFAULT_GRAPH_DATA);
+  // Track names/ids that were explicitly deleted locally so syncBackend never re-adds them
+  // Seeded from localStorage so deletes persist across page refreshes
+  const deletedNamesRef = useRef((() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_DELETED_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  })());
+  // Helper to persist deleted set to localStorage
+  const persistDeletedNames = (set) => {
+    try { localStorage.setItem(STORAGE_DELETED_KEY, JSON.stringify([...set])); } catch(e) {}
+  };
+  // Track names that were saved locally but not yet confirmed by server (prevent sync overwrite)
+  const pendingSavedNamesRef = useRef(new Set());
   const [selectedNode, setSelectedNode] = useState(null);
   const [routingConfig, setRoutingConfig] = useState({
     chatMode: 'everyone_except',
@@ -366,61 +339,99 @@ export function AppProvider({ children }) {
 
   const syncBackend = async () => {
     try {
-      // 1. Sync social graph (enriched with DB interactions, DP, and per-person AI settings)
+      // 1. Sync social graph — only update live stats (counts, profilePic)
+      //    Never overwrite locally-edited names/fields and never re-add deleted people
       const res = await fetch(`${API_BASE}/api/social-graph`);
       const data = await res.json();
       if (data.success && Array.isArray(data.nodes) && data.nodes.length > 0) {
-        const root = DEFAULT_GRAPH_DATA[0];
-        const serverNodes = data.nodes.map(n => {
-          const defaultMatch = DEFAULT_GRAPH_DATA.find(d => d.name.toLowerCase() === n.name.toLowerCase());
-          return {
-            id: n.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-            name: n.name,
-            handle: n.instagramHandle || defaultMatch?.handle || '',
-            senderId: n.senderId || defaultMatch?.senderId || '',
-            profilePic: n.profilePic || '',
-            aiEnabled: n.aiEnabled !== false,
-            replyToMessages: n.replyToMessages !== false,
-            replyToReelsAndPosts: n.replyToReelsAndPosts !== false,
-            chatsCount: typeof n.chatsCount === 'number' ? n.chatsCount : (typeof defaultMatch?.chatsCount === 'number' ? defaultMatch.chatsCount : 0),
-            reelsCount: typeof n.reelsCount === 'number' ? n.reelsCount : (typeof defaultMatch?.reelsCount === 'number' ? defaultMatch.reelsCount : 0),
-            messageCount: typeof n.chatsCount === 'number' ? n.chatsCount : 0,
-            relationship: n.relationshipToSam || defaultMatch?.relationship || 'Friend',
-            category: n.category || defaultMatch?.category || 'online_friend',
-            dob: n.dob || defaultMatch?.dob || (defaultMatch?.importantDates?.[0]?.date) || '',
-            gender: n.gender || defaultMatch?.gender || 'unknown',
-            personalNotes: n.personalNotes || defaultMatch?.personalNotes || (n.lore || []).join('\n'),
-            rollingSummary: defaultMatch?.rollingSummary || n.relationshipToSam,
-            conversationStyle: defaultMatch?.conversationStyle || 'Casual banter',
-            importantDates: defaultMatch?.importantDates || [],
-            facts: defaultMatch?.facts || (n.lore || []),
-            lore: n.lore || defaultMatch?.lore || [],
-            connections: (n.connections || []).map(c => ({
-              targetName: c.targetName,
-              rel: c.relationship || c.rel || 'connected'
-            })),
-            roastStyle: n.roastStyle || defaultMatch?.roastStyle || '',
-            idleHours: defaultMatch?.idleHours || 6,
-            reminderEligible: defaultMatch?.reminderEligible || false
-          };
-        });
+        const deletedNames = deletedNamesRef.current;
+        const pendingSaved = pendingSavedNamesRef.current;
 
-        const merged = [root];
-        const existingNames = new Set();
-        serverNodes.forEach(sn => {
-          merged.push(sn);
-          existingNames.add(sn.name.toLowerCase());
-        });
-        DEFAULT_GRAPH_DATA.forEach(dn => {
-          if (!dn.isRoot && !existingNames.has(dn.name.toLowerCase())) {
-            merged.push(dn);
-          }
-        });
+        setNodes(prev => {
+          // Build a map of current local nodes by name (lowercase) for fast lookup
+          const localMap = new Map();
+          prev.forEach(n => {
+            if (n.name) localMap.set(n.name.toLowerCase(), n);
+          });
 
-        const deduplicated = deduplicateNodes(merged);
-        root.children = deduplicated.filter(m => !m.isRoot).map(m => m.id);
-        setNodes(deduplicated);
-        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated));
+          // Set of names that exist on the server (for detecting truly new server contacts)
+          const serverNameSet = new Set(data.nodes.map(n => (n.name || '').toLowerCase()));
+
+          // Update existing local nodes with live stats from server (chatsCount, reelsCount, profilePic only)
+          const updatedNodes = prev.map(n => {
+            if (n.isRoot) return n;
+            const serverNode = data.nodes.find(sn =>
+              (sn.instagramHandle && n.handle && sn.instagramHandle.replace(/^@/,'').toLowerCase() === n.handle.replace(/^@/,'').toLowerCase()) ||
+              (sn.senderId && n.senderId && sn.senderId === n.senderId) ||
+              (sn.name && n.name && sn.name.toLowerCase() === n.name.toLowerCase())
+            );
+            if (!serverNode) return n;
+            // Only update stats & profilePic — never overwrite locally edited fields
+            return {
+              ...n,
+              profilePic: serverNode.profilePic || n.profilePic || '',
+              chatsCount: typeof serverNode.chatsCount === 'number' ? serverNode.chatsCount : n.chatsCount,
+              reelsCount: typeof serverNode.reelsCount === 'number' ? serverNode.reelsCount : n.reelsCount,
+              messageCount: typeof serverNode.chatsCount === 'number' ? serverNode.chatsCount : n.messageCount,
+              // Only update AI prefs if not pending a local save
+              ...(pendingSaved.has(n.name.toLowerCase()) ? {} : {
+                aiEnabled: serverNode.aiEnabled !== false,
+                replyToMessages: serverNode.replyToMessages !== false,
+                replyToReelsAndPosts: serverNode.replyToReelsAndPosts !== false
+              })
+            };
+          });
+
+          // Add truly new server contacts (not in local state, not deleted)
+          data.nodes.forEach(sn => {
+            const snNameLower = (sn.name || '').toLowerCase();
+            if (!snNameLower) return;
+            if (deletedNames.has(snNameLower)) return; // skip deleted
+            if (localMap.has(snNameLower)) return; // already exists locally
+            // New person from server — add them
+            const defaultMatch = DEFAULT_GRAPH_DATA.find(d => d.name.toLowerCase() === snNameLower);
+            updatedNodes.push({
+              id: snNameLower.replace(/[^a-z0-9]/g, '_'),
+              name: sn.name,
+              handle: sn.instagramHandle || defaultMatch?.handle || '',
+              senderId: sn.senderId || defaultMatch?.senderId || '',
+              profilePic: sn.profilePic || '',
+              aiEnabled: sn.aiEnabled !== false,
+              replyToMessages: sn.replyToMessages !== false,
+              replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
+              chatsCount: sn.chatsCount || 0,
+              reelsCount: sn.reelsCount || 0,
+              messageCount: sn.chatsCount || 0,
+              relationship: sn.relationshipToSam || defaultMatch?.relationship || 'Friend',
+              category: sn.category || defaultMatch?.category || 'online_friend',
+              dob: sn.dob || defaultMatch?.dob || '',
+              gender: sn.gender || defaultMatch?.gender || 'unknown',
+              personalNotes: sn.personalNotes || defaultMatch?.personalNotes || (sn.lore || []).join('\n'),
+              rollingSummary: defaultMatch?.rollingSummary || sn.relationshipToSam,
+              conversationStyle: defaultMatch?.conversationStyle || 'Casual banter',
+              importantDates: defaultMatch?.importantDates || [],
+              facts: defaultMatch?.facts || (sn.lore || []),
+              lore: sn.lore || defaultMatch?.lore || [],
+              connections: (sn.connections || []).map(c => ({ targetName: c.targetName, rel: c.relationship || c.rel || 'connected' })),
+              roastStyle: sn.roastStyle || defaultMatch?.roastStyle || '',
+              idleHours: defaultMatch?.idleHours || 6,
+              reminderEligible: defaultMatch?.reminderEligible || false
+            });
+          });
+
+          // Also ensure DEFAULT_GRAPH_DATA people appear if not deleted and not already present
+          DEFAULT_GRAPH_DATA.forEach(dn => {
+            if (dn.isRoot) return;
+            const dnLower = dn.name.toLowerCase();
+            if (deletedNames.has(dnLower)) return; // skip deleted
+            if (updatedNodes.some(n => !n.isRoot && n.name.toLowerCase() === dnLower)) return; // already present
+            updatedNodes.push(dn);
+          });
+
+          const deduplicated = deduplicateNodes(updatedNodes);
+          try { localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated)); } catch(e) {}
+          return deduplicated;
+        });
       }
 
       // 2. Sync persona config
@@ -452,6 +463,14 @@ export function AppProvider({ children }) {
     const cleanName = accumulatedNode.name.trim();
     const id = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_');
     const toDelete = Array.isArray(duplicateNamesToDelete) ? duplicateNamesToDelete : (accumulatedNode.duplicateNamesToDelete || []);
+
+    // Mark as pending save so syncBackend won't overwrite during the save round-trip
+    pendingSavedNamesRef.current.add(cleanName.toLowerCase());
+    // If this is a rename, make sure old name is NOT in deletedNames (it was never deleted)
+    // and remove the pending flag 6 seconds after save (enough time for server to update)
+    setTimeout(() => {
+      pendingSavedNamesRef.current.delete(cleanName.toLowerCase());
+    }, 6000);
 
     const formattedNode = {
       id,
@@ -557,6 +576,12 @@ export function AppProvider({ children }) {
     const targetName = targetObj?.name || (typeof nodeOrId === 'string' ? nodeOrId : '');
     const targetSenderId = targetObj?.senderId || '';
     const targetId = targetObj?.id || targetObj?._id || '';
+
+    // Register in deletedNames ref so syncBackend never re-adds this person
+    // Persisted to localStorage so it survives page refresh
+    if (targetName) deletedNamesRef.current.add(targetName.toLowerCase());
+    if (targetId) deletedNamesRef.current.add(targetId.toLowerCase());
+    persistDeletedNames(deletedNamesRef.current);
 
     // Optimistically update local nodes state
     setNodes(prev => {

@@ -97,32 +97,28 @@ export default function RelationshipsPage() {
   const [userClarification, setUserClarification] = useState('');
   const [knowBirthYear, setKnowBirthYear] = useState(true);
 
-  // Keep form data synchronized when a person is opened or updated
+  // Initialize form data ONLY when switching to a different person (not on every node poll)
+  // This prevents typing from being reset by the 4s background sync
   useEffect(() => {
     if (selectedPerson) {
-      const current = nodes.find(n =>
-        n.id === selectedPerson.id ||
-        (n.senderId && selectedPerson.senderId && n.senderId === selectedPerson.senderId) ||
-        (n.name && selectedPerson.name && n.name.toLowerCase() === selectedPerson.name.toLowerCase())
-      ) || selectedPerson;
-
-      const currentDob = current.dob || current.importantDates?.[0]?.date || '';
+      const currentDob = selectedPerson.dob || selectedPerson.importantDates?.[0]?.date || '';
       const hasYear = /\b(19|20)\d{2}\b/.test(currentDob);
       setKnowBirthYear(currentDob ? hasYear : true);
 
       setFormData({
-        name: current.name || '',
-        handle: current.handle || current.instagramHandle || '',
-        senderId: current.senderId || '',
+        name: selectedPerson.name || '',
+        handle: selectedPerson.handle || selectedPerson.instagramHandle || '',
+        senderId: selectedPerson.senderId || '',
         dob: currentDob,
-        gender: current.gender || 'unknown',
-        category: current.category || 'online_friend',
-        relationship: current.relationship || current.relationshipToSam || '',
-        personalNotes: current.personalNotes || (current.lore || []).join('\n'),
-        roastStyle: current.roastStyle || ''
+        gender: selectedPerson.gender || 'unknown',
+        category: selectedPerson.category || 'online_friend',
+        relationship: selectedPerson.relationship || selectedPerson.relationshipToSam || '',
+        personalNotes: selectedPerson.personalNotes || (selectedPerson.lore || []).join('\n'),
+        roastStyle: selectedPerson.roastStyle || ''
       });
     }
-  }, [selectedPerson, nodes]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPerson?.id, selectedPerson?.name]);
 
   // Auto-fetch & live sync intel from DMs when a person is opened
   useEffect(() => {
@@ -1212,28 +1208,6 @@ export default function RelationshipsPage() {
               />
             </div>
 
-            {/* Save Button */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
-              <button
-                type="submit"
-                style={{
-                  background: '#09090b',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '11px 24px',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Save size={15} />
-                <span>Save Profile Changes</span>
-              </button>
-            </div>
           </form>
         </div>
 
