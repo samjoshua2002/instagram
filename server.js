@@ -938,20 +938,26 @@ app.get('/api/social-graph', async (req, res) => {
 
       const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
 
-      // Compute total chats count and reels count
-      let chatsCount = memory?.messageCount || 0;
+      // Compute total chats count and reels count (ONLY count their messages, not Sam's or AI's replies)
+      let chatsCount = 0;
       let reelsCount = 0;
       if (effectiveSenderId) {
         try {
-          reelsCount = await Message.countDocuments({
-            $or: [{ senderId: effectiveSenderId }, { recipientId: effectiveSenderId }],
-            text: { $regex: /\[Shared an Instagram Reel|reel/i }
+          // Count only incoming messages sent by the contact
+          chatsCount = await Message.countDocuments({
+            senderId: effectiveSenderId,
+            role: 'user'
           });
-          if (chatsCount === 0) {
-            chatsCount = await Message.countDocuments({
-              $or: [{ senderId: effectiveSenderId }, { recipientId: effectiveSenderId }]
-            });
-          }
+
+          // Count only reels shared by the contact
+          reelsCount = await Message.countDocuments({
+            senderId: effectiveSenderId,
+            role: 'user',
+            $or: [
+              { text: { $regex: /\[Shared an Instagram Reel|reel/i } },
+              { isReelOrShare: true }
+            ]
+          });
         } catch (cntErr) {}
       }
 
