@@ -22,6 +22,10 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  profilePic: {
+    type: String,
+    default: '',
+  },
   senderId: {
     type: String,
     default: '',

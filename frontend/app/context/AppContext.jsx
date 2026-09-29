@@ -60,14 +60,15 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
   {
     id: 'annie',
     name: 'Annie',
-    handle: '',
+    handle: '@annies_hepsiba',
+    senderId: '2173928080193783',
     relationship: 'Sister',
     category: 'relative',
     gender: 'female',
     personalNotes: 'Sam\'s sister. Currently talking and close with Bhavani.',
     rollingSummary: 'Sam\'s sister.',
-    facts: ['Sam\'s sister', 'Currently talking with Bhavani'],
-    lore: ['Sam\'s sister', 'Currently talking with Bhavani'],
+    facts: ['Sam\'s sister', 'Currently talking with Bhavani', 'Instagram: @annies_hepsiba'],
+    lore: ['Sam\'s sister', 'Currently talking with Bhavani', 'Instagram: @annies_hepsiba'],
     connections: [{ targetName: 'Bhavani', rel: 'Talking / close with Bhavani' }],
     roastStyle: 'Sisterly teasing and banter.',
     idleHours: 2,
@@ -105,7 +106,7 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
   },
   {
     id: 'roni',
-    name: 'Roni (Roni Uncle)',
+    name: 'Roni',
     handle: '',
     relationship: 'Group Legend & Running Gag',
     category: 'group_icon',
@@ -231,6 +232,78 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
   }
 ];
 
+export function deduplicateNodes(nodesList) {
+  if (!Array.isArray(nodesList) || nodesList.length === 0) return DEFAULT_GRAPH_DATA;
+
+  const root = nodesList.find(n => n.isRoot) || DEFAULT_GRAPH_DATA[0];
+  const listWithoutRoot = nodesList.filter(n => !n.isRoot);
+
+  const mergedMap = new Map();
+
+  for (const node of listWithoutRoot) {
+    const rawName = (node.name || '').trim();
+    if (!rawName) continue;
+
+    // Check if this is a variant of Roni (e.g. "Roni", "Roni (Roni Uncle)", "Roni Uncle")
+    let canonicalKey = rawName.toLowerCase();
+    if (/^roni(\s*\(.*\))?$/i.test(canonicalKey) || canonicalKey.includes('roni uncle')) {
+      canonicalKey = 'roni';
+    } else if (canonicalKey.includes('annie') || node.handle?.toLowerCase().includes('annies_hepsiba')) {
+      canonicalKey = 'annie';
+    } else if (node.senderId && node.senderId.trim()) {
+      canonicalKey = `sender_${node.senderId.trim()}`;
+    } else if (node.handle && node.handle.trim()) {
+      canonicalKey = `handle_${node.handle.replace(/^@/, '').toLowerCase().trim()}`;
+    }
+
+    if (!mergedMap.has(canonicalKey)) {
+      const copy = { ...node };
+      if (canonicalKey === 'roni') {
+        copy.id = 'roni';
+        copy.name = 'Roni';
+        copy.relationship = 'Group Legend & Running Gag ("Roni Uncle")';
+      } else if (canonicalKey === 'annie') {
+        copy.id = 'annie';
+        copy.name = 'Annie';
+        copy.handle = copy.handle || '@annies_hepsiba';
+        copy.senderId = copy.senderId || '2173928080193783';
+      }
+      mergedMap.set(canonicalKey, copy);
+    } else {
+      const existing = mergedMap.get(canonicalKey);
+      if (!existing.handle && node.handle) existing.handle = node.handle;
+      if (!existing.senderId && node.senderId) existing.senderId = node.senderId;
+      if (!existing.profilePic && node.profilePic) existing.profilePic = node.profilePic;
+      if (typeof node.aiEnabled === 'boolean') existing.aiEnabled = node.aiEnabled;
+      if (typeof node.replyToMessages === 'boolean') existing.replyToMessages = node.replyToMessages;
+      if (typeof node.replyToReelsAndPosts === 'boolean') existing.replyToReelsAndPosts = node.replyToReelsAndPosts;
+
+      // Merge facts
+      const existingFacts = new Set(existing.facts || []);
+      (node.facts || []).forEach(f => existingFacts.add(f));
+      existing.facts = Array.from(existingFacts);
+
+      // Merge lore
+      const existingLore = new Set(existing.lore || []);
+      (node.lore || []).forEach(l => existingLore.add(l));
+      existing.lore = Array.from(existingLore);
+
+      // Merge connections
+      const existingTargets = new Set((existing.connections || []).map(c => (c.targetName || '').toLowerCase()));
+      (node.connections || []).forEach(c => {
+        if (c.targetName && !existingTargets.has(c.targetName.toLowerCase())) {
+          existing.connections.push(c);
+          existingTargets.add(c.targetName.toLowerCase());
+        }
+      });
+    }
+  }
+
+  const result = [root, ...Array.from(mergedMap.values())];
+  root.children = result.filter(n => !n.isRoot).map(n => n.id);
+  return result;
+}
+
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
@@ -253,14 +326,15 @@ export function AppProvider({ children }) {
     setTimeout(() => setToastMessage(''), 4000);
   }, []);
 
-  // Hydration from LocalStorage
+  // Hydration from LocalStorage with instant deduplication
   useEffect(() => {
     try {
       const cachedNodes = localStorage.getItem(STORAGE_NODES_KEY);
       if (cachedNodes) {
         const parsed = JSON.parse(cachedNodes);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setNodes(parsed);
+          const deduplicated = deduplicateNodes(parsed);
+          setNodes(deduplicated);
         }
       }
       const cachedConfig = localStorage.getItem(STORAGE_CONFIG_KEY);
@@ -276,7 +350,7 @@ export function AppProvider({ children }) {
 
   const syncBackend = async () => {
     try {
-      // 1. Sync social graph
+      // 1. Sync social graph (enriched with DB interactions, DP, and per-person AI settings)
       const res = await fetch(`${API_BASE}/api/social-graph`);
       const data = await res.json();
       if (data.success && Array.isArray(data.nodes) && data.nodes.length > 0) {
@@ -288,6 +362,10 @@ export function AppProvider({ children }) {
             name: n.name,
             handle: n.instagramHandle || defaultMatch?.handle || '',
             senderId: n.senderId || defaultMatch?.senderId || '',
+            profilePic: n.profilePic || '',
+            aiEnabled: n.aiEnabled !== false,
+            replyToMessages: n.replyToMessages !== false,
+            replyToReelsAndPosts: n.replyToReelsAndPosts !== false,
             relationship: n.relationshipToSam || defaultMatch?.relationship || 'Friend',
             category: defaultMatch?.category || 'close_friend',
             gender: n.gender || defaultMatch?.gender || 'unknown',
@@ -319,9 +397,10 @@ export function AppProvider({ children }) {
           }
         });
 
-        root.children = merged.filter(m => !m.isRoot).map(m => m.id);
-        setNodes(merged);
-        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(merged));
+        const deduplicated = deduplicateNodes(merged);
+        root.children = deduplicated.filter(m => !m.isRoot).map(m => m.id);
+        setNodes(deduplicated);
+        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated));
       }
 
       // 2. Sync persona config
@@ -330,14 +409,14 @@ export function AppProvider({ children }) {
       if (pData && (pData.chatMode || pData.globalBotActive !== undefined)) {
         setRoutingConfig({
           chatMode: pData.chatMode || 'everyone_except',
-          excludedContactIds: pData.excludedContactIds || [],
-          includedContactIds: pData.includedContactIds || [],
+          excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
+          includedContactIds: (pData.includedContactIds || []).filter(Boolean),
           globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
         });
         localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify({
           chatMode: pData.chatMode || 'everyone_except',
-          excludedContactIds: pData.excludedContactIds || [],
-          includedContactIds: pData.includedContactIds || [],
+          excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
+          includedContactIds: (pData.includedContactIds || []).filter(Boolean),
           globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
         }));
       }
@@ -347,17 +426,19 @@ export function AppProvider({ children }) {
   };
 
   // Optimistic Save Node
-  const saveNode = async (accumulatedNode) => {
+  const saveNode = async (accumulatedNode, duplicateNamesToDelete = []) => {
     if (!accumulatedNode?.name) return;
 
     const cleanName = accumulatedNode.name.trim();
     const id = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const toDelete = Array.isArray(duplicateNamesToDelete) ? duplicateNamesToDelete : (accumulatedNode.duplicateNamesToDelete || []);
 
     const formattedNode = {
       id,
       name: cleanName,
       handle: accumulatedNode.instagramHandle || accumulatedNode.handle || '',
       senderId: accumulatedNode.senderId || '',
+      profilePic: accumulatedNode.profilePic || '',
       relationship: accumulatedNode.relationshipToSam || accumulatedNode.relationship || 'Friend',
       category: accumulatedNode.category || 'close_friend',
       gender: accumulatedNode.gender || 'unknown',
@@ -372,33 +453,34 @@ export function AppProvider({ children }) {
         rel: c.relationship || c.rel || 'connected'
       })),
       roastStyle: accumulatedNode.roastStyle || 'Playful natural banter',
+      aiEnabled: accumulatedNode.aiEnabled !== false,
+      replyToMessages: accumulatedNode.replyToMessages !== false,
+      replyToReelsAndPosts: accumulatedNode.replyToReelsAndPosts !== false,
       idleHours: 4,
       reminderEligible: true
     };
 
-    // Instant React state update
     setNodes(prev => {
-      const existingIdx = prev.findIndex(n => n.name.toLowerCase() === cleanName.toLowerCase());
+      // Filter out duplicate names
+      const filtered = prev.filter(n => {
+        const nNameLower = n.name.toLowerCase();
+        return !toDelete.some(d => d.toLowerCase() === nNameLower);
+      });
+
+      const existingIdx = filtered.findIndex(n => n.name.toLowerCase() === cleanName.toLowerCase());
       let next;
       if (existingIdx >= 0) {
-        next = [...prev];
+        next = [...filtered];
         next[existingIdx] = { ...next[existingIdx], ...formattedNode };
       } else {
-        next = [...prev, formattedNode];
+        next = [...filtered, formattedNode];
       }
 
-      const rootIdx = next.findIndex(n => n.isRoot);
-      if (rootIdx >= 0) {
-        next[rootIdx] = {
-          ...next[rootIdx],
-          children: next.filter(n => !n.isRoot).map(n => n.id)
-        };
-      }
-
+      const deduplicated = deduplicateNodes(next);
       try {
-        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(next));
+        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated));
       } catch (e) {}
-      return next;
+      return deduplicated;
     });
 
     setSelectedNode(formattedNode);
@@ -423,8 +505,137 @@ export function AppProvider({ children }) {
           }))
         })
       });
+
+      for (const dup of toDelete) {
+        await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(dup)}`, {
+          method: 'DELETE'
+        });
+      }
     } catch (err) {
       console.warn('Backend node save error:', err.message);
+    }
+  };
+
+  // Delete a Person from Knowledge Tree & MongoDB
+  const deleteNode = async (nodeNameOrId) => {
+    if (!nodeNameOrId) return;
+    const target = nodes.find(n => n.id === nodeNameOrId || n.name.toLowerCase() === nodeNameOrId.toLowerCase());
+    const targetName = target ? target.name : nodeNameOrId;
+
+    setNodes(prev => {
+      const updated = prev.filter(n => n.id !== nodeNameOrId && n.name.toLowerCase() !== targetName.toLowerCase());
+      const rootIdx = updated.findIndex(n => n.isRoot);
+      if (rootIdx >= 0) {
+        updated[rootIdx] = {
+          ...updated[rootIdx],
+          children: updated.filter(n => !n.isRoot).map(n => n.id)
+        };
+      }
+      try {
+        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    if (selectedNode && (selectedNode.id === nodeNameOrId || selectedNode.name.toLowerCase() === targetName.toLowerCase())) {
+      setSelectedNode(null);
+    }
+
+    showToast(`🗑️ Deleted ${targetName} from Knowledge Tree & DB`);
+
+    try {
+      await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(targetName)}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.warn('Backend delete node error:', err.message);
+    }
+  };
+
+  // Update Per-Person AI Reply Mode (Full AI, Reels Only, Paused / Sam Manual)
+  const updateContactPreferences = async (contactIdOrSenderId, { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts }) => {
+    if (!contactIdOrSenderId) return;
+
+    let finalAiEnabled = aiEnabled;
+    let finalReplyMessages = replyToMessages;
+    let finalReplyReels = replyToReelsAndPosts;
+
+    if (aiMode === 'full_ai') {
+      finalAiEnabled = true;
+      finalReplyMessages = true;
+      finalReplyReels = true;
+    } else if (aiMode === 'reels_only') {
+      finalAiEnabled = true;
+      finalReplyMessages = false;
+      finalReplyReels = true;
+    } else if (aiMode === 'messages_only') {
+      finalAiEnabled = true;
+      finalReplyMessages = true;
+      finalReplyReels = false;
+    } else if (aiMode === 'paused' || aiMode === 'manual') {
+      finalAiEnabled = false;
+      finalReplyMessages = false;
+      finalReplyReels = false;
+    }
+
+    let contactName = '';
+    setNodes(prev => {
+      const next = prev.map(n => {
+        const matches = (
+          n.id === contactIdOrSenderId ||
+          n.senderId === contactIdOrSenderId ||
+          n.name.toLowerCase() === contactIdOrSenderId.toLowerCase() ||
+          (n.handle && n.handle.replace(/^@/, '').toLowerCase() === contactIdOrSenderId.replace(/^@/, '').toLowerCase())
+        );
+
+        if (matches) {
+          contactName = n.name;
+          return {
+            ...n,
+            ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
+            ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
+            ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+          };
+        }
+        return n;
+      });
+      try {
+        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    if (selectedNode) {
+      setSelectedNode(prev => ({
+        ...prev,
+        ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
+        ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
+        ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+      }));
+    }
+
+    const nameStr = contactName || contactIdOrSenderId;
+    if (aiMode === 'reels_only') {
+      showToast(`🎬 ${nameStr}: AI will ONLY react to shared Reels!`);
+    } else if (aiMode === 'paused' || aiMode === 'manual') {
+      showToast(`⏸️ Stopped AI for ${nameStr}. Sam will chat manually!`);
+    } else {
+      showToast(`⚡ Full AI auto-reply enabled for ${nameStr}!`);
+    }
+
+    try {
+      await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(contactIdOrSenderId)}/preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aiMode,
+          aiEnabled: finalAiEnabled,
+          replyToMessages: finalReplyMessages,
+          replyToReelsAndPosts: finalReplyReels
+        })
+      });
+    } catch (e) {
+      console.warn('Preferences backend sync note:', e.message);
     }
   };
 
@@ -519,6 +730,8 @@ export function AppProvider({ children }) {
         saveRouting,
         toggleGlobalBot,
         saveNode,
+        deleteNode,
+        updateContactPreferences,
         addFact,
         showToast,
         toastMessage,

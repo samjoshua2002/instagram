@@ -24,6 +24,10 @@ const PORT = process.env.PORT || 3000;
 // Connect to MongoDB
 connectDB();
 
+function escapeRegex(string) {
+  return (string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -905,11 +909,38 @@ app.post('/api/cleanup', async (req, res) => {
   }
 });
 
-// Social Graph Tree Chain Endpoints
+// Social Graph Tree Chain Endpoints (auto-discovers newly talked contacts & enriches with live DP & per-person AI settings)
 app.get('/api/social-graph', async (req, res) => {
   try {
+    // 1. Train and link graph from DB first so newly talked people appear immediately
+    await socialGraphService.trainGraphFromDB(UserMemory, Message);
+
+    // 2. Fetch all social graph nodes
     const nodes = await SocialGraph.find({}).sort({ updatedAt: -1 });
-    res.json({ success: true, nodes });
+
+    // 3. Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
+    const enrichedNodes = await Promise.all(nodes.map(async (n) => {
+      let memory = null;
+      if (n.senderId) {
+        memory = await UserMemory.findOne({ senderId: n.senderId });
+      }
+      if (!memory && n.instagramHandle) {
+        const cleanU = n.instagramHandle.replace(/^@/, '').toLowerCase().trim();
+        memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
+      }
+
+      return {
+        ...n.toObject(),
+        profilePic: memory?.profilePic || n.profilePic || '',
+        aiEnabled: memory ? memory.aiEnabled !== false : true,
+        replyToMessages: memory ? memory.replyToMessages !== false : true,
+        replyToReelsAndPosts: memory ? memory.replyToReelsAndPosts !== false : true,
+        messageCount: memory?.messageCount || 0,
+        lastInteraction: memory?.lastInteraction || n.updatedAt
+      };
+    }));
+
+    res.json({ success: true, nodes: enrichedNodes });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1006,12 +1037,103 @@ app.post('/api/social-graph/node', async (req, res) => {
   }
 });
 
-// Delete a friend node from the tree
+// Delete a friend node from the tree and database
 app.delete('/api/social-graph/node/:name', async (req, res) => {
   try {
-    await SocialGraph.deleteOne({ name: new RegExp(`^${req.params.name}$`, 'i') });
+    const rawName = (req.params.name || '').trim();
+    if (!rawName) return res.status(400).json({ error: 'Name is required' });
+
+    await SocialGraph.deleteMany({
+      $or: [
+        { name: new RegExp(`^${escapeRegex(rawName)}$`, 'i') },
+        { name: rawName },
+        { instagramHandle: `@${rawName.replace(/^@/, '')}` }
+      ]
+    });
     socialGraphService.clearCache();
-    res.json({ success: true, message: `Deleted ${req.params.name}` });
+    res.json({ success: true, message: `Deleted ${rawName} from database` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update per-person AI reply policy (Full AI, Only Reels, Stop AI / Sam Manual)
+app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts } = req.body;
+
+    let finalAiEnabled = aiEnabled;
+    let finalReplyMessages = replyToMessages;
+    let finalReplyReels = replyToReelsAndPosts;
+
+    if (aiMode === 'full_ai') {
+      finalAiEnabled = true;
+      finalReplyMessages = true;
+      finalReplyReels = true;
+    } else if (aiMode === 'reels_only') {
+      finalAiEnabled = true;
+      finalReplyMessages = false;
+      finalReplyReels = true;
+    } else if (aiMode === 'messages_only') {
+      finalAiEnabled = true;
+      finalReplyMessages = true;
+      finalReplyReels = false;
+    } else if (aiMode === 'paused' || aiMode === 'manual') {
+      finalAiEnabled = false;
+      finalReplyMessages = false;
+      finalReplyReels = false;
+    }
+
+    const cleanId = (identifier || '').trim();
+    const cleanHandle = cleanId.replace(/^@/, '');
+
+    // Update UserMemory if present
+    await UserMemory.updateMany(
+      {
+        $or: [
+          { senderId: cleanId },
+          { username: new RegExp(`^${escapeRegex(cleanHandle)}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(cleanId)}$`, 'i') }
+        ]
+      },
+      {
+        $set: {
+          ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
+          ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
+          ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+        }
+      }
+    );
+
+    // Update SocialGraph if present
+    await SocialGraph.updateMany(
+      {
+        $or: [
+          { senderId: cleanId },
+          { instagramHandle: new RegExp(`^@?${escapeRegex(cleanHandle)}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(cleanId)}$`, 'i') },
+          { aliases: cleanHandle.toLowerCase() }
+        ]
+      },
+      {
+        $set: {
+          ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
+          ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
+          ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+        }
+      }
+    );
+
+    socialGraphService.clearCache();
+    res.json({
+      success: true,
+      preferences: {
+        aiEnabled: finalAiEnabled,
+        replyToMessages: finalReplyMessages,
+        replyToReelsAndPosts: finalReplyReels
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1027,7 +1149,22 @@ app.post('/api/social-graph/ai-interview', async (req, res) => {
       existingNode
     });
 
-    if (interviewResult.isComplete && autoSave && interviewResult.node?.name) {
+    // Handle automated duplicate merging in DB
+    if (Array.isArray(interviewResult.duplicateNamesToDelete) && interviewResult.duplicateNamesToDelete.length > 0) {
+      console.log('🗑️ AI identified duplicate names to remove from DB:', interviewResult.duplicateNamesToDelete);
+      const queryList = interviewResult.duplicateNamesToDelete.map(n => n.trim()).filter(Boolean);
+      const regexList = queryList.map(n => new RegExp(`^${escapeRegex(n)}$`, 'i'));
+
+      await SocialGraph.deleteMany({
+        $or: [
+          { name: { $in: regexList } },
+          { name: { $in: queryList } }
+        ]
+      });
+      socialGraphService.clearCache();
+    }
+
+    if (interviewResult.isComplete && (autoSave || interviewResult.duplicateNamesToDelete?.length) && interviewResult.node?.name) {
       const node = interviewResult.node;
       await SocialGraph.findOneAndUpdate(
         { name: new RegExp(`^${node.name.trim()}$`, 'i') },
