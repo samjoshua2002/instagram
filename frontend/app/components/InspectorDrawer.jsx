@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from './ContactAvatar';
-import { X, Sparkles, Clock, Check, Film, PauseCircle, Trash2 } from 'lucide-react';
+import { X, Sparkles, Clock, Check, Film, PauseCircle, Trash2, Link2, AlertTriangle } from 'lucide-react';
 
 export default function InspectorDrawer() {
   const {
@@ -13,6 +13,7 @@ export default function InspectorDrawer() {
     startAiInterview,
     deleteNode,
     updateContactPreferences,
+    setLinkingTargetPerson,
     API_BASE,
     showToast
   } = useApp();
@@ -56,6 +57,8 @@ export default function InspectorDrawer() {
     }
   };
 
+  const hasInstagramId = Boolean(selectedNode.handle || selectedNode.senderId);
+
   return (
     <div
       style={{
@@ -78,10 +81,33 @@ export default function InspectorDrawer() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <ContactAvatar contact={selectedNode} size={44} showStatus={true} />
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#ffffff' }}>{selectedNode.name}</h2>
-            <span style={{ fontSize: '0.78rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
-              {selectedNode.handle || 'No Instagram handle'}
-            </span>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>{selectedNode.name}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+              <span style={{ fontSize: '0.78rem', color: hasInstagramId ? '#10b981' : '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
+                {selectedNode.handle || 'No Instagram handle'}
+              </span>
+              <button
+                onClick={() => setLinkingTargetPerson(selectedNode)}
+                title={hasInstagramId ? "Edit or change linked Instagram ID" : "Link Instagram ID"}
+                style={{
+                  background: hasInstagramId ? '#18181b' : 'rgba(245, 158, 11, 0.2)',
+                  border: '1px solid',
+                  borderColor: hasInstagramId ? '#3f3f46' : '#f59e0b',
+                  color: hasInstagramId ? '#a1a1aa' : '#f59e0b',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  fontSize: '0.68rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+              >
+                <Link2 size={10} />
+                <span>{hasInstagramId ? 'Edit ID' : '+ Link ID'}</span>
+              </button>
+            </div>
           </div>
         </div>
         <button
@@ -91,6 +117,50 @@ export default function InspectorDrawer() {
           <X size={18} />
         </button>
       </div>
+
+      {/* Prominent Banner when Contact has NO ID */}
+      {!hasInstagramId && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1.5px solid #f59e0b',
+            borderRadius: '10px',
+            padding: '12px 14px',
+            marginBottom: '18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: '800', fontSize: '0.82rem' }}>
+            <AlertTriangle size={16} />
+            <span>Missing Instagram Account Connection</span>
+          </div>
+          <p style={{ color: '#d1d5db', fontSize: '0.75rem', margin: 0, lineHeight: '1.4' }}>
+            The AI clone doesn&apos;t know when {selectedNode.name} texts you in live DMs. Link their @handle to merge past conversation memories and reply using this lore.
+          </p>
+          <button
+            onClick={() => setLinkingTargetPerson(selectedNode)}
+            style={{
+              background: '#f59e0b',
+              color: '#000000',
+              border: 'none',
+              padding: '7px 12px',
+              borderRadius: '6px',
+              fontSize: '0.76rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <Link2 size={14} />
+            <span>Link Instagram ID Now</span>
+          </button>
+        </div>
+      )}
 
       {/* Per-Person AI Behavior Controller */}
       <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px', marginBottom: '18px' }}>

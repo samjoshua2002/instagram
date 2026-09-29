@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import AiInterviewModal from './components/AiInterviewModal';
 import InspectorDrawer from './components/InspectorDrawer';
+import LinkIdModal from './components/LinkIdModal';
 
 export const metadata = {
   title: 'Chatter OS // Sam Joshua',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }) {
           <Toast />
           <AiInterviewModal />
           <InspectorDrawer />
+          <LinkIdModal />
         </AppProvider>
       </body>
     </html>

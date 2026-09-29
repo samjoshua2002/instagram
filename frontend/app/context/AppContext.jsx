@@ -321,6 +321,9 @@ export function AppProvider({ children }) {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [editingNode, setEditingNode] = useState(null);
 
+  // Link Instagram ID Modal State
+  const [linkingTargetPerson, setLinkingTargetPerson] = useState(null);
+
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 4000);
@@ -719,6 +722,71 @@ export function AppProvider({ children }) {
     setIsAiModalOpen(true);
   };
 
+  // Link Instagram ID & Merge chatter records
+  const linkContactId = async (personName, instagramHandle, senderId) => {
+    if (!personName) return false;
+    const cleanHandle = instagramHandle ? `@${instagramHandle.replace(/^@/, '').trim()}` : '';
+
+    // Optimistically update local nodes state
+    setNodes(prev => {
+      const targetLower = personName.toLowerCase();
+      // Remove any duplicate node that previously had this handle or senderId
+      const filtered = prev.filter(n => {
+        if (n.name.toLowerCase() === targetLower) return true;
+        if (cleanHandle && n.handle && n.handle.toLowerCase() === cleanHandle.toLowerCase()) return false;
+        if (senderId && n.senderId && n.senderId === senderId) return false;
+        return true;
+      });
+
+      const next = filtered.map(n => {
+        if (n.name.toLowerCase() === targetLower) {
+          return {
+            ...n,
+            handle: cleanHandle || n.handle,
+            senderId: senderId || n.senderId
+          };
+        }
+        return n;
+      });
+
+      try {
+        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    if (selectedNode && selectedNode.name.toLowerCase() === personName.toLowerCase()) {
+      setSelectedNode(prev => ({
+        ...prev,
+        handle: cleanHandle || prev.handle,
+        senderId: senderId || prev.senderId
+      }));
+    }
+
+    showToast(`🔗 Linked ${personName} with ${cleanHandle || senderId}!`);
+    setLinkingTargetPerson(null);
+
+    // Call backend to persist merge and link in MongoDB
+    try {
+      const res = await fetch(`${API_BASE}/api/social-graph/link-id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personName, instagramHandle: cleanHandle, senderId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✅ Merged & linked ${personName}! AI will recognize them in DMs.`);
+        syncBackend();
+        return true;
+      } else {
+        showToast(`⚠️ Link warning: ${data.error || 'Check server connection'}`);
+      }
+    } catch (err) {
+      console.warn('Backend link error:', err.message);
+    }
+    return false;
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -739,6 +807,10 @@ export function AppProvider({ children }) {
         setIsAiModalOpen,
         editingNode,
         startAiInterview,
+        linkingTargetPerson,
+        setLinkingTargetPerson,
+        linkContactId,
+        syncBackend,
         API_BASE
       }}
     >
