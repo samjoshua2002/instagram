@@ -30,6 +30,26 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+.app-main-content {
+  margin-left: 305px;
+  width: calc(100vw - 305px);
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  background: #000000;
+}
+
+@media (max-width: 768px) {
+  .app-main-content {
+    margin-left: 0;
+    width: 100vw;
+    margin-top: 56px;
+    height: calc(100vh - 56px);
+  }
+}
+
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

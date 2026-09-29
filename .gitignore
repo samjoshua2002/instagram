@@ -5,3 +5,5 @@ cloudflared.exe
 .DS_Store
 Thumbs.db
 scratch/
+.next/
+frontend/.next/
