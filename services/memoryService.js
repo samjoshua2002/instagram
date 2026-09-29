@@ -225,6 +225,58 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       await memory.save();
 
       console.log(`🧠 [Deep Memory Updated] @${memory.username}: Dates=${memory.importantDates.length}, Favs=${memory.favoriteThings.length}, Events=${memory.lifeEvents.length}`);
+
+      // Dynamically sync updated memory into SocialGraph so People Menu cards update in real time!
+      try {
+        const SocialGraph = require('../models/SocialGraph');
+        const socialGraphService = require('./socialGraphService');
+        const cleanU = (memory.username || '').replace(/^@/, '').toLowerCase().trim();
+        const displayName = memory.name && !memory.name.startsWith('User_') ? memory.name.trim() : (memory.nickname || memory.username);
+
+        const node = await SocialGraph.findOne({
+          $or: [
+            { senderId: memory.senderId },
+            { instagramHandle: `@${cleanU}` },
+            { instagramHandle: cleanU },
+            { aliases: cleanU }
+          ]
+        });
+
+        const allFacts = [
+          ...(memory.facts || []).map(f => f.fact),
+          ...(memory.importantDates || []).map(d => `${d.title}: ${d.date} ${d.details ? `(${d.details})` : ''}`),
+          ...(memory.favoriteThings || []).map(f => `Favorite ${f.category}: ${f.item}`),
+          ...(memory.lifeEvents || []).map(e => `${e.title}: ${e.details}`)
+        ].filter(Boolean);
+
+        if (node) {
+          node.lore = Array.from(new Set([...(node.lore || []), ...allFacts]));
+          if (memory.profilePic) node.profilePic = memory.profilePic;
+          if (memory.gender && node.gender === 'unknown') node.gender = memory.gender;
+          node.updatedAt = new Date();
+          await node.save();
+        } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU)) {
+          await SocialGraph.create({
+            name: displayName,
+            aliases: [cleanU, (memory.name || '').toLowerCase()].filter(Boolean),
+            instagramHandle: `@${cleanU}`,
+            senderId: memory.senderId,
+            profilePic: memory.profilePic || '',
+            gender: memory.gender || 'unknown',
+            relationshipToSam: memory.relationshipType && memory.relationshipType !== 'stranger'
+              ? `${memory.relationshipType.charAt(0).toUpperCase() + memory.relationshipType.slice(1)}`
+              : 'Follower / Online Contact',
+            connections: [],
+            lore: allFacts.length > 0 ? allFacts : (memory.personalNotes ? [memory.personalNotes] : []),
+            languages: ['English'],
+            roastStyle: 'Casual & friendly'
+          });
+        }
+        socialGraphService.clearCache();
+        console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for @${cleanU}`);
+      } catch (sgSyncErr) {
+        console.warn('⚠️ Dynamic SocialGraph sync note:', sgSyncErr.message);
+      }
     } catch (err) {
       console.error('❌ Error updating user memory:', err.message);
     }

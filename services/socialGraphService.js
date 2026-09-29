@@ -147,16 +147,16 @@ class SocialGraphService {
         },
         {
           name: 'Annie',
-          aliases: ['annie', 'ann', 'sister'],
-          instagramHandle: '',
-          senderId: '',
+          aliases: ['annie', 'ann', 'sister', 'annies_hepsiba', 'annies hepsiba', 'annies'],
+          instagramHandle: '@annies_hepsiba',
+          senderId: '2173928080193783',
           gender: 'female',
           relationshipToSam: 'Sister',
           connections: [
             { targetName: 'Bhavani', relationship: 'talking / friends with Bhavani', notes: 'Bhavani is currently talking with Annie.' }
           ],
           lore: [
-            'Sam\'s sister.',
+            'Sam\'s sister (Instagram: @annies_hepsiba).',
             'Currently talking with Bhavani.'
           ],
           languages: ['English', 'Tamil'],
@@ -192,17 +192,36 @@ class SocialGraphService {
 
       const memories = await UserMemoryModel.find({});
       for (const mem of memories) {
-        const usernameLower = (mem.username || '').toLowerCase();
-        const nameLower = (mem.name || '').toLowerCase();
-        const nicknameLower = (mem.nickname || '').toLowerCase();
+        const usernameLower = (mem.username || '').replace(/^@/, '').toLowerCase().trim();
+        const nameLower = (mem.name || '').toLowerCase().trim();
+        const nicknameLower = (mem.nickname || '').toLowerCase().trim();
+
+        // Skip internal testing accounts
+        if (
+          !usernameLower ||
+          /^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(usernameLower) ||
+          /^(test_|ig_tester_)/i.test(mem.senderId) ||
+          mem.senderId === 'me'
+        ) {
+          continue;
+        }
 
         const orConditions = [{ senderId: mem.senderId }];
-        if (usernameLower) orConditions.push({ aliases: usernameLower });
+        if (usernameLower) {
+          orConditions.push({ aliases: usernameLower });
+          orConditions.push({ instagramHandle: `@${usernameLower}` });
+          orConditions.push({ instagramHandle: usernameLower });
+        }
         if (nameLower) {
           orConditions.push({ aliases: nameLower });
           orConditions.push({ name: new RegExp(`^${escapeRegex(nameLower)}$`, 'i') });
         }
-        if (nicknameLower) orConditions.push({ aliases: nicknameLower });
+        if (nicknameLower) {
+          orConditions.push({ aliases: nicknameLower });
+        }
+        if (usernameLower.includes('annie') || nameLower.includes('annie')) {
+          orConditions.push({ name: 'Annie' });
+        }
 
         // Check if this memory belongs to an existing node
         const matchingNode = await SocialGraph.findOne({ $or: orConditions });
@@ -214,16 +233,52 @@ class SocialGraphService {
             updated = true;
           }
           if (mem.username && !matchingNode.instagramHandle) {
-            matchingNode.instagramHandle = `@${mem.username}`;
+            matchingNode.instagramHandle = `@${usernameLower}`;
             updated = true;
           }
           if (mem.gender && matchingNode.gender === 'unknown') {
             matchingNode.gender = mem.gender;
             updated = true;
           }
+          if (mem.profilePic && !matchingNode.profilePic) {
+            matchingNode.profilePic = mem.profilePic;
+            updated = true;
+          }
           if (updated) {
             await matchingNode.save();
             console.log(`🔗 [SocialGraph] Linked senderId ${mem.senderId} (${mem.username}) to node ${matchingNode.name}`);
+          }
+        } else {
+          // Newly talked person discovered from conversation history!
+          const cleanDisplayName = mem.name && !mem.name.startsWith('User_') ? mem.name.trim() : (mem.nickname || mem.username);
+          const cleanHandle = `@${usernameLower}`;
+
+          // Extra safety duplicate check by name, handle, or senderId
+          const exists = await SocialGraph.findOne({
+            $or: [
+              { name: new RegExp(`^${escapeRegex(cleanDisplayName)}$`, 'i') },
+              { instagramHandle: cleanHandle },
+              { senderId: mem.senderId }
+            ]
+          });
+
+          if (!exists) {
+            await SocialGraph.create({
+              name: cleanDisplayName,
+              aliases: [usernameLower, nameLower, nicknameLower].filter(Boolean),
+              instagramHandle: cleanHandle,
+              senderId: mem.senderId,
+              profilePic: mem.profilePic || '',
+              gender: mem.gender || 'unknown',
+              relationshipToSam: mem.relationshipType && mem.relationshipType !== 'stranger'
+                ? `${mem.relationshipType.charAt(0).toUpperCase() + mem.relationshipType.slice(1)}`
+                : 'Follower / Online Contact',
+              connections: [],
+              lore: mem.personalNotes ? [mem.personalNotes] : ((mem.facts || []).map(f => f.fact).filter(Boolean)),
+              languages: ['English'],
+              roastStyle: 'Casual & friendly'
+            });
+            console.log(`✨ [SocialGraph] Added newly talked contact to Knowledge Tree: ${cleanDisplayName} (${cleanHandle})`);
           }
         }
       }
