@@ -322,10 +322,23 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   userMemory.messageCount = (userMemory.messageCount || 0) + 1;
   await userMemory.save();
 
-  // 4. Check if Bot is enabled globally
-  if (!config.globalBotActive) {
-    console.log(`⏸️ Global Bot is paused. Message saved to inbox, skipping auto-reply.`);
+  // 4. Check if Bot is enabled globally or paused
+  if (!config.globalBotActive || config.chatMode === 'paused') {
+    console.log(`⏸️ Global Bot is paused (mode: ${config.chatMode || 'paused'}). Message saved to inbox, skipping auto-reply.`);
     return;
+  }
+
+  // Check chat routing mode: 'everyone', 'everyone_except', 'only_selected'
+  if (config.chatMode === 'everyone_except') {
+    if ((config.excludedContactIds || []).includes(senderId) || userMemory.aiEnabled === false) {
+      console.log(`⏸️ User ${userMemory.username} (${senderId}) is in the EXCLUDE list. Skipping auto-reply.`);
+      return;
+    }
+  } else if (config.chatMode === 'only_selected') {
+    if (!(config.includedContactIds || []).includes(senderId)) {
+      console.log(`⏸️ User ${userMemory.username} (${senderId}) is NOT in the selected whitelist. Skipping auto-reply.`);
+      return;
+    }
   }
 
   // Check if AI is enabled for this specific user
@@ -503,6 +516,9 @@ app.get('/api/status', async (req, res) => {
       creatorName: config.creatorName || 'Sam Joshua',
       instagramHandle: config.instagramHandle || '@chipichappa.daily',
       globalBotActive: config.globalBotActive ?? true,
+      chatMode: config.chatMode || 'everyone',
+      excludedContactIds: config.excludedContactIds || [],
+      includedContactIds: config.includedContactIds || [],
       hasPageAccessToken: !!(token && token.length > 10),
       appId: process.env.META_APP_ID || '1037131122693653',
       webhookVerifyToken: VERIFY_TOKEN,
@@ -733,6 +749,9 @@ app.put('/api/persona', async (req, res) => {
       customKnowledge,
       forbiddenWords,
       globalBotActive,
+      chatMode,
+      excludedContactIds,
+      includedContactIds,
       typingDelaySeconds,
       instagramPageAccessToken,
       instagramAccountId,
@@ -746,6 +765,9 @@ app.put('/api/persona', async (req, res) => {
     if (customKnowledge !== undefined) config.customKnowledge = customKnowledge;
     if (forbiddenWords !== undefined) config.forbiddenWords = forbiddenWords;
     if (globalBotActive !== undefined) config.globalBotActive = globalBotActive;
+    if (chatMode !== undefined) config.chatMode = chatMode;
+    if (excludedContactIds !== undefined) config.excludedContactIds = excludedContactIds;
+    if (includedContactIds !== undefined) config.includedContactIds = includedContactIds;
     if (typingDelaySeconds !== undefined) config.typingDelaySeconds = typingDelaySeconds;
     if (instagramPageAccessToken !== undefined) config.instagramPageAccessToken = instagramPageAccessToken;
     if (instagramAccountId !== undefined) config.instagramAccountId = instagramAccountId;
@@ -907,8 +929,9 @@ app.post('/api/social-graph/sync', async (req, res) => {
 // Add or edit a friend node in the social knowledge tree
 app.post('/api/social-graph/node', async (req, res) => {
   try {
-    const { name, aliases, instagramHandle, senderId, gender, relationshipToSam, lore, roastStyle, connections } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+    const finalRelationship = relationshipToSam || req.body.relationship || 'friend';
+    const rawHandle = instagramHandle || req.body.handle || '';
+    const finalHandle = rawHandle ? (rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`) : '';
 
     let parsedAliases = [];
     if (Array.isArray(aliases)) {
@@ -926,7 +949,16 @@ app.post('/api/social-graph/node', async (req, res) => {
 
     let parsedConnections = [];
     if (Array.isArray(connections)) {
-      parsedConnections = connections;
+      parsedConnections = connections.map(c => {
+        if (typeof c === 'string') {
+          return { targetName: c.trim(), relationship: 'connected', notes: '' };
+        }
+        return {
+          targetName: c.targetName || c.name || '',
+          relationship: c.relationship || c.rel || 'friend',
+          notes: c.notes || ''
+        };
+      }).filter(c => c.targetName);
     } else if (typeof connections === 'string') {
       parsedConnections = connections.split(',').map(c => {
         const match = c.trim().match(/^([^(]+)(?:\(([^)]+)\))?/);
@@ -947,10 +979,10 @@ app.post('/api/social-graph/node', async (req, res) => {
         $set: {
           name: name.trim(),
           aliases: parsedAliases,
-          instagramHandle: instagramHandle ? (instagramHandle.startsWith('@') ? instagramHandle : `@${instagramHandle}`) : '',
+          instagramHandle: finalHandle,
           senderId: senderId || '',
           gender: gender || 'unknown',
-          relationshipToSam: relationshipToSam || 'friend',
+          relationshipToSam: finalRelationship,
           lore: parsedLore,
           roastStyle: roastStyle || 'Banter back naturally matching their energy.',
           connections: parsedConnections,

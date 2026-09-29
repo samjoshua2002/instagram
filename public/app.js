@@ -652,6 +652,10 @@ function setupEventListeners() {
         await loadSocialGraph();
       }
     } catch (err) {
+      showToast('Error deleting friend: ' + err.message, true);
+    }
+  });
+
   // AI Clarification Wizard inside modal
   const sendAiWizardMessage = async () => {
     const input = document.getElementById('aiWizardInput');
