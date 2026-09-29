@@ -4,12 +4,20 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   List, LayoutGrid, Search, Sparkles, ChevronDown, ChevronRight,
-  Plus, Users, ArrowRight, Trash2, Film, PauseCircle
+  Plus, Users, ArrowRight, Trash2, Film, PauseCircle, Link2, AlertTriangle
 } from 'lucide-react';
 import ContactAvatar from '../components/ContactAvatar';
 
 export default function RelationshipsPage() {
-  const { nodes, setSelectedNode, startAiInterview, addFact, deleteNode, updateContactPreferences } = useApp();
+  const {
+    nodes,
+    setSelectedNode,
+    startAiInterview,
+    addFact,
+    deleteNode,
+    updateContactPreferences,
+    setLinkingTargetPerson
+  } = useApp();
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'chart'
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState(new Set(['bhavani', 'rajveer', 'fami']));
@@ -37,6 +45,10 @@ export default function RelationshipsPage() {
       );
     });
   }, [nodes, searchQuery]);
+
+  const unlinkedFriends = useMemo(() => {
+    return nodes.filter(n => !n.isRoot && !n.handle && !n.senderId);
+  }, [nodes]);
 
   const handleQuickAddFact = (friendId, e) => {
     e?.preventDefault();
@@ -148,6 +160,75 @@ export default function RelationshipsPage() {
         />
       </div>
 
+      {/* Unlinked Contacts Warning Banner */}
+      {unlinkedFriends.length > 0 && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1.5px solid #f59e0b',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                background: 'rgba(245, 158, 11, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#f59e0b',
+                flexShrink: 0
+              }}
+            >
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div style={{ color: '#f59e0b', fontWeight: '800', fontSize: '0.92rem' }}>
+                Action Required: {unlinkedFriends.length} Contact{unlinkedFriends.length > 1 ? 's' : ''} Missing Instagram ID
+              </div>
+              <div style={{ color: '#d1d5db', fontSize: '0.8rem', marginTop: '2px' }}>
+                Chatter OS cannot recognize them when they DM you! Link their @handle or select from recent chats so AI auto-merges memory and answers with their specific lore.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {unlinkedFriends.map(friend => (
+              <button
+                key={friend.id}
+                onClick={() => setLinkingTargetPerson(friend)}
+                style={{
+                  background: '#f59e0b',
+                  color: '#000000',
+                  border: 'none',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Link2 size={13} />
+                <span>+ Link ID: {friend.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Root Persona Banner: Sam Joshua */}
       <div style={{ background: '#09090b', border: '1.5px solid #ffffff', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 0 35px rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -211,9 +292,42 @@ export default function RelationshipsPage() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontWeight: '800', fontSize: '1rem', color: '#ffffff' }}>{friend.name}</span>
-                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
-                          {friend.handle || 'No handle'}
-                        </span>
+                        {friend.handle ? (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLinkingTargetPerson(friend);
+                            }}
+                            title="Click to edit or re-link Instagram handle"
+                            style={{ fontSize: '0.75rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            {friend.handle}
+                            <Link2 size={11} style={{ opacity: 0.7 }} />
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLinkingTargetPerson(friend);
+                            }}
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1px solid #f59e0b',
+                              color: '#f59e0b',
+                              padding: '2px 8px',
+                              borderRadius: '5px',
+                              fontSize: '0.7rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <AlertTriangle size={11} />
+                            <span>No ID — [+ Link ID]</span>
+                          </button>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '2px' }}>
                         {friend.relationship}
@@ -313,6 +427,42 @@ export default function RelationshipsPage() {
                 {/* Expanded Details Body */}
                 {isExpanded && (
                   <div style={{ padding: '20px', borderTop: '1px solid #27272a', background: '#09090b', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {/* Unlinked Alert in Expanded Card if missing ID */}
+                    {(!friend.handle && !friend.senderId) && (
+                      <div style={{ gridColumn: '1 / -1', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid #f59e0b', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <AlertTriangle size={18} color="#f59e0b" />
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#f59e0b' }}>
+                              Instagram ID Not Linked
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#d1d5db', marginTop: '2px' }}>
+                              Add {friend.name}&apos;s @handle or numeric ID so the AI merges their chat log and recognizes them in incoming DMs.
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setLinkingTargetPerson(friend)}
+                          style={{
+                            background: '#f59e0b',
+                            color: '#000000',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '6px',
+                            fontSize: '0.76rem',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <Link2 size={13} />
+                          <span>Link Instagram ID Now</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Individual AI Behavior Quick Bar */}
                     <div style={{ gridColumn: '1 / -1', background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                       <div>
@@ -507,9 +657,35 @@ export default function RelationshipsPage() {
                       <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff' }}>
                         {node.name}
                       </h3>
-                      <div style={{ fontSize: '0.74rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace" }}>
-                        {node.handle || 'No handle'}
-                      </div>
+                      {node.handle ? (
+                        <div style={{ fontSize: '0.74rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
+                          {node.handle}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLinkingTargetPerson(node);
+                          }}
+                          style={{
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            border: '1px solid #f59e0b',
+                            color: '#f59e0b',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.65rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            marginTop: '2px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                        >
+                          <AlertTriangle size={10} />
+                          <span>+ Link ID</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
