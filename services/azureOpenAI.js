@@ -357,6 +357,57 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
       throw err;
     }
   }
+
+  /**
+   * Analyzes raw direct message chat logs or pasted conversation text,
+   * extracts all necessary profile attributes, and identifies any clarifying questions.
+   */
+  async extractPersonFromRawChat({ chatText, currentPerson = {}, userClarifications = '' }) {
+    const systemPrompt = `You are an expert personal intelligence architect for Sam Joshua's Instagram OS.
+Analyze the provided raw direct message chat or conversation notes between Sam and a friend/contact.
+Extract comprehensive attributes for this person so Sam's AI clone can understand who they are, their life lore, how they talk, and mutual friends.
+
+Current profile context: ${JSON.stringify(currentPerson || {})}
+User clarifications (if any): "${userClarifications || 'None'}"
+
+Raw chat text to analyze:
+"""
+${chatText}
+"""
+
+Return a STRICT JSON object in this exact format:
+{
+  "name": "Full name or clear nickname",
+  "handle": "@instagram_handle (include @ if found, else empty string)",
+  "dob": "Date of birth if mentioned or implied (e.g. 'March 12' or '2004-05-18') else ''",
+  "gender": "female" | "male" | "neutral" | "unknown",
+  "category": "close_friend" | "online_friend" | "offline_friend" | "family" | "professional" | "business",
+  "relationshipToSam": "Specific relationship (e.g. Medicine Student / Homie / Sister / Client)",
+  "personalNotes": "Detailed synthesized lore, study details, college, hobbies, habits, inside jokes, Netflix shows, or topics discussed",
+  "facts": ["Fact 1", "Fact 2", "Fact 3"],
+  "banterStyle": "Their texting vibe or how Sam talks with them (e.g. playful roasting, supportive, casual shortcuts)",
+  "connections": [
+    { "targetName": "Name of mutual friend or relative mentioned in the chat", "relationship": "how they connect" }
+  ],
+  "clarifyingQuestions": [
+    "List 1 to 3 concise, specific questions if there are any ambiguous facts or unclear details in the chat that Sam should confirm before saving (e.g. 'Is Annie your elder sister or cousin?', 'Are they studying in Chennai or Coimbatore?'). If everything is completely clear, return an empty array []"
+  ],
+  "confidenceScore": 85
+}`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        messages: [{ role: 'system', content: systemPrompt }],
+        temperature: 0.3,
+        response_format: { type: 'json_object' }
+      });
+      return JSON.parse(response.choices[0].message.content.trim());
+    } catch (err) {
+      console.error('❌ Azure OpenAI raw chat extraction error:', err.message);
+      throw err;
+    }
+  }
 }
 
 module.exports = new AzureOpenAIService();
+

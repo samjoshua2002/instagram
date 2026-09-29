@@ -4,12 +4,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
-  Trash2, Calendar, Bot, Film, Pause, Play, Check, Save, User,
-  Plus, RefreshCw, MessageSquare, Shield, ExternalLink
+  Trash2, Calendar, Bot, Film, Pause, Check, Save, User,
+  Plus, RefreshCw, MessageSquare, Shield, X, Users
 } from 'lucide-react';
 import ContactAvatar from '../components/ContactAvatar';
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function RelationshipsPage() {
+
   const {
     nodes,
     saveNode,
@@ -19,6 +25,8 @@ export default function RelationshipsPage() {
     setLinkingTargetPerson,
     startAiInterview,
     aiAutofillPerson,
+    lookupContact,
+    extractFromRawChat,
     API_BASE,
     showToast
   } = useApp();
@@ -49,26 +57,60 @@ export default function RelationshipsPage() {
   const [newConnTarget, setNewConnTarget] = useState('');
   const [newConnRel, setNewConnRel] = useState('');
 
+  // Raw Chat Extraction Modal State
+  const [isRawChatModalOpen, setIsRawChatModalOpen] = useState(false);
+  const [rawChatText, setRawChatText] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractedData, setExtractedData] = useState(null);
+  const [userClarification, setUserClarification] = useState('');
+  const [knowBirthYear, setKnowBirthYear] = useState(true);
+
   // Keep form data synchronized when a person is opened or updated
   useEffect(() => {
     if (selectedPerson) {
-      // Find latest version from nodes array
-      const current = nodes.find(n => n.id === selectedPerson.id || (n.senderId && n.senderId === selectedPerson.senderId)) || selectedPerson;
+      const current = nodes.find(n =>
+        n.id === selectedPerson.id ||
+        (n.senderId && selectedPerson.senderId && n.senderId === selectedPerson.senderId) ||
+        (n.name && selectedPerson.name && n.name.toLowerCase() === selectedPerson.name.toLowerCase())
+      ) || selectedPerson;
+
+      const currentDob = current.dob || current.importantDates?.[0]?.date || '';
+      const hasYear = /\b(19|20)\d{2}\b/.test(currentDob);
+      setKnowBirthYear(currentDob ? hasYear : true);
+
       setFormData({
         name: current.name || '',
-        handle: current.handle || '',
+        handle: current.handle || current.instagramHandle || '',
         senderId: current.senderId || '',
-        dob: current.dob || current.importantDates?.[0]?.date || '',
+        dob: currentDob,
         gender: current.gender || 'unknown',
         category: current.category || 'online_friend',
-        relationship: current.relationship || '',
+        relationship: current.relationship || current.relationshipToSam || '',
         personalNotes: current.personalNotes || (current.lore || []).join('\n'),
         roastStyle: current.roastStyle || ''
       });
     }
   }, [selectedPerson, nodes]);
 
-  // Unlinked contacts without ID
+  // Overall Dashboard Metrics
+  const dashboardStats = useMemo(() => {
+    let totalPeople = 0;
+    let totalDMs = 0;
+    let totalReels = 0;
+    let activeAi = 0;
+
+    nodes.forEach(n => {
+      if (n.isRoot) return;
+      totalPeople++;
+      totalDMs += (n.chatsCount || n.messageCount || 0);
+      totalReels += (n.reelsCount || 0);
+      if (n.aiEnabled !== false) activeAi++;
+    });
+
+    return { totalPeople, totalDMs, totalReels, activeAi };
+  }, [nodes]);
+
+  // Unlinked contacts without handle
   const unlinkedFriends = useMemo(() => {
     return nodes.filter(n => !n.isRoot && !n.handle && !n.senderId);
   }, [nodes]);
@@ -132,7 +174,6 @@ export default function RelationshipsPage() {
       return (
         n.name.toLowerCase().includes(q) ||
         (n.handle || '').toLowerCase().includes(q) ||
-        (n.senderId || '').includes(q) ||
         (n.dob || '').toLowerCase().includes(q) ||
         (n.relationship || '').toLowerCase().includes(q) ||
         (n.personalNotes || '').toLowerCase().includes(q) ||
@@ -141,6 +182,16 @@ export default function RelationshipsPage() {
     });
   }, [nodes, activeCategory, searchQuery]);
 
+  // Autocomplete Suggestions for Friend Connections
+  const friendSuggestions = useMemo(() => {
+    if (!newConnTarget.trim() || !selectedPerson) return [];
+    const q = newConnTarget.toLowerCase().trim();
+    return nodes
+      .filter(n => !n.isRoot && n.name.toLowerCase() !== selectedPerson.name.toLowerCase())
+      .filter(n => n.name.toLowerCase().includes(q) || (n.handle && n.handle.toLowerCase().includes(q)))
+      .slice(0, 5);
+  }, [nodes, newConnTarget, selectedPerson]);
+
   // Calculate Knowledge Completeness Score (0 - 100%)
   const knowledgeBreakdown = useMemo(() => {
     if (!selectedPerson) return { score: 0, items: [] };
@@ -148,16 +199,41 @@ export default function RelationshipsPage() {
     const items = [
       { key: 'name', label: 'Full Name', complete: Boolean(formData.name.trim()), points: 15 },
       { key: 'handle', label: 'Instagram Handle', complete: Boolean(formData.handle.trim()), points: 15 },
-      { key: 'senderId', label: 'Sender ID Linked', complete: Boolean(formData.senderId.trim()), points: 15 },
       { key: 'dob', label: 'Date of Birth', complete: Boolean(formData.dob.trim()), points: 15 },
-      { key: 'relation', label: 'Relationship & Category', complete: Boolean(formData.relationship.trim() && formData.category), points: 15 },
-      { key: 'lore', label: 'Personal Lore & Bio', complete: Boolean(formData.personalNotes.trim().length > 15), points: 15 },
-      { key: 'facts', label: 'Learned Facts Intel', complete: (selectedPerson.facts?.length || 0) >= 2, points: 10 }
+      { key: 'relation', label: 'Category & Specific Relation', complete: Boolean(formData.relationship.trim() && formData.category), points: 15 },
+      { key: 'lore', label: 'Personal Lore & Notes', complete: Boolean(formData.personalNotes.trim().length > 15), points: 20 },
+      { key: 'facts', label: 'Synthesized Intel / Facts', complete: (selectedPerson.facts?.length || 0) >= 2, points: 20 }
     ];
 
     const score = items.reduce((acc, curr) => (curr.complete ? acc + curr.points : acc), 0);
     return { score, items };
   }, [selectedPerson, formData]);
+
+  // Direct Message Automation mode for selectedPerson
+  const currentAiMode = useMemo(() => {
+    if (!selectedPerson) return 'full_ai';
+    if (selectedPerson.aiEnabled === false) return 'paused';
+    if (selectedPerson.replyToMessages === false && selectedPerson.replyToReelsAndPosts !== false) return 'reels_only';
+    return 'full_ai';
+  }, [selectedPerson]);
+
+  // Set AI mode with instant state reflection
+  const handleSetAiMode = (mode) => {
+    if (!selectedPerson) return;
+    const targetKey = selectedPerson.senderId || selectedPerson.id || selectedPerson.name;
+    const isPaused = mode === 'paused';
+    const isReelsOnly = mode === 'reels_only';
+    const isFullAi = mode === 'full_ai';
+
+    setSelectedPerson(prev => ({
+      ...prev,
+      aiEnabled: !isPaused,
+      replyToMessages: isFullAi,
+      replyToReelsAndPosts: isFullAi || isReelsOnly
+    }));
+
+    updateContactPreferences(targetKey, { aiMode: mode });
+  };
 
   // Save changes from inner page
   const handleSaveInnerForm = async (e) => {
@@ -167,11 +243,14 @@ export default function RelationshipsPage() {
       return;
     }
 
+    const cleanHandle = formData.handle.trim() ? (formData.handle.startsWith('@') ? formData.handle.trim() : `@${formData.handle.trim()}`) : '';
+
     const updated = {
       ...selectedPerson,
       name: formData.name.trim(),
-      handle: formData.handle.trim() ? (formData.handle.startsWith('@') ? formData.handle.trim() : `@${formData.handle.trim()}`) : '',
-      senderId: formData.senderId.trim(),
+      handle: cleanHandle,
+      instagramHandle: cleanHandle,
+      senderId: formData.senderId.trim() || selectedPerson.senderId || '',
       dob: formData.dob.trim(),
       dateOfBirth: formData.dob.trim(),
       gender: formData.gender,
@@ -220,12 +299,113 @@ export default function RelationshipsPage() {
     }
   };
 
-  // Add custom fact to memory
+  // Trigger Raw Chat Extraction using AI
+  const handleAnalyzeRawChat = async (e) => {
+    e?.preventDefault();
+    if (!rawChatText.trim()) {
+      showToast('Please paste chat text to analyze');
+      return;
+    }
+
+    setIsExtracting(true);
+    try {
+      const extraction = await extractFromRawChat(rawChatText, selectedPerson, userClarification);
+      if (extraction) {
+        setExtractedData(extraction);
+        showToast('Chat analyzed! Review extracted attributes & confirm.');
+      } else {
+        showToast('Failed to analyze chat text. Check server.');
+      }
+    } catch (err) {
+      showToast(`Extraction error: ${err.message}`);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  // Load recent messages from DB into raw chat textarea
+  const handleLoadRecentDms = async () => {
+    if (!selectedPerson?.senderId) {
+      showToast('No linked sender ID to fetch messages');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/messages`);
+      const data = await res.json();
+      if (data.messages && data.messages.length > 0) {
+        const text = data.messages.map(m => `${m.role === 'assistant' ? 'Sam' : selectedPerson.name}: ${m.text}`).join('\n');
+        setRawChatText(text);
+        showToast(`Loaded ${data.messages.length} messages from history`);
+      } else {
+        showToast('No messages found in history');
+      }
+    } catch (e) {
+      showToast('Could not fetch messages');
+    }
+  };
+
+  // Confirm and Apply Extracted Attributes
+  const handleConfirmExtraction = () => {
+    if (!extractedData) return;
+
+    // Merge notes and facts
+    const currentNotes = formData.personalNotes.trim();
+    const newNotes = extractedData.personalNotes || '';
+    const mergedNotes = currentNotes ? `${currentNotes}\n${newNotes}` : newNotes;
+
+    setFormData(prev => ({
+      ...prev,
+      name: extractedData.name || prev.name,
+      handle: extractedData.handle || prev.handle,
+      dob: extractedData.dob || prev.dob,
+      gender: extractedData.gender || prev.gender,
+      category: extractedData.category || prev.category,
+      relationship: extractedData.relationshipToSam || prev.relationship,
+      personalNotes: mergedNotes,
+      roastStyle: extractedData.banterStyle || prev.roastStyle
+    }));
+
+    // Add facts if extracted
+    if (Array.isArray(extractedData.facts) && selectedPerson) {
+      extractedData.facts.forEach(f => {
+        addFact(selectedPerson.id, f);
+      });
+    }
+
+    // Add connections if extracted
+    if (Array.isArray(extractedData.connections) && selectedPerson) {
+      const currentConns = selectedPerson.connections || [];
+      const newConns = [...currentConns];
+      extractedData.connections.forEach(c => {
+        if (!newConns.some(nc => nc.targetName.toLowerCase() === c.targetName.toLowerCase())) {
+          newConns.push(c);
+        }
+      });
+      selectedPerson.connections = newConns;
+    }
+
+    setIsRawChatModalOpen(false);
+    setExtractedData(null);
+    setRawChatText('');
+    setUserClarification('');
+    showToast('AI pre-filled all profile fields! Review and click Save Changes.');
+  };
+
+  // Add custom fact to memory and synchronize with personalNotes
   const handleAddFact = (e) => {
     e?.preventDefault();
     if (!newFactInput.trim() || !selectedPerson) return;
-    addFact(selectedPerson.id, newFactInput.trim());
+    const factText = newFactInput.trim();
+    addFact(selectedPerson.id, factText);
+
+    // Link: also append to personalNotes
+    setFormData(prev => ({
+      ...prev,
+      personalNotes: prev.personalNotes ? `${prev.personalNotes}\n• ${factText}` : `• ${factText}`
+    }));
+
     setNewFactInput('');
+    showToast('Fact added & linked to personal lore');
   };
 
   // Force AI learning from DMs
@@ -279,9 +459,9 @@ export default function RelationshipsPage() {
   // VIEW 1: FULL INNER PERSON PAGE (When a person is clicked/opened)
   // =========================================================================
   if (selectedPerson) {
-    const isPaused = selectedPerson.aiEnabled === false;
-    const isReelsOnly = !isPaused && selectedPerson.replyToMessages === false && selectedPerson.replyToReelsAndPosts !== false;
-    const isFullAi = !isPaused && !isReelsOnly;
+    const isPaused = currentAiMode === 'paused';
+    const isReelsOnly = currentAiMode === 'reels_only';
+    const isFullAi = currentAiMode === 'full_ai';
 
     return (
       <div style={{ padding: '32px 36px 80px 36px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -304,27 +484,52 @@ export default function RelationshipsPage() {
                 gap: '8px'
               }}
             >
-              <ArrowLeft size={20} />
-          
+              <ArrowLeft size={16} />
+              <span>Back to Directory</span>
             </button>
 
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#09090b', letterSpacing: '-0.5px', margin: 0 }}>
-                  {formData.name || selectedPerson.name}
-                </h1>
-                <span style={{ fontSize: '0.68rem', background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#09090b', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-                  {formData.category.replace('_', ' ').toUpperCase()}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>
-                {formData.handle || (formData.senderId ? `ID: ${formData.senderId}` : 'No Instagram ID linked')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <ContactAvatar contact={{ ...selectedPerson, name: formData.name, handle: formData.handle }} size={42} />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#09090b', letterSpacing: '-0.5px', margin: 0 }}>
+                    {formData.name || selectedPerson.name}
+                  </h1>
+                  <span style={{ fontSize: '0.68rem', background: '#f4f4f5', border: '1px solid #e4e4e7', color: '#09090b', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+                    {formData.category.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>
+                  {formData.handle || 'No handle set'}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Quick Header Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Gemini Black Icon for AI Extraction from Raw Chat */}
+            <button
+              type="button"
+              onClick={() => setIsRawChatModalOpen(true)}
+              style={{
+                background: '#09090b',
+                color: '#ffffff',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px'
+              }}
+            >
+              <Sparkles size={14} />
+              <span>AI Extract from Raw Chat</span>
+            </button>
+
             <button
               type="button"
               onClick={handleTriggerAutofill}
@@ -344,7 +549,7 @@ export default function RelationshipsPage() {
               }}
             >
               <RefreshCw size={13} className={isAutofilling ? 'animate-spin' : ''} />
-              <span>{isAutofilling ? 'Scanning DMs...' : 'Fill Fields with AI'}</span>
+              <span>{isAutofilling ? 'Scanning DMs...' : 'Scan DMs with AI'}</span>
             </button>
 
             <button
@@ -365,10 +570,202 @@ export default function RelationshipsPage() {
               }}
             >
               <Save size={14} />
-              <span>Save Changes</span>
+              <span>Save Profile Changes</span>
             </button>
           </div>
         </div>
+
+        {/* ================= MODAL: AI RAW CHAT EXTRACTION & CLARIFICATION ================= */}
+        {isRawChatModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(9, 9, 11, 0.45)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 110,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid #e4e4e7',
+                borderRadius: '14px',
+                width: '100%',
+                maxWidth: '750px',
+                maxHeight: '88vh',
+                overflowY: 'auto',
+                boxShadow: '0 20px 45px rgba(0,0,0,0.12)',
+                padding: '24px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e4e4e7', paddingBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ background: '#09090b', color: '#ffffff', padding: '5px', borderRadius: '6px' }}>
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                      AI Raw Chat Extraction for {formData.name}
+                    </h3>
+                    <p style={{ fontSize: '0.76rem', color: '#71717a', margin: '2px 0 0 0' }}>
+                      Paste conversation logs or notes. AI will extract attributes, ask clarifying questions, and prefill the profile.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsRawChatModalOpen(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Paste Raw Chat */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                    Paste Raw Direct Message Chat or Conversation Notes
+                  </label>
+                  {selectedPerson.senderId && (
+                    <button
+                      type="button"
+                      onClick={handleLoadRecentDms}
+                      style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Load Recent DMs from Database
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  rows={6}
+                  value={rawChatText}
+                  onChange={(e) => setRawChatText(e.target.value)}
+                  placeholder="Paste Instagram DM conversation here (e.g. 'Sam: hey did you finish your exam? Bhavani: yeah 3rd year medicine exam done, going back to hostel...')..."
+                  style={{ width: '100%', fontSize: '0.82rem' }}
+                />
+              </div>
+
+              {/* User Clarification input if needed */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                  Additional Notes or Clarifications for AI (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={userClarification}
+                  onChange={(e) => setUserClarification(e.target.value)}
+                  placeholder="e.g. She is my medicine student friend, not sister. Birthday is in March."
+                  style={{ width: '100%', fontSize: '0.82rem' }}
+                />
+              </div>
+
+              {/* Analyze Button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                <button
+                  type="button"
+                  onClick={handleAnalyzeRawChat}
+                  disabled={isExtracting || !rawChatText.trim()}
+                  style={{
+                    background: '#09090b',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: '700',
+                    cursor: (isExtracting || !rawChatText.trim()) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Sparkles size={14} className={isExtracting ? 'animate-spin' : ''} />
+                  <span>{isExtracting ? 'Analyzing Conversation...' : 'Analyze Chat with AI'}</span>
+                </button>
+              </div>
+
+              {/* Extracted Data Preview & Clarifying Questions */}
+              {extractedData && (
+                <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px', marginBottom: '18px' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '8px' }}>
+                    AI EXTRACTED ATTRIBUTES
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', padding: '8px 10px', borderRadius: '6px', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#71717a', fontWeight: '700' }}>NAME: </span>
+                      <span style={{ fontWeight: '600', color: '#09090b' }}>{extractedData.name || 'Not mentioned'}</span>
+                    </div>
+                    <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', padding: '8px 10px', borderRadius: '6px', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#71717a', fontWeight: '700' }}>HANDLE: </span>
+                      <span style={{ fontWeight: '600', color: '#09090b' }}>{extractedData.handle || 'Not mentioned'}</span>
+                    </div>
+                    <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', padding: '8px 10px', borderRadius: '6px', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#71717a', fontWeight: '700' }}>DOB: </span>
+                      <span style={{ fontWeight: '600', color: '#09090b' }}>{extractedData.dob || 'Not mentioned'}</span>
+                    </div>
+                    <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', padding: '8px 10px', borderRadius: '6px', fontSize: '0.78rem' }}>
+                      <span style={{ color: '#71717a', fontWeight: '700' }}>RELATION: </span>
+                      <span style={{ fontWeight: '600', color: '#09090b' }}>{extractedData.relationshipToSam || 'Friend'}</span>
+                    </div>
+                  </div>
+
+                  {/* Clarifying Questions from AI */}
+                  {extractedData.clarifyingQuestions && extractedData.clarifyingQuestions.length > 0 && (
+                    <div style={{ background: '#ffffff', border: '1px solid #09090b', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: '800', color: '#09090b', marginBottom: '6px' }}>
+                        <AlertCircle size={14} />
+                        <span>AI Clarifying Questions (Please check or confirm):</span>
+                      </div>
+                      <ul style={{ paddingLeft: '18px', margin: 0, fontSize: '0.78rem', color: '#09090b', lineHeight: '1.5' }}>
+                        {extractedData.clarifyingQuestions.map((q, idx) => (
+                          <li key={idx}>{q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Lore & Facts Preview */}
+                  {extractedData.personalNotes && (
+                    <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', padding: '10px 12px', borderRadius: '6px', fontSize: '0.78rem', color: '#09090b', marginBottom: '14px' }}>
+                      <span style={{ color: '#71717a', fontWeight: '700', display: 'block', marginBottom: '4px' }}>SYNTHESIZED LORE & TOPICS:</span>
+                      <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>{extractedData.personalNotes}</div>
+                    </div>
+                  )}
+
+                  {/* Confirm & Apply Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={handleConfirmExtraction}
+                      style={{
+                        background: '#09090b',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontSize: '0.84rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Check size={14} />
+                      <span>Confirm & Prefill Profile Fields</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ================= CARD 1: KNOWLEDGE SCORE & COMPLETENESS ================= */}
         <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
@@ -461,7 +858,7 @@ export default function RelationshipsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
             <button
               type="button"
-              onClick={() => updateContactPreferences(selectedPerson.senderId || selectedPerson.id, { aiMode: 'full_ai' })}
+              onClick={() => handleSetAiMode('full_ai')}
               style={{
                 padding: '12px 14px',
                 borderRadius: '8px',
@@ -473,7 +870,8 @@ export default function RelationshipsPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                textAlign: 'left'
+                textAlign: 'left',
+                transition: 'all 0.15s ease'
               }}
             >
               <Bot size={18} />
@@ -485,7 +883,7 @@ export default function RelationshipsPage() {
 
             <button
               type="button"
-              onClick={() => updateContactPreferences(selectedPerson.senderId || selectedPerson.id, { aiMode: 'reels_only' })}
+              onClick={() => handleSetAiMode('reels_only')}
               style={{
                 padding: '12px 14px',
                 borderRadius: '8px',
@@ -497,7 +895,8 @@ export default function RelationshipsPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                textAlign: 'left'
+                textAlign: 'left',
+                transition: 'all 0.15s ease'
               }}
             >
               <Film size={18} />
@@ -509,7 +908,7 @@ export default function RelationshipsPage() {
 
             <button
               type="button"
-              onClick={() => updateContactPreferences(selectedPerson.senderId || selectedPerson.id, { aiMode: 'paused' })}
+              onClick={() => handleSetAiMode('paused')}
               style={{
                 padding: '12px 14px',
                 borderRadius: '8px',
@@ -521,7 +920,8 @@ export default function RelationshipsPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                textAlign: 'left'
+                textAlign: 'left',
+                transition: 'all 0.15s ease'
               }}
             >
               <Pause size={18} />
@@ -543,8 +943,8 @@ export default function RelationshipsPage() {
           </div>
 
           <form onSubmit={handleSaveInnerForm} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Row 1: Name, Handle, Sender ID */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+            {/* Row 1: Name, Handle */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                   Full Name
@@ -569,33 +969,114 @@ export default function RelationshipsPage() {
                   placeholder="@username"
                 />
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Numeric Sender ID
-                </label>
-                <input
-                  type="text"
-                  value={formData.senderId}
-                  onChange={(e) => setFormData({ ...formData, senderId: e.target.value })}
-                  placeholder="e.g. 29005624469042002"
-                />
-              </div>
             </div>
 
             {/* Row 2: Date of Birth, Gender, Category */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Date of Birth (DOB)
-                </label>
-                <input
-                  type="text"
-                  value={formData.dob}
-                  onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                  placeholder="e.g. March 12, 2007"
-                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                    Birthday Calendar
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !knowBirthYear;
+                      setKnowBirthYear(next);
+                      if (!next && formData.dob) {
+                        const cleaned = formData.dob.replace(/,?\s*(19|20)\d{2}/, '').replace(/^\d{4}-/, '').trim();
+                        setFormData(prev => ({ ...prev, dob: cleaned }));
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#09090b',
+                      fontSize: '0.68rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {knowBirthYear ? "Don't know birth year?" : "Know birth year?"}
+                  </button>
+                </div>
+
+                {knowBirthYear ? (
+                  <div>
+                    <input
+                      type="date"
+                      value={(() => {
+                        if (!formData.dob) return '';
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(formData.dob)) return formData.dob;
+                        const d = new Date(formData.dob);
+                        if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
+                          return d.toISOString().split('T')[0];
+                        }
+                        return '';
+                      })()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) {
+                          setFormData({ ...formData, dob: '' });
+                          return;
+                        }
+                        const [y, m, d] = val.split('-');
+                        const monthName = MONTH_NAMES[parseInt(m, 10) - 1] || m;
+                        setFormData({ ...formData, dob: `${monthName} ${parseInt(d, 10)}, ${y}` });
+                      }}
+                      style={{ width: '100%' }}
+                    />
+                    {formData.dob && (
+                      <span style={{ fontSize: '0.72rem', color: '#71717a', display: 'block', marginTop: '4px' }}>
+                        Selected: <b>{formData.dob}</b>
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select
+                        value={(() => {
+                          const match = MONTH_NAMES.find(m => formData.dob.toLowerCase().includes(m.toLowerCase()));
+                          return match || 'January';
+                        })()}
+                        onChange={(e) => {
+                          const m = e.target.value;
+                          const currentDay = (formData.dob.match(/\b([1-9]|[12]\d|3[01])\b/) || [])[0] || '1';
+                          setFormData({ ...formData, dob: `${m} ${currentDay}` });
+                        }}
+                        style={{ flex: 1.2 }}
+                      >
+                        {MONTH_NAMES.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={(() => {
+                          const match = (formData.dob.match(/\b([1-9]|[12]\d|3[01])\b/) || [])[0];
+                          return match || '1';
+                        })()}
+                        onChange={(e) => {
+                          const d = e.target.value;
+                          const currentMonth = MONTH_NAMES.find(m => formData.dob.toLowerCase().includes(m.toLowerCase())) || 'January';
+                          setFormData({ ...formData, dob: `${currentMonth} ${d}` });
+                        }}
+                        style={{ flex: 0.8 }}
+                      >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <option key={day} value={day}>{day}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#71717a', display: 'block', marginTop: '4px' }}>
+                      Remembering date & month: <b>{formData.dob || 'Not set'}</b>
+                    </span>
+                  </div>
+                )}
               </div>
+
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -639,27 +1120,27 @@ export default function RelationshipsPage() {
                 type="text"
                 value={formData.relationship}
                 onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
-                placeholder="e.g. Closest Online Friend / Medicine Student"
+                placeholder="e.g. Closest Online Friend / 3rd Year Medicine Student"
               />
             </div>
 
-            {/* Row 4: Personal Notes & Highlights */}
+            {/* Row 4: Personal Notes & Highlights (Linked to facts!) */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Personal Notes & Highlights (Studies, Habits, Netflix, Inside Jokes)
+                  Personal Lore, Habits & Synthesized DM Notes
                 </label>
-                <span style={{ fontSize: '0.7rem', color: '#a1a1aa' }}>Multi-line text</span>
+                <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Linked to DM Intel</span>
               </div>
               <textarea
                 rows={5}
                 value={formData.personalNotes}
                 onChange={(e) => setFormData({ ...formData, personalNotes: e.target.value })}
-                placeholder="Write detailed background information that the AI should know about this person..."
+                placeholder="Write detailed background information, habits, exams, Netflix shows, inside jokes, and life updates..."
               />
             </div>
 
-            {/* Row 5: Banter & Cussing Style */}
+            {/* Row 5: Banter Style */}
             <div>
               <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Banter & Conversation Style
@@ -668,7 +1149,7 @@ export default function RelationshipsPage() {
                 type="text"
                 value={formData.roastStyle}
                 onChange={(e) => setFormData({ ...formData, roastStyle: e.target.value })}
-                placeholder="e.g. Gentle playful teasing, Hindi bro banter, sweet concise shortcuts..."
+                placeholder="e.g. Playful teasing, Hindi bro banter, sweet concise shortcuts..."
               />
             </div>
 
@@ -697,7 +1178,7 @@ export default function RelationshipsPage() {
           </form>
         </div>
 
-        {/* ================= CARD 4: SOCIAL CONNECTIONS (TREE CHAIN) ================= */}
+        {/* ================= CARD 4: SOCIAL CONNECTIONS (WITH SUGGESTIONS) ================= */}
         <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
           <div style={{ fontSize: '0.7rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '4px' }}>
             SOCIAL GRAPH
@@ -737,43 +1218,93 @@ export default function RelationshipsPage() {
             )}
           </div>
 
-          {/* Add Friend Connection Form */}
-          <form onSubmit={handleAddConnection} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Friend Name (e.g. Annie, Rajveer, Moksha)"
-              value={newConnTarget}
-              onChange={(e) => setNewConnTarget(e.target.value)}
-              style={{ flex: 1, minWidth: '180px' }}
-            />
-            <input
-              type="text"
-              placeholder="How they know each other (e.g. Talking with sister)"
-              value={newConnRel}
-              onChange={(e) => setNewConnRel(e.target.value)}
-              style={{ flex: 1, minWidth: '180px' }}
-            />
-            <button
-              type="submit"
-              disabled={!newConnTarget.trim()}
-              style={{
-                background: '#09090b',
-                color: '#ffffff',
-                border: 'none',
-                padding: '9px 16px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                fontWeight: '700',
-                cursor: !newConnTarget.trim() ? 'not-allowed' : 'pointer',
-                opacity: !newConnTarget.trim() ? 0.5 : 1
-              }}
-            >
-              + Link Friend
-            </button>
-          </form>
+          {/* Add Friend Connection Form with Suggestions */}
+          <div style={{ position: 'relative' }}>
+            <form onSubmit={handleAddConnection} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Friend Name (e.g. Annie, Rajveer, Moksha)"
+                  value={newConnTarget}
+                  onChange={(e) => setNewConnTarget(e.target.value)}
+                  style={{ width: '100%' }}
+                />
+
+                {/* Suggestions Dropdown */}
+                {friendSuggestions.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: '#ffffff',
+                      border: '1px solid #e4e4e7',
+                      borderRadius: '8px',
+                      marginTop: '4px',
+                      zIndex: 20,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {friendSuggestions.map((sug) => (
+                      <div
+                        key={sug.id || sug.name}
+                        onClick={() => {
+                          setNewConnTarget(sug.name);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderBottom: '1px solid #f4f4f5'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f4f4f5')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                      >
+                        <span style={{ fontWeight: '700', color: '#09090b' }}>{sug.name}</span>
+                        <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                          {sug.handle || sug.relationship}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="text"
+                placeholder="How they know each other (e.g. Sister, Homie, Classmate)"
+                value={newConnRel}
+                onChange={(e) => setNewConnRel(e.target.value)}
+                style={{ flex: 1, minWidth: '180px' }}
+              />
+
+              <button
+                type="submit"
+                disabled={!newConnTarget.trim()}
+                style={{
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '9px 16px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  cursor: !newConnTarget.trim() ? 'not-allowed' : 'pointer',
+                  opacity: !newConnTarget.trim() ? 0.5 : 1
+                }}
+              >
+                + Link Friend
+              </button>
+            </form>
+          </div>
         </div>
 
-        {/* ================= CARD 5: LEARNED MEMORIES & FACTS ================= */}
+        {/* ================= CARD 5: SYNTHESIZED INTEL (LINKED TO LORE) ================= */}
         <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <div>
@@ -833,7 +1364,7 @@ export default function RelationshipsPage() {
           <form onSubmit={handleAddFact} style={{ display: 'flex', gap: '8px' }}>
             <input
               type="text"
-              placeholder="Add custom remembered fact..."
+              placeholder="Add custom remembered fact (automatically syncs with personal notes)..."
               value={newFactInput}
               onChange={(e) => setNewFactInput(e.target.value)}
               style={{ flex: 1 }}
@@ -860,7 +1391,7 @@ export default function RelationshipsPage() {
   }
 
   // =========================================================================
-  // VIEW 2: ALL PEOPLE DIRECTORY (Shadcn Light Monochrome Table)
+  // VIEW 2: ALL PEOPLE DIRECTORY (Shadcn Light Monochrome Table & Dashboard)
   // =========================================================================
   return (
     <div style={{ padding: '32px 36px 80px 36px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -868,13 +1399,13 @@ export default function RelationshipsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
           <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-            PEOPLE DIRECTORY
+            PEOPLE DIRECTORY & INTELLIGENCE
           </div>
           <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: '#09090b' }}>
             All People
           </h1>
           <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '4px' }}>
-            Unified intelligence table showing handles, IDs, birth dates, relationship categories, and automation rules.
+            Unified directory showing profiles, interaction statistics, and automated intelligence rules.
           </p>
         </div>
 
@@ -897,6 +1428,65 @@ export default function RelationshipsPage() {
           <Sparkles size={14} />
           <span>+ Add Person</span>
         </button>
+      </div>
+
+      {/* ================= DASHBOARD METRICS SUMMARY ================= */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
+            <Users size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              Total People
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
+              {dashboardStats.totalPeople}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
+            <MessageSquare size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              Total Chats / DMs
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
+              {dashboardStats.totalDMs}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
+            <Film size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              Reels Shared
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
+              {dashboardStats.totalReels}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
+            <Bot size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              AI Active Contacts
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
+              {dashboardStats.activeAi}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Action Required Banner for missing Instagram IDs */}
@@ -1012,7 +1602,7 @@ export default function RelationshipsPage() {
           <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
           <input
             type="text"
-            placeholder="Filter people by name, @username, ID, birth date, relation, or lore..."
+            placeholder="Filter people by name, @username, birth date, relation, or lore..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -1035,17 +1625,14 @@ export default function RelationshipsPage() {
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead>
               <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '60px' }}>
+                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '56px' }}>
                   PROFILE
                 </th>
                 <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
                   NAME
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
-                  ID (SENDER ID)
                 </th>
                 <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
                   USERNAME
@@ -1056,6 +1643,12 @@ export default function RelationshipsPage() {
                 <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
                   RELATION
                 </th>
+                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                  CHATS
+                </th>
+                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                  REELS
+                </th>
                 <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
                   ACTION
                 </th>
@@ -1064,17 +1657,17 @@ export default function RelationshipsPage() {
             <tbody>
               {filteredPeople.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
+                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
                     No people found matching your filters.
                   </td>
                 </tr>
               ) : (
                 filteredPeople.map((person) => {
-                  const hasId = Boolean(person.senderId);
-                  const hasHandle = Boolean(person.handle);
-                  const isPaused = person.aiEnabled === false;
-                  const isReelsOnly = !isPaused && person.replyToMessages === false && person.replyToReelsAndPosts !== false;
+                  const hasHandle = Boolean(person.handle || person.instagramHandle);
+                  const handleDisplay = person.handle || person.instagramHandle;
                   const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+                  const chatsCount = person.chatsCount || person.messageCount || 0;
+                  const reelsCount = person.reelsCount || 0;
 
                   return (
                     <tr
@@ -1105,36 +1698,7 @@ export default function RelationshipsPage() {
                         )}
                       </td>
 
-                      {/* Column 3: ID */}
-                      <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
-                        {hasId ? (
-                          <span style={{ fontSize: '0.75rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                            {person.senderId}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setLinkingTargetPerson(person)}
-                            style={{
-                              background: '#ffffff',
-                              border: '1px solid #e4e4e7',
-                              color: '#09090b',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.68rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Link2 size={10} />
-                            <span>Link ID</span>
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Column 4: USERNAME */}
+                      {/* Column 3: USERNAME */}
                       <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
                         {hasHandle ? (
                           <span
@@ -1151,7 +1715,7 @@ export default function RelationshipsPage() {
                               gap: '4px'
                             }}
                           >
-                            {person.handle}
+                            {handleDisplay}
                           </span>
                         ) : (
                           <button
@@ -1172,7 +1736,7 @@ export default function RelationshipsPage() {
                         )}
                       </td>
 
-                      {/* Column 5: DATE OF BIRTH */}
+                      {/* Column 4: DATE OF BIRTH */}
                       <td style={{ padding: '10px 16px' }}>
                         {dobDisplay ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#09090b' }}>
@@ -1184,43 +1748,37 @@ export default function RelationshipsPage() {
                         )}
                       </td>
 
-                      {/* Column 6: RELATION */}
+                      {/* Column 5: RELATION */}
                       <td style={{ padding: '10px 16px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           <span style={{ fontSize: '0.8rem', color: '#09090b', fontWeight: '600' }}>
-                            {person.relationship}
+                            {person.relationship || person.relationshipToSam || 'Friend'}
                           </span>
                           <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                            {person.category ? person.category.replace('_', ' ').toUpperCase() : 'FRIEND'}
+                            {person.category ? person.category.replace('_', ' ').toUpperCase() : 'ONLINE FRIEND'}
                           </span>
                         </div>
                       </td>
 
-                      {/* Column 7: ACTION */}
+                      {/* Column 6: CHATS COUNT */}
+                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <span style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <MessageSquare size={11} style={{ color: '#71717a' }} />
+                          <span>{chatsCount}</span>
+                        </span>
+                      </td>
+
+                      {/* Column 7: REELS COUNT */}
+                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <span style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Film size={11} style={{ color: '#71717a' }} />
+                          <span>{reelsCount}</span>
+                        </span>
+                      </td>
+
+                      {/* Column 8: ACTION (ONLY OPEN AND DELETE) */}
                       <td style={{ padding: '10px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                          {/* Quick AI Toggle */}
-                          <button
-                            onClick={() => {
-                              const nextMode = isPaused ? 'full_ai' : (isReelsOnly ? 'paused' : 'reels_only');
-                              updateContactPreferences(person.senderId || person.id, { aiMode: nextMode });
-                            }}
-                            title="Cycle AI reply policy"
-                            style={{
-                              fontSize: '0.66rem',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              fontFamily: "'JetBrains Mono', monospace",
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              background: '#ffffff',
-                              color: '#09090b',
-                              border: '1px solid #e4e4e7'
-                            }}
-                          >
-                            {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS' : 'FULL AI')}
-                          </button>
-
                           {/* Open Full Inner Page */}
                           <button
                             onClick={() => setSelectedPerson(person)}

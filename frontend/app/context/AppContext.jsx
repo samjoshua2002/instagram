@@ -812,6 +812,38 @@ export function AppProvider({ children }) {
     return false;
   };
 
+  // Quick lookup of contact in DB by handle or username
+  const lookupContact = async (handleOrQuery) => {
+    if (!handleOrQuery) return null;
+    try {
+      const clean = handleOrQuery.replace(/^@/, '').trim();
+      const res = await fetch(`${API_BASE}/api/contacts/lookup?handle=${encodeURIComponent(clean)}`);
+      const data = await res.json();
+      if (data.found) return data;
+    } catch (e) {
+      console.warn('Contact lookup error:', e.message);
+    }
+    return null;
+  };
+
+  // Extract attributes from raw chat text using Azure OpenAI
+  const extractFromRawChat = async (chatText, currentPerson = {}, userClarifications = '') => {
+    try {
+      const res = await fetch(`${API_BASE}/api/social-graph/extract-from-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatText, currentPerson, userClarifications })
+      });
+      const data = await res.json();
+      if (data.success && data.extraction) {
+        return data.extraction;
+      }
+    } catch (e) {
+      console.warn('Extract from raw chat error:', e.message);
+    }
+    return null;
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -836,6 +868,8 @@ export function AppProvider({ children }) {
         linkingTargetPerson,
         setLinkingTargetPerson,
         linkContactId,
+        lookupContact,
+        extractFromRawChat,
         syncBackend,
         API_BASE
       }}
@@ -843,6 +877,7 @@ export function AppProvider({ children }) {
       {children}
     </AppContext.Provider>
   );
+
 }
 
 export function useApp() {
