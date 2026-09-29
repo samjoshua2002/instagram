@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   await loadStatus();
   await loadConversations();
+  await loadSocialGraph();
   setupEventListeners();
   setupSimulator();
 });
@@ -567,6 +568,88 @@ function setupEventListeners() {
       personalNotes,
     });
   });
+
+  // Sync Social Tree button
+  document.getElementById('syncTreeBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('syncTreeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Training & Syncing...</span>';
+    try {
+      const res = await fetch('/api/social-graph/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🌳 Synced ${data.count} friends in the Social Tree!`);
+        await loadSocialGraph();
+      } else {
+        showToast('Sync failed: ' + data.error, true);
+      }
+    } catch (err) {
+      showToast('Error syncing tree: ' + err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🔄 Sync & Retrain from DB</span>';
+    }
+  });
+}
+
+async function loadSocialGraph() {
+  try {
+    const res = await fetch('/api/social-graph');
+    const data = await res.json();
+    if (!data.success) return;
+
+    const grid = document.getElementById('friendsGrid');
+    const badge = document.getElementById('friendsCountBadge');
+    if (badge) badge.textContent = data.nodes.length;
+    if (!grid) return;
+
+    grid.innerHTML = data.nodes.map(node => {
+      const initials = (node.name || '?').slice(0, 2).toUpperCase();
+      const connectionsChips = (node.connections || []).map(c => 
+        `<span class="tree-chip" title="${escapeHtml(c.notes)}">🔗 <b>${escapeHtml(c.targetName)}</b> (${escapeHtml(c.relationship)})</span>`
+      ).join('');
+
+      const loreItems = (node.lore || []).map(l => `• ${escapeHtml(l)}`).join('<br>');
+
+      return `
+        <div class="friend-card">
+          <div class="friend-card-top">
+            <div class="friend-profile">
+              <div class="friend-avatar">${initials}</div>
+              <div>
+                <div class="friend-name">${escapeHtml(node.name)}</div>
+                <div class="friend-handle">${escapeHtml(node.instagramHandle || 'No handle')}</div>
+              </div>
+            </div>
+            <span class="friend-rel-badge">${escapeHtml(node.relationshipToSam || 'Friend')}</span>
+          </div>
+
+          ${connectionsChips ? `
+            <div class="tree-connections-block">
+              <div class="tree-connections-title">Connected Friends (Tree Chain)</div>
+              <div class="tree-chips">${connectionsChips}</div>
+            </div>
+          ` : ''}
+
+          ${loreItems ? `
+            <div class="friend-lore-block">
+              <div class="friend-lore-title">Shared Lore & Inside Jokes</div>
+              <div>${loreItems}</div>
+            </div>
+          ` : ''}
+
+          ${node.roastStyle ? `
+            <div class="friend-roast-block">
+              <div class="friend-roast-title">⚡ Cuss / Roast Style</div>
+              <div>${escapeHtml(node.roastStyle)}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading social graph:', err);
+  }
 }
 
 function escapeHtml(str) {
