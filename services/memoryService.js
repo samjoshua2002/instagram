@@ -106,7 +106,14 @@ Return a valid JSON object with EXACTLY this structure:
     { "title": "e.g. Moving to new apartment / Studying for exams / Starting new job", "details": "brief context", "dateOrTime": "timeframe" }
   ],
   "personalNotes": "1-2 sentence ongoing note of who this person is, their current vibe or emotional state, and what is happening in their life right now.",
-  "rollingSummary": "Concise 1-3 sentence summary of the ongoing relationship and conversation context."
+  "rollingSummary": "Concise 1-3 sentence summary of the ongoing relationship and conversation context.",
+  "mentionedPeople": [
+    {
+      "name": "Name of any friend, relative, or person mentioned in the conversation (e.g. Roni, Rajveer, Moksha, Fami, Arun, etc.)",
+      "relationship": "Relationship term: sister, bro, friend, lover, relative, cousin",
+      "notes": "What was discussed or their role"
+    }
+  ]
 }
 Only extract genuine details explicitly stated or strongly implied by the user. Do not invent information. If an array has no new items, leave it empty.`;
 
@@ -138,6 +145,26 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       }
       if (parsed.rollingSummary) {
         memory.rollingSummary = parsed.rollingSummary;
+      }
+
+      // Update social graph dynamically if friends/relationships were mentioned
+      if (Array.isArray(parsed.mentionedPeople) && parsed.mentionedPeople.length > 0) {
+        try {
+          const socialGraphService = require('./socialGraphService');
+          const senderName = memory.name || memory.nickname || memory.username;
+          for (const p of parsed.mentionedPeople) {
+            if (p.name && p.name.trim()) {
+              await socialGraphService.recordConnection(
+                senderName,
+                p.name.trim(),
+                p.relationship || 'friend',
+                p.notes || ''
+              );
+            }
+          }
+        } catch (sgErr) {
+          console.error('⚠️ [MemoryService] Non-critical social graph link error:', sgErr.message);
+        }
       }
 
       // Merge new facts

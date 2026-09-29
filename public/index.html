@@ -56,6 +56,11 @@
           <span>AI Simulator</span>
           <span class="pill-hot">Test Live</span>
         </button>
+        <button class="nav-btn" data-tab="friendsTreeTab" id="navFriendsTree">
+          <span class="icon">🌳</span>
+          <span>Friends & Tree Chain</span>
+          <span class="badge" id="friendsCountBadge">8</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -332,6 +337,25 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      <!-- ================= 3. FRIENDS SOCIAL TREE CHAIN TAB ================= -->
+      <section id="friendsTreeTab" class="tab-pane">
+        <div class="tree-container">
+          <div class="tree-header">
+            <div>
+              <h2>🌳 Friends Social Tree & Knowledge Graph</h2>
+              <p class="sub-text">Interlinks all your friends, relationships (sister, bro, friend, lover, relative), shared lore, and roasting styles so the AI knows who they're talking about.</p>
+            </div>
+            <div class="tree-actions">
+              <button class="btn-primary" id="syncTreeBtn">
+                <span>🔄 Sync & Retrain from DB</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="friends-grid" id="friendsGrid">
+            <!-- Populated dynamically via app.js -->
           </div>
         </div>
       </section>
