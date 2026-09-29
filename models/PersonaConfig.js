@@ -57,6 +57,17 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     type: Boolean,
     default: true,
   },
+  chatMode: {
+    type: String,
+    enum: ['everyone', 'everyone_except', 'only_selected', 'paused'],
+    default: 'everyone',
+  },
+  excludedContactIds: [{
+    type: String,
+  }],
+  includedContactIds: [{
+    type: String,
+  }],
   typingDelaySeconds: {
     type: Number,
     default: 1.5,
