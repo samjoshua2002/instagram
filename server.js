@@ -955,6 +955,44 @@ app.delete('/api/social-graph/node/:name', async (req, res) => {
   }
 });
 
+// AI Conversational Interview to clarify friend details, relationships & lore
+app.post('/api/social-graph/ai-interview', async (req, res) => {
+  try {
+    const { conversationHistory, userInput, existingNode, autoSave } = req.body;
+    const interviewResult = await azureOpenAI.interviewPersonForSocialTree({
+      conversationHistory,
+      userInput,
+      existingNode
+    });
+
+    if (interviewResult.isComplete && autoSave && interviewResult.node?.name) {
+      const node = interviewResult.node;
+      await SocialGraph.findOneAndUpdate(
+        { name: new RegExp(`^${node.name.trim()}$`, 'i') },
+        {
+          $set: {
+            name: node.name.trim(),
+            aliases: node.aliases || [],
+            instagramHandle: node.instagramHandle || '',
+            gender: node.gender || 'unknown',
+            relationshipToSam: node.relationshipToSam || 'friend',
+            lore: node.lore || [],
+            roastStyle: node.roastStyle || '',
+            connections: node.connections || [],
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+      socialGraphService.clearCache();
+    }
+
+    res.json({ success: true, ...interviewResult });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);

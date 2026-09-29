@@ -652,18 +652,121 @@ function setupEventListeners() {
         await loadSocialGraph();
       }
     } catch (err) {
-      showToast('Error deleting: ' + err.message, true);
+  // AI Clarification Wizard inside modal
+  const sendAiWizardMessage = async () => {
+    const input = document.getElementById('aiWizardInput');
+    const chat = document.getElementById('aiWizardChat');
+    const sendBtn = document.getElementById('aiWizardSendBtn');
+    if (!input || !input.value.trim()) return;
+
+    const userText = input.value.trim();
+    input.value = '';
+
+    // Append user bubble
+    const userBubble = document.createElement('div');
+    userBubble.style.cssText = 'background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.4); padding: 6px 10px; border-radius: 6px; align-self: flex-end; color: #fff;';
+    userBubble.textContent = userText;
+    chat.appendChild(userBubble);
+    chat.scrollTop = chat.scrollHeight;
+
+    aiWizardHistory.push({ role: 'user', content: userText });
+
+    // Typing bubble
+    const typingBubble = document.createElement('div');
+    typingBubble.style.cssText = 'background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; color: #a5b4fc; font-style: italic;';
+    typingBubble.textContent = '🤖 Analyzing circle & thinking...';
+    chat.appendChild(typingBubble);
+    chat.scrollTop = chat.scrollHeight;
+
+    sendBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/social-graph/ai-interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationHistory: aiWizardHistory,
+          userInput: userText,
+          existingNode: currentEditingNode
+        })
+      });
+
+      const data = await res.json();
+      typingBubble.remove();
+
+      if (data.success) {
+        aiWizardHistory.push({ role: 'assistant', content: data.question || data.summary });
+
+        // Append AI response question
+        const aiBubble = document.createElement('div');
+        aiBubble.style.cssText = 'background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); padding: 6px 10px; border-radius: 6px; color: #e2e8f0; line-height: 1.4;';
+        aiBubble.innerHTML = `🤖 <b>AI:</b> ${escapeHtml(data.question || data.summary)}`;
+        chat.appendChild(aiBubble);
+        chat.scrollTop = chat.scrollHeight;
+
+        // Auto-fill form fields with extracted node data!
+        if (data.node) {
+          if (data.node.name) document.getElementById('modalFriendName').value = data.node.name;
+          if (data.node.instagramHandle) document.getElementById('modalFriendHandle').value = data.node.instagramHandle;
+          if (data.node.relationshipToSam) document.getElementById('modalFriendRelation').value = data.node.relationshipToSam;
+          if (data.node.gender) document.getElementById('modalFriendGender').value = data.node.gender;
+          if (Array.isArray(data.node.connections) && data.node.connections.length > 0) {
+            document.getElementById('modalFriendConnections').value = data.node.connections.map(c => `${c.targetName} (${c.relationship})`).join(', ');
+          }
+          if (Array.isArray(data.node.lore) && data.node.lore.length > 0) {
+            document.getElementById('modalFriendLore').value = data.node.lore.join('\n');
+          }
+          if (data.node.roastStyle) document.getElementById('modalFriendRoast').value = data.node.roastStyle;
+          if (Array.isArray(data.node.aliases) && data.node.aliases.length > 0) {
+            document.getElementById('modalFriendAliases').value = data.node.aliases.join(', ');
+          }
+        }
+
+        if (data.isComplete) {
+          showToast('✨ All details clarified! Click Save to update the database.');
+        }
+      }
+    } catch (err) {
+      typingBubble.remove();
+      const errBubble = document.createElement('div');
+      errBubble.style.cssText = 'color: #f87171; font-size: 0.75rem;';
+      errBubble.textContent = 'Error connecting to AI: ' + err.message;
+      chat.appendChild(errBubble);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  };
+
+  document.getElementById('aiWizardSendBtn')?.addEventListener('click', sendAiWizardMessage);
+  document.getElementById('aiWizardInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendAiWizardMessage();
     }
   });
 }
 
 let currentSocialNodes = [];
+let currentEditingNode = null;
+let aiWizardHistory = [];
 
 function openFriendModal(node = null) {
   const modal = document.getElementById('friendModal');
   const title = document.getElementById('modalFriendTitle');
   const delBtn = document.getElementById('deleteFriendBtn');
+  const aiChat = document.getElementById('aiWizardChat');
   if (!modal) return;
+
+  currentEditingNode = node;
+  aiWizardHistory = [];
+
+  if (aiChat) {
+    aiChat.innerHTML = `
+      <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
+        🤖 <i>${node ? `Tell me what new details or updates you want to add for <b>${escapeHtml(node.name)}</b>!` : `Tell me about this person in plain words (e.g. "Priya is my cousin studying architecture, she talks with Bhavani"), and I will ask you questions to clarify everything and fill the form!`}</i>
+      </div>
+    `;
+  }
 
   if (node) {
     if (title) title.textContent = `Edit Info: ${node.name}`;
@@ -694,6 +797,8 @@ function openFriendModal(node = null) {
 
 function closeFriendModal() {
   document.getElementById('friendModal')?.classList.remove('show');
+  currentEditingNode = null;
+  aiWizardHistory = [];
 }
 
 async function loadSocialGraph() {

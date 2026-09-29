@@ -1,738 +1,939 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Network, Plus, RefreshCw, X, Share2, Shield, Heart, User, Trash2, ArrowUpRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Minus, Download, Maximize2, Sparkles, MessageSquare, Send, RefreshCw, X, ChevronRight, ChevronDown, Check, User, Heart, Shield, Zap } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
-const INITIAL_NODES = [
+const DEFAULT_GRAPH_DATA = [
   {
+    id: 'sam',
     name: 'Sam Joshua',
-    instagramHandle: '@catovidz',
-    relationshipToSam: 'Creator / You',
-    gender: 'male',
-    connections: [
-      { targetName: 'Bhavani', relationship: 'closest online friend' },
-      { targetName: 'Annie', relationship: 'sister' },
-      { targetName: 'Rajveer', relationship: 'day-one homie' },
-      { targetName: 'Moksha', relationship: 'sister figure' },
-      { targetName: 'Fami', relationship: 'very close friend (moi)' },
-      { targetName: 'Arun', relationship: 'tamil homie' },
-      { targetName: 'Roni', relationship: 'running joke buddy' }
-    ],
-    lore: ['Creator of Chatter AI. Direct messaging auto-pilot.'],
-    roastStyle: 'Casual chill creator vibe.',
-    isCenter: true
+    sub: 'Creator / Core',
+    isRoot: true,
+    relationship: 'Root Node',
+    children: ['bhavani', 'annie', 'rajveer', 'moksha', 'fami', 'arun', 'roni', 'rubesh']
   },
   {
+    id: 'bhavani',
     name: 'Bhavani',
-    aliases: ['bhavani', 'bhanvani', 'yk_bhavani._.xo', 'bhavani🐹'],
-    instagramHandle: '@yk_bhavani._.xo',
-    senderId: '29005624469042002',
+    handle: '@yk_bhavani._.xo',
+    relationship: 'Closest Online Friend',
     gender: 'female',
-    relationshipToSam: 'Closest online friend / Medicine student',
-    connections: [
-      { targetName: 'Annie', relationship: 'talking with Sam\'s sister Annie', notes: 'Currently talking with Sam\'s sister Annie.' }
-    ],
     lore: [
-      'Bhanvani is one of Sam\'s closest online friends.',
-      'Her dad is in the Indian Army, and she is studying medicine.',
-      'Shares a Netflix subscription with Sam (she recently added one of her new friends to their plan).',
-      'Currently talking with Sam\'s sister Annie.',
-      'Loves hamsters (hamster obsession 🐹) and is obsessed with reading books.',
-      'Birthday is on 12th March 2007.',
-      'Loves teasing Sam and joking around with playful personality.',
-      'Strictly NEVER call her bro, da, or man. Speak warmly, tease back gently.'
+      'Dad is in the Indian Army',
+      'Studying medicine',
+      'Shares Netflix subscription',
+      'Hamster obsession 🐹 & loves books',
+      'Birthday: 12th March 2007'
     ],
-    roastStyle: 'Playful and gentle teasing, no hard insults. Tease her about her hamster obsession or Netflix password sharing.',
-    languages: ['English', 'Tamil']
+    connections: [
+      { targetName: 'Annie', rel: 'Talking with sister' }
+    ],
+    roastStyle: 'Gentle playful teasing, no hard insults. Tease about hamster drama or Netflix watchlist.'
   },
   {
+    id: 'annie',
     name: 'Annie',
-    aliases: ['annie', 'ann', 'sister'],
-    instagramHandle: '',
-    senderId: '',
+    handle: '',
+    relationship: 'Sister',
     gender: 'female',
-    relationshipToSam: 'Sister',
-    connections: [
-      { targetName: 'Bhavani', relationship: 'talking / friends with Bhavani', notes: 'Bhavani is currently talking with Annie.' }
+    lore: [
+      'Sam\'s sister',
+      'Currently talking with Bhavani'
     ],
-    lore: ['Sam\'s sister.', 'Currently talking with Bhavani.'],
-    roastStyle: 'Sisterly teasing.',
-    languages: ['English', 'Tamil']
+    connections: [
+      { targetName: 'Bhavani', rel: 'Talking / close with Bhavani' }
+    ],
+    roastStyle: 'Sisterly teasing and banter.'
   },
   {
+    id: 'rajveer',
     name: 'Rajveer',
-    aliases: ['rajveer', 'gs', 'unpredictable_2k26'],
-    instagramHandle: '@unpredictable_2k26',
-    senderId: '877566845441453',
+    handle: '@unpredictable_2k26',
+    relationship: 'Day-One Homie / Brother',
     gender: 'male',
-    relationshipToSam: 'Day-one Homie / Brother',
-    connections: [
-      { targetName: 'Roni', relationship: 'close buddy / favorite trolling victim' },
-      { targetName: 'Moksha', relationship: 'close friend / account sharer' },
-      { targetName: 'Fami', relationship: 'friend in circle / plots ragebaits' }
-    ],
     lore: [
-      'Calls himself drama king; talks in Hinglish and Hindi.',
-      'Running gag about Roni uncle: fake bank account, court cases, axe of justice, Nami simping.',
-      'When he roasts or insults, roast him back hard like guy friends do.'
+      'Drama king of the group',
+      'Constantly trolls Roni uncle',
+      'Speaks Hindi/Hinglish (bhai, bro, lmao)'
     ],
-    roastStyle: 'Savage Hindi/Hinglish bro banter: "abe chal na lode", "aukaat mein reh bsdk", "dramebaaz chup baith".',
-    languages: ['Hindi', 'Hinglish', 'English']
+    connections: [
+      { targetName: 'Roni', rel: 'Favorite trolling victim' },
+      { targetName: 'Moksha', rel: 'Close friend / account sharing' },
+      { targetName: 'Fami', rel: 'Plots ragebaits against her' }
+    ],
+    roastStyle: 'Savage Hindi/Hinglish bro banter: "abe chal na lode", "bsdk chup baith".'
   },
   {
-    name: 'Roni',
-    aliases: ['roni', 'roni uncle', 'roni_uncle'],
-    instagramHandle: '',
-    senderId: '',
+    id: 'roni',
+    name: 'Roni (Roni Uncle)',
+    handle: '',
+    relationship: 'Group Legend & Running Gag',
     gender: 'male',
-    relationshipToSam: 'Close friend / Group running joke legend',
-    connections: [
-      { targetName: 'Rajveer', relationship: 'close buddy' }
-    ],
     lore: [
-      'Legendary running gag friend of the circle ("roni uncle").',
-      'Jokes: Roni bank account, legal team on speed dial, Area 51 research, Toji soul, axe of justice, simping over Nami and Robin.'
+      'Legendary running gag friend ("Roni Uncle")',
+      'Fake legal team on speed dial',
+      'Area 51 research & alien biryani',
+      'Axe of justice & anime protagonist delusions'
     ],
-    roastStyle: 'Clown his anime protagonist delusions, fake legal team, and axe of justice jokes.',
-    languages: ['Hinglish', 'English']
+    connections: [
+      { targetName: 'Rajveer', rel: 'Trolled constantly by Rajveer' }
+    ],
+    roastStyle: 'Clown his anime delusions, fake legal team, and axe of justice.'
   },
   {
+    id: 'moksha',
     name: 'Moksha',
-    aliases: ['moksha', '1fyz_2', 'fyz'],
-    instagramHandle: '@1fyz_2',
-    senderId: '1337018008317393',
+    handle: '@1fyz_2',
+    relationship: 'Sister Figure / Drama Queen',
     gender: 'female',
-    relationshipToSam: 'Close friend / Sister figure / Drama queen',
-    connections: [
-      { targetName: 'Rajveer', relationship: 'close friend / account sharer' },
-      { targetName: 'Fami', relationship: 'friend / plots ragebaits' }
-    ],
     lore: [
-      'High-voltage drama queen. Uses hardcore Hindi cuss words when angry or teasing ("abey lovde", "bkl", "mkc").',
-      'When she cusses, cuss and roast her right back in Hindi: "chup kar chudail", "apni gaand mat phula dramebaaz", "bkl chill kar".'
+      'High-voltage drama queen',
+      'Hardcore Hindi cussing banter (abey lovde, bkl, mkc)',
+      'Rajveer texts from her account'
     ],
-    roastStyle: 'Savage Hindi sister/drama queen roast: "chup kar chudail", "abe lodu chup baith", "bkl drama factory".',
-    languages: ['Hindi', 'Hinglish', 'English']
+    connections: [
+      { targetName: 'Rajveer', rel: 'Account sharer & close buddy' },
+      { targetName: 'Fami', rel: 'Plots ragebaits against her' }
+    ],
+    roastStyle: 'Match her Hindi cussing directly: "chup kar chudail", "apni gaand mat phula dramebaaz", "bkl chill kar".'
   },
   {
+    id: 'fami',
     name: 'Fami',
-    aliases: ['fami', 'mavis', 'm4visyzx', 'moi', 'ო𝗈ꪱᜒ'],
-    instagramHandle: '@m4visyzx',
-    senderId: '2144547476275057',
+    handle: '@m4visyzx',
+    relationship: 'Very Close Friend ("moi")',
     gender: 'female',
-    relationshipToSam: 'Very close friend ("moi" / Fami)',
-    connections: [
-      { targetName: 'Rajveer', relationship: 'friend / teasing target' },
-      { targetName: 'Moksha', relationship: 'friend / circle' }
-    ],
     lore: [
-      'Goes by Fami (Instagram: @m4visyzx, display name "moi" / "ო𝗈ꪱᜒ").',
-      'Very close friend of Sam with high emotional connection (often texts "Oyy", "Please reply", "Byy").',
-      'Gets easily ragebaited by Rajveer and Moksha ("fami will get so ragebaited").',
-      'Strictly NEVER call her "da", "bro", or "man". Be warm, sweet, playful, and responsive.'
+      'Goes by Fami (Instagram: @m4visyzx, display name "moi")',
+      'Easily ragebaited by Rajveer & Moksha',
+      'Sends cute texts: "Oyy", "Please reply", "Byy"',
+      'Never call her bro/da - speak sweetly'
     ],
-    roastStyle: 'Cute playful banter, tease her when she gets ragebaited or confused.',
-    languages: ['English']
+    connections: [
+      { targetName: 'Rajveer', rel: 'Gets easily ragebaited' },
+      { targetName: 'Moksha', rel: 'Target of inside jokes' }
+    ],
+    roastStyle: 'Cute playful banter, tease when she gets confused or ragebaited.'
   },
   {
+    id: 'arun',
     name: 'Arun',
-    aliases: ['arun', 'graphicsbyarun'],
-    instagramHandle: '@graphicsbyarun',
-    senderId: '1144338295203170',
+    handle: '@graphicsbyarun',
+    relationship: 'Close Tamil Homie / Designer',
     gender: 'male',
-    relationshipToSam: 'Close Tamil homie / Graphic designer bro',
-    connections: [
-      { targetName: 'Rubesh', relationship: 'homie / inside joke couple' }
-    ],
     lore: [
-      'Texts in Tamil and Tanglish ("dei", "summa irunga", "gay Lord").',
-      'When he roasts or calls Sam gay, abuse him back in Tamil: "dei mooditu poda gomma", "otha summa iru da", "ne tha da periya gay lord".'
+      'Texts in Tamil & Tanglish (dei, summa irunga, gay lord)',
+      'Shipped with Rubesh as inside joke'
     ],
-    roastStyle: 'Tamil roast: "dei poi vela paaru da", "ne tha da gay lord", "otha mooditu po gomma".',
-    languages: ['Tamil', 'Tanglish', 'English']
+    connections: [
+      { targetName: 'Rubesh', rel: 'Inside joke gay lover ship' }
+    ],
+    roastStyle: 'Tamil roast: "dei mooditu poda gomma", "otha summa iru da", "ne tha da periya gay lord".'
   },
   {
+    id: 'rubesh',
     name: 'Rubesh',
-    aliases: ['rubesh', 'rupesh'],
-    instagramHandle: '',
-    senderId: '',
+    handle: '',
+    relationship: 'Friend in Group',
     gender: 'male',
-    relationshipToSam: 'Friend in the group',
-    connections: [
-      { targetName: 'Arun', relationship: 'homie / inside joke couple' }
+    lore: [
+      'Running joke partner with Arun'
     ],
-    lore: ['Running joke partner with Arun ("U and Rubesh gay lovers breakup ha").'],
-    roastStyle: 'Bring up the Arun ship joke.',
-    languages: ['Tamil', 'English']
+    connections: [
+      { targetName: 'Arun', rel: 'Shipped as a couple with Arun' }
+    ],
+    roastStyle: 'Bring up the Arun ship joke.'
   }
 ];
 
-export default function SocialTreePage() {
-  const [nodes, setNodes] = useState(INITIAL_NODES);
+export default function MindMapPage() {
+  const [nodes, setNodes] = useState(DEFAULT_GRAPH_DATA);
+  const [expandedNodes, setExpandedNodes] = useState(new Set(['sam', 'bhavani', 'rajveer']));
   const [selectedNode, setSelectedNode] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'list'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    instagramHandle: '',
-    relationshipToSam: 'Friend',
-    gender: 'unknown',
-    connections: '',
-    lore: '',
-    roastStyle: '',
-    aliases: ''
-  });
+  // Zoom & Pan Canvas state
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 80, y: 320 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
 
-  const canvasRef = useRef(null);
+  // AI Interview Modal State
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [editingNode, setEditingNode] = useState(null);
+  const [aiChat, setAiChat] = useState([]);
+  const [aiInput, setAiInput] = useState('');
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [accumulatedNode, setAccumulatedNode] = useState(null);
 
-  // Fetch nodes from API
-  const fetchNodes = async () => {
-    setIsLoading(true);
+  const containerRef = useRef(null);
+  const chatBottomRef = useRef(null);
+
+  // Fetch from backend
+  const refreshNodes = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/social-graph`);
       const data = await res.json();
       if (data.success && data.nodes?.length > 0) {
-        // Merge with Sam creator node at center
-        const samNode = INITIAL_NODES.find(n => n.name === 'Sam Joshua');
-        setNodes([samNode, ...data.nodes.filter(n => n.name !== 'Sam Joshua')]);
+        // Map backend format to tree
+        const formatted = data.nodes.map(n => ({
+          id: n.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          name: n.name,
+          handle: n.instagramHandle,
+          relationship: n.relationshipToSam,
+          gender: n.gender,
+          lore: n.lore || [],
+          connections: (n.connections || []).map(c => ({ targetName: c.targetName, rel: c.relationship })),
+          roastStyle: n.roastStyle
+        }));
+
+        const root = DEFAULT_GRAPH_DATA[0];
+        root.children = formatted.map(f => f.id);
+        setNodes([root, ...formatted]);
       }
     } catch (err) {
       console.warn('Using local tree data:', err.message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNodes();
+    refreshNodes();
   }, []);
 
-  // Save node
-  const handleSaveNode = async (e) => {
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [aiChat]);
+
+  // Toggle node expansion
+  const toggleExpand = (id) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Pan handlers
+  const handleMouseDown = (e) => {
+    if (e.target.closest('.interactive-node') || e.target.closest('.canvas-controls')) return;
+    setIsPanning(true);
+    setStartPan({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isPanning) return;
+    setOffset({
+      x: e.clientX - startPan.x,
+      y: e.clientY - startPan.y
+    });
+  };
+
+  const handleMouseUp = () => setIsPanning(false);
+
+  const handleWheel = (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+    setScale(s => Math.min(Math.max(0.4, s * zoomFactor), 2.5));
+  };
+
+  // Start AI Clarification Interview
+  const startAiInterview = (person = null) => {
+    setEditingNode(person);
+    const initialGreeting = person
+      ? `Hey Sam! Let's update details for **${person.name}**. What new info, inside jokes, or relationship updates do you have for them?`
+      : `Hey Sam! Who is this new person you want to add to your circle? Tell me their name, how you know them (sister, homie, friend, lover, relative), and what they're like!`;
+
+    setAiChat([
+      { role: 'assistant', content: initialGreeting }
+    ]);
+    setAccumulatedNode(person ? { ...person } : { name: '', relationshipToSam: '', connections: [], lore: [] });
+    setIsAiModalOpen(true);
+  };
+
+  // Send message in AI Interview
+  const handleSendAiMessage = async (e) => {
+    e?.preventDefault();
+    if (!aiInput.trim()) return;
+
+    const userMsg = aiInput.trim();
+    setAiInput('');
+    const newChat = [...aiChat, { role: 'user', content: userMsg }];
+    setAiChat(newChat);
+    setIsAiTyping(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/social-graph/ai-interview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationHistory: newChat.map(m => ({ role: m.role, content: m.content })),
+          userInput: userMsg,
+          existingNode: accumulatedNode
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (data.node) {
+          setAccumulatedNode(prev => ({ ...prev, ...data.node }));
+        }
+
+        const replyContent = data.question || (data.isComplete ? `Got it! I've structured everything for **${data.node?.name}**. You can review on the right and click Save!` : data.summary);
+        setAiChat(prev => [...prev, { role: 'assistant', content: replyContent }]);
+      }
+    } catch (err) {
+      setAiChat(prev => [...prev, {
+        role: 'assistant',
+        content: `I've noted that! What else should the AI know about ${accumulatedNode?.name || 'them'} (like their Instagram handle, connections, or how to roast them)?`
+      }]);
+    } finally {
+      setIsAiTyping(false);
+    }
+  };
+
+  // Finalize and Save Node
+  const handleFinalizeSave = async () => {
+    if (!accumulatedNode?.name) return;
 
     try {
       const res = await fetch(`${API_BASE}/api/social-graph/node`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(accumulatedNode)
       });
       const data = await res.json();
       if (data.success) {
-        setIsModalOpen(false);
-        fetchNodes();
+        setIsAiModalOpen(false);
+        refreshNodes();
       }
     } catch (err) {
-      // Offline fallback: update local state
-      const existsIndex = nodes.findIndex(n => n.name.toLowerCase() === formData.name.toLowerCase());
-      const updatedNode = {
-        ...formData,
-        connections: formData.connections.split(',').map(c => ({ targetName: c.trim(), relationship: 'friend' })).filter(c => c.targetName),
-        lore: formData.lore.split('\n').filter(Boolean)
-      };
-
-      if (existsIndex >= 0) {
-        const next = [...nodes];
-        next[existsIndex] = updatedNode;
-        setNodes(next);
-      } else {
-        setNodes([...nodes, updatedNode]);
-      }
-      setIsModalOpen(false);
+      setIsAiModalOpen(false);
+      refreshNodes();
     }
   };
 
-  // Canvas Interactive Force / Radial Dot Tree
-  useEffect(() => {
-    if (viewMode !== 'tree') return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Layout calculation for Mind Map Tree
+  const treeLayout = useMemo(() => {
+    const root = nodes.find(n => n.isRoot) || nodes[0];
+    const friendNodes = nodes.filter(n => !n.isRoot);
 
-    const ctx = canvas.getContext('2d');
-    let animationFrameId;
+    const rootPos = { x: 0, y: 0, width: 280, height: 56, ...root };
+    const branches = [];
+    const subBranches = [];
+    const connectionsCurves = [];
 
-    const resize = () => {
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
+    // Vertical spacing between friend nodes
+    const totalFriends = friendNodes.length;
+    const verticalGap = 72;
+    const startY = -((totalFriends - 1) * verticalGap) / 2;
 
-    // Compute positions
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    friendNodes.forEach((node, idx) => {
+      const nodeX = 380;
+      const nodeY = startY + idx * verticalGap;
+      const nodeWidth = 220;
+      const nodeHeight = 50;
 
-    const nonCenterNodes = nodes.filter(n => !n.isCenter);
-    const radius = Math.min(centerX, centerY) * 0.72;
-
-    const positionedNodes = nodes.map((node, i) => {
-      if (node.isCenter) {
-        return { ...node, x: centerX, y: centerY, r: 24 };
-      }
-      const index = nonCenterNodes.findIndex(n => n.name === node.name);
-      const angle = (index / nonCenterNodes.length) * Math.PI * 2 - Math.PI / 2;
-      return {
+      const branchNode = {
         ...node,
-        x: centerX + Math.cos(angle) * radius,
-        y: centerY + Math.sin(angle) * radius,
-        r: 16
+        x: nodeX,
+        y: nodeY,
+        width: nodeWidth,
+        height: nodeHeight
       };
+      branches.push(branchNode);
+
+      // Curve from Root to this Friend
+      connectionsCurves.push({
+        from: { x: rootPos.x + rootPos.width, y: rootPos.y + rootPos.height / 2 },
+        to: { x: nodeX, y: nodeY + nodeHeight / 2 },
+        color: '#6366f1'
+      });
+
+      // If this friend node is expanded, generate sub-branches for lore & connections!
+      if (expandedNodes.has(node.id || node.name.toLowerCase())) {
+        const subItems = [
+          { label: node.relationship || 'Friend', type: 'rel' },
+          ...(node.connections || []).map(c => ({ label: `🔗 ${c.targetName} (${c.rel || 'linked'})`, type: 'conn' })),
+          ...(node.lore || []).slice(0, 3).map(l => ({ label: l, type: 'lore' })),
+          ...(node.roastStyle ? [{ label: `⚡ ${node.roastStyle}`, type: 'roast' }] : [])
+        ];
+
+        const subGap = 42;
+        const subStartY = nodeY - ((subItems.length - 1) * subGap) / 2;
+
+        subItems.forEach((sub, sIdx) => {
+          const subX = nodeX + nodeWidth + 140;
+          const subY = subStartY + sIdx * subGap;
+          const subWidth = 240;
+          const subHeight = 36;
+
+          subBranches.push({
+            id: `${node.name}_sub_${sIdx}`,
+            label: sub.label,
+            type: sub.type,
+            x: subX,
+            y: subY,
+            width: subWidth,
+            height: subHeight,
+            parentNode: branchNode
+          });
+
+          // Curve from Friend Node to Sub-item
+          connectionsCurves.push({
+            from: { x: nodeX + nodeWidth, y: nodeY + nodeHeight / 2 },
+            to: { x: subX, y: subY + subHeight / 2 },
+            color: sub.type === 'conn' ? '#06b6d4' : (sub.type === 'roast' ? '#f43f5e' : '#a855f7')
+          });
+        });
+      }
     });
 
-    let hoveredNode = null;
-
-    const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // 1. Draw subtle background grid dots
-      ctx.fillStyle = '#151515';
-      const gridSize = 40;
-      for (let x = 0; x < canvas.width; x += gridSize) {
-        for (let y = 0; y < canvas.height; y += gridSize) {
-          ctx.beginPath();
-          ctx.arc(x, y, 1, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // 2. Draw connections (lines)
-      positionedNodes.forEach(nodeA => {
-        (nodeA.connections || []).forEach(conn => {
-          const nodeB = positionedNodes.find(n => n.name.toLowerCase() === conn.targetName.toLowerCase());
-          if (nodeB) {
-            const isHighlighted = (hoveredNode && (hoveredNode.name === nodeA.name || hoveredNode.name === nodeB.name)) ||
-                                  (selectedNode && (selectedNode.name === nodeA.name || selectedNode.name === nodeB.name));
-
-            ctx.beginPath();
-            ctx.moveTo(nodeA.x, nodeA.y);
-            ctx.lineTo(nodeB.x, nodeB.y);
-
-            if (isHighlighted) {
-              ctx.strokeStyle = '#ffffff';
-              ctx.lineWidth = 2;
-              ctx.setLineDash([4, 4]);
-            } else {
-              ctx.strokeStyle = '#222222';
-              ctx.lineWidth = 1;
-              ctx.setLineDash([]);
-            }
-            ctx.stroke();
-
-            // Draw connection label midpoint if highlighted
-            if (isHighlighted) {
-              const midX = (nodeA.x + nodeB.x) / 2;
-              const midY = (nodeA.y + nodeB.y) / 2;
-              ctx.fillStyle = '#000000';
-              ctx.fillRect(midX - 45, midY - 10, 90, 20);
-              ctx.strokeStyle = '#444444';
-              ctx.strokeRect(midX - 45, midY - 10, 90, 20);
-              ctx.fillStyle = '#aaaaaa';
-              ctx.font = '10px monospace';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(conn.relationship?.slice(0, 16) || 'linked', midX, midY);
-            }
-          }
-        });
-      });
-
-      // 3. Draw Nodes (Dots)
-      positionedNodes.forEach(node => {
-        const isHovered = hoveredNode?.name === node.name;
-        const isSelected = selectedNode?.name === node.name;
-
-        // Outer glow on active/hover
-        if (isHovered || isSelected) {
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, node.r + 10, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-          ctx.fill();
-        }
-
-        // Main dot
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
-        ctx.fillStyle = node.isCenter ? '#ffffff' : (isSelected ? '#ffffff' : '#0a0a0a');
-        ctx.fill();
-        ctx.strokeStyle = (isHovered || isSelected) ? '#ffffff' : (node.isCenter ? '#ffffff' : '#333333');
-        ctx.lineWidth = node.isCenter ? 3 : 2;
-        ctx.setLineDash([]);
-        ctx.stroke();
-
-        // Node Label
-        ctx.fillStyle = (isHovered || isSelected || node.isCenter) ? '#ffffff' : '#888888';
-        ctx.font = node.isCenter ? 'bold 13px "Space Grotesk"' : '12px "Space Grotesk"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.fillText(node.name, node.x, node.y + node.r + 8);
-
-        // Subtext (Handle / Role)
-        if (node.instagramHandle || node.relationshipToSam) {
-          ctx.fillStyle = '#444444';
-          ctx.font = '10px monospace';
-          const sub = node.instagramHandle || node.relationshipToSam;
-          ctx.fillText(sub.length > 20 ? sub.slice(0, 18) + '...' : sub, node.x, node.y + node.r + 24);
-        }
-      });
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    // Mouse interactions
-    const handleMouseMove = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      let found = null;
-      for (const node of positionedNodes) {
-        const dist = Math.hypot(node.x - mouseX, node.y - mouseY);
-        if (dist <= node.r + 6) {
-          found = node;
-          break;
-        }
-      }
-      hoveredNode = found;
-      canvas.style.cursor = found ? 'pointer' : 'default';
-    };
-
-    const handleClick = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      for (const node of positionedNodes) {
-        const dist = Math.hypot(node.x - mouseX, node.y - mouseY);
-        if (dist <= node.r + 6) {
-          setSelectedNode(node);
-          return;
-        }
-      }
-    };
-
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('click', handleClick);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', resize);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('click', handleClick);
-    };
-  }, [nodes, viewMode, selectedNode]);
-
-  const filteredNodes = nodes.filter(n =>
-    n.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (n.relationshipToSam || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (n.instagramHandle || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    return { rootPos, branches, subBranches, connectionsCurves };
+  }, [nodes, expandedNodes]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#000000', color: '#ffffff', padding: '24px' }}>
-      {/* Header Bar */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #1a1a1a', paddingBottom: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.25rem', fontWeight: '700', letterSpacing: '-0.5px' }}>CHATTER // SOCIAL TREE</span>
-            <span className="mono" style={{ fontSize: '0.7rem', background: '#111111', border: '1px solid #222222', padding: '2px 8px', borderRadius: '4px', color: '#888888' }}>
-              PURE BLACK MINIMALIST
+    <div
+      ref={containerRef}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onWheel={handleWheel}
+      style={{
+        width: '100vw',
+        height: '100vh',
+        background: '#0d111a',
+        overflow: 'hidden',
+        position: 'relative',
+        cursor: isPanning ? 'grabbing' : 'grab',
+        userSelect: 'none',
+        fontFamily: "'Space Grotesk', -apple-system, sans-serif"
+      }}
+    >
+      {/* Subtle Background Grid */}
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <circle cx="20" cy="20" r="1" fill="#1b2234" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+      </svg>
+
+      {/* Floating Canvas Controls (Zoom In, Zoom Out, Reset, Download, Add) */}
+      <div
+        className="canvas-controls"
+        style={{
+          position: 'fixed',
+          top: '24px',
+          left: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          zIndex: 40
+        }}
+      >
+        <div style={{ background: '#161d2d', border: '1px solid #232d44', borderRadius: '10px', padding: '4px', display: 'flex', flexDirection: 'column', gap: '4px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+          <button
+            onClick={() => setScale(s => Math.min(s * 1.2, 2.5))}
+            style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', color: '#c5d1e8', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', cursor: 'pointer' }}
+            title="Zoom In"
+          >
+            <Plus size={18} />
+          </button>
+          <button
+            onClick={() => setScale(s => Math.max(s * 0.8, 0.4))}
+            style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', color: '#c5d1e8', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', cursor: 'pointer' }}
+            title="Zoom Out"
+          >
+            <Minus size={18} />
+          </button>
+          <button
+            onClick={() => { setScale(1); setOffset({ x: 80, y: 320 }); }}
+            style={{ width: '36px', height: '36px', background: 'transparent', border: 'none', color: '#c5d1e8', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', cursor: 'pointer' }}
+            title="Reset View"
+          >
+            <Maximize2 size={16} />
+          </button>
+        </div>
+
+        <button
+          onClick={() => startAiInterview(null)}
+          style={{
+            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+            border: 'none',
+            color: '#fff',
+            padding: '10px 16px',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: '600',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(99,102,241,0.35)'
+          }}
+        >
+          <Sparkles size={16} />
+          <span>+ Add Person (AI Interview)</span>
+        </button>
+
+        <button
+          onClick={refreshNodes}
+          style={{
+            background: '#161d2d',
+            border: '1px solid #232d44',
+            color: '#94a3b8',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.8rem',
+            cursor: 'pointer'
+          }}
+        >
+          <RefreshCw size={13} />
+          <span>Sync DB</span>
+        </button>
+      </div>
+
+      {/* SVG Connections & Curved Bezier Lines */}
+      <svg
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transformOrigin: '0 0'
+        }}
+      >
+        {treeLayout.connectionsCurves.map((curve, idx) => {
+          const dx = (curve.to.x - curve.from.x) * 0.55;
+          const path = `M ${curve.from.x} ${curve.from.y} C ${curve.from.x + dx} ${curve.from.y}, ${curve.to.x - dx} ${curve.to.y}, ${curve.to.x} ${curve.to.y}`;
+
+          return (
+            <g key={idx}>
+              <path
+                d={path}
+                fill="none"
+                stroke={curve.color}
+                strokeWidth="2.5"
+                strokeOpacity="0.45"
+                strokeLinecap="round"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke={curve.color}
+                strokeWidth="1"
+                strokeOpacity="0.9"
+                strokeLinecap="round"
+              />
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Transformed Canvas Content */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transformOrigin: '0 0',
+          width: '1px',
+          height: '1px'
+        }}
+      >
+        {/* ROOT NODE: Sam Joshua */}
+        <div
+          className="interactive-node"
+          onClick={() => setSelectedNode(treeLayout.rootPos)}
+          style={{
+            position: 'absolute',
+            left: `${treeLayout.rootPos.x}px`,
+            top: `${treeLayout.rootPos.y}px`,
+            width: `${treeLayout.rootPos.width}px`,
+            height: `${treeLayout.rootPos.height}px`,
+            background: 'linear-gradient(135deg, #1e2638, #252f48)',
+            border: '1.5px solid #6366f1',
+            borderRadius: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 18px',
+            color: '#ffffff',
+            boxShadow: '0 8px 30px rgba(99,102,241,0.25)',
+            cursor: 'pointer'
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '1rem', letterSpacing: '-0.3px' }}>Sam Joshua</div>
+            <div style={{ fontSize: '0.75rem', color: '#a5b4fc', fontFamily: 'monospace' }}>@catovidz // Creator Core</div>
+          </div>
+          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>
+            👑
+          </div>
+        </div>
+
+        {/* BRANCH NODES: Friends */}
+        {treeLayout.branches.map(node => {
+          const isExpanded = expandedNodes.has(node.id || node.name.toLowerCase());
+          const isSelected = selectedNode?.name === node.name;
+
+          return (
+            <div
+              key={node.name}
+              className="interactive-node"
+              onClick={() => setSelectedNode(node)}
+              style={{
+                position: 'absolute',
+                left: `${node.x}px`,
+                top: `${node.y}px`,
+                width: `${node.width}px`,
+                height: `${node.height}px`,
+                background: isSelected ? '#252f48' : '#182030',
+                border: isSelected ? '1.5px solid #a855f7' : '1px solid #28344e',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 14px',
+                color: '#ffffff',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  {node.name}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  {node.handle || node.relationship}
+                </div>
+              </div>
+
+              {/* Expand Toggle Chevron */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpand(node.id || node.name.toLowerCase());
+                }}
+                style={{
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  background: isExpanded ? '#6366f1' : '#222b40',
+                  color: isExpanded ? '#fff' : '#94a3b8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  marginLeft: '8px',
+                  flexShrink: 0
+                }}
+                title={isExpanded ? 'Collapse sub-branches' : 'Expand sub-branches'}
+              >
+                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* SUB-BRANCH NODES: Lore, Connections, Roast style */}
+        {treeLayout.subBranches.map(sub => (
+          <div
+            key={sub.id}
+            className="interactive-node"
+            style={{
+              position: 'absolute',
+              left: `${sub.x}px`,
+              top: `${sub.y}px`,
+              width: `${sub.width}px`,
+              height: `${sub.height}px`,
+              background: sub.type === 'conn' ? '#082f49' : (sub.type === 'roast' ? '#4c0519' : '#1e1b4b'),
+              border: `1px solid ${sub.type === 'conn' ? '#0284c7' : (sub.type === 'roast' ? '#e11d48' : '#7c3aed')}`,
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 12px',
+              color: '#ffffff',
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
+            }}
+            title={sub.label}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {sub.label}
             </span>
           </div>
-          <p style={{ fontSize: '0.8rem', color: '#666666', marginTop: '4px' }}>
-            Interactive node-based relationship graph & friend tree. Deployable on Vercel.
-          </p>
-        </div>
+        ))}
+      </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            className="btn"
-            onClick={() => setViewMode(viewMode === 'tree' ? 'list' : 'tree')}
-          >
-            <Network size={14} />
-            <span>{viewMode === 'tree' ? 'List View' : 'Dot Tree View'}</span>
-          </button>
-
-          <button className="btn" onClick={fetchNodes} disabled={isLoading}>
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-            <span>Sync</span>
-          </button>
-
-          <button className="btn btn-primary" onClick={() => {
-            setFormData({
-              name: '',
-              instagramHandle: '',
-              relationshipToSam: 'Friend',
-              gender: 'unknown',
-              connections: '',
-              lore: '',
-              roastStyle: '',
-              aliases: ''
-            });
-            setIsModalOpen(true);
-          }}>
-            <Plus size={14} />
-            <span>Add Friend / Node</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      {viewMode === 'tree' ? (
-        <div className="canvas-wrapper">
-          <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
-          <div style={{ position: 'absolute', bottom: '16px', left: '16px', background: 'rgba(0, 0, 0, 0.7)', border: '1px solid #222222', borderRadius: '6px', padding: '8px 12px', fontSize: '0.75rem', color: '#666666' }}>
-            💡 Click any dot to inspect details, lore, and relationships.
-          </div>
-        </div>
-      ) : (
-        /* Minimalist List Grid */
-        <div>
-          <div style={{ marginBottom: '16px', maxWidth: '360px' }}>
-            <input
-              type="text"
-              placeholder="Search friends, handles, relationships..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+      {/* Right Drawer Inspector: Selected Person Details */}
+      {selectedNode && (
+        <div
+          style={{
+            position: 'fixed',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: '420px',
+            maxWidth: '90vw',
+            background: '#111726',
+            borderLeft: '1px solid #232d44',
+            padding: '24px',
+            zIndex: 50,
+            overflowY: 'auto',
+            boxShadow: '-10px 0 40px rgba(0,0,0,0.6)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #232d44', paddingBottom: '14px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: '700', color: '#fff' }}>{selectedNode.name}</h2>
+              <span style={{ fontSize: '0.8rem', color: '#818cf8', fontFamily: 'monospace' }}>{selectedNode.handle || 'No handle'}</span>
+            </div>
+            <button
+              onClick={() => setSelectedNode(null)}
+              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-            {filteredNodes.map(node => (
-              <div
-                key={node.name}
-                onClick={() => setSelectedNode(node)}
-                style={{
-                  background: '#080808',
-                  border: '1px solid #1c1c1c',
-                  borderRadius: '8px',
-                  padding: '18px',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s ease'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#444444'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#1c1c1c'}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '1rem', fontWeight: '600' }}>{node.name}</h3>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: '#666666' }}>{node.instagramHandle || 'No handle'}</span>
-                  </div>
-                  <span className="mono" style={{ fontSize: '0.7rem', border: '1px solid #222222', padding: '2px 6px', borderRadius: '4px', color: '#aaaaaa' }}>
-                    {node.relationshipToSam}
-                  </span>
-                </div>
-
-                {node.connections?.length > 0 && (
-                  <div style={{ fontSize: '0.75rem', color: '#777777', marginBottom: '8px' }}>
-                    <b>Linked to:</b> {node.connections.map(c => c.targetName).join(', ')}
-                  </div>
-                )}
-
-                <p style={{ fontSize: '0.8rem', color: '#555555', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                  {node.lore?.[0] || 'No lore recorded.'}
-                </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold' }}>Relationship</span>
+              <div style={{ marginTop: '4px', background: '#182030', padding: '8px 12px', borderRadius: '8px', border: '1px solid #28344e', fontSize: '0.85rem', color: '#e2e8f0' }}>
+                {selectedNode.relationship || selectedNode.relationshipToSam || 'Friend'}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Inspector Drawer */}
-      <div className={`inspector-drawer ${selectedNode ? 'open' : ''}`}>
-        {selectedNode && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #1a1a1a', paddingBottom: '16px' }}>
+            {selectedNode.connections?.length > 0 && (
               <div>
-                <span className="mono" style={{ fontSize: '0.7rem', color: '#666666', textTransform: 'uppercase' }}>Node Details</span>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: '700', marginTop: '2px' }}>{selectedNode.name}</h2>
-                <span className="mono" style={{ fontSize: '0.8rem', color: '#888888' }}>{selectedNode.instagramHandle || 'Unlinked Account'}</span>
-              </div>
-              <button className="btn btn-sm" onClick={() => setSelectedNode(null)}>
-                <X size={14} />
-              </button>
-            </div>
-
-            {/* Relationship Badge */}
-            <div style={{ marginBottom: '20px' }}>
-              <span className="mono" style={{ fontSize: '0.75rem', color: '#666666', display: 'block', marginBottom: '4px' }}>RELATIONSHIP TO SAM</span>
-              <div style={{ background: '#0a0a0a', border: '1px solid #222222', borderRadius: '6px', padding: '10px 14px', fontSize: '0.85rem' }}>
-                {selectedNode.relationshipToSam || 'Friend'}
-              </div>
-            </div>
-
-            {/* Tree Connections */}
-            <div style={{ marginBottom: '20px' }}>
-              <span className="mono" style={{ fontSize: '0.75rem', color: '#666666', display: 'block', marginBottom: '6px' }}>CONNECTED FRIENDS (TREE CHAIN)</span>
-              {selectedNode.connections?.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {selectedNode.connections.map((c, idx) => (
-                    <div
-                      key={idx}
-                      style={{ background: '#080808', border: '1px solid #1a1a1a', borderRadius: '6px', padding: '8px 12px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}
-                    >
-                      <span style={{ fontWeight: '500' }}>🔗 {c.targetName}</span>
-                      <span className="mono" style={{ color: '#777777', fontSize: '0.7rem' }}>{c.relationship}</span>
+                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold' }}>Connected Friends</span>
+                <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {selectedNode.connections.map((c, i) => (
+                    <div key={i} style={{ background: '#082f49', border: '1px solid #0284c7', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem', color: '#bae6fd', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>🔗 {c.targetName}</span>
+                      <span style={{ color: '#7dd3fc', fontSize: '0.7rem' }}>{c.rel}</span>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p style={{ fontSize: '0.8rem', color: '#444444' }}>No direct connections established.</p>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Shared Lore & Inside Jokes */}
-            <div style={{ marginBottom: '20px' }}>
-              <span className="mono" style={{ fontSize: '0.75rem', color: '#666666', display: 'block', marginBottom: '6px' }}>SHARED LORE & INSIDE JOKES</span>
-              {selectedNode.lore?.length > 0 ? (
-                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {selectedNode.lore.map((item, idx) => (
-                    <li key={idx} style={{ background: '#080808', border: '1px solid #1a1a1a', borderRadius: '6px', padding: '8px 12px', fontSize: '0.8rem', color: '#cccccc', lineHeight: '1.4' }}>
+            {selectedNode.lore?.length > 0 && (
+              <div>
+                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold' }}>Shared Inside Jokes & Lore</span>
+                <ul style={{ marginTop: '6px', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {selectedNode.lore.map((item, i) => (
+                    <li key={i} style={{ background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: '6px', padding: '8px 10px', fontSize: '0.8rem', color: '#e0e7ff', lineHeight: '1.4' }}>
                       • {item}
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p style={{ fontSize: '0.8rem', color: '#444444' }}>No lore recorded.</p>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Cuss & Roast Style */}
             {selectedNode.roastStyle && (
-              <div style={{ marginBottom: '24px' }}>
-                <span className="mono" style={{ fontSize: '0.75rem', color: '#666666', display: 'block', marginBottom: '6px' }}>⚡ CUSS & ROAST STYLE (BANTER BACK)</span>
-                <div style={{ background: '#0d0d0d', border: '1px solid #222222', borderRadius: '6px', padding: '10px 14px', fontSize: '0.8rem', color: '#aaaaaa', lineHeight: '1.4' }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold' }}>⚡ Cuss & Banter Style</span>
+                <div style={{ marginTop: '4px', background: '#4c0519', border: '1px solid #be123c', padding: '10px 12px', borderRadius: '8px', fontSize: '0.8rem', color: '#fecdd3', lineHeight: '1.4' }}>
                   {selectedNode.roastStyle}
                 </div>
               </div>
             )}
 
-            {/* Edit / Quick Actions */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '30px' }}>
-              <button
-                className="btn btn-primary"
-                style={{ flex: 1 }}
-                onClick={() => {
-                  setFormData({
-                    name: selectedNode.name,
-                    instagramHandle: selectedNode.instagramHandle || '',
-                    relationshipToSam: selectedNode.relationshipToSam || '',
-                    gender: selectedNode.gender || 'unknown',
-                    connections: (selectedNode.connections || []).map(c => `${c.targetName} (${c.relationship})`).join(', '),
-                    lore: (selectedNode.lore || []).join('\n'),
-                    roastStyle: selectedNode.roastStyle || '',
-                    aliases: (selectedNode.aliases || []).join(', ')
-                  });
-                  setIsModalOpen(true);
-                }}
-              >
-                Edit Node Info
-              </button>
-            </div>
+            <button
+              onClick={() => startAiInterview(selectedNode)}
+              style={{
+                marginTop: '10px',
+                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                color: '#fff',
+                border: 'none',
+                padding: '12px',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Sparkles size={16} />
+              <span>Clarify & Edit with AI</span>
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Add / Edit Node Modal */}
-      {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-box">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #1a1a1a', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Add / Edit Friend Node</h3>
-              <button className="btn btn-sm" onClick={() => setIsModalOpen(false)}>
-                <X size={14} />
-              </button>
+      {/* AI INTERACTIVE INTERVIEW MODAL (Asks questions to clarify before updating DB!) */}
+      {isAiModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              background: '#111726',
+              border: '1px solid #2a3652',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '850px',
+              height: '80vh',
+              maxHeight: '700px',
+              display: 'flex',
+              flexDirection: 'row',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.8)'
+            }}
+          >
+            {/* Left Column: Conversational Chat Interview */}
+            <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #232d44' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #232d44', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={18} color="#a855f7" />
+                  <span style={{ fontWeight: '600', color: '#fff', fontSize: '0.95rem' }}>AI Knowledge Tree Architect</span>
+                </div>
+                <button
+                  onClick={() => setIsAiModalOpen(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Chat Messages */}
+              <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {aiChat.map((msg, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      maxWidth: '85%',
+                      background: msg.role === 'user' ? '#6366f1' : '#1e2638',
+                      color: '#ffffff',
+                      padding: '10px 14px',
+                      borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                      fontSize: '0.85rem',
+                      lineHeight: '1.45',
+                      border: msg.role === 'user' ? 'none' : '1px solid #2b3650'
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+                ))}
+                {isAiTyping && (
+                  <div style={{ alignSelf: 'flex-start', background: '#1e2638', padding: '8px 14px', borderRadius: '12px', color: '#a5b4fc', fontSize: '0.8rem' }}>
+                    Thinking & analyzing circle...
+                  </div>
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Input Form */}
+              <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid #232d44', display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Tell AI about them (e.g. Her name is Priya, my cousin, talks to Bhavani)..."
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  style={{ flex: 1, background: '#0b0f19', border: '1px solid #2a3652', borderRadius: '8px', color: '#fff', padding: '10px 14px', fontSize: '0.85rem' }}
+                />
+                <button
+                  type="submit"
+                  disabled={isAiTyping || !aiInput.trim()}
+                  style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Send size={16} />
+                </button>
+              </form>
             </div>
 
-            <form onSubmit={handleSaveNode} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Right Column: Live Node Summary & Save Button */}
+            <div style={{ flex: 0.8, padding: '20px', background: '#0c101a', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Friend Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Bhanvani, Roni, Rajveer, Moksha"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+                <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold' }}>Live Node Preview</span>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#fff', marginTop: '4px' }}>
+                  {accumulatedNode?.name || '(Waiting for name...)'}
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#818cf8', fontFamily: 'monospace' }}>
+                  {accumulatedNode?.instagramHandle || 'No handle yet'}
+                </span>
+
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ background: '#161d2d', padding: '8px 10px', borderRadius: '6px', border: '1px solid #232d44', fontSize: '0.75rem', color: '#e2e8f0' }}>
+                    <b>Relation:</b> {accumulatedNode?.relationshipToSam || 'Not clarified yet'}
+                  </div>
+
+                  <div style={{ background: '#161d2d', padding: '8px 10px', borderRadius: '6px', border: '1px solid #232d44', fontSize: '0.75rem', color: '#e2e8f0' }}>
+                    <b>Connections:</b> {(accumulatedNode?.connections || []).map(c => c.targetName).join(', ') || 'None specified'}
+                  </div>
+
+                  {accumulatedNode?.lore?.length > 0 && (
+                    <div style={{ background: '#161d2d', padding: '8px 10px', borderRadius: '6px', border: '1px solid #232d44', fontSize: '0.75rem', color: '#e2e8f0' }}>
+                      <b>Lore:</b>
+                      <ul style={{ paddingLeft: '14px', marginTop: '4px' }}>
+                        {accumulatedNode.lore.map((l, i) => (
+                          <li key={i}>{l}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Instagram Handle</label>
-                <input
-                  type="text"
-                  placeholder="e.g. @yk_bhavani._.xo"
-                  value={formData.instagramHandle}
-                  onChange={(e) => setFormData({ ...formData, instagramHandle: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Relationship to Sam</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Closest online friend / Medicine student"
-                  value={formData.relationshipToSam}
-                  onChange={(e) => setFormData({ ...formData, relationshipToSam: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Gender</label>
-                <select
-                  value={formData.gender}
-                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  onClick={handleFinalizeSave}
+                  disabled={!accumulatedNode?.name}
+                  style={{
+                    background: accumulatedNode?.name ? 'linear-gradient(135deg, #10b981, #059669)' : '#232d44',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    fontSize: '0.9rem',
+                    cursor: accumulatedNode?.name ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
                 >
-                  <option value="female">Female (Never call da/bro)</option>
-                  <option value="male">Male (Casual bro/da)</option>
-                  <option value="neutral">Neutral</option>
-                  <option value="unknown">Unknown</option>
-                </select>
+                  <Check size={16} />
+                  <span>Save to Knowledge Tree & DB</span>
+                </button>
+                <button
+                  onClick={() => setIsAiModalOpen(false)}
+                  style={{ background: 'transparent', border: '1px solid #232d44', color: '#94a3b8', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                >
+                  Cancel
+                </button>
               </div>
-
-              <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Connected Friends (Tree Chain)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Annie (sister), Rajveer (homie)"
-                  value={formData.connections}
-                  onChange={(e) => setFormData({ ...formData, connections: e.target.value })}
-                />
-                <span className="mono" style={{ fontSize: '0.65rem', color: '#555555' }}>Format: Name (relationship), Name (relationship)</span>
-              </div>
-
-              <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Shared Lore & Inside Jokes (1 per line)</label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Indian Army dad, Netflix subscription, hamster obsession, 12th March 2007 birthday..."
-                  value={formData.lore}
-                  onChange={(e) => setFormData({ ...formData, lore: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="mono" style={{ fontSize: '0.75rem', color: '#777777', display: 'block', marginBottom: '4px' }}>Cuss / Roast Style</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Playful and gentle teasing, no hard insults. Tease about hamster obsession."
-                  value={formData.roastStyle}
-                  onChange={(e) => setFormData({ ...formData, roastStyle: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Node</button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
