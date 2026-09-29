@@ -590,6 +590,110 @@ function setupEventListeners() {
       btn.innerHTML = '<span>🔄 Sync & Retrain from DB</span>';
     }
   });
+
+  // Add New Friend button
+  document.getElementById('addNewFriendBtn')?.addEventListener('click', () => {
+    openFriendModal(null);
+  });
+
+  // Close modal buttons
+  document.getElementById('closeFriendModalBtn')?.addEventListener('click', closeFriendModal);
+  document.getElementById('cancelFriendModalBtn')?.addEventListener('click', closeFriendModal);
+
+  // Save Friend button
+  document.getElementById('saveFriendModalBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('modalFriendName')?.value.trim();
+    if (!name) {
+      showToast('Friend name is required', true);
+      return;
+    }
+
+    const payload = {
+      name,
+      instagramHandle: document.getElementById('modalFriendHandle')?.value.trim(),
+      relationshipToSam: document.getElementById('modalFriendRelation')?.value.trim(),
+      gender: document.getElementById('modalFriendGender')?.value,
+      connections: document.getElementById('modalFriendConnections')?.value.trim(),
+      lore: document.getElementById('modalFriendLore')?.value.trim(),
+      roastStyle: document.getElementById('modalFriendRoast')?.value.trim(),
+      aliases: document.getElementById('modalFriendAliases')?.value.trim(),
+    };
+
+    try {
+      const res = await fetch('/api/social-graph/node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Saved information for ${name}!`);
+        closeFriendModal();
+        await loadSocialGraph();
+      } else {
+        showToast('Error saving: ' + (data.error || 'Failed'), true);
+      }
+    } catch (err) {
+      showToast('Error saving friend: ' + err.message, true);
+    }
+  });
+
+  // Delete Friend button
+  document.getElementById('deleteFriendBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('modalFriendName')?.value.trim();
+    if (!name || !confirm(`Are you sure you want to delete ${name} from the social tree?`)) return;
+
+    try {
+      const res = await fetch(`/api/social-graph/node/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Deleted ${name} from tree`);
+        closeFriendModal();
+        await loadSocialGraph();
+      }
+    } catch (err) {
+      showToast('Error deleting: ' + err.message, true);
+    }
+  });
+}
+
+let currentSocialNodes = [];
+
+function openFriendModal(node = null) {
+  const modal = document.getElementById('friendModal');
+  const title = document.getElementById('modalFriendTitle');
+  const delBtn = document.getElementById('deleteFriendBtn');
+  if (!modal) return;
+
+  if (node) {
+    if (title) title.textContent = `Edit Info: ${node.name}`;
+    document.getElementById('modalFriendName').value = node.name || '';
+    document.getElementById('modalFriendHandle').value = node.instagramHandle || '';
+    document.getElementById('modalFriendRelation').value = node.relationshipToSam || '';
+    document.getElementById('modalFriendGender').value = node.gender || 'unknown';
+    document.getElementById('modalFriendConnections').value = (node.connections || []).map(c => `${c.targetName} (${c.relationship})`).join(', ');
+    document.getElementById('modalFriendLore').value = (node.lore || []).join('\n');
+    document.getElementById('modalFriendRoast').value = node.roastStyle || '';
+    document.getElementById('modalFriendAliases').value = (node.aliases || []).join(', ');
+    if (delBtn) delBtn.style.display = 'block';
+  } else {
+    if (title) title.textContent = 'Add New Friend & Lore';
+    document.getElementById('modalFriendName').value = '';
+    document.getElementById('modalFriendHandle').value = '';
+    document.getElementById('modalFriendRelation').value = 'Friend';
+    document.getElementById('modalFriendGender').value = 'unknown';
+    document.getElementById('modalFriendConnections').value = '';
+    document.getElementById('modalFriendLore').value = '';
+    document.getElementById('modalFriendRoast').value = '';
+    document.getElementById('modalFriendAliases').value = '';
+    if (delBtn) delBtn.style.display = 'none';
+  }
+
+  modal.classList.add('show');
+}
+
+function closeFriendModal() {
+  document.getElementById('friendModal')?.classList.remove('show');
 }
 
 async function loadSocialGraph() {
@@ -598,12 +702,13 @@ async function loadSocialGraph() {
     const data = await res.json();
     if (!data.success) return;
 
+    currentSocialNodes = data.nodes || [];
     const grid = document.getElementById('friendsGrid');
     const badge = document.getElementById('friendsCountBadge');
-    if (badge) badge.textContent = data.nodes.length;
+    if (badge) badge.textContent = currentSocialNodes.length;
     if (!grid) return;
 
-    grid.innerHTML = data.nodes.map(node => {
+    grid.innerHTML = currentSocialNodes.map(node => {
       const initials = (node.name || '?').slice(0, 2).toUpperCase();
       const connectionsChips = (node.connections || []).map(c => 
         `<span class="tree-chip" title="${escapeHtml(c.notes)}">🔗 <b>${escapeHtml(c.targetName)}</b> (${escapeHtml(c.relationship)})</span>`
@@ -644,9 +749,23 @@ async function loadSocialGraph() {
               <div>${escapeHtml(node.roastStyle)}</div>
             </div>
           ` : ''}
+
+          <div class="friend-card-actions">
+            <span class="sub-text" style="font-size: 0.75rem; color: var(--text-dim);">Gender: ${escapeHtml(node.gender || 'unknown')}</span>
+            <button class="btn-subtle btn-sm edit-friend-btn" data-name="${escapeHtml(node.name)}">✏️ Edit Info</button>
+          </div>
         </div>
       `;
     }).join('');
+
+    // Attach click listeners to edit buttons
+    grid.querySelectorAll('.edit-friend-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const friendName = btn.getAttribute('data-name');
+        const node = currentSocialNodes.find(n => n.name === friendName);
+        if (node) openFriendModal(node);
+      });
+    });
   } catch (err) {
     console.error('Error loading social graph:', err);
   }

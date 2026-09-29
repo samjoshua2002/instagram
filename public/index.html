@@ -337,8 +337,9 @@
                 </div>
               </div>
             </div>
-          </div>
         </div>
+      </section>
+
       <!-- ================= 3. FRIENDS SOCIAL TREE CHAIN TAB ================= -->
       <section id="friendsTreeTab" class="tab-pane">
         <div class="tree-container">
@@ -348,6 +349,9 @@
               <p class="sub-text">Interlinks all your friends, relationships (sister, bro, friend, lover, relative), shared lore, and roasting styles so the AI knows who they're talking about.</p>
             </div>
             <div class="tree-actions">
+              <button class="btn-subtle" id="addNewFriendBtn">
+                <span>➕ Add / Edit Friend Info</span>
+              </button>
               <button class="btn-primary" id="syncTreeBtn">
                 <span>🔄 Sync & Retrain from DB</span>
               </button>
@@ -361,6 +365,61 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- Modal for Adding / Editing Friend Info -->
+  <div class="modal-backdrop" id="friendModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalFriendTitle">Add / Edit Friend Information</h3>
+        <button class="btn-icon" id="closeFriendModalBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <label>Friend Name *</label>
+          <input type="text" id="modalFriendName" placeholder="e.g. Roni, Rajveer, Moksha, Fami">
+        </div>
+        <div class="field-group">
+          <label>Instagram Handle</label>
+          <input type="text" id="modalFriendHandle" placeholder="e.g. @m4visyzx or @unpredictable_2k26">
+        </div>
+        <div class="field-group">
+          <label>Relationship to Sam</label>
+          <input type="text" id="modalFriendRelation" placeholder="e.g. Day-one Homie / Brother, Sister figure, Close friend, Lover / Romantic, Relative">
+        </div>
+        <div class="field-group">
+          <label>Gender</label>
+          <select id="modalFriendGender">
+            <option value="male">Male (Banter/Bro)</option>
+            <option value="female">Female (Never call da/bro)</option>
+            <option value="neutral">Neutral</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Connected Friends (Tree Chain)</label>
+          <input type="text" id="modalFriendConnections" placeholder="e.g. Rajveer (homie), Moksha (friend)">
+          <span class="sub-text" style="font-size: 0.72rem; color: var(--text-dim);">Format: Name (relationship), Name (relationship)</span>
+        </div>
+        <div class="field-group">
+          <label>Shared Lore & Inside Jokes (1 per line)</label>
+          <textarea id="modalFriendLore" rows="3" placeholder="e.g. Fake bank account, legal team on speed dial, axe of justice..."></textarea>
+        </div>
+        <div class="field-group">
+          <label>Cuss & Roast Style (How to abuse/banter back)</label>
+          <textarea id="modalFriendRoast" rows="2" placeholder="e.g. Savage Hindi sister roast: 'chup kar chudail', 'bkl drama factory'"></textarea>
+        </div>
+        <div class="field-group">
+          <label>Aliases & Nicknames (comma separated)</label>
+          <input type="text" id="modalFriendAliases" placeholder="e.g. roni, roni uncle, roni_uncle">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-subtle" id="deleteFriendBtn" style="display: none; color: #f87171;">🗑️ Delete</button>
+        <button class="btn-subtle" id="cancelFriendModalBtn">Cancel</button>
+        <button class="btn-primary" id="saveFriendModalBtn">💾 Save Friend Info</button>
+      </div>
+    </div>
   </div>
 
   <!-- Notification Toast -->
