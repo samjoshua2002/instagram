@@ -15,6 +15,8 @@ const azureOpenAI = require('./services/azureOpenAI');
 const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
+const socialGraphService = require('./services/socialGraphService');
+const SocialGraph = require('./models/SocialGraph');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -851,6 +853,27 @@ app.post('/api/cleanup', async (req, res) => {
   }
 });
 
+// Social Graph Tree Chain Endpoints
+app.get('/api/social-graph', async (req, res) => {
+  try {
+    const nodes = await SocialGraph.find({}).sort({ updatedAt: -1 });
+    res.json({ success: true, nodes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/social-graph/sync', async (req, res) => {
+  try {
+    await socialGraphService.seedInitialGraph();
+    await socialGraphService.trainGraphFromDB(UserMemory, Message);
+    const nodes = await SocialGraph.find({});
+    res.json({ success: true, message: 'Social knowledge tree synced from DB', count: nodes.length, nodes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
@@ -859,6 +882,11 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 Webhook URL: http://localhost:${PORT}/webhook`);
   console.log(`🔑 Webhook Verify Token: ${VERIFY_TOKEN}`);
   console.log(`======================================================\n`);
+
+  // Seed & train social knowledge tree
+  socialGraphService.seedInitialGraph().then(() => {
+    return socialGraphService.trainGraphFromDB(UserMemory, Message);
+  }).catch(e => console.error('❌ SocialGraph init error:', e.message));
 
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
