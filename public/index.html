@@ -375,6 +375,23 @@
         <button class="btn-icon" id="closeFriendModalBtn">✕</button>
       </div>
       <div class="modal-body">
+        <!-- AI Conversational Assistant Box -->
+        <div class="ai-assistant-box" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-size: 0.8rem; font-weight: 600; color: #a5b4fc;">✨ AI Clarification Wizard</span>
+            <span style="font-size: 0.7rem; color: var(--text-dim);">Tell AI & it asks questions</span>
+          </div>
+          <div id="aiWizardChat" style="max-height: 140px; overflow-y: auto; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
+              🤖 <i>Tell me about this person in plain words (e.g. "Priya is my cousin studying architecture, she talks with Bhavani"), and I will ask you follow-up questions to clarify their lore, connections, and roast style!</i>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="aiWizardInput" placeholder="Tell AI about them..." style="padding: 8px 12px; font-size: 0.82rem;">
+            <button type="button" class="btn-primary btn-sm" id="aiWizardSendBtn" style="padding: 0 14px; white-space: nowrap;">Ask AI</button>
+          </div>
+        </div>
+
         <div class="field-group">
           <label>Friend Name *</label>
           <input type="text" id="modalFriendName" placeholder="e.g. Roni, Rajveer, Moksha, Fami">
