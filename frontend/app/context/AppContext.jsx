@@ -282,6 +282,9 @@ export function deduplicateNodes(nodesList) {
       if (typeof node.aiEnabled === 'boolean') existing.aiEnabled = node.aiEnabled;
       if (typeof node.replyToMessages === 'boolean') existing.replyToMessages = node.replyToMessages;
       if (typeof node.replyToReelsAndPosts === 'boolean') existing.replyToReelsAndPosts = node.replyToReelsAndPosts;
+      if (typeof node.chatsCount === 'number') existing.chatsCount = node.chatsCount;
+      if (typeof node.reelsCount === 'number') existing.reelsCount = node.reelsCount;
+      if (typeof node.messageCount === 'number') existing.messageCount = node.messageCount;
 
       // Merge facts
       const factSet = new Set([...(existing.facts || []), ...(node.facts || [])]);
@@ -332,7 +335,7 @@ export function AppProvider({ children }) {
     setTimeout(() => setToastMessage(''), 4000);
   }, []);
 
-  // Hydration from LocalStorage with instant deduplication
+  // Hydration from LocalStorage with instant deduplication & live polling
   useEffect(() => {
     try {
       const cachedNodes = localStorage.getItem(STORAGE_NODES_KEY);
@@ -352,6 +355,13 @@ export function AppProvider({ children }) {
     }
 
     syncBackend();
+
+    // Live background polling every 4 seconds to sync chat & reel counts in real time
+    const interval = setInterval(() => {
+      syncBackend();
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const syncBackend = async () => {
@@ -372,6 +382,9 @@ export function AppProvider({ children }) {
             aiEnabled: n.aiEnabled !== false,
             replyToMessages: n.replyToMessages !== false,
             replyToReelsAndPosts: n.replyToReelsAndPosts !== false,
+            chatsCount: typeof n.chatsCount === 'number' ? n.chatsCount : (typeof defaultMatch?.chatsCount === 'number' ? defaultMatch.chatsCount : 0),
+            reelsCount: typeof n.reelsCount === 'number' ? n.reelsCount : (typeof defaultMatch?.reelsCount === 'number' ? defaultMatch.reelsCount : 0),
+            messageCount: typeof n.chatsCount === 'number' ? n.chatsCount : 0,
             relationship: n.relationshipToSam || defaultMatch?.relationship || 'Friend',
             category: n.category || defaultMatch?.category || 'online_friend',
             dob: n.dob || defaultMatch?.dob || (defaultMatch?.importantDates?.[0]?.date) || '',
