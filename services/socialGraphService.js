@@ -70,21 +70,24 @@ class SocialGraphService {
         },
         {
           name: 'Fami',
-          aliases: ['fami', 'fami_', 'famine'],
-          instagramHandle: '',
-          senderId: '',
+          aliases: ['fami', 'fami_', 'famine', 'mavis', 'm4visyzx', 'moi', 'mavisyzx', 'ო𝗈ꪱᜒ'],
+          instagramHandle: '@m4visyzx',
+          senderId: '2144547476275057',
           gender: 'female',
-          relationshipToSam: 'Friend in circle',
+          relationshipToSam: 'Very close friend ("moi" / Fami)',
           connections: [
-            { targetName: 'Rajveer', relationship: 'friend', notes: 'Gets easily ragebaited by Rajveer.' },
-            { targetName: 'Moksha', relationship: 'friend', notes: 'Friend in circle.' }
+            { targetName: 'Rajveer', relationship: 'friend / teasing target', notes: 'Gets easily ragebaited by Rajveer; Rajveer and Moksha love plotting against her.' },
+            { targetName: 'Moksha', relationship: 'friend / circle', notes: 'Moksha and Rajveer plot to ragebait Fami with inside jokes.' }
           ],
           lore: [
-            'Friend in the circle who gets super easily ragebaited ("fami will get so ragebaited").',
-            'Also jokingly referenced with the Chainsaw Man Famine Devil character.'
+            'Goes by Fami (Instagram: @m4visyzx, display name "moi" / "ო𝗈ꪱᜒ").',
+            'Very close friend of Sam with high emotional connection (often texts "Oyy", "Please reply", "Byy").',
+            'Friend in the circle who gets super easily ragebaited by Rajveer and Moksha ("fami will get so ragebaited").',
+            'Also jokingly referenced with the Chainsaw Man Famine Devil character.',
+            'Strictly NEVER call her "da", "bro", or "man". Be warm, sweet, playful, and responsive to her cute "oyy / please reply" energy.'
           ],
-          languages: ['English', 'Hinglish'],
-          roastStyle: 'Tease her about getting easily ragebaited or confused.',
+          languages: ['English'],
+          roastStyle: 'Cute playful banter, tease her when she gets ragebaited or confused.',
         },
         {
           name: 'Arun',
@@ -132,20 +135,6 @@ class SocialGraphService {
           ],
           languages: ['English', 'Tamil'],
           roastStyle: 'Playful and gentle, no hard insults.',
-        },
-        {
-          name: 'Mavis',
-          aliases: ['mavis', 'm4visyzx', 'moi', 'mavisyzx'],
-          instagramHandle: '@m4visyzx',
-          senderId: '2144547476275057',
-          gender: 'female',
-          relationshipToSam: 'Very close friend ("moi")',
-          connections: [],
-          lore: [
-            'Close friend known as "moi". High emotional connection, shares personal thoughts.'
-          ],
-          languages: ['English'],
-          roastStyle: 'Cute playful banter.',
         }
       ];
 
