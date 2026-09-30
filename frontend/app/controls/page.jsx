@@ -42,8 +42,7 @@ export default function ControlsPage() {
     saveRouting,
     setRoutingConfig,
     updateContactPreferences,
-    getReelRecommendation,
-    sendInterestReel,
+    sendAutoReel,
     autoDispatchReels,
     showToast
   } = useApp();
@@ -51,13 +50,9 @@ export default function ControlsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
 
-  // Reel Preview & Send Modal state
-  const [selectedContactForReel, setSelectedContactForReel] = useState(null);
-  const [reelRecommendation, setReelRecommendation] = useState(null);
-  const [isLoadingReel, setIsLoadingReel] = useState(false);
-  const [isSendingReel, setIsSendingReel] = useState(false);
-  const [reelCaption, setReelCaption] = useState('');
-  const [reelUrl, setReelUrl] = useState('');
+  // Per-contact instant reel sending tracking
+  const [sendingReelMap, setSendingReelMap] = useState({});
+  const [sentReelSuccessMap, setSentReelSuccessMap] = useState({});
 
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
 
@@ -162,47 +157,19 @@ export default function ControlsPage() {
     setIsSaving(false);
   };
 
-  const handleOpenReelModal = async (contact) => {
-    setSelectedContactForReel(contact);
-    setIsLoadingReel(true);
-    setReelRecommendation(null);
-    setReelCaption('');
-    setReelUrl('');
+  const handleInstantShareReel = async (contact) => {
+    const key = contact.name || contact.id;
+    setSendingReelMap(prev => ({ ...prev, [key]: true }));
     try {
-      const rec = await getReelRecommendation(contact.senderId || contact.name);
-      if (rec && rec.recommendation) {
-        setReelRecommendation(rec);
-        setReelCaption(rec.recommendation.caption || '');
-        setReelUrl(rec.recommendation.reel?.url || '');
-      } else {
-        showToast('Could not find specific reel recommendation');
-      }
-    } catch (err) {
-      showToast('Error getting reel recommendation: ' + err.message);
-    } finally {
-      setIsLoadingReel(false);
-    }
-  };
-
-  const handleSendReel = async () => {
-    if (!selectedContactForReel || !reelUrl) return;
-    setIsSendingReel(true);
-    try {
-      const res = await sendInterestReel(
-        selectedContactForReel.senderId || selectedContactForReel.name,
-        reelCaption,
-        reelUrl
-      );
+      const res = await sendAutoReel(contact.name || contact.senderId);
       if (res && res.success) {
-        showToast(`🎉 Reel sent to ${selectedContactForReel.name}!`);
-        setSelectedContactForReel(null);
-      } else {
-        showToast(res?.message || 'Failed to send reel');
+        setSentReelSuccessMap(prev => ({ ...prev, [key]: true }));
+        setTimeout(() => {
+          setSentReelSuccessMap(prev => ({ ...prev, [key]: false }));
+        }, 3500);
       }
-    } catch (err) {
-      showToast('Failed to send reel: ' + err.message);
     } finally {
-      setIsSendingReel(false);
+      setSendingReelMap(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -684,27 +651,82 @@ export default function ControlsPage() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={() => handleOpenReelModal(contact)}
-                    style={{
-                      background: '#09090b',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '4px 9px',
-                      borderRadius: '5px',
-                      fontSize: '0.68rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      whiteSpace: 'nowrap'
-                    }}
-                    title={`Send interest-matched Reel to ${contact.name}`}
-                  >
-                    <Film size={11} />
-                    <span>Share Reel</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {/* Auto-Reels ON/OFF Toggle */}
+                    <button
+                      onClick={() => {
+                        const currentVal = contact.autoSendReels !== false;
+                        updateContactPreferences(contact.senderId || contact.id, { autoSendReels: !currentVal });
+                      }}
+                      style={{
+                        background: (contact.autoSendReels !== false) ? '#f0fdf4' : '#f4f4f5',
+                        color: (contact.autoSendReels !== false) ? '#16a34a' : '#71717a',
+                        border: '1px solid',
+                        borderColor: (contact.autoSendReels !== false) ? '#bbf7d0' : '#e4e4e7',
+                        padding: '3px 8px',
+                        borderRadius: '5px',
+                        fontSize: '0.65rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={(contact.autoSendReels !== false) ? 'Autonomous reel sharing is ACTIVE for this friend' : 'Autonomous reel sharing is PAUSED for this friend'}
+                    >
+                      <span style={{ fontSize: '8px' }}>{(contact.autoSendReels !== false) ? '●' : '○'}</span>
+                      <span>{(contact.autoSendReels !== false) ? 'Auto-Reels: ON' : 'Auto-Reels: OFF'}</span>
+                    </button>
+
+                    {/* 1-Click Instant Share Reel Button */}
+                    {(() => {
+                      const cKey = contact.name || contact.id;
+                      const isSending = !!sendingReelMap[cKey];
+                      const isSent = !!sentReelSuccessMap[cKey];
+                      return (
+                        <button
+                          onClick={() => handleInstantShareReel(contact)}
+                          disabled={isSending}
+                          style={{
+                            background: isSent ? '#16a34a' : '#09090b',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '4px 10px',
+                            borderRadius: '5px',
+                            fontSize: '0.68rem',
+                            fontWeight: '700',
+                            cursor: isSending ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease',
+                            opacity: isSending ? 0.75 : 1
+                          }}
+                          title={`Instantly send an AI-selected reel based on their interests to ${contact.name}`}
+                        >
+                          {isSending ? (
+                            <>
+                              <RefreshCw size={11} className="animate-spin" />
+                              <span>Sending...</span>
+                            </>
+                          ) : isSent ? (
+                            <>
+                              <Check size={11} />
+                              <span>Reel Sent!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Film size={11} />
+                              <span>Share Reel</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {/* Bottom Row: AI Mode Selector Buttons */}
@@ -783,206 +805,6 @@ export default function ControlsPage() {
           })}
         </div>
       </div>
-
-      {/* Reel Preview & Send Modal */}
-      {selectedContactForReel && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '16px'
-          }}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '14px',
-              width: '100%',
-              maxWidth: '520px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              overflow: 'hidden',
-              border: '1px solid #e4e4e7'
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e4e4e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ContactAvatar contact={selectedContactForReel} size={32} showStatus={false} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: '#09090b' }}>
-                    Send Reel to {selectedContactForReel.name}
-                  </h3>
-                  <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {selectedContactForReel.handle || selectedContactForReel.relationship || 'Friend'}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedContactForReel(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#71717a', padding: '4px' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '20px' }}>
-              {isLoadingReel ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                  <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px auto', color: '#09090b' }} />
-                  <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#09090b' }}>
-                    Synthesizing Personality & Finding Matching Reel...
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '4px' }}>
-                    Scanning facts for {selectedContactForReel.name} to pick the best viral reel and caption.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Matched Interest Badge */}
-                  {reelRecommendation && (
-                    <div style={{ background: '#f4f4f5', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e4e4e7' }}>
-                      <div style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
-                        DETECTED INTEREST MATCH
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#09090b' }}>
-                          {reelRecommendation.recommendation?.reel?.category?.toUpperCase() || 'GENERAL'}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: '#71717a' }}>
-                          ({reelRecommendation.recommendation?.confidence || 90}% confidence match)
-                        </span>
-                      </div>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#52525b' }}>
-                        {reelRecommendation.recommendation?.reasoning || 'Selected based on synthesized friendship interests and facts.'}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Reel Link Input */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#09090b', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-                      INSTAGRAM REEL URL
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        value={reelUrl}
-                        onChange={(e) => setReelUrl(e.target.value)}
-                        placeholder="https://www.instagram.com/reel/..."
-                        style={{
-                          flex: 1,
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid #e4e4e7',
-                          fontSize: '0.8rem',
-                          fontFamily: "'JetBrains Mono', monospace"
-                        }}
-                      />
-                      {reelUrl && (
-                        <a
-                          href={reelUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            background: '#f4f4f5',
-                            border: '1px solid #e4e4e7',
-                            borderRadius: '6px',
-                            padding: '0 10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: '#09090b',
-                            textDecoration: 'none'
-                          }}
-                          title="Open on Instagram"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Caption Textarea */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#09090b', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-                      NATURAL AI CAPTION (SAM&apos;S VOICE)
-                    </label>
-                    <textarea
-                      value={reelCaption}
-                      onChange={(e) => setReelCaption(e.target.value)}
-                      rows={3}
-                      placeholder="Write a casual comment to accompany the reel..."
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #e4e4e7',
-                        fontSize: '0.84rem',
-                        lineHeight: '1.4',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.7rem', color: '#71717a', marginTop: '4px', display: 'block' }}>
-                      This message and reel will unfurl directly in their Instagram DM inbox as a playable card.
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            {!isLoadingReel && (
-              <div style={{ padding: '14px 20px', borderTop: '1px solid #e4e4e7', background: '#fafafa', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  onClick={() => setSelectedContactForReel(null)}
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e4e4e7',
-                    color: '#71717a',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSendReel}
-                  disabled={isSendingReel || !reelUrl}
-                  style={{
-                    background: '#09090b',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 18px',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    opacity: (isSendingReel || !reelUrl) ? 0.6 : 1
-                  }}
-                >
-                  {isSendingReel ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
-                  <span>{isSendingReel ? 'Sending to Instagram...' : 'Send Reel to DM'}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

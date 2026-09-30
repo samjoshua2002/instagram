@@ -277,7 +277,9 @@ Generate the dynamic Reel recommendation and personalized caption now.`;
         ]
       });
 
-      if (candidates.length === 0) return;
+      if (candidates.length === 0) {
+        return { success: true, count: 0, message: 'All contacts are currently up to date! None due for auto-reels right now.' };
+      }
 
       // Pick one eligible friend to send an interest reel per scan
       const targetFriend = candidates[Math.floor(Math.random() * candidates.length)];
@@ -292,8 +294,10 @@ Generate the dynamic Reel recommendation and personalized caption now.`;
       );
 
       console.log(`✅ [Reel Service] Sent dynamic AI reel to ${targetFriend.name}: "${recommendation.caption}"`);
+      return { success: true, count: 1, recipient: targetFriend.name, caption: recommendation.caption };
     } catch (err) {
       console.warn('Reel auto-share scan note:', err.message);
+      return { success: false, error: err.message };
     }
   }
 }
