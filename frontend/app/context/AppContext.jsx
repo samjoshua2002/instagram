@@ -422,7 +422,7 @@ export function AppProvider({ children }) {
           });
 
           // If MongoDB has records, use live DB records exclusively (no hardcoded injection)
-          if (!serverNodes || serverNodes.length === 0) {
+          if (!data?.nodes || data.nodes.length === 0) {
             DEFAULT_GRAPH_DATA.forEach(dn => {
               if (dn.isRoot) return;
               const dnLower = dn.name.toLowerCase();
