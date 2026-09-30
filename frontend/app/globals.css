@@ -131,18 +131,21 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ═══════════════════════════════════════════
-   MOBILE RESPONSIVE — Relationships & Inner Page
+   RESPONSIVE — Desktop Table vs Mobile Cards
    ═══════════════════════════════════════════ */
 
-/* Table: hide less critical columns on mobile */
-@media (max-width: 768px) {
-  /* Relationships outer table */
-  .rel-table-col-dob,
-  .rel-table-col-id { display: none !important; }
+/* Default (Desktop & Tablet) */
+.desktop-table-container {
+  display: block;
+}
+.mobile-people-cards {
+  display: none;
+}
 
+@media (max-width: 768px) {
   /* Outer page padding */
   [data-page="relationships"] {
-    padding: 16px !important;
+    padding: 14px !important;
   }
 
   /* Inner person page: single column */
@@ -150,24 +153,42 @@ input:focus, textarea:focus, select:focus {
     padding: 12px !important;
   }
 
-  /* Grid layouts stack */
-  [style*="grid-template-columns"] {
-    grid-template-columns: 1fr !important;
+  /* Stats grid: 2x2 compact on tablet/mobile */
+  .metrics-summary-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* On mobile: hide horizontal scroll table and show compact cards */
+  .desktop-table-container {
+    display: none !important;
+  }
+  .mobile-people-cards {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+
+  /* Header area: keep title on left, add button on right */
+  .page-header-row,
+  .directory-header-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .header-add-btn {
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
   }
 }
 
 @media (max-width: 640px) {
-  /* Relationships table — show only name + action */
-  .rel-table-col-username,
-  .rel-table-col-relation { display: none !important; }
-
-  /* Header area: stack title and buttons */
-  .page-header-row {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 12px !important;
-  }
-
   /* Inner page header */
   .inner-page-header {
     flex-direction: column !important;
@@ -185,16 +206,8 @@ input:focus, textarea:focus, select:focus {
   /* Fact items */
   .fact-item { font-size: 0.78rem !important; }
 
-  /* Stats row: 2 per row */
-  .stats-grid {
-    grid-template-columns: 1fr 1fr !important;
-  }
-
   /* AI raw chat textarea */
   textarea { font-size: 0.8rem !important; }
-
-  /* Table action buttons */
-  .action-cell-text { display: none !important; }
 }
 
 /* Sidebar: hidden on mobile, shown via toggle */
