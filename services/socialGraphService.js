@@ -27,6 +27,7 @@ class SocialGraphService {
       console.log(`✅ [SocialGraph] Connected live to MongoDB: loaded ${allNodes.length} contacts dynamically from DB (zero hardcoded).`);
     } catch (err) {
       console.error('❌ [SocialGraph] Error loading graph from MongoDB:', err.message);
+    }
   }
 
   /**
