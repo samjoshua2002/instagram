@@ -226,6 +226,20 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
 
       console.log(`🧠 [Deep Memory Updated] @${memory.username}: Dates=${memory.importantDates.length}, Favs=${memory.favoriteThings.length}, Events=${memory.lifeEvents.length}`);
 
+      // Auto-delete raw message text AFTER intel has been extracted and saved
+      // messageCount and reelsCount are integers on UserMemory — NOT on Message docs — so they're safe
+      try {
+        const cleaned = await Message.deleteMany({
+          $or: [{ senderId }, { recipientId: senderId }]
+        });
+        if (cleaned.deletedCount > 0) {
+          console.log(`🧹 [Auto-Cleanup] Deleted ${cleaned.deletedCount} raw messages for ${senderId} — intel already saved to UserMemory.`);
+        }
+      } catch (cleanErr) {
+        console.warn('⚠️ [MemoryService] Non-critical message cleanup error:', cleanErr.message);
+      }
+
+
       // Dynamically sync updated memory into SocialGraph so People Menu cards update in real time!
       try {
         const SocialGraph = require('../models/SocialGraph');
