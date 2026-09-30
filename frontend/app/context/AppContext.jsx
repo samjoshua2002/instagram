@@ -121,7 +121,10 @@ export function AppProvider({ children }) {
     chatMode: 'everyone_except',
     excludedContactIds: ['29005624469042002', '877566845441453'], // Bhavani & Rajveer excluded by default for Sam's manual chat
     includedContactIds: [],
-    globalBotActive: true
+    globalBotActive: true,
+    autoShareReelsEnabled: true,
+    autoShareReelsFrequencyHours: 24,
+    autoShareReelsTopics: ['hamsters', 'medicine', 'tamil_comedy', 'hindi_memes', 'design_video', 'cute_wholesome', 'aesthetic_music']
   });
   const [toastMessage, setToastMessage] = useState('');
 
@@ -740,6 +743,56 @@ export function AppProvider({ children }) {
     return null;
   };
 
+  // Get interest-based reel recommendation & preview
+  const getReelRecommendation = async (identifier) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/reels/recommend/${encodeURIComponent(identifier)}`);
+      const data = await res.json();
+      if (data.success && data.recommendation) {
+        return data.recommendation;
+      }
+    } catch (e) {
+      console.warn('Reel recommendation error:', e.message);
+    }
+    return null;
+  };
+
+  // Send tailored reel directly to friend's Instagram DM
+  const sendInterestReel = async ({ recipientId, contactName, messageText, reelUrl }) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/reels/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientId, contactName, messageText, reelUrl })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🎬 Sent interest reel to ${contactName || 'friend'} on Instagram!`);
+        syncBackend();
+        return data;
+      } else {
+        showToast(`⚠️ Failed to send reel: ${data.error || 'Server error'}`);
+      }
+    } catch (e) {
+      showToast(`⚠️ Send reel error: ${e.message}`);
+    }
+    return null;
+  };
+
+  // Trigger manual batch auto-dispatch
+  const autoDispatchReels = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/reels/auto-dispatch`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('🚀 Auto-dispatch executed: interest reel sent to eligible friend!');
+        syncBackend();
+      }
+    } catch (e) {
+      showToast(`Auto-dispatch note: ${e.message}`);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -767,6 +820,9 @@ export function AppProvider({ children }) {
         lookupContact,
         extractFromRawChat,
         syncBackend,
+        getReelRecommendation,
+        sendInterestReel,
+        autoDispatchReels,
         API_BASE
       }}
     >
