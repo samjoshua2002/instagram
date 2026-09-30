@@ -129,3 +129,106 @@ input:focus, textarea:focus, select:focus {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+/* ═══════════════════════════════════════════
+   MOBILE RESPONSIVE — Relationships & Inner Page
+   ═══════════════════════════════════════════ */
+
+/* Table: hide less critical columns on mobile */
+@media (max-width: 768px) {
+  /* Relationships outer table */
+  .rel-table-col-dob,
+  .rel-table-col-id { display: none !important; }
+
+  /* Outer page padding */
+  [data-page="relationships"] {
+    padding: 16px !important;
+  }
+
+  /* Inner person page: single column */
+  [data-page="inner-person"] {
+    padding: 12px !important;
+  }
+
+  /* Grid layouts stack */
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Relationships table — show only name + action */
+  .rel-table-col-username,
+  .rel-table-col-relation { display: none !important; }
+
+  /* Header area: stack title and buttons */
+  .page-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Inner page header */
+  .inner-page-header {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  /* Card padding tighter */
+  .inner-card {
+    padding: 14px !important;
+  }
+
+  /* Back button: icon only */
+  .back-btn-text { display: none !important; }
+
+  /* Fact items */
+  .fact-item { font-size: 0.78rem !important; }
+
+  /* Stats row: 2 per row */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* AI raw chat textarea */
+  textarea { font-size: 0.8rem !important; }
+
+  /* Table action buttons */
+  .action-cell-text { display: none !important; }
+}
+
+/* Sidebar: hidden on mobile, shown via toggle */
+@media (max-width: 768px) {
+  .sidebar-nav {
+    transform: translateX(-100%);
+    position: fixed;
+    z-index: 999;
+    transition: transform 0.25s ease;
+    height: 100vh;
+    top: 0;
+    left: 0;
+  }
+  .sidebar-nav.open {
+    transform: translateX(0);
+  }
+  /* Top bar shown on mobile */
+  .mobile-topbar {
+    display: flex !important;
+  }
+}
+
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #ffffff;
+  border-bottom: 1px solid #e4e4e7;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 100;
+}
+

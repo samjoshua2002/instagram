@@ -127,6 +127,48 @@ export default function RelationshipsPage() {
 
     const autoSyncFromDMs = async () => {
       try {
+        // Step 1: Trigger server-side memory extraction from live DMs (auto-learn + auto-cleanup)
+        if (selectedPerson.senderId) {
+          try {
+            const learnRes = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/learn`, { method: 'POST' });
+            const learnData = await learnRes.json();
+
+            // Step 2: If server returned updated memory, auto-fill birthday and important dates
+            if (learnData.memory && !isCancelled) {
+              const mem = learnData.memory;
+
+              // Auto-fill DOB if not already set
+              if (mem.importantDates && mem.importantDates.length > 0) {
+                const bdayEntry = mem.importantDates.find(d =>
+                  d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
+                );
+                if (bdayEntry && bdayEntry.date) {
+                  setFormData(prev => ({
+                    ...prev,
+                    dob: prev.dob || bdayEntry.date
+                  }));
+                }
+              }
+
+              // Auto-fill personal notes from rolling summary if empty
+              if (mem.personalNotes && !isCancelled) {
+                setFormData(prev => ({
+                  ...prev,
+                  personalNotes: prev.personalNotes || mem.personalNotes
+                }));
+              }
+
+              // Auto-fill facts from memory
+              if (Array.isArray(mem.facts) && mem.facts.length > 0 && selectedPerson) {
+                mem.facts.forEach(f => addFact(selectedPerson.id, f.fact || f));
+              }
+            }
+          } catch (learnErr) {
+            // non-critical — continue with AI autofill fallback
+          }
+        }
+
+        // Step 3: AI autofill from social graph as fallback
         const autofill = await aiAutofillPerson(selectedPerson.name);
         if (autofill && !isCancelled) {
           setFormData(prev => ({
@@ -134,7 +176,7 @@ export default function RelationshipsPage() {
             category: prev.category === 'online_friend' && autofill.category ? autofill.category : prev.category,
             relationship: !prev.relationship && autofill.relationshipToSam ? autofill.relationshipToSam : prev.relationship,
             dob: !prev.dob && autofill.dob ? autofill.dob : prev.dob,
-            personalNotes: prev.personalNotes ? (prev.personalNotes.includes(autofill.personalNotes) ? prev.personalNotes : `${prev.personalNotes}\n${autofill.personalNotes}`) : (autofill.personalNotes || ''),
+            personalNotes: prev.personalNotes ? (prev.personalNotes.includes(autofill.personalNotes || '') ? prev.personalNotes : `${prev.personalNotes}\n${autofill.personalNotes || ''}`) : (autofill.personalNotes || ''),
             roastStyle: !prev.roastStyle && autofill.banterStyle ? autofill.banterStyle : prev.roastStyle
           }));
 
@@ -153,6 +195,7 @@ export default function RelationshipsPage() {
       isCancelled = true;
     };
   }, [selectedPerson?.name, selectedPerson?.senderId, aiAutofillPerson, addFact]);
+
 
   // Overall Dashboard Metrics
   const dashboardStats = useMemo(() => {
@@ -688,21 +731,12 @@ export default function RelationshipsPage() {
                 </button>
               </div>
 
-              {/* Paste Raw Chat */}
+                {/* Paste Raw Chat */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ marginBottom: '6px' }}>
                   <label style={{ fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
                     Paste Raw Direct Message Chat or Conversation Notes
                   </label>
-                  {selectedPerson.senderId && (
-                    <button
-                      type="button"
-                      onClick={handleLoadRecentDms}
-                      style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Load Recent DMs from Database
-                    </button>
-                  )}
                 </div>
                 <textarea
                   rows={6}
@@ -1349,27 +1383,10 @@ export default function RelationshipsPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleForceLearn}
-              disabled={isLearning}
-              style={{
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
-                color: '#09090b',
-                padding: '7px 14px',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <RefreshCw size={12} className={isLearning ? 'animate-spin' : ''} />
-              <span>{isLearning ? 'Synthesizing...' : 'Force AI Learn from DMs'}</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
+              <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>AUTO-SYNCING FROM DMs</span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
