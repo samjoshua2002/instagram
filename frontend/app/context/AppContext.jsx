@@ -463,12 +463,12 @@ export function AppProvider({ children }) {
   };
 
   // Update Per-Person AI Reply Mode (Full AI, Reels Only, Paused / Sam Manual)
-  const updateContactPreferences = async (contactIdOrSenderId, { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts }) => {
+  const updateContactPreferences = async (contactIdOrSenderId, prefs) => {
     if (!contactIdOrSenderId) return;
-
-    let finalAiEnabled = aiEnabled;
-    let finalReplyMessages = replyToMessages;
-    let finalReplyReels = replyToReelsAndPosts;
+    const { aiMode, autoSendReels } = (typeof prefs === 'object' && prefs !== null) ? prefs : { aiMode: prefs };
+    let finalAiEnabled;
+    let finalReplyMessages;
+    let finalReplyReels;
 
     if (aiMode === 'full_ai') {
       finalAiEnabled = true;
@@ -494,8 +494,8 @@ export function AppProvider({ children }) {
         const matches = (
           n.id === contactIdOrSenderId ||
           n.senderId === contactIdOrSenderId ||
-          n.name.toLowerCase() === contactIdOrSenderId.toLowerCase() ||
-          (n.handle && n.handle.replace(/^@/, '').toLowerCase() === contactIdOrSenderId.replace(/^@/, '').toLowerCase())
+          n.name.toLowerCase() === String(contactIdOrSenderId).toLowerCase() ||
+          (n.handle && n.handle.replace(/^@/, '').toLowerCase() === String(contactIdOrSenderId).replace(/^@/, '').toLowerCase())
         );
 
         if (matches) {
@@ -504,7 +504,8 @@ export function AppProvider({ children }) {
             ...n,
             ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
             ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
-            ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+            ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {}),
+            ...(typeof autoSendReels === 'boolean' ? { autoSendReels } : {})
           };
         }
         return n;
@@ -520,16 +521,19 @@ export function AppProvider({ children }) {
         ...prev,
         ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
         ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
-        ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+        ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {}),
+        ...(typeof autoSendReels === 'boolean' ? { autoSendReels } : {})
       }));
     }
 
     const nameStr = contactName || contactIdOrSenderId;
-    if (aiMode === 'reels_only') {
+    if (typeof autoSendReels === 'boolean') {
+      showToast(autoSendReels ? `🎬 Auto-Reels ENABLED for ${nameStr}!` : `⏸️ Auto-Reels PAUSED for ${nameStr}!`);
+    } else if (aiMode === 'reels_only') {
       showToast(`🎬 ${nameStr}: AI will ONLY react to shared Reels!`);
     } else if (aiMode === 'paused' || aiMode === 'manual') {
       showToast(`⏸️ Stopped AI for ${nameStr}. Sam will chat manually!`);
-    } else {
+    } else if (aiMode) {
       showToast(`⚡ Full AI auto-reply enabled for ${nameStr}!`);
     }
 
@@ -541,7 +545,8 @@ export function AppProvider({ children }) {
           aiMode,
           aiEnabled: finalAiEnabled,
           replyToMessages: finalReplyMessages,
-          replyToReelsAndPosts: finalReplyReels
+          replyToReelsAndPosts: finalReplyReels,
+          autoSendReels
         })
       });
     } catch (e) {
@@ -779,14 +784,49 @@ export function AppProvider({ children }) {
     return null;
   };
 
+  // 1-Click Send Auto Reel based on interest without typing
+  const sendAutoReel = async (identifier) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/reels/send-auto/${encodeURIComponent(identifier)}`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        showToast('Server is busy or updating. Please try again in 5 seconds.');
+        return { success: false };
+      }
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🎉 Sent interest Reel to ${data.contactName}!`);
+        syncBackend();
+        return data;
+      } else {
+        showToast(`⚠️ Could not send reel: ${data.error || 'Server error'}`);
+        return { success: false, error: data.error };
+      }
+    } catch (e) {
+      showToast(`⚠️ Error sending reel: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  };
+
   // Trigger manual batch auto-dispatch
   const autoDispatchReels = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/reels/auto-dispatch`, { method: 'POST' });
+      if (!res.ok) {
+        showToast('Server is currently updating. Please try again in 10 seconds.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
-        showToast('🚀 Auto-dispatch executed: interest reel sent to eligible friend!');
+        if (data.scanResult?.count > 0) {
+          showToast(`🚀 Auto-dispatch sent reel to ${data.scanResult.recipient}!`);
+        } else {
+          showToast(`✨ ${data.message || 'All contacts are up to date! None due right now.'}`);
+        }
         syncBackend();
+      } else {
+        showToast(`Auto-dispatch: ${data.error || 'No reels dispatched'}`);
       }
     } catch (e) {
       showToast(`Auto-dispatch note: ${e.message}`);
@@ -822,6 +862,7 @@ export function AppProvider({ children }) {
         syncBackend,
         getReelRecommendation,
         sendInterestReel,
+        sendAutoReel,
         autoDispatchReels,
         API_BASE
       }}
