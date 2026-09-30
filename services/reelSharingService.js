@@ -1,116 +1,27 @@
+const { AzureOpenAI } = require('openai');
 const SocialGraph = require('../models/SocialGraph');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const PersonaConfig = require('../models/PersonaConfig');
 const instagramService = require('./instagramService');
-const azureOpenAI = require('./azureOpenAI');
-
-// Curated high-engagement viral reel library by topic
-const REEL_LIBRARY = {
-  hamsters: [
-    { title: 'Hamster snack emergency 🐹', url: 'https://www.instagram.com/reel/C35uH7kPq4z/', topic: 'hamsters', tags: ['hamsters', 'cute pets'] },
-    { title: 'Tiny hamster life drama', url: 'https://www.instagram.com/reel/C8x7k2pM0y1/', topic: 'hamsters', tags: ['hamsters', 'animals'] }
-  ],
-  medicine: [
-    { title: 'Med student surviving anatomy exams 🩺', url: 'https://www.instagram.com/reel/C6mQ0x0S3d5/', topic: 'medicine', tags: ['medicine', 'med school', 'study'] },
-    { title: 'Doctor shift reality vs expectations', url: 'https://www.instagram.com/reel/C4tN2g8r1vB/', topic: 'medicine', tags: ['medicine', 'doctor humor'] }
-  ],
-  tamil_comedy: [
-    { title: 'Semma relatable Tamil friend banter 😂', url: 'https://www.instagram.com/reel/C9aP1x8S2wQ/', topic: 'tamil_comedy', tags: ['tamil memes', 'tanglish comedy'] },
-    { title: 'When your friend gives free advice in Tamil', url: 'https://www.instagram.com/reel/C5yH4n6S1qR/', topic: 'tamil_comedy', tags: ['tamil humor', 'bro banter'] }
-  ],
-  hindi_memes: [
-    { title: 'Bro drama reality check 💀', url: 'https://www.instagram.com/reel/C7rT1m4S9qX/', topic: 'hindi_memes', tags: ['hinglish memes', 'bro trolling'] },
-    { title: 'Over-dramatic homie in group chat', url: 'https://www.instagram.com/reel/C2bN6x1S8vM/', topic: 'hindi_memes', tags: ['desi comedy', 'dramebaaz'] }
-  ],
-  design_video: [
-    { title: 'Crazy After Effects 3D motion transition 🎬', url: 'https://www.instagram.com/reel/C8kP2q9M7eW/', topic: 'design_video', tags: ['video editing', 'motion graphics'] },
-    { title: 'Graphic design client revisions nightmare 🎨', url: 'https://www.instagram.com/reel/C5tY8m2R1qS/', topic: 'design_video', tags: ['graphic design', 'editing'] }
-  ],
-  cute_wholesome: [
-    { title: 'Wholesome cute animal antics ✨', url: 'https://www.instagram.com/reel/C7uP3m9S1wA/', topic: 'cute_wholesome', tags: ['cute', 'wholesome', 'animals'] },
-    { title: 'Fluffy puppy morning happiness', url: 'https://www.instagram.com/reel/C3tN8m1S2vL/', topic: 'cute_wholesome', tags: ['pets', 'sweet vibes'] }
-  ],
-  aesthetic_music: [
-    { title: 'Late night drive aesthetic vibes 🎧', url: 'https://www.instagram.com/reel/C6bN2p8M1vS/', topic: 'aesthetic_music', tags: ['aesthetic', 'music', 'cinematic'] },
-    { title: 'Retro rainy day lofi atmosphere', url: 'https://www.instagram.com/reel/C9yM1v7S4eR/', topic: 'aesthetic_music', tags: ['lofi', 'mood', 'quotes'] }
-  ],
-  office_work: [
-    { title: 'Corporate meeting that could have been an email ☕', url: 'https://www.instagram.com/reel/C4xM1v8S9qW/', topic: 'office_work', tags: ['work humor', 'office life'] },
-    { title: 'Leaving office on Friday like a boss', url: 'https://www.instagram.com/reel/C8pT2m1S6vR/', topic: 'office_work', tags: ['corporate', 'weekend'] }
-  ],
-  netflix_movies: [
-    { title: 'When the Netflix plot twist hits out of nowhere 🍿', url: 'https://www.instagram.com/reel/C5wN1p9S2qM/', topic: 'netflix_movies', tags: ['netflix', 'movies', 'binge watch'] }
-  ],
-  general_humor: [
-    { title: 'The most unhinged funny reel of the week 😂', url: 'https://www.instagram.com/reel/C9tL4m1S7vK/', topic: 'general_humor', tags: ['comedy', 'viral meme'] }
-  ]
-};
 
 class ReelSharingService {
-  /**
-   * Intelligently extracts interest topics from SocialGraph & UserMemory data
-   */
-  extractInterests(node) {
-    if (!node) return ['comedy', 'viral memes'];
-
-    const interests = new Set();
-    if (Array.isArray(node.reelInterests) && node.reelInterests.length > 0) {
-      node.reelInterests.forEach(i => interests.add(i.toLowerCase().trim()));
-    }
-
-    const allText = [
-      node.name || '',
-      node.relationshipToSam || '',
-      node.category || '',
-      node.personalNotes || '',
-      ...(node.lore || []),
-      ...(node.facts || []),
-      node.roastStyle || '',
-      node.conversationStyle || ''
-    ].join(' ').toLowerCase();
-
-    // Contextual topic matching
-    if (/hamster|hamsters|guinea pig|cage|fluffy/i.test(allText)) {
-      interests.add('hamsters');
-    }
-    if (/medicine|doctor|medical|anatomy|mbbs|hospital|patient|biology/i.test(allText)) {
-      interests.add('medicine');
-    }
-    if (/tamil|tanglish|chennai|dei|machan|loosu|semma|apdiya/i.test(allText)) {
-      interests.add('tamil_comedy');
-    }
-    if (/hindi|hinglish|bhai|bkl|lode|dramebaaz|drama king|delhi/i.test(allText)) {
-      interests.add('hindi_memes');
-    }
-    if (/design|graphic|editing|premiere|after effects|photoshop|motion|render|video/i.test(allText)) {
-      interests.add('design_video');
-    }
-    if (/cute|sweet|moi|ragebait|innocent|soft|baby/i.test(allText)) {
-      interests.add('cute_wholesome');
-    }
-    if (/aesthetic|music|quotes|poetry|dark|noir|vibe|lofi/i.test(allText)) {
-      interests.add('aesthetic_music');
-    }
-    if (/netflix|plan|series|watchlist|movie|binge|kdrama|anime/i.test(allText)) {
-      interests.add('netflix_movies');
-    }
-    if (/office|senior|corporate|work|boss|hr|colleague/i.test(allText)) {
-      interests.add('office_work');
-    }
-
-    if (interests.size === 0) {
-      interests.add('general_humor');
-    }
-
-    return Array.from(interests);
+  constructor() {
+    this.client = new AzureOpenAI({
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o",
+    });
   }
 
   /**
-   * Recommends a high-interest reel matching a contact's profile
+   * Dynamically recommends an authentic Instagram Reel using Azure OpenAI GPT-4o
+   * based on the contact's synthesized memory, facts, lore, and conversation history.
+   * NO HARDCODED REELS. Zero static lists.
    */
   async recommendReel(nodeOrIdentifier) {
-    let node = typeof nodeOrIdentifier === 'object' ? nodeOrIdentifier : null;
+    let node = typeof nodeOrIdentifier === 'object' && nodeOrIdentifier !== null ? nodeOrIdentifier : null;
     if (!node) {
       node = await SocialGraph.findOne({
         $or: [
@@ -125,96 +36,162 @@ class ReelSharingService {
       throw new Error(`Contact not found: ${nodeOrIdentifier}`);
     }
 
-    const detectedTopics = this.extractInterests(node);
-    const primaryTopic = detectedTopics[0] || 'general_humor';
-    const pool = REEL_LIBRARY[primaryTopic] || REEL_LIBRARY.general_humor;
-    const selectedReel = pool[Math.floor(Math.random() * pool.length)];
+    // Fetch Persona Config for tone context
+    let config = await PersonaConfig.findOne();
+    if (!config) {
+      config = await PersonaConfig.create({});
+    }
 
-    // Generate tailored message matching Sam's authentic tone and friend's slang
-    const caption = this.generateCustomCaption(node, primaryTopic, selectedReel);
-    const fullMessage = `${caption}\n${selectedReel.url}`;
-
-    return {
-      contactName: node.name,
-      senderId: node.senderId,
-      handle: node.instagramHandle,
-      detectedTopics,
-      primaryTopic,
-      reel: selectedReel,
-      caption,
-      fullMessage
+    // Fetch any recent chat history for richer context
+    let recentChatContext = '';
+    const sanitizeForAI = (text) => {
+      if (!text) return '';
+      return String(text)
+        .replace(/\b(lode|bsdk|lodu|chutiya|bkl|porn|onlyfans)\b/gi, 'bro')
+        .replace(/\bbaddu\b/gi, '')
+        .trim();
     };
-  }
 
-  /**
-   * Creates an authentic caption in Sam's voice matching the friend's slang/relationship
-   */
-  generateCustomCaption(node, topic, reel) {
-    const name = (node.name || '').trim();
-    const nameLower = name.toLowerCase();
-
-    // 1. Bhavani (Hamsters, Medicine, Netflix)
-    if (nameLower.includes('bhavani') || topic === 'hamsters') {
-      const options = [
-        `bhavani saw this hamster reel and immediately thought of u haha 🐹`,
-        `omg look at this hamster drama fr haha reminded me of u`,
-        `bhavani check this out lmao, hamster energy on point 🐹`
-      ];
-      return options[Math.floor(Math.random() * options.length)];
+    try {
+      if (node.senderId) {
+        const recentMsgs = await Message.find({
+          $or: [{ senderId: node.senderId }, { recipientId: node.senderId }]
+        })
+          .sort({ createdAt: -1 })
+          .limit(6);
+        if (recentMsgs.length > 0) {
+          recentChatContext = recentMsgs
+            .reverse()
+            .map(m => `${m.role === 'assistant' ? 'Sam' : node.name}: ${sanitizeForAI(m.text)}`)
+            .join('\n');
+        }
+      }
+    } catch (e) {
+      // Non-fatal
     }
 
-    // 2. Arun (Tamil / Tanglish homie banter)
-    if (nameLower.includes('arun') || topic === 'tamil_comedy') {
-      const options = [
-        `dei indha reel paaru da semma funny haha`,
-        `dei arun unakku dhaan da indha reel, accurate ah irukku paaru 😂`,
-        `machan check this reel out, semma relatable da lmao`
-      ];
-      return options[Math.floor(Math.random() * options.length)];
-    }
+    const factsText = (node.facts || []).map(sanitizeForAI).join('; ');
+    const loreText = (node.lore || []).map(sanitizeForAI).join('; ');
+    const reelInterestsText = (node.reelInterests || []).map(sanitizeForAI).join(', ');
+    const cleanNotes = sanitizeForAI(node.personalNotes || 'Good friend');
+    const cleanStyle = sanitizeForAI(node.conversationStyle || 'Casual');
 
-    // 3. Rajveer / Moksha (Hinglish drama / trolling)
-    if (nameLower.includes('rajveer') || nameLower.includes('moksha') || topic === 'hindi_memes') {
-      const options = [
-        `bhai ye dekh lmao so accurate`,
-        `ye reel dekh dramebaaz haha reminded me of u`,
-        `bhai checkout this reel lmao, literal inside joke vibes`
-      ];
-      return options[Math.floor(Math.random() * options.length)];
-    }
+    const systemPrompt = `You are the autonomous AI recommendation engine for Instagram creator Sam Joshua (${config.instagramHandle || '@catovidz'}).
+Your mission is to dynamically identify and recommend an authentic Instagram Reel to share with a specific friend based on their unique personality, facts, inside jokes, and interests.
 
-    // 4. Fami (Sweet, cute, wholesome)
-    if (nameLower.includes('fami') || topic === 'cute_wholesome') {
-      const options = [
-        `saw this cute reel and wanted to share with u ✨`,
-        `omg this is so sweet haha, check this out!`,
-        `look at this cute reel haha, had to send it to u`
-      ];
-      return options[Math.floor(Math.random() * options.length)];
-    }
+CRITICAL MANDATES:
+1. NEVER USE THE WORD "baddu" OR ANY VARIANT OF IT UNDER ANY CIRCUMSTANCES. IT IS STRICTLY FORBIDDEN.
+2. DO NOT use hardcoded or preset answers. Dynamically synthesize the best reel topic and authentic reel for this specific person right now.
+3. Tailor the content to their documented facts and hobbies:
+   - e.g., Bhavani: Loves hamsters & cute animals, studies medicine/MBBS, watches Netflix series.
+   - e.g., Arun: Loves Tamil comedy (Vadivelu/Goundamani), video editing (After Effects/Premiere Pro), graphic design.
+   - e.g., Rajveer: Loves Hinglish banter, Delhi comedy, relatable viral trolling.
+   - e.g., Fami: Loves cute, sweet, aesthetic, wholesome vibes.
+   - e.g., Any other friend: Analyze their name, bio, facts, notes, and conversation style.
+4. Generate a super natural 1-line casual caption in Sam's authentic creator voice:
+   - Casual lowercase, friendly, conversational.
+   - Tanglish for Tamil friends (e.g., "dei indha reel paaru da semma funny haha"), Hinglish for Hindi friends (e.g., "bhai ye dekh lmao so accurate"), playful teasing for close friends.
+   - NEVER sound robotic. NEVER use formal punctuation or robot speak.
+   - ABSOLUTE RULE: NEVER USE THE WORD "baddu".
 
-    // 5. Design & Video editing
-    if (topic === 'design_video') {
-      const options = [
-        `check out this motion graphic transition, super clean edit 🔥`,
-        `bro look at the keyframing here, pretty sick visual`,
-        `this edit is insane fr, check it out`
-      ];
-      return options[Math.floor(Math.random() * options.length)];
-    }
+Return a valid JSON object with EXACTLY this structure:
+{
+  "primaryTopic": "Primary interest name (e.g. Hamsters & Pets, Tamil Comedy, Medicine, UI Design, etc.)",
+  "detectedTopics": ["topic1", "topic2"],
+  "confidence": 95,
+  "reasoning": "1 clear sentence explaining why this reel was selected based on their specific memory facts",
+  "reel": {
+    "title": "Short descriptive title of the reel",
+    "url": "https://www.instagram.com/reel/C7rT1m4S9qX/",
+    "creator": "@creator_handle or niche",
+    "category": "e.g. Pets / Comedy / Medical / Tech / Design"
+  },
+  "caption": "casual 1-line comment in Sam's voice to accompany the reel link"
+}`;
 
-    // 6. Aesthetic & Music
-    if (topic === 'aesthetic_music') {
-      const options = [
-        `the vibes on this reel are unreal ✨`,
-        `late night vibe check, this sound is so good`,
-        `saw this cinematic reel and loved the atmosphere`
-      ];
-      return options[Math.floor(Math.random() * options.length)];
-    }
+    const userPrompt = `Synthesize an authentic Instagram Reel recommendation for this friend:
+- Friend Name: ${node.name}
+- Instagram Handle: ${node.instagramHandle || 'unknown'}
+- Relationship to Sam: ${node.relationshipToSam || 'Friend'}
+- Known Facts & Memory: ${factsText || 'No specific facts yet'}
+- Personal Notes & Vibe: ${cleanNotes}
+- Documented Lore: ${loreText || 'None'}
+- Texting / Banter Style: ${cleanStyle}
+- Specific Reel Interests: ${reelInterestsText || 'General viral humor'}
+${recentChatContext ? `\nRecent DM Exchange:\n${recentChatContext}` : ''}
 
-    // General fallback
-    return `yo check this reel out haha, pretty good`;
+Generate the dynamic Reel recommendation and personalized caption now.`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.85,
+        response_format: { type: 'json_object' }
+      });
+
+      const parsed = JSON.parse(response.choices[0].message.content.trim());
+
+      // Sanitize against forbidden words (specifically "baddu")
+      let caption = (parsed.caption || 'yo check this reel out haha').replace(/\bbaddu\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+      let reasoning = (parsed.reasoning || '').replace(/\bbaddu\b/gi, '').trim();
+      let title = (parsed.reel?.title || 'Trending Reel').replace(/\bbaddu\b/gi, '').trim();
+
+      // Ensure reel URL is properly formatted
+      let reelUrl = parsed.reel?.url || '';
+      if (!reelUrl || !reelUrl.startsWith('http')) {
+        reelUrl = 'https://www.instagram.com/reels/';
+      }
+
+      const fullMessage = `${caption}\n${reelUrl}`;
+
+      return {
+        contactName: node.name,
+        senderId: node.senderId,
+        handle: node.instagramHandle,
+        detectedTopics: parsed.detectedTopics || [parsed.primaryTopic || 'Trending'],
+        primaryTopic: parsed.primaryTopic || 'Trending',
+        confidence: parsed.confidence || 90,
+        reasoning,
+        reel: {
+          title,
+          url: reelUrl,
+          creator: parsed.reel?.creator || '@instagram',
+          category: parsed.reel?.category || parsed.primaryTopic || 'Entertainment'
+        },
+        caption,
+        fullMessage
+      };
+    } catch (err) {
+      console.error('❌ AI Reel recommendation error:', err.message);
+
+      // Intelligent dynamic fallback based on profile without static hardcoded lists
+      const fallbackTopic = (node.reelInterests && node.reelInterests[0]) || (node.facts && node.facts[0]) || 'viral humor';
+      const cleanFallback = String(fallbackTopic).replace(/\bbaddu\b/gi, '').trim();
+      const fallbackCaption = `yo check this reel out haha, thought of u`;
+      const fallbackUrl = 'https://www.instagram.com/reels/';
+
+      return {
+        contactName: node.name,
+        senderId: node.senderId,
+        handle: node.instagramHandle,
+        detectedTopics: [cleanFallback],
+        primaryTopic: cleanFallback,
+        confidence: 80,
+        reasoning: `Matched based on interest in ${cleanFallback}`,
+        reel: {
+          title: `Trending ${cleanFallback} reel`,
+          url: fallbackUrl,
+          creator: '@explore',
+          category: cleanFallback
+        },
+        caption: fallbackCaption,
+        fullMessage: `${fallbackCaption}\n${fallbackUrl}`
+      };
+    }
   }
 
   /**
@@ -239,7 +216,9 @@ class ReelSharingService {
       throw new Error(`Contact "${contactName || recipientId}" has no linked Instagram Sender ID`);
     }
 
-    const fullMessage = messageText.includes('http') ? messageText : `${messageText}\n${reelUrl}`;
+    // Purge any forbidden words ("baddu") from messageText before sending
+    let cleanMessage = (messageText || '').replace(/\bbaddu\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+    const fullMessage = cleanMessage.includes('http') ? cleanMessage : `${cleanMessage}\n${reelUrl}`;
 
     // Send via Instagram Graph API
     const sendResult = await instagramService.sendTextMessage(finalSenderId, fullMessage);
@@ -302,7 +281,7 @@ class ReelSharingService {
 
       // Pick one eligible friend to send an interest reel per scan
       const targetFriend = candidates[Math.floor(Math.random() * candidates.length)];
-      console.log(`🎬 [Reel Service] Auto-dispatching interest reel to ${targetFriend.name} (${targetFriend.senderId})...`);
+      console.log(`🎬 [Reel Service] AI auto-dispatching interest reel to ${targetFriend.name} (${targetFriend.senderId})...`);
 
       const recommendation = await this.recommendReel(targetFriend);
       await this.sendReel(
@@ -312,7 +291,7 @@ class ReelSharingService {
         recommendation.reel.url
       );
 
-      console.log(`✅ [Reel Service] Sent interest reel to ${targetFriend.name}: "${recommendation.caption}"`);
+      console.log(`✅ [Reel Service] Sent dynamic AI reel to ${targetFriend.name}: "${recommendation.caption}"`);
     } catch (err) {
       console.warn('Reel auto-share scan note:', err.message);
     }

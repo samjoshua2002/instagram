@@ -215,6 +215,7 @@ INSTRUCTIONS FOR THIS REPLY:
 - Respond naturally as ${config.creatorName} texting from your phone.
 - If they mentioned an exam, birthday, favorite thing, friend, or life event — bring it up naturally.
 - Generate language organically from the conversation — no fixed word lists.
+- STRICTLY FORBIDDEN: NEVER USE THE WORD "baddu" OR ANY VARIANT UNDER ANY CIRCUMSTANCES.
 - Only return the raw message text. No quotation marks, no name prefix.`;
 
 
@@ -265,6 +266,9 @@ INSTRUCTIONS FOR THIS REPLY:
       if (reply.startsWith(`${config.creatorName}:`)) {
         reply = reply.replace(`${config.creatorName}:`, '').trim();
       }
+
+      // Strictly purge forbidden words like "baddu"
+      reply = reply.replace(/\bbaddu\b/gi, '').replace(/\s{2,}/g, ' ').trim();
 
       return reply;
     } catch (err) {
