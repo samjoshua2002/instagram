@@ -59,6 +59,41 @@ class SocialGraphService {
           console.log(`🧼 [Sanitized Node]: Cleaned outdated roast words for ${node.name}`);
         }
       }
+      // Clean up any duplicate records sharing senderId or instagramHandle in MongoDB
+      const seenSenderIds = new Map();
+      const seenHandles = new Map();
+      for (const node of allNodes) {
+        const sId = (node.senderId || '').trim();
+        const h = (node.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
+        if (sId) {
+          if (seenSenderIds.has(sId)) {
+            const prevNode = seenSenderIds.get(sId);
+            const keepNew = (node.name || '').length >= (prevNode.name || '').length || (node.updatedAt || 0) > (prevNode.updatedAt || 0);
+            const toDelete = keepNew ? prevNode : node;
+            const toKeep = keepNew ? node : prevNode;
+            await SocialGraph.deleteOne({ _id: toDelete._id });
+            seenSenderIds.set(sId, toKeep);
+            console.log(`🧼 [Sanitize] Removed duplicate node "${toDelete.name}" in favor of "${toKeep.name}"`);
+            continue;
+          } else {
+            seenSenderIds.set(sId, node);
+          }
+        }
+        if (h) {
+          if (seenHandles.has(h)) {
+            const prevNode = seenHandles.get(h);
+            const keepNew = (node.name || '').length >= (prevNode.name || '').length || (node.updatedAt || 0) > (prevNode.updatedAt || 0);
+            const toDelete = keepNew ? prevNode : node;
+            const toKeep = keepNew ? node : prevNode;
+            await SocialGraph.deleteOne({ _id: toDelete._id });
+            seenHandles.set(h, toKeep);
+            console.log(`🧼 [Sanitize] Removed duplicate handle node "${toDelete.name}" in favor of "${toKeep.name}"`);
+            continue;
+          } else {
+            seenHandles.set(h, node);
+          }
+        }
+      }
     } catch (err) {
       console.warn('Node sanitization note:', err.message);
     }
@@ -104,9 +139,6 @@ class SocialGraphService {
         }
         if (nicknameLower) {
           orConditions.push({ aliases: nicknameLower });
-        }
-        if (usernameLower.includes('annie') || nameLower.includes('annie')) {
-          orConditions.push({ name: 'Annie' });
         }
 
         // Check if this memory belongs to an existing node
