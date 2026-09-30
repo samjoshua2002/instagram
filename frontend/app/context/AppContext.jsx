@@ -121,10 +121,7 @@ export function AppProvider({ children }) {
     chatMode: 'everyone_except',
     excludedContactIds: ['29005624469042002', '877566845441453'], // Bhavani & Rajveer excluded by default for Sam's manual chat
     includedContactIds: [],
-    globalBotActive: true,
-    autoShareReelsEnabled: true,
-    autoShareReelsFrequencyHours: 24,
-    autoShareReelsTopics: ['hamsters', 'medicine', 'tamil_comedy', 'hindi_memes', 'design_video', 'cute_wholesome', 'aesthetic_music']
+    globalBotActive: true
   });
   const [toastMessage, setToastMessage] = useState('');
 
@@ -748,91 +745,6 @@ export function AppProvider({ children }) {
     return null;
   };
 
-  // Get interest-based reel recommendation & preview
-  const getReelRecommendation = async (identifier) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/reels/recommend/${encodeURIComponent(identifier)}`);
-      const data = await res.json();
-      if (data.success && data.recommendation) {
-        return data.recommendation;
-      }
-    } catch (e) {
-      console.warn('Reel recommendation error:', e.message);
-    }
-    return null;
-  };
-
-  // Send tailored reel directly to friend's Instagram DM
-  const sendInterestReel = async ({ recipientId, contactName, messageText, reelUrl }) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/reels/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientId, contactName, messageText, reelUrl })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`🎬 Sent interest reel to ${contactName || 'friend'} on Instagram!`);
-        syncBackend();
-        return data;
-      } else {
-        showToast(`⚠️ Failed to send reel: ${data.error || 'Server error'}`);
-      }
-    } catch (e) {
-      showToast(`⚠️ Send reel error: ${e.message}`);
-    }
-    return null;
-  };
-
-  // 1-Click Send Auto Reel based on interest without typing
-  const sendAutoReel = async (identifier) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/reels/send-auto/${encodeURIComponent(identifier)}`, {
-        method: 'POST'
-      });
-      if (!res.ok) {
-        showToast('Server is busy or updating. Please try again in 5 seconds.');
-        return { success: false };
-      }
-      const data = await res.json();
-      if (data.success) {
-        showToast(`🎉 Sent interest Reel to ${data.contactName}!`);
-        syncBackend();
-        return data;
-      } else {
-        showToast(`⚠️ Could not send reel: ${data.error || 'Server error'}`);
-        return { success: false, error: data.error };
-      }
-    } catch (e) {
-      showToast(`⚠️ Error sending reel: ${e.message}`);
-      return { success: false, error: e.message };
-    }
-  };
-
-  // Trigger manual batch auto-dispatch
-  const autoDispatchReels = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/reels/auto-dispatch`, { method: 'POST' });
-      if (!res.ok) {
-        showToast('Server is currently updating. Please try again in 10 seconds.');
-        return;
-      }
-      const data = await res.json();
-      if (data.success) {
-        if (data.scanResult?.count > 0) {
-          showToast(`🚀 Auto-dispatch sent reel to ${data.scanResult.recipient}!`);
-        } else {
-          showToast(`✨ ${data.message || 'All contacts are up to date! None due right now.'}`);
-        }
-        syncBackend();
-      } else {
-        showToast(`Auto-dispatch: ${data.error || 'No reels dispatched'}`);
-      }
-    } catch (e) {
-      showToast(`Auto-dispatch note: ${e.message}`);
-    }
-  };
-
   return (
     <AppContext.Provider
       value={{
@@ -860,10 +772,6 @@ export function AppProvider({ children }) {
         lookupContact,
         extractFromRawChat,
         syncBackend,
-        getReelRecommendation,
-        sendInterestReel,
-        sendAutoReel,
-        autoDispatchReels,
         API_BASE
       }}
     >
