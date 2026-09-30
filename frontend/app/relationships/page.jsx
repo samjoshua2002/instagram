@@ -1509,21 +1509,22 @@ export default function RelationshipsPage() {
   return (
     <div style={{ padding: '32px 36px 80px 36px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
+      <div className="directory-header-row page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
             PEOPLE DIRECTORY & INTELLIGENCE
           </div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: '#09090b' }}>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: '#09090b', lineHeight: 1.1 }}>
             All People
           </h1>
-          <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '4px' }}>
+          <p style={{ color: '#71717a', fontSize: '0.82rem', marginTop: '4px' }}>
             Unified directory showing profiles, interaction statistics, and automated intelligence rules.
           </p>
         </div>
 
         <button
           onClick={() => startAiInterview(null)}
+          className="header-add-btn"
           style={{
             background: '#09090b',
             color: '#ffffff',
@@ -1535,7 +1536,9 @@ export default function RelationshipsPage() {
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '6px',
+            flexShrink: 0,
+            marginLeft: 'auto'
           }}
         >
           <Sparkles size={14} />
@@ -1544,7 +1547,7 @@ export default function RelationshipsPage() {
       </div>
 
       {/* ================= DASHBOARD METRICS SUMMARY ================= */}
-      <div style={{
+      <div className="metrics-summary-grid" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
         gap: '10px',
@@ -1712,210 +1715,434 @@ export default function RelationshipsPage() {
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}
       >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
-            <thead>
-              <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '56px' }}>
-                  PROFILE
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
-                  NAME
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
-                  USERNAME
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
-                  DATE OF BIRTH
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
-                  RELATION
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
-                  CHATS
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
-                  REELS
-                </th>
-                <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
-                  ACTION
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedPeople.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
-                    {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
-                  </td>
+        {/* 1. Desktop & Tablet Table View */}
+        <div className="desktop-table-container">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+              <thead>
+                <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '56px' }}>
+                    PROFILE
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                    NAME
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                    USERNAME
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                    DATE OF BIRTH
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                    RELATION
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                    CHATS
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                    REELS
+                  </th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
+                    ACTION
+                  </th>
                 </tr>
-              ) : (
-                pagedPeople.map((person) => {
+              </thead>
+              <tbody>
+                {pagedPeople.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
+                      {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
+                    </td>
+                  </tr>
+                ) : (
+                  pagedPeople.map((person) => {
+                    const hasHandle = Boolean(person.handle || person.instagramHandle);
+                    const handleDisplay = person.handle || person.instagramHandle;
+                    const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+                    const chatsCount = person.chatsCount || person.messageCount || 0;
+                    const reelsCount = person.reelsCount || 0;
 
-                  const hasHandle = Boolean(person.handle || person.instagramHandle);
-                  const handleDisplay = person.handle || person.instagramHandle;
-                  const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
-                  const chatsCount = person.chatsCount || person.messageCount || 0;
-                  const reelsCount = person.reelsCount || 0;
+                    return (
+                      <tr
+                        key={person.id || person.senderId || person.name}
+                        onClick={() => setSelectedPerson(person)}
+                        style={{
+                          borderBottom: '1px solid #f4f4f5',
+                          cursor: 'pointer',
+                          transition: 'background 0.1s ease'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#fafafa')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                      >
+                        {/* Column 1: PROFILE */}
+                        <td style={{ padding: '10px 16px' }}>
+                          <ContactAvatar contact={person} size={36} showStatus={true} />
+                        </td>
 
-                  return (
-                    <tr
-                      key={person.id || person.senderId || person.name}
+                        {/* Column 2: NAME */}
+                        <td style={{ padding: '10px 16px' }}>
+                          <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#09090b' }}>
+                            {person.name}
+                          </div>
+                          {person.gender && person.gender !== 'unknown' && (
+                            <div style={{ fontSize: '0.68rem', color: '#71717a', textTransform: 'capitalize' }}>
+                              {person.gender}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Column 3: USERNAME */}
+                        <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
+                          {hasHandle ? (
+                            <span
+                              onClick={() => setLinkingTargetPerson(person)}
+                              title="Edit handle"
+                              style={{
+                                fontSize: '0.78rem',
+                                color: '#09090b',
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              {handleDisplay}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setLinkingTargetPerson(person)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1px solid #e4e4e7',
+                                color: '#71717a',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.68rem',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              No Handle
+                            </button>
+                          )}
+                        </td>
+
+                        {/* Column 4: DATE OF BIRTH */}
+                        <td style={{ padding: '10px 16px' }}>
+                          {dobDisplay ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#09090b' }}>
+                              <Calendar size={12} style={{ color: '#71717a' }} />
+                              <span>{dobDisplay}</span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>—</span>
+                          )}
+                        </td>
+
+                        {/* Column 5: RELATION */}
+                        <td style={{ padding: '10px 16px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '0.8rem', color: '#09090b', fontWeight: '600' }}>
+                              {person.relationship || person.relationshipToSam || 'Friend'}
+                            </span>
+                            <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                              {person.category ? person.category.replace('_', ' ').toUpperCase() : 'ONLINE FRIEND'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Column 6: CHATS COUNT */}
+                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                          <span style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <MessageSquare size={11} style={{ color: '#71717a' }} />
+                            <span>{chatsCount}</span>
+                          </span>
+                        </td>
+
+                        {/* Column 7: REELS COUNT */}
+                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                          <span style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Film size={11} style={{ color: '#71717a' }} />
+                            <span>{reelsCount}</span>
+                          </span>
+                        </td>
+
+                        {/* Column 8: ACTION */}
+                        <td style={{ padding: '10px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                            <button
+                              onClick={() => setSelectedPerson(person)}
+                              style={{
+                                background: '#09090b',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.74rem',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <span>Open</span>
+                              <ArrowRight size={11} />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete ${person.name} from Database?`)) {
+                                  deleteNode(person);
+                                }
+                              }}
+                              title="Delete Person"
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid #e4e4e7',
+                                color: '#71717a',
+                                padding: '5px 7px',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 2. Mobile Compact Cards View (screens <= 768px) */}
+        <div className="mobile-people-cards" style={{ padding: '12px' }}>
+          {pagedPeople.length === 0 ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px' }}>
+              {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
+            </div>
+          ) : (
+            pagedPeople.map((person) => {
+              const hasHandle = Boolean(person.handle || person.instagramHandle);
+              const handleDisplay = person.handle || person.instagramHandle;
+              const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+              const chatsCount = person.chatsCount || person.messageCount || 0;
+              const reelsCount = person.reelsCount || 0;
+              const relDisplay = person.relationship || person.relationshipToSam || 'Friend';
+              const catDisplay = person.category ? person.category.replace('_', ' ').toUpperCase() : 'ONLINE FRIEND';
+
+              return (
+                <div
+                  key={person.id || person.senderId || person.name}
+                  onClick={() => setSelectedPerson(person)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e4e4e7',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s ease'
+                  }}
+                >
+                  {/* Card Top Row: Avatar + Name/Handle + Category badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                      <ContactAvatar contact={person} size={42} showStatus={true} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.92rem', color: '#09090b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {person.name}
+                          </span>
+                          {person.gender && person.gender !== 'unknown' && (
+                            <span style={{ fontSize: '0.65rem', color: '#71717a', textTransform: 'capitalize', fontWeight: '500' }}>
+                              ({person.gender})
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                          {hasHandle ? (
+                            <span
+                              onClick={() => setLinkingTargetPerson(person)}
+                              style={{
+                                fontSize: '0.74rem',
+                                color: '#52525b',
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {handleDisplay}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setLinkingTargetPerson(person)}
+                              style={{
+                                background: '#f4f4f5',
+                                border: '1px solid #e4e4e7',
+                                color: '#71717a',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.65rem',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              + Link Handle
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Tag */}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <span style={{
+                        background: '#f4f4f5',
+                        border: '1px solid #e4e4e7',
+                        color: '#09090b',
+                        padding: '3px 8px',
+                        borderRadius: '5px',
+                        fontSize: '0.66rem',
+                        fontWeight: '700',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        display: 'inline-block'
+                      }}>
+                        {catDisplay}
+                      </span>
+                      <div style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: '500', marginTop: '2px' }}>
+                        {relDisplay}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Middle Info Row: DOB + Chat counts + Reels */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #f4f4f5',
+                    gap: '8px'
+                  }}>
+                    {/* Date of Birth */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.74rem', color: dobDisplay ? '#09090b' : '#a1a1aa' }}>
+                      <Calendar size={13} style={{ color: '#71717a', flexShrink: 0 }} />
+                      <span style={{ fontWeight: dobDisplay ? '600' : '400' }}>
+                        {dobDisplay || 'No birthday set'}
+                      </span>
+                    </div>
+
+                    {/* Interaction Badges */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        background: '#fafafa',
+                        border: '1px solid #e4e4e7',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: '700',
+                        color: '#09090b',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        <MessageSquare size={11} style={{ color: '#71717a' }} />
+                        <span>{chatsCount}</span>
+                      </span>
+
+                      <span style={{
+                        background: '#fafafa',
+                        border: '1px solid #e4e4e7',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: '700',
+                        color: '#09090b',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        <Film size={11} style={{ color: '#71717a' }} />
+                        <span>{reelsCount}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom Row: Action Buttons */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: '4px',
+                      gap: '8px'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
                       onClick={() => setSelectedPerson(person)}
                       style={{
-                        borderBottom: '1px solid #f4f4f5',
+                        flex: 1,
+                        background: '#09090b',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '7px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.76rem',
+                        fontWeight: '700',
                         cursor: 'pointer',
-                        transition: 'background 0.1s ease'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fafafa')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
                     >
-                      {/* Column 1: PROFILE */}
-                      <td style={{ padding: '10px 16px' }}>
-                        <ContactAvatar contact={person} size={36} showStatus={true} />
-                      </td>
+                      <span>Open Details</span>
+                      <ArrowRight size={12} />
+                    </button>
 
-                      {/* Column 2: NAME */}
-                      <td style={{ padding: '10px 16px' }}>
-                        <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#09090b' }}>
-                          {person.name}
-                        </div>
-                        {person.gender && person.gender !== 'unknown' && (
-                          <div style={{ fontSize: '0.68rem', color: '#71717a', textTransform: 'capitalize' }}>
-                            {person.gender}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Column 3: USERNAME */}
-                      <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
-                        {hasHandle ? (
-                          <span
-                            onClick={() => setLinkingTargetPerson(person)}
-                            title="Edit handle"
-                            style={{
-                              fontSize: '0.78rem',
-                              color: '#09090b',
-                              fontFamily: "'JetBrains Mono', monospace",
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            {handleDisplay}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setLinkingTargetPerson(person)}
-                            style={{
-                              background: '#ffffff',
-                              border: '1px solid #e4e4e7',
-                              color: '#71717a',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.68rem',
-                              fontWeight: '600',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            No Handle
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Column 4: DATE OF BIRTH */}
-                      <td style={{ padding: '10px 16px' }}>
-                        {dobDisplay ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#09090b' }}>
-                            <Calendar size={12} style={{ color: '#71717a' }} />
-                            <span>{dobDisplay}</span>
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>—</span>
-                        )}
-                      </td>
-
-                      {/* Column 5: RELATION */}
-                      <td style={{ padding: '10px 16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontSize: '0.8rem', color: '#09090b', fontWeight: '600' }}>
-                            {person.relationship || person.relationshipToSam || 'Friend'}
-                          </span>
-                          <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                            {person.category ? person.category.replace('_', ' ').toUpperCase() : 'ONLINE FRIEND'}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Column 6: CHATS COUNT */}
-                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                        <span style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <MessageSquare size={11} style={{ color: '#71717a' }} />
-                          <span>{chatsCount}</span>
-                        </span>
-                      </td>
-
-                      {/* Column 7: REELS COUNT */}
-                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                        <span style={{ background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Film size={11} style={{ color: '#71717a' }} />
-                          <span>{reelsCount}</span>
-                        </span>
-                      </td>
-
-                      {/* Column 8: ACTION (ONLY OPEN AND DELETE) */}
-                      <td style={{ padding: '10px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                          {/* Open Full Inner Page */}
-                          <button
-                            onClick={() => setSelectedPerson(person)}
-                            style={{
-                              background: '#09090b',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '5px 12px',
-                              borderRadius: '6px',
-                              fontSize: '0.74rem',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <span>Open</span>
-                            <ArrowRight size={11} />
-                          </button>
-
-                          {/* Delete */}
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Delete ${person.name} from Database?`)) {
-                                deleteNode(person);
-                              }
-                            }}
-                            title="Delete Person"
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid #e4e4e7',
-                              color: '#71717a',
-                              padding: '5px 7px',
-                              borderRadius: '6px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete ${person.name} from Database?`)) {
+                          deleteNode(person);
+                        }
+                      }}
+                      title="Delete Person"
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        color: '#71717a',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Table Pagination */}
