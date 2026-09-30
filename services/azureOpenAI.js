@@ -77,8 +77,8 @@ class AzureOpenAIService {
 
     // Knowledge gaps by priority
     const hasName = !!(userMemory.name && !userMemory.name.startsWith('User_'));
-    const hasDob = !!(userMemory.importantDates || []).some(d =>
-      d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday'));
+    const hasDob = !!(userMemory.dob || (userMemory.importantDates || []).some(d =>
+      d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')));
     const hasGender = userMemory.gender && userMemory.gender !== 'unknown';
     const hasNickname = !!userMemory.nickname;
     const hasFacts = (userMemory.facts || []).length >= 3;
@@ -174,11 +174,24 @@ GENDER & ADDRESSING (CRITICAL):
 BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - This person's specific banter/roast style: ${userMemory.roastStyle || 'match their energy naturally'}
 - When they use slang, cuss words, or trash talk: match their exact language and energy. Use whatever language THEY are writing in.
-- NEVER mix language styles — if they write in Tamil, reply in Tamil. If Hindi, reply in Hindi. If English, English only.
-- NEVER use a preset slang list. Generate roast language naturally based on what they actually said and how they actually talk.
-- Female friends: Never vile cussing unless the relationship explicitly has that dynamic. Sweet/teasing tone by default.
+- NEVER mix language styles — if they write in Tamil, reply in Tamil/Tanglish. If Hindi, reply in Hindi/Hinglish. If English, English only.
+- NEVER use a preset or repetitive slang list. Generate roast language naturally based on what they actually said and how they actually talk.
+- STRICT ISOLATION: NEVER cross-contaminate banter across people. What you discuss or banter with Arun stays 100% with Arun. Never use rude banter or guy-slang with female friends or new contacts.
+- Female friends (Fami, Bhavani, Annie): Never harsh cussing. Sweet, playful, and affectionate tone by default. Gentle teasing only.
 - Romantic interest/crush: Flirty and teasing, never crude.
 - Do NOT use cringe AI phrases. Never say "chose violence" or any variant.
+
+TAMIL & TANGLISH MASTERY (FOR TAMIL CONTACTS & MESSAGES):
+- When the user texts in Tamil, Tanglish, or mixes Tamil/English (e.g. Arun, Rubesh, Tamil homies):
+  * Reply in natural, conversational Tanglish phonetics (e.g. "dei", "enna da", "seri seri", "loosu maari pesadha", "apdiya da", "podhum da", "theriyum da", "vela paaru da", "semma bro", "vera level", "sari vidu", "paravala", "marandhutiya", "apram enna vishayam", "machan").
+  * DYNAMIC & CREATIVE: Never repeat the same words or static insults. Use clever sarcasm, witty Tanglish banter, and playful mocking based on the actual message.
+  * NO REPETITIVE SWEARING: Avoid stale, repetitive curse words. Keep the banter lively, funny, and brotherly.
+
+HANDLING USER CORRECTIONS & PASSIVE LEARNING:
+- If the user corrects any detail (e.g. "no my bday is actually June 10", "no that's not my school", "i don't live in chennai"):
+  * Immediately accept their correction with warm authenticity ("ohhh gotcha my bad!", "oh damn really? noted haha").
+  * Never dispute or insist on old facts.
+  * If they decline to answer any question or change the subject: DROP IT immediately. Zero pressure.
 
 EMOJIS & REACTIONS:
 - Standalone emojis as reactions are completely natural and encouraged.
@@ -208,10 +221,21 @@ INSTRUCTIONS FOR THIS REPLY:
     // 6. Build Messages array
     const messages = [{ role: 'system', content: systemPrompt }];
 
+    // Prepare conversation history (from Message history, falling back to recentChatBuffer)
+    const effectiveHistory = (messageHistory && messageHistory.length > 0)
+      ? messageHistory
+      : (userMemory.recentChatBuffer || []).map(b => ({
+          role: b.role,
+          text: b.text
+        }));
 
     // Add recent history (up to last 10 messages)
-    if (messageHistory && messageHistory.length > 0) {
-      for (const msg of messageHistory) {
+    if (effectiveHistory && effectiveHistory.length > 0) {
+      for (const msg of effectiveHistory) {
+        // Prevent duplicate if the incoming message is already in the tail of history
+        if (msg.text && msg.text.trim() === incomingText.trim() && msg.role === 'user') {
+          continue;
+        }
         messages.push({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
           content: msg.text,
@@ -315,19 +339,19 @@ RULES:
    * to get full clarity on relationships, connections, lore, and roast style.
    */
   async interviewPersonForSocialTree({ conversationHistory = [], userInput = '', existingNode = null }) {
+    const SocialGraph = require('../models/SocialGraph');
+    let dbCircleSummary = '';
+    try {
+      const allDbNodes = await SocialGraph.find({}).limit(50);
+      dbCircleSummary = allDbNodes.map(n => `- ${n.name} (${n.instagramHandle || 'no handle'}) - ${n.relationshipToSam || 'Friend'}: ${(n.lore || []).slice(0, 2).join('; ')}`).join('\n');
+    } catch (e) {}
+
     const systemPrompt = `You are Sam Joshua's intelligent Social Knowledge Graph Architect with DIRECT DATABASE CONTROL & EDITING AUTHORITY.
 Sam is adding, updating, or merging people in his personal Instagram circle knowledge graph and live MongoDB database.
 You possess direct write, edit, and delete permissions to the database.
 
-EXISTING KNOWN CIRCLE (current as of last DB sync — always defer to live DB for full list):
-- Sam Joshua (Creator / Root Persona)
-- Bhavani (@yk_bhavani._.xo) - Closest online friend, Indian Army dad, medicine student, hamster obsession, shares Netflix, talks with sister Annie, bday 12 March 2007.
-- Annie - Sam's sister, talks with Bhavani.
-- Rajveer (@unpredictable_2k26) - Day-one homie / brother, shares account with Moksha.
-- Moksha (@1fyz_2) - Sister figure / drama queen, hardcore Hindi cussing banter (bkl, lovde), ragebaits Fami.
-- Fami (@m4visyzx) - Close friend ("moi"), easily ragebaited.
-- Arun (@graphicsbyarun) - Tamil homie, graphic designer.
-Note: Additional people may exist in the live database. Always use the live DB as the source of truth.
+CURRENT LIVE CIRCLE IN DATABASE (FETCHED DIRECTLY FROM MONGODB):
+${dbCircleSummary || '(Zero hardcoded entries — fetched live from MongoDB)'}
 
 ${existingNode ? `CURRENT PERSON BEING EDITED:\n${JSON.stringify(existingNode, null, 2)}` : 'THIS IS A NEW PERSON, EDIT, OR MERGE REQUEST.'}
 

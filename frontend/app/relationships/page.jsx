@@ -89,6 +89,14 @@ export default function RelationshipsPage() {
   const [newConnTarget, setNewConnTarget] = useState('');
   const [newConnRel, setNewConnRel] = useState('');
 
+  // Pagination state — table
+  const TABLE_PAGE_SIZE = 10;
+  const [tablePage, setTablePage] = useState(1);
+
+  // Pagination state — facts
+  const FACTS_PAGE_SIZE = 8;
+  const [factsPage, setFactsPage] = useState(1);
+
   // Raw Chat Extraction Modal State
   const [isRawChatModalOpen, setIsRawChatModalOpen] = useState(false);
   const [rawChatText, setRawChatText] = useState('');
@@ -135,13 +143,12 @@ export default function RelationshipsPage() {
         const mem = data.memory;
 
         // Auto-fill birthday if server learned it from DMs and field is still empty
-        if (mem.importantDates?.length > 0) {
-          const bday = mem.importantDates.find(d =>
-            d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
-          );
-          if (bday?.date) {
-            setFormData(prev => ({ ...prev, dob: prev.dob || bday.date }));
-          }
+        const bday = (mem.importantDates || []).find(d =>
+          d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
+        );
+        const autoDob = mem.dob || bday?.date || '';
+        if (autoDob) {
+          setFormData(prev => ({ ...prev, dob: prev.dob || autoDob }));
         }
 
         // Auto-update personal notes if server has richer summary
@@ -185,16 +192,15 @@ export default function RelationshipsPage() {
               const mem = learnData.memory;
 
               // Auto-fill DOB if not already set
-              if (mem.importantDates && mem.importantDates.length > 0) {
-                const bdayEntry = mem.importantDates.find(d =>
-                  d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
-                );
-                if (bdayEntry && bdayEntry.date) {
-                  setFormData(prev => ({
-                    ...prev,
-                    dob: prev.dob || bdayEntry.date
-                  }));
-                }
+              const bdayEntry = (mem.importantDates || []).find(d =>
+                d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
+              );
+              const autoDob = mem.dob || bdayEntry?.date || '';
+              if (autoDob) {
+                setFormData(prev => ({
+                  ...prev,
+                  dob: prev.dob || autoDob
+                }));
               }
 
               // Auto-fill personal notes from rolling summary if empty
@@ -333,6 +339,16 @@ export default function RelationshipsPage() {
       );
     });
   }, [nodes, activeCategory, searchQuery]);
+
+  // Reset table page when filter/search changes
+  useEffect(() => { setTablePage(1); }, [activeCategory, searchQuery]);
+  // Reset facts page when selected person changes
+  useEffect(() => { setFactsPage(1); }, [selectedPerson?.id]);
+
+  // Paginated slices
+  const totalTablePages = Math.max(1, Math.ceil(filteredPeople.length / TABLE_PAGE_SIZE));
+  const pagedPeople = filteredPeople.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE);
+
 
   // Autocomplete Suggestions for Friend Connections
   const friendSuggestions = useMemo(() => {
@@ -1528,63 +1544,38 @@ export default function RelationshipsPage() {
       </div>
 
       {/* ================= DASHBOARD METRICS SUMMARY ================= */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
-            <Users size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-              Total People
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '10px',
+        marginBottom: '20px'
+      }}>
+        {[
+          { icon: <Users size={16} />, label: 'Total People', value: dashboardStats.totalPeople },
+          { icon: <MessageSquare size={16} />, label: 'Total Chats', value: dashboardStats.totalDMs },
+          { icon: <Film size={16} />, label: 'Reels Shared', value: dashboardStats.totalReels },
+          { icon: <Bot size={16} />, label: 'AI Active', value: dashboardStats.activeAi },
+        ].map(({ icon, label, value }) => (
+          <div key={label} style={{
+            background: '#ffffff',
+            border: '1px solid #e4e4e7',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ background: '#f4f4f5', padding: '8px', borderRadius: '7px', color: '#09090b', flexShrink: 0 }}>
+              {icon}
             </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
-              {dashboardStats.totalPeople}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
-            <MessageSquare size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-              Total Chats / DMs
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
-              {dashboardStats.totalDMs}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
-            <Film size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-              Reels Shared
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
-              {dashboardStats.totalReels}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.68rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', whiteSpace: 'nowrap' }}>{label}</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#09090b', lineHeight: 1.2 }}>{value}</div>
             </div>
           </div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ background: '#f4f4f5', padding: '10px', borderRadius: '8px', color: '#09090b' }}>
-            <Bot size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-              AI Active Contacts
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginTop: '1px' }}>
-              {dashboardStats.activeAi}
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
+
 
       {/* Action Required Banner for missing Instagram IDs */}
       {unlinkedFriends.length > 0 && (
@@ -1752,14 +1743,15 @@ export default function RelationshipsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredPeople.length === 0 ? (
+              {pagedPeople.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
-                    No people found matching your filters.
+                    {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
                   </td>
                 </tr>
               ) : (
-                filteredPeople.map((person) => {
+                pagedPeople.map((person) => {
+
                   const hasHandle = Boolean(person.handle || person.instagramHandle);
                   const handleDisplay = person.handle || person.instagramHandle;
                   const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
@@ -1925,6 +1917,64 @@ export default function RelationshipsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Table Pagination */}
+        {totalTablePages > 1 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderTop: '1px solid #e4e4e7',
+            background: '#fafafa',
+            borderBottomLeftRadius: '10px',
+            borderBottomRightRadius: '10px'
+          }}>
+            <span style={{ fontSize: '0.78rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+              {filteredPeople.length} people &nbsp;·&nbsp; Page {tablePage} of {totalTablePages}
+            </span>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                onClick={() => setTablePage(p => Math.max(1, p - 1))}
+                disabled={tablePage === 1}
+                style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '5px 12px', fontSize: '0.78rem', fontWeight: '600', cursor: tablePage === 1 ? 'not-allowed' : 'pointer', opacity: tablePage === 1 ? 0.4 : 1 }}
+              >← Prev</button>
+              {Array.from({ length: totalTablePages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalTablePages || Math.abs(p - tablePage) <= 1)
+                .reduce((acc, p, i, arr) => {
+                  if (i > 0 && p - arr[i - 1] > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) => (
+                  p === '...' ? (
+                    <span key={`ellipsis-${i}`} style={{ fontSize: '0.78rem', color: '#71717a', padding: '0 4px' }}>…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setTablePage(p)}
+                      style={{
+                        background: tablePage === p ? '#09090b' : '#ffffff',
+                        color: tablePage === p ? '#ffffff' : '#09090b',
+                        border: '1px solid ' + (tablePage === p ? '#09090b' : '#e4e4e7'),
+                        borderRadius: '6px',
+                        padding: '5px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        minWidth: '32px'
+                      }}
+                    >{p}</button>
+                  )
+                ))}
+              <button
+                onClick={() => setTablePage(p => Math.min(totalTablePages, p + 1))}
+                disabled={tablePage === totalTablePages}
+                style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '5px 12px', fontSize: '0.78rem', fontWeight: '600', cursor: tablePage === totalTablePages ? 'not-allowed' : 'pointer', opacity: tablePage === totalTablePages ? 0.4 : 1 }}
+              >Next →</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

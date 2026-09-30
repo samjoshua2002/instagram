@@ -92,6 +92,8 @@ ${formattedChat}
 Return a valid JSON object with EXACTLY this structure:
 {
   "nickname": "Extracted nickname or what they prefer to be called (leave empty if none)",
+  "dob": "Exact birthday or birthdate if stated or referenced (e.g. 'May 18' or '18th May 2005' or '12 March') else empty string",
+  "schoolOrCollege": "School, college, academy, or workplace if mentioned else empty string",
   "gender": "one of: female, male, neutral, unknown (infer accurately from their name e.g. Mikasa/Priya is female, Alex/Sam/User is neutral/unknown unless stated, bio, pronouns, or how they speak)",
   "conversationStyle": "Short description of how they text: shortcuts they use (e.g. u, rn, fr, idk, wbu), lowercase or caps, energy level, emojis, slang",
   "relationshipType": "one of: stranger, fan, client, collaborator, friend",
@@ -131,6 +133,32 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       if (parsed.nickname && parsed.nickname.trim() !== '') {
         memory.nickname = parsed.nickname.trim();
       }
+
+      // Extract and record Birthday / DOB
+      const bdayItem = (parsed.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''));
+      const detectedDob = (parsed.dob && parsed.dob.trim()) || bdayItem?.date || '';
+      if (detectedDob) {
+        memory.dob = detectedDob;
+        // Also ensure it is present in importantDates
+        const hasBdayDate = (memory.importantDates || []).some(d => /birth|bday/i.test(d.title));
+        if (!hasBdayDate) {
+          memory.importantDates.push({
+            title: 'Birthday',
+            date: detectedDob,
+            details: 'Learned from DM conversation'
+          });
+        }
+      }
+
+      // Extract and record School / College
+      if (parsed.schoolOrCollege && parsed.schoolOrCollege.trim()) {
+        const sc = parsed.schoolOrCollege.trim();
+        const exists = (memory.facts || []).some(f => f.fact.toLowerCase().includes(sc.toLowerCase()));
+        if (!exists) {
+          memory.facts.push({ fact: `Studies/works at ${sc}` });
+        }
+      }
+
       if (parsed.gender && ['female', 'male', 'neutral', 'unknown'].includes(parsed.gender)) {
         memory.gender = parsed.gender;
       }
@@ -226,19 +254,28 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
 
       console.log(`🧠 [Deep Memory Updated] @${memory.username}: Dates=${memory.importantDates.length}, Favs=${memory.favoriteThings.length}, Events=${memory.lifeEvents.length}`);
 
-      // Auto-delete raw message text AFTER intel has been extracted and saved
-      // messageCount and reelsCount are integers on UserMemory — NOT on Message docs — so they're safe
+      // Auto-cleanup: keep recent 6 messages in Message collection for immediate active conversation continuity,
+      // and purge older raw messages so DB stays lean and private.
+      // (messageCount and reelsCount are integers on UserMemory — NOT on Message docs — so they're completely safe)
       try {
-        const cleaned = await Message.deleteMany({
+        const recentToKeep = await Message.find({
           $or: [{ senderId }, { recipientId: senderId }]
+        })
+        .sort({ createdAt: -1 })
+        .limit(6)
+        .select('_id');
+
+        const keepIds = recentToKeep.map(m => m._id);
+        const cleaned = await Message.deleteMany({
+          $or: [{ senderId }, { recipientId: senderId }],
+          _id: { $nin: keepIds }
         });
         if (cleaned.deletedCount > 0) {
-          console.log(`🧹 [Auto-Cleanup] Deleted ${cleaned.deletedCount} raw messages for ${senderId} — intel already saved to UserMemory.`);
+          console.log(`🧹 [Auto-Cleanup] Pruned ${cleaned.deletedCount} older messages for ${senderId}. Kept active ${keepIds.length} messages for immediate conversation flow.`);
         }
       } catch (cleanErr) {
         console.warn('⚠️ [MemoryService] Non-critical message cleanup error:', cleanErr.message);
       }
-
 
       // Dynamically sync updated memory into SocialGraph so People Menu cards update in real time!
       try {
@@ -247,14 +284,25 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
         const cleanU = (memory.username || '').replace(/^@/, '').toLowerCase().trim();
         const displayName = memory.name && !memory.name.startsWith('User_') ? memory.name.trim() : (memory.nickname || memory.username);
 
-        const node = await SocialGraph.findOne({
-          $or: [
-            { senderId: memory.senderId },
-            { instagramHandle: `@${cleanU}` },
-            { instagramHandle: cleanU },
-            { aliases: cleanU }
-          ]
-        });
+        const orConditions = [{ senderId: memory.senderId }];
+        if (cleanU && !cleanU.startsWith('user_')) {
+          orConditions.push({ instagramHandle: `@${cleanU}` });
+          orConditions.push({ instagramHandle: cleanU });
+          orConditions.push({ aliases: cleanU });
+          orConditions.push({ name: new RegExp(`^${cleanU.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        }
+        if (memory.name && !memory.name.startsWith('User_')) {
+          const n = memory.name.toLowerCase().trim();
+          orConditions.push({ aliases: n });
+          orConditions.push({ name: new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        }
+        if (memory.nickname) {
+          const nk = memory.nickname.toLowerCase().trim();
+          orConditions.push({ aliases: nk });
+          orConditions.push({ name: new RegExp(`^${nk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        }
+
+        const node = await SocialGraph.findOne({ $or: orConditions });
 
         const allFacts = [
           ...(memory.facts || []).map(f => f.fact),
@@ -263,18 +311,34 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
           ...(memory.lifeEvents || []).map(e => `${e.title}: ${e.details}`)
         ].filter(Boolean);
 
+        const activeDob = memory.dob || (memory.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''))?.date || '';
+
         if (node) {
           node.lore = Array.from(new Set([...(node.lore || []), ...allFacts]));
+          if (activeDob && (!node.dob || node.dob.trim() === '')) {
+            node.dob = activeDob;
+          }
+          if (memory.personalNotes) {
+            node.personalNotes = memory.personalNotes;
+          }
+          if (!node.senderId && memory.senderId) {
+            node.senderId = memory.senderId;
+          }
+          if (cleanU && !cleanU.startsWith('user_') && !node.instagramHandle) {
+            node.instagramHandle = `@${cleanU}`;
+          }
           if (memory.profilePic) node.profilePic = memory.profilePic;
           if (memory.gender && node.gender === 'unknown') node.gender = memory.gender;
           node.updatedAt = new Date();
           await node.save();
+          console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for ${node.name} (DOB: "${node.dob || ''}", Lore: ${node.lore.length})`);
         } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU)) {
           await SocialGraph.create({
             name: displayName,
-            aliases: [cleanU, (memory.name || '').toLowerCase()].filter(Boolean),
-            instagramHandle: `@${cleanU}`,
+            aliases: [cleanU, (memory.name || '').toLowerCase(), (memory.nickname || '').toLowerCase()].filter(Boolean),
+            instagramHandle: cleanU ? `@${cleanU}` : '',
             senderId: memory.senderId,
+            dob: activeDob,
             profilePic: memory.profilePic || '',
             gender: memory.gender || 'unknown',
             relationshipToSam: memory.relationshipType && memory.relationshipType !== 'stranger'
@@ -282,12 +346,13 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
               : 'Follower / Online Contact',
             connections: [],
             lore: allFacts.length > 0 ? allFacts : (memory.personalNotes ? [memory.personalNotes] : []),
+            personalNotes: memory.personalNotes || '',
             languages: ['English'],
             roastStyle: 'Casual & friendly'
           });
+          console.log(`✨ [SocialGraph Dynamic Sync]: Created new card for ${displayName} (DOB: "${activeDob}")`);
         }
         socialGraphService.clearCache();
-        console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for @${cleanU}`);
       } catch (sgSyncErr) {
         console.warn('⚠️ Dynamic SocialGraph sync note:', sgSyncErr.message);
       }
