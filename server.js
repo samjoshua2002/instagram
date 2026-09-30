@@ -880,13 +880,39 @@ app.post('/api/reels/send', async (req, res) => {
   }
 });
 
+// 1-Click Automatic Send: picks interest reel with AI and sends immediately to DM without manual typing
+app.post('/api/reels/send-auto/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const clean = decodeURIComponent(identifier).trim();
+    const rec = await reelSharingService.recommendReel(clean);
+    const result = await reelSharingService.sendReel(
+      rec.senderId,
+      rec.contactName,
+      rec.caption,
+      rec.reel.url
+    );
+    res.json({
+      success: true,
+      contactName: rec.contactName,
+      caption: rec.caption,
+      reel: rec.reel,
+      reasoning: rec.reasoning,
+      result
+    });
+  } catch (err) {
+    console.error('Error in /api/reels/send-auto:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Manually trigger or test interest reel auto-dispatch
 app.post('/api/reels/auto-dispatch', async (req, res) => {
   try {
-    await reelSharingService.autoShareReelsScan();
-    res.json({ success: true, message: 'Reel sharing scan executed' });
+    const scanResult = await reelSharingService.autoShareReelsScan();
+    res.json({ success: true, scanResult, message: scanResult?.message || 'Scan completed' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1622,7 +1648,7 @@ app.delete('/api/social-graph/node/:name', async (req, res) => {
 app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
   try {
     const { identifier } = req.params;
-    const { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts } = req.body;
+    const { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts, autoSendReels } = req.body;
 
     let finalAiEnabled = aiEnabled;
     let finalReplyMessages = replyToMessages;
@@ -1681,7 +1707,8 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
         $set: {
           ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
           ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
-          ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+          ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {}),
+          ...(typeof autoSendReels === 'boolean' ? { autoSendReels } : {})
         }
       }
     );
@@ -1692,7 +1719,8 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
       preferences: {
         aiEnabled: finalAiEnabled,
         replyToMessages: finalReplyMessages,
-        replyToReelsAndPosts: finalReplyReels
+        replyToReelsAndPosts: finalReplyReels,
+        autoSendReels
       }
     });
   } catch (err) {
