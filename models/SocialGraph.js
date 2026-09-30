@@ -65,16 +65,6 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: 'Banter back naturally matching their energy.',
   },
-  reelInterests: [{
-    type: String,
-  }],
-  lastReelSentAt: {
-    type: Date,
-  },
-  autoSendReels: {
-    type: Boolean,
-    default: true,
-  },
   updatedAt: {
     type: Date,
     default: Date.now,
