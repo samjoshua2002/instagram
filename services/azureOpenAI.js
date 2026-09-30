@@ -52,7 +52,42 @@ class AzureOpenAIService {
       .map(s => `User: "${s.userMessage}"\n${config.creatorName}: "${s.myReply}"`)
       .join('\n\n');
 
+    // 4b. Knowledge Gap Calculator — scores profile completeness & finds highest-priority unknown field
+    const knowledgeGaps = [];
+    const hasName = !!(userMemory.name && !userMemory.name.startsWith('User_'));
+    const hasDob = !!(userMemory.importantDates || []).some(d => d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday'));
+    const hasGender = userMemory.gender && userMemory.gender !== 'unknown';
+    const hasNickname = !!userMemory.nickname;
+    const hasFacts = (userMemory.facts || []).length >= 3;
+    const hasNotes = !!(userMemory.personalNotes && userMemory.personalNotes.length > 30);
+    const hasFavorites = (userMemory.favoriteThings || []).length >= 1;
+    const hasRelationship = userMemory.relationshipType && userMemory.relationshipType !== 'stranger';
+    const hasLifeEvent = (userMemory.lifeEvents || []).length >= 1;
+    const hasConversationStyle = !!(userMemory.conversationStyle && userMemory.conversationStyle !== 'Casual');
+
+    // Priority order: most useful facts first
+    if (!hasName) knowledgeGaps.push({ field: 'real name', hint: "naturally ask what their real name is or what to call them" });
+    if (!hasDob) knowledgeGaps.push({ field: 'birthday', hint: "casually ask when their birthday is — only if conversation flows naturally to it" });
+    if (!hasGender) knowledgeGaps.push({ field: 'gender', hint: "infer from how they write — do NOT ask directly" });
+    if (!hasLifeEvent) knowledgeGaps.push({ field: 'current life situation', hint: "ask what they're up to lately, what they study or work on" });
+    if (!hasFavorites) knowledgeGaps.push({ field: 'favorite shows/music/games', hint: "ask what they've been watching or listening to lately" });
+    if (!hasFacts) knowledgeGaps.push({ field: 'personal facts', hint: "ask a natural question about their hobbies, city, or interests" });
+    if (!hasRelationship) knowledgeGaps.push({ field: 'relationship context', hint: "how do you know each other — follower, college friend, mutual?" });
+    if (!hasNickname && hasName) knowledgeGaps.push({ field: 'preferred nickname', hint: "check if they prefer a shorter name or nickname" });
+
+    const knowledgeScore = Math.round(
+      ((hasName ? 15 : 0) + (hasDob ? 10 : 0) + (hasGender ? 5 : 0) + (hasNickname ? 5 : 0) +
+       (hasFacts ? 15 : 0) + (hasNotes ? 15 : 0) + (hasFavorites ? 10 : 0) +
+       (hasRelationship ? 10 : 0) + (hasLifeEvent ? 10 : 0) + (hasConversationStyle ? 5 : 0))
+    );
+
+    const topGap = knowledgeGaps[0]; // highest priority unknown
+    const knowledgeGapDirective = topGap
+      ? `KNOWLEDGE SCORE: ${knowledgeScore}/100. Biggest unknown: "${topGap.field}". Action: ${topGap.hint}. Only ask if conversation naturally allows it — NEVER ask more than one question per reply and NEVER ask back-to-back.`
+      : `KNOWLEDGE SCORE: ${knowledgeScore}/100. Profile is well-filled. Focus on natural conversation rather than gathering intel.`;
+
     // 5. Construct System Prompt
+
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}). 
 You are texting directly on your phone in Instagram Direct Messages (DMs).
 
@@ -67,7 +102,7 @@ TEXTING STYLE RULES:
 - KEEP IT CONCISE: 1–2 short lines max. Quick, natural, immediate DM replies.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths — sometimes 1 word, sometimes an emoji alone, sometimes a one-liner. Keep it unpredictable.
 - TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they've told you before naturally like a close friend would.
-- INTEL GATHERING: Gently gather intel naturally in conversation (nickname, exam dates, hobbies, mutual friends) without sounding like a survey.
+- INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}
 ${socialTreeContext}
 
 REEL & SHARED MEDIA REACTIONS:
