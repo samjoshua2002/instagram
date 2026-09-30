@@ -120,6 +120,53 @@ export default function RelationshipsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id, selectedPerson?.name]);
 
+  // Live-refresh: poll server for updated profile every 15s while inner page is open
+  // This auto-fills birthday, facts, notes from live DM learning without manual refresh
+  useEffect(() => {
+    if (!selectedPerson?.senderId) return;
+    let cancelled = false;
+
+    const pollMemory = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/memory`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!data.memory || cancelled) return;
+        const mem = data.memory;
+
+        // Auto-fill birthday if server learned it from DMs and field is still empty
+        if (mem.importantDates?.length > 0) {
+          const bday = mem.importantDates.find(d =>
+            d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
+          );
+          if (bday?.date) {
+            setFormData(prev => ({ ...prev, dob: prev.dob || bday.date }));
+          }
+        }
+
+        // Auto-update personal notes if server has richer summary
+        if (mem.personalNotes) {
+          setFormData(prev => ({
+            ...prev,
+            personalNotes: (!prev.personalNotes || prev.personalNotes.length < mem.personalNotes.length)
+              ? mem.personalNotes
+              : prev.personalNotes
+          }));
+        }
+
+        // Auto-add facts from memory learning
+        if (mem.facts?.length > 0 && selectedPerson) {
+          mem.facts.forEach(f => addFact(selectedPerson.id, f.fact || f));
+        }
+      } catch (e) { /* silent */ }
+    };
+
+    const interval = setInterval(pollMemory, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [selectedPerson?.senderId, selectedPerson?.id, addFact]);
+
+
+
   // Auto-fetch & live sync intel from DMs when a person is opened
   useEffect(() => {
     if (!selectedPerson) return;
