@@ -52,10 +52,33 @@ class AzureOpenAIService {
       .map(s => `User: "${s.userMessage}"\n${config.creatorName}: "${s.myReply}"`)
       .join('\n\n');
 
-    // 4b. Knowledge Gap Calculator — scores profile completeness & finds highest-priority unknown field
-    const knowledgeGaps = [];
+    // 4b. Knowledge Gap System — context-aware, never robotic or pushy
+    const msgCount = userMemory.messageCount || 0;
+    const recentHistory = (messageHistory || []).slice(-6); // last 6 messages
+
+    // Check if a gap question was asked in the last 4 messages (avoid repetition)
+    const recentText = recentHistory.map(m => (m.text || '').toLowerCase()).join(' ');
+    const alreadyAskedRecently =
+      recentText.includes('when') ||
+      recentText.includes('what do you') ||
+      recentText.includes('what are you') ||
+      recentText.includes('where do you') ||
+      recentText.includes('how old') ||
+      recentText.includes('bday') ||
+      recentText.includes('birthday') ||
+      recentText.includes('btw u') ||
+      recentText.includes('btw what') ||
+      recentText.includes('btw when');
+
+    // Check if their last message was short/deflecting (≤ 4 words → they dodged the question)
+    const lastUserMsg = recentHistory.filter(m => m.role !== 'assistant').slice(-1)[0];
+    const lastMsgWords = (lastUserMsg?.text || '').trim().split(/\s+/).length;
+    const theyDeflected = lastMsgWords <= 4 && alreadyAskedRecently;
+
+    // Knowledge gaps by priority
     const hasName = !!(userMemory.name && !userMemory.name.startsWith('User_'));
-    const hasDob = !!(userMemory.importantDates || []).some(d => d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday'));
+    const hasDob = !!(userMemory.importantDates || []).some(d =>
+      d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday'));
     const hasGender = userMemory.gender && userMemory.gender !== 'unknown';
     const hasNickname = !!userMemory.nickname;
     const hasFacts = (userMemory.facts || []).length >= 3;
@@ -65,28 +88,47 @@ class AzureOpenAIService {
     const hasLifeEvent = (userMemory.lifeEvents || []).length >= 1;
     const hasConversationStyle = !!(userMemory.conversationStyle && userMemory.conversationStyle !== 'Casual');
 
-    // Priority order: most useful facts first
-    if (!hasName) knowledgeGaps.push({ field: 'real name', hint: "naturally ask what their real name is or what to call them" });
-    if (!hasDob) knowledgeGaps.push({ field: 'birthday', hint: "casually ask when their birthday is — only if conversation flows naturally to it" });
-    if (!hasGender) knowledgeGaps.push({ field: 'gender', hint: "infer from how they write — do NOT ask directly" });
-    if (!hasLifeEvent) knowledgeGaps.push({ field: 'current life situation', hint: "ask what they're up to lately, what they study or work on" });
-    if (!hasFavorites) knowledgeGaps.push({ field: 'favorite shows/music/games', hint: "ask what they've been watching or listening to lately" });
-    if (!hasFacts) knowledgeGaps.push({ field: 'personal facts', hint: "ask a natural question about their hobbies, city, or interests" });
-    if (!hasRelationship) knowledgeGaps.push({ field: 'relationship context', hint: "how do you know each other — follower, college friend, mutual?" });
-    if (!hasNickname && hasName) knowledgeGaps.push({ field: 'preferred nickname', hint: "check if they prefer a shorter name or nickname" });
-
     const knowledgeScore = Math.round(
-      ((hasName ? 15 : 0) + (hasDob ? 10 : 0) + (hasGender ? 5 : 0) + (hasNickname ? 5 : 0) +
-       (hasFacts ? 15 : 0) + (hasNotes ? 15 : 0) + (hasFavorites ? 10 : 0) +
-       (hasRelationship ? 10 : 0) + (hasLifeEvent ? 10 : 0) + (hasConversationStyle ? 5 : 0))
+      (hasName ? 15 : 0) + (hasDob ? 10 : 0) + (hasGender ? 5 : 0) + (hasNickname ? 5 : 0) +
+      (hasFacts ? 15 : 0) + (hasNotes ? 15 : 0) + (hasFavorites ? 10 : 0) +
+      (hasRelationship ? 10 : 0) + (hasLifeEvent ? 10 : 0) + (hasConversationStyle ? 5 : 0)
     );
 
-    const topGap = knowledgeGaps[0]; // highest priority unknown
-    const knowledgeGapDirective = topGap
-      ? `KNOWLEDGE SCORE: ${knowledgeScore}/100. Biggest unknown: "${topGap.field}". Action: ${topGap.hint}. Only ask if conversation naturally allows it — NEVER ask more than one question per reply and NEVER ask back-to-back.`
-      : `KNOWLEDGE SCORE: ${knowledgeScore}/100. Profile is well-filled. Focus on natural conversation rather than gathering intel.`;
+    // Determine what gap to fill next — only the single highest priority
+    const gapCandidates = [];
+    if (!hasName)         gapCandidates.push("their real name");
+    if (!hasLifeEvent)    gapCandidates.push("what they're currently up to / studying / working on");
+    if (!hasFavorites)    gapCandidates.push("something they've been watching, listening to, or into lately");
+    if (!hasFacts)        gapCandidates.push("their hobbies, city, or day-to-day life");
+    if (!hasDob)          gapCandidates.push("their birthday (only if it naturally comes up — never force it)");
+    if (!hasRelationship) gapCandidates.push("how you know each other or what brought them here");
+    const topGap = gapCandidates[0] || null;
 
-    // 5. Construct System Prompt
+    // Decide the actual directive based on context
+    let knowledgeGapDirective;
+
+    if (msgCount < 5) {
+      // Brand new contact: just be warm and friendly. Zero questions. Let them lead.
+      knowledgeGapDirective = `This is a new contact (only ${msgCount} messages exchanged). PRIORITY: Be warm, genuine, and friendly. DO NOT ask any questions yet. Just vibe and respond naturally to what they say. Learn passively from what they share.`;
+
+    } else if (theyDeflected) {
+      // They gave a very short answer to our question — back off completely
+      knowledgeGapDirective = `They gave a very short response (possible deflection). DO NOT ask any follow-up question this reply. Just reply naturally and keep the vibe going.`;
+
+    } else if (alreadyAskedRecently) {
+      // We already asked something recently — don't stack questions
+      knowledgeGapDirective = `You already asked a question recently. DO NOT ask another one this reply. Just respond to what they said naturally.`;
+
+    } else if (topGap && msgCount >= 5 && msgCount % 5 === 0) {
+      // Allow ONE casual intel question every ~5 exchanges, only if conversation is flowing
+      knowledgeGapDirective = `Profile score: ${knowledgeScore}/100. If and ONLY IF the conversation has a natural pause or they asked you something back, you may casually drop in a question about: "${topGap}". Make it sound completely natural — like a friend asking mid-conversation, NOT like a form. If the conversation is mid-topic, skip the question entirely this reply.`;
+
+    } else {
+      // Normal reply — learn passively from what they say, no active questioning
+      knowledgeGapDirective = `Profile score: ${knowledgeScore}/100. Just have a natural conversation. Passively pick up on any info they share (facts, dates, favorites, life updates) — the memory system will capture it automatically. Do NOT ask any questions this reply.`;
+    }
+
+
 
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}). 
 You are texting directly on your phone in Instagram Direct Messages (DMs).
