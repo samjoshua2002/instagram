@@ -322,43 +322,51 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   // Re-activate conversation: update lastInteraction and clear lastReminderSentAt
   userMemory.lastInteraction = msgTime;
-  userMemory.lastReminderSentAt = null; // Sending a message re-activates reminder eligibility for future idle moments
+  userMemory.lastReminderSentAt = null;
   userMemory.messageCount = (userMemory.messageCount || 0) + 1;
   await userMemory.save();
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ALWAYS LEARN — regardless of AI being paused, enabled, or globally off.
+  // Memory extraction runs in background on EVERY incoming DM.
+  // This ensures the profile auto-fills even when you manually manage chats.
+  // ─────────────────────────────────────────────────────────────────────────
+  memoryService.updateMemoryAsync(senderId).catch(err => {
+    console.error('Background memory update failed (non-critical):', err.message);
+  });
+
   // 4. Check if Bot is enabled globally or paused
   if (!config.globalBotActive || config.chatMode === 'paused') {
-    console.log(`⏸️ Global Bot is paused (mode: ${config.chatMode || 'paused'}). Message saved to inbox, skipping auto-reply.`);
+    console.log(`⏸️ Global Bot is paused. Message learned, skipping auto-reply.`);
     return;
   }
 
-  // Check chat routing mode: 'everyone', 'everyone_except', 'only_selected'
+  // Check chat routing mode
   if (config.chatMode === 'everyone_except') {
     if ((config.excludedContactIds || []).includes(senderId) || userMemory.aiEnabled === false) {
-      console.log(`⏸️ User ${userMemory.username} (${senderId}) is in the EXCLUDE list. Skipping auto-reply.`);
+      console.log(`⏸️ ${userMemory.username} is excluded. Message learned, skipping auto-reply.`);
       return;
     }
   } else if (config.chatMode === 'only_selected') {
     if (!(config.includedContactIds || []).includes(senderId)) {
-      console.log(`⏸️ User ${userMemory.username} (${senderId}) is NOT in the selected whitelist. Skipping auto-reply.`);
+      console.log(`⏸️ ${userMemory.username} not in whitelist. Message learned, skipping auto-reply.`);
       return;
     }
   }
 
   // Check if AI is enabled for this specific user
   if (!userMemory.aiEnabled) {
-    console.log(`⏸️ AI is paused for user ${userMemory.username} (${senderId}). Skipping auto-reply.`);
+    console.log(`⏸️ AI paused for ${userMemory.username}. Message learned, skipping auto-reply.`);
     return;
   }
 
-  // Check per-person custom reply toggles:
+  // Check per-person reply toggles
   if (isReelOrShare && userMemory.replyToReelsAndPosts === false) {
-    console.log(`⏸️ Reel & Post auto-reply disabled for user @${userMemory.username} (${senderId}). Skipping reply.`);
+    console.log(`⏸️ Reel/Post reply disabled for @${userMemory.username}. Skipping.`);
     return;
   }
-
   if (!isReelOrShare && userMemory.replyToMessages === false) {
-    console.log(`⏸️ Text message auto-reply disabled for user @${userMemory.username} (${senderId}). Skipping reply.`);
+    console.log(`⏸️ Message reply disabled for @${userMemory.username}. Skipping.`);
     return;
   }
 
@@ -495,10 +503,11 @@ async function dispatchDebouncedReply(queueEntry) {
   // Turn off typing
   await instagramService.sendSenderAction(senderId, 'typing_off');
 
-  // Update memory, extracted facts, and summary in background
-  memoryService.updateMemoryAsync(senderId).catch(err => {
-    console.error('Failed to update memory in background:', err.message);
-  });
+  // Memory update already triggered earlier (ALWAYS-LEARN block) — no duplicate needed here.
+  // But re-trigger if the reply itself contained new info (e.g. we asked a curiosity question)
+  setTimeout(() => {
+    memoryService.updateMemoryAsync(senderId).catch(() => {});
+  }, 3000); // slight delay so the outgoing message is saved first
 }
 
 /**
@@ -716,7 +725,20 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
 });
 
 
+// Get live UserMemory for a person (used by frontend 15s auto-refresh poll)
+app.get('/api/conversations/:senderId/memory', async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    const memory = await UserMemory.findOne({ senderId });
+    if (!memory) return res.status(404).json({ error: 'Memory not found' });
+    res.json({ memory });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Add custom fact/memory
+
 app.post('/api/conversations/:senderId/fact', async (req, res) => {
   try {
     const { senderId } = req.params;
