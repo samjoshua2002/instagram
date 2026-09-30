@@ -697,13 +697,24 @@ app.put('/api/conversations/:senderId/memory', async (req, res) => {
 app.post('/api/conversations/:senderId/learn', async (req, res) => {
   try {
     const { senderId } = req.params;
+
+    // 1. Run memory extraction from current messages
     await memoryService.updateMemoryAsync(senderId);
+
+    // 2. After learning, delete raw message TEXT from DB for this user
+    //    but do NOT touch messageCount / reelsCount (those are on UserMemory, not Message docs)
+    const deleted = await Message.deleteMany({
+      $or: [{ senderId }, { recipientId: senderId }]
+    });
+    console.log(`🧹 [Post-Learn Cleanup] Deleted ${deleted.deletedCount} raw messages for ${senderId} — intel preserved in UserMemory.`);
+
     const updatedMemory = await UserMemory.findOne({ senderId });
-    res.json({ success: true, memory: updatedMemory });
+    res.json({ success: true, memory: updatedMemory, deletedMessages: deleted.deletedCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Add custom fact/memory
 app.post('/api/conversations/:senderId/fact', async (req, res) => {
