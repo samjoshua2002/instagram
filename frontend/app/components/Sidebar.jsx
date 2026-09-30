@@ -38,17 +38,18 @@ export default function Sidebar() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
           <button
             onClick={() => startAiInterview(null)}
-            style={{ background: '#09090b', color: '#ffffff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{ background: '#09090b', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
           >
-            <Sparkles size={12} />
+            <Sparkles size={13} />
             <span>+ Add</span>
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}
+            style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            aria-label="Toggle navigation menu"
           >
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
