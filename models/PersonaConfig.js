@@ -89,17 +89,6 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     type: Number,
     default: 5,
   },
-  autoShareReelsEnabled: {
-    type: Boolean,
-    default: true,
-  },
-  autoShareReelsFrequencyHours: {
-    type: Number,
-    default: 24,
-  },
-  autoShareReelsTopics: [{
-    type: String,
-  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);

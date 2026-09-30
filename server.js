@@ -17,7 +17,6 @@ const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
-const reelSharingService = require('./services/reelSharingService');
 const SocialGraph = require('./models/SocialGraph');
 
 const app = express();
@@ -850,69 +849,6 @@ app.put('/api/persona', async (req, res) => {
     res.json({ success: true, config });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-// =========================================================================
-// INTEREST-BASED REEL SHARING ENDPOINTS
-// =========================================================================
-
-// Get interest-tailored reel recommendation and preview for a contact
-app.get('/api/reels/recommend/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    const clean = decodeURIComponent(identifier).trim();
-    const recommendation = await reelSharingService.recommendReel(clean);
-    res.json({ success: true, recommendation });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Send interest-tailored reel to a contact's Instagram DM
-app.post('/api/reels/send', async (req, res) => {
-  try {
-    const { recipientId, contactName, messageText, reelUrl } = req.body;
-    const result = await reelSharingService.sendReel(recipientId, contactName, messageText, reelUrl);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 1-Click Automatic Send: picks interest reel with AI and sends immediately to DM without manual typing
-app.post('/api/reels/send-auto/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    const clean = decodeURIComponent(identifier).trim();
-    const rec = await reelSharingService.recommendReel(clean);
-    const result = await reelSharingService.sendReel(
-      rec.senderId,
-      rec.contactName,
-      rec.caption,
-      rec.reel.url
-    );
-    res.json({
-      success: true,
-      contactName: rec.contactName,
-      caption: rec.caption,
-      reel: rec.reel,
-      reasoning: rec.reasoning,
-      result
-    });
-  } catch (err) {
-    console.error('Error in /api/reels/send-auto:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Manually trigger or test interest reel auto-dispatch
-app.post('/api/reels/auto-dispatch', async (req, res) => {
-  try {
-    const scanResult = await reelSharingService.autoShareReelsScan();
-    res.json({ success: true, scanResult, message: scanResult?.message || 'Scan completed' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1800,9 +1736,4 @@ app.listen(PORT, '0.0.0.0', () => {
 
   // Start automatic 3-day old chat cleanup scheduler to conserve DB storage
   memoryService.startDailyCleanup(3);
-
-  // Start automatic interest-based reel sharing scheduler (checks every 30 mins)
-  setInterval(() => {
-    reelSharingService.autoShareReelsScan().catch(e => console.warn('Reel sharing scan note:', e.message));
-  }, 30 * 60 * 1000);
 });
