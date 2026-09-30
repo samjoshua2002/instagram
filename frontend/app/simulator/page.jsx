@@ -31,8 +31,8 @@ export default function SimulatorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          testSenderId: targetFriend.senderId || 'test_sim_id',
-          testUsername: targetFriend.name,
+          testSenderId: targetFriend?.senderId || 'test_sim_id',
+          testUsername: targetFriend?.name || 'Friend',
           messageText: userText
         })
       });
@@ -122,7 +122,7 @@ export default function SimulatorPage() {
         <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid #27272a', display: 'flex', gap: '10px', background: '#0e0e11' }}>
           <input
             type="text"
-            placeholder={`Type a DM as ${targetFriend.name}...`}
+            placeholder={`Type a DM as ${targetFriend?.name || 'Friend'}...`}
             value={inputMsg}
             onChange={(e) => setInputMsg(e.target.value)}
             style={{ flex: 1, background: '#000000', border: '1px solid #27272a', borderRadius: '8px', color: '#ffffff', padding: '12px 16px', fontSize: '0.85rem', outline: 'none' }}
