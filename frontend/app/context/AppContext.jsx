@@ -4,196 +4,21 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
-const STORAGE_NODES_KEY = 'chatter_social_nodes_v7';
-const STORAGE_CONFIG_KEY = 'chatter_persona_config_v7';
-const STORAGE_DELETED_KEY = 'chatter_deleted_names_v1';
+const STORAGE_NODES_KEY = 'chatter_social_nodes_v8';
+const STORAGE_CONFIG_KEY = 'chatter_persona_config_v8';
+const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 
-export const DEFAULT_GRAPH_DATA = [
-  {
-    id: 'sam',
-    name: 'Sam Joshua',
-    handle: '@catovidz',
-    sub: 'Creator / Core Node',
-    isRoot: true,
-    relationship: 'Root Persona',
-    children: ['bhavani', 'annie', 'rajveer', 'moksha', 'fami', 'arun']
-  },
-  {
-    id: 'bhavani',
-    name: 'Bhavani',
-    handle: '@yk_bhavani._.xo',
-    senderId: '29005624469042002',
-    relationship: 'Closest Online Friend / Medicine Student',
-    category: 'online_friend',
-    dob: 'March 12, 2007',
-    gender: 'female',
-    personalNotes: `Bhanvani is one of my closest online friends. Her dad is in the Indian Army, and she is currently studying medicine. We used to send each other reels every day, and she has always been very supportive of me.
+export const ROOT_NODE = {
+  id: 'sam',
+  name: 'Sam Joshua',
+  handle: '@catovidz',
+  sub: 'Creator / Core Node',
+  isRoot: true,
+  relationship: 'Root Persona',
+  children: []
+};
 
-Even though we have never met in person, we have become really close over time. We even share a Netflix subscription, and she recently added one of her new friends to our plan as well.
-
-She is genuinely kind, caring, and supportive, but she also loves teasing me and always finds a way to joke around with me. She is currently talking with my sister, Annie, too.
-
-Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a playful personality and enjoys teasing the people she is close to. Overall, she is a very sweet, supportive, caring, and fun-loving online friend who has become a really important person in my life.`,
-    rollingSummary: 'Bhavani is a very close online friend studying medicine whose dad is in the Army. She shares a Netflix plan with Sam, loves hamsters and reading, and talks with Sam\'s sister Annie. She loves teasing Sam playfully.',
-    conversationStyle: "Uses casual shortcuts like 'u', 'rn', 'fr'; texts in lowercase; playfully teasing; energetic with hamster/book vibes.",
-    importantDates: [{ title: 'Birthday', date: 'March 12, 2007', details: 'Born 12th March 2007' }],
-    facts: [
-      'Her dad is in the Indian Army.',
-      'She is currently studying medicine.',
-      'Shares a Netflix subscription with Sam (she recently added her friend to it).',
-      'Currently talking with Sam\'s sister Annie.',
-      'Birthday is on 12th March 2007.',
-      'Obsessed with hamsters 🐹 and reading books.'
-    ],
-    lore: [
-      'Dad is in the Indian Army, studying medicine.',
-      'Shares a Netflix subscription with Sam.',
-      'Talking with Sam\'s sister Annie.',
-      'Hamster obsession 🐹 & loves books.',
-      'Birthday: 12th March 2007.'
-    ],
-    connections: [
-      { targetName: 'Annie', rel: 'Talking with sister' }
-    ],
-    roastStyle: 'Gentle playful teasing, no hard insults. Tease about hamster drama or Netflix watchlist.',
-    idleHours: 6,
-    reminderEligible: true
-  },
-  {
-    id: 'annie',
-    name: 'Annie',
-    handle: '@annies_hepsiba',
-    senderId: '2173928080193783',
-    relationship: 'Sister',
-    category: 'family',
-    dob: '',
-    gender: 'female',
-    personalNotes: 'Sam\'s sister. Currently talking and close with Bhavani.',
-    rollingSummary: 'Sam\'s sister.',
-    facts: ['Sam\'s sister', 'Currently talking with Bhavani', 'Instagram: @annies_hepsiba'],
-    lore: ['Sam\'s sister', 'Currently talking with Bhavani', 'Instagram: @annies_hepsiba'],
-    connections: [{ targetName: 'Bhavani', rel: 'Talking / close with Bhavani' }],
-    roastStyle: 'Sisterly teasing and banter.',
-    idleHours: 2,
-    reminderEligible: false
-  },
-  {
-    id: 'rajveer',
-    name: 'Rajveer',
-    handle: '@unpredictable_2k26',
-    senderId: '877566845441453',
-    relationship: 'Day-One Homie / Brother',
-    category: 'homie',
-    gender: 'male',
-    personalNotes: 'Day-one homie. Drama king who trolls Roni uncle about his fake legal team. Texts in Hinglish/Hindi.',
-    rollingSummary: 'Rajveer is Sam\'s day-one homie. They constantly banter about Roni uncle and inside jokes.',
-    conversationStyle: 'Hinglish slang: bhai, bro, lmao, dramebaaz, uppercase drama.',
-    facts: [
-      'Drama king of the group',
-      'Constantly trolls Roni uncle (fake bank account, legal team)',
-      'Threatens to nuke chat'
-    ],
-    lore: [
-      'Drama king of the group',
-      'Constantly trolls Roni uncle (fake bank account, legal team)',
-      'Threatens to nuke chat'
-    ],
-    connections: [
-      { targetName: 'Roni', rel: 'Favorite trolling victim' },
-      { targetName: 'Moksha', rel: 'Close friend / account sharing' },
-      { targetName: 'Fami', rel: 'Plots ragebaits against her' }
-    ],
-    roastStyle: 'Savage Hindi/Hinglish bro banter: "abe chal na lode", "bsdk chup baith".',
-    idleHours: 7,
-    reminderEligible: true
-  },
-  {
-    id: 'moksha',
-    name: 'Moksha',
-    handle: '@1fyz_2',
-    senderId: '1337018008317393',
-    relationship: 'Sister Figure / Drama Queen',
-    category: 'close_friend',
-    gender: 'female',
-    personalNotes: 'Close friend & sister figure. High-voltage drama queen. Hardcore Hindi cussing when angry or teasing.',
-    rollingSummary: 'Close drama queen friend. Banters in Hindi cussing. Shares account with Rajveer.',
-    conversationStyle: 'Rapid-fire Hindi cussing: abey lovde, bkl, mkc, samm, laughing emojis.',
-    facts: [
-      'High-voltage drama queen',
-      'Hardcore Hindi cussing banter (abey lovde, bkl, mkc)',
-      'Rajveer texts from her account'
-    ],
-    lore: [
-      'High-voltage drama queen',
-      'Hardcore Hindi cussing banter (abey lovde, bkl, mkc)',
-      'Rajveer texts from her account'
-    ],
-    connections: [
-      { targetName: 'Rajveer', rel: 'Account sharer & close buddy' },
-      { targetName: 'Fami', rel: 'Plots ragebaits against her' }
-    ],
-    roastStyle: 'Match her Hindi cussing directly: "chup kar chudail", "apni gaand mat phula dramebaaz", "bkl chill kar".',
-    idleHours: 8,
-    reminderEligible: true
-  },
-  {
-    id: 'fami',
-    name: 'Fami',
-    handle: '@m4visyzx',
-    senderId: '2144547476275057',
-    relationship: 'Very Close Friend ("moi")',
-    category: 'close_friend',
-    gender: 'female',
-    personalNotes: 'Goes by Fami (@m4visyzx / moi). High emotional connection. Very easily ragebaited by Rajveer & Moksha.',
-    rollingSummary: 'Very close friend of Sam known as "moi".',
-    conversationStyle: 'Cute concise texts: "Oyy", "Please reply", "Byy". Sensitive and sweet.',
-    facts: [
-      'Goes by Fami (Instagram: @m4visyzx, display name "moi")',
-      'Easily ragebaited by Rajveer & Moksha',
-      'Sends cute texts: "Oyy", "Please reply", "Byy"',
-      'Never call her bro/da - speak sweetly'
-    ],
-    lore: [
-      'Goes by Fami (Instagram: @m4visyzx, display name "moi")',
-      'Easily ragebaited by Rajveer & Moksha',
-      'Sends cute texts: "Oyy", "Please reply", "Byy"',
-      'Never call her bro/da - speak sweetly'
-    ],
-    connections: [
-      { targetName: 'Rajveer', rel: 'Gets easily ragebaited' },
-      { targetName: 'Moksha', rel: 'Target of inside jokes' }
-    ],
-    roastStyle: 'Cute playful banter, tease when she gets confused or ragebaited.',
-    idleHours: 5.5,
-    reminderEligible: true
-  },
-  {
-    id: 'arun',
-    name: 'Arun',
-    handle: '@graphicsbyarun',
-    senderId: '1144338295203170',
-    relationship: 'Close Tamil Homie / Designer',
-    category: 'homie',
-    gender: 'male',
-    personalNotes: 'Graphic designer homie. Texts in Tamil & Tanglish. Shipped as a couple with Rubesh as inside joke.',
-    rollingSummary: 'Tamil friend who banters with gay lord jokes.',
-    conversationStyle: 'Tamil/Tanglish: dei, enna da, loosu maari pesadha, semma, laughing tears.',
-    facts: [
-      'Texts in Tamil & Tanglish (dei, summa irunga, enna da, semma)',
-      'Graphic designer friend / homie',
-      'Shipped with Rubesh as inside joke'
-    ],
-    lore: [
-      'Texts in Tamil & Tanglish (dei, summa irunga, enna da, semma)',
-      'Graphic designer friend / homie',
-      'Shipped with Rubesh as inside joke'
-    ],
-    connections: [{ targetName: 'Rubesh', rel: 'Inside joke gay lover ship' }],
-    roastStyle: 'Dynamic witty Tamil/Tanglish bro banter: "dei enna da over ah panra", "loosu maari pesadha", "poi vela paaru da", "seri seri podhum", "semma comic da". Never repeat canned insults.',
-    idleHours: 9,
-    reminderEligible: true
-  }
-];
+export const DEFAULT_GRAPH_DATA = [ROOT_NODE];
 
 export function deduplicateNodes(nodesList) {
   if (!Array.isArray(nodesList) || nodesList.length === 0) return DEFAULT_GRAPH_DATA;
@@ -343,107 +168,62 @@ export function AppProvider({ children }) {
 
   const syncBackend = async () => {
     try {
-      // 1. Sync social graph — only update live stats (counts, profilePic)
-      //    Never overwrite locally-edited names/fields and never re-add deleted people
+      // 1. Sync social graph directly from live MongoDB database
       const res = await fetch(`${API_BASE}/api/social-graph`);
       const data = await res.json();
       if (data.success && Array.isArray(data.nodes) && data.nodes.length > 0) {
-        const deletedNames = deletedNamesRef.current;
         const pendingSaved = pendingSavedNamesRef.current;
 
+        const serverContacts = data.nodes.map(sn => {
+          const snName = sn.name || '';
+          const snId = snName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+          return {
+            id: snId,
+            _id: sn._id,
+            name: snName,
+            handle: sn.instagramHandle || '',
+            senderId: sn.senderId || '',
+            profilePic: sn.profilePic || '',
+            aiEnabled: sn.aiEnabled !== false,
+            replyToMessages: sn.replyToMessages !== false,
+            replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
+            chatsCount: sn.chatsCount || 0,
+            reelsCount: sn.reelsCount || 0,
+            messageCount: sn.chatsCount || 0,
+            relationship: sn.relationshipToSam || 'Friend',
+            category: sn.category || 'online_friend',
+            dob: sn.dob || '',
+            gender: sn.gender || 'unknown',
+            personalNotes: sn.personalNotes || (sn.lore || []).join('\n'),
+            rollingSummary: sn.relationshipToSam || 'Friend in circle',
+            conversationStyle: 'Casual banter',
+            importantDates: sn.importantDates || [],
+            facts: sn.facts || (sn.lore || []),
+            lore: sn.lore || [],
+            connections: (sn.connections || []).map(c => ({
+              targetName: c.targetName || c.name || '',
+              rel: c.relationship || c.rel || 'connected'
+            })),
+            roastStyle: sn.roastStyle || '',
+            idleHours: 6,
+            reminderEligible: false
+          };
+        });
+
         setNodes(prev => {
-          // Build a map of current local nodes by name (lowercase) for fast lookup
-          const localMap = new Map();
-          prev.forEach(n => {
-            if (n.name) localMap.set(n.name.toLowerCase(), n);
+          const root = prev.find(n => n.isRoot) || ROOT_NODE;
+          root.children = serverContacts.map(n => n.id);
+
+          // If a contact was saved in the last 6s locally, overlay recent edits
+          const mergedContacts = serverContacts.map(sn => {
+            const local = prev.find(p => !p.isRoot && p.name.toLowerCase() === sn.name.toLowerCase());
+            if (local && pendingSaved.has(sn.name.toLowerCase())) {
+              return { ...sn, ...local };
+            }
+            return sn;
           });
 
-          // Set of names that exist on the server (for detecting truly new server contacts)
-          const serverNameSet = new Set(data.nodes.map(n => (n.name || '').toLowerCase()));
-
-          // Update existing local nodes with live stats from server (chatsCount, reelsCount, profilePic only)
-          const updatedNodes = prev.map(n => {
-            if (n.isRoot) return n;
-            const serverNode = data.nodes.find(sn =>
-              (sn.instagramHandle && n.handle && sn.instagramHandle.replace(/^@/,'').toLowerCase() === n.handle.replace(/^@/,'').toLowerCase()) ||
-              (sn.senderId && n.senderId && sn.senderId === n.senderId) ||
-              (sn.name && n.name && sn.name.toLowerCase() === n.name.toLowerCase())
-            );
-            if (!serverNode) return n;
-            // Only update stats & profilePic — never overwrite locally edited fields
-            return {
-              ...n,
-              profilePic: serverNode.profilePic || n.profilePic || '',
-              chatsCount: typeof serverNode.chatsCount === 'number' ? serverNode.chatsCount : n.chatsCount,
-              reelsCount: typeof serverNode.reelsCount === 'number' ? serverNode.reelsCount : n.reelsCount,
-              messageCount: typeof serverNode.chatsCount === 'number' ? serverNode.chatsCount : n.messageCount,
-              // Only update AI prefs if not pending a local save
-              ...(pendingSaved.has(n.name.toLowerCase()) ? {} : {
-                aiEnabled: serverNode.aiEnabled !== false,
-                replyToMessages: serverNode.replyToMessages !== false,
-                replyToReelsAndPosts: serverNode.replyToReelsAndPosts !== false
-              })
-            };
-          });
-
-          // Add truly new server contacts (not in local state, not deleted, not duplicate senderId/handle)
-          data.nodes.forEach(sn => {
-            const snNameLower = (sn.name || '').toLowerCase();
-            if (!snNameLower) return;
-            if (deletedNames.has(snNameLower)) return; // skip deleted
-            if (localMap.has(snNameLower)) return; // already exists locally
-            // Skip if senderId or handle already exists in updatedNodes
-            if (sn.senderId && updatedNodes.some(u => u.senderId && u.senderId === sn.senderId)) return;
-            const snHandle = (sn.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
-            if (snHandle && updatedNodes.some(u => (u.handle || '').replace(/^@/, '').toLowerCase().trim() === snHandle)) return;
-            // New person from server — add them
-            const defaultMatch = DEFAULT_GRAPH_DATA.find(d => d.name.toLowerCase() === snNameLower);
-            updatedNodes.push({
-              id: snNameLower.replace(/[^a-z0-9]/g, '_'),
-              name: sn.name,
-              handle: sn.instagramHandle || defaultMatch?.handle || '',
-              senderId: sn.senderId || defaultMatch?.senderId || '',
-              profilePic: sn.profilePic || '',
-              aiEnabled: sn.aiEnabled !== false,
-              replyToMessages: sn.replyToMessages !== false,
-              replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
-              chatsCount: sn.chatsCount || 0,
-              reelsCount: sn.reelsCount || 0,
-              messageCount: sn.chatsCount || 0,
-              relationship: sn.relationshipToSam || defaultMatch?.relationship || 'Friend',
-              category: sn.category || defaultMatch?.category || 'online_friend',
-              dob: sn.dob || defaultMatch?.dob || '',
-              gender: sn.gender || defaultMatch?.gender || 'unknown',
-              personalNotes: sn.personalNotes || defaultMatch?.personalNotes || (sn.lore || []).join('\n'),
-              rollingSummary: defaultMatch?.rollingSummary || sn.relationshipToSam,
-              conversationStyle: defaultMatch?.conversationStyle || 'Casual banter',
-              importantDates: defaultMatch?.importantDates || [],
-              facts: defaultMatch?.facts || (sn.lore || []),
-              lore: sn.lore || defaultMatch?.lore || [],
-              connections: (sn.connections || []).map(c => ({ targetName: c.targetName, rel: c.relationship || c.rel || 'connected' })),
-              roastStyle: sn.roastStyle || defaultMatch?.roastStyle || '',
-              idleHours: defaultMatch?.idleHours || 6,
-              reminderEligible: defaultMatch?.reminderEligible || false
-            });
-          });
-
-          // If MongoDB has records, use live DB records exclusively (no hardcoded injection)
-          if (!data?.nodes || data.nodes.length === 0) {
-            DEFAULT_GRAPH_DATA.forEach(dn => {
-              if (dn.isRoot) return;
-              const dnLower = dn.name.toLowerCase();
-              if (deletedNames.has(dnLower)) return;
-              const dnHandle = (dn.handle || '').replace(/^@/, '').toLowerCase().trim();
-              if (updatedNodes.some(n => !n.isRoot && (
-                n.name.toLowerCase() === dnLower ||
-                (n.senderId && dn.senderId && n.senderId === dn.senderId) ||
-                (dnHandle && (n.handle || '').replace(/^@/, '').toLowerCase().trim() === dnHandle)
-              ))) return;
-              updatedNodes.push(dn);
-            });
-          }
-
-          const deduplicated = deduplicateNodes(updatedNodes);
+          const deduplicated = deduplicateNodes([root, ...mergedContacts]);
           try { localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated)); } catch(e) {}
           return deduplicated;
         });
