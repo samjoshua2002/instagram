@@ -177,17 +177,19 @@ Bhanvani absolutely loves hamsters and is obsessed with reading books. She has a
     gender: 'male',
     personalNotes: 'Graphic designer homie. Texts in Tamil & Tanglish. Shipped as a couple with Rubesh as inside joke.',
     rollingSummary: 'Tamil friend who banters with gay lord jokes.',
-    conversationStyle: 'Tamil/Tanglish: dei, summa irunga, gay lord, laughing tears.',
+    conversationStyle: 'Tamil/Tanglish: dei, enna da, loosu maari pesadha, semma, laughing tears.',
     facts: [
-      'Texts in Tamil & Tanglish (dei, summa irunga, gay lord)',
+      'Texts in Tamil & Tanglish (dei, summa irunga, enna da, semma)',
+      'Graphic designer friend / homie',
       'Shipped with Rubesh as inside joke'
     ],
     lore: [
-      'Texts in Tamil & Tanglish (dei, summa irunga, gay lord)',
+      'Texts in Tamil & Tanglish (dei, summa irunga, enna da, semma)',
+      'Graphic designer friend / homie',
       'Shipped with Rubesh as inside joke'
     ],
     connections: [{ targetName: 'Rubesh', rel: 'Inside joke gay lover ship' }],
-    roastStyle: 'Tamil roast: "dei mooditu poda gomma", "otha summa iru da", "ne tha da periya gay lord".',
+    roastStyle: 'Dynamic witty Tamil/Tanglish bro banter: "dei enna da over ah panra", "loosu maari pesadha", "poi vela paaru da", "seri seri podhum", "semma comic da". Never repeat canned insults.',
     idleHours: 9,
     reminderEligible: true
   }
@@ -419,14 +421,16 @@ export function AppProvider({ children }) {
             });
           });
 
-          // Also ensure DEFAULT_GRAPH_DATA people appear if not deleted and not already present
-          DEFAULT_GRAPH_DATA.forEach(dn => {
-            if (dn.isRoot) return;
-            const dnLower = dn.name.toLowerCase();
-            if (deletedNames.has(dnLower)) return; // skip deleted
-            if (updatedNodes.some(n => !n.isRoot && n.name.toLowerCase() === dnLower)) return; // already present
-            updatedNodes.push(dn);
-          });
+          // If MongoDB has records, use live DB records exclusively (no hardcoded injection)
+          if (!serverNodes || serverNodes.length === 0) {
+            DEFAULT_GRAPH_DATA.forEach(dn => {
+              if (dn.isRoot) return;
+              const dnLower = dn.name.toLowerCase();
+              if (deletedNames.has(dnLower)) return;
+              if (updatedNodes.some(n => !n.isRoot && n.name.toLowerCase() === dnLower)) return;
+              updatedNodes.push(dn);
+            });
+          }
 
           const deduplicated = deduplicateNodes(updatedNodes);
           try { localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated)); } catch(e) {}
