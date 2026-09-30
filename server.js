@@ -324,6 +324,12 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   userMemory.lastInteraction = msgTime;
   userMemory.lastReminderSentAt = null;
   userMemory.messageCount = (userMemory.messageCount || 0) + 1;
+  userMemory.recentChatBuffer = (userMemory.recentChatBuffer || []).slice(-9);
+  userMemory.recentChatBuffer.push({
+    role: 'user',
+    text: messageText,
+    timestamp: msgTime,
+  });
   await userMemory.save();
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -438,16 +444,25 @@ async function dispatchDebouncedReply(queueEntry) {
   await new Promise(resolve => setTimeout(resolve, delayMs));
 
   // Fetch recent conversation history
-  const history = await Message.find({
+  let history = await Message.find({
     $or: [
-      { senderId, recipientId },
-      { senderId: recipientId, recipientId: senderId }
+      { senderId },
+      { recipientId: senderId }
     ]
   })
   .sort({ createdAt: -1 })
   .limit(10);
 
   history.reverse();
+
+  // If DB history is sparse or pruned, fallback to UserMemory.recentChatBuffer!
+  if ((!history || history.length === 0) && userMemory.recentChatBuffer && userMemory.recentChatBuffer.length > 0) {
+    history = userMemory.recentChatBuffer.map(m => ({
+      role: m.role,
+      text: m.text,
+      timestamp: m.timestamp
+    }));
+  }
 
   // Generate response mimicking Sam Joshua
   console.log(`🤖 Generating Sam's response via Azure OpenAI...`);
@@ -499,6 +514,20 @@ async function dispatchDebouncedReply(queueEntry) {
     sentByAI: true,
     timestamp: new Date(),
   });
+
+  // Also append outgoing assistant reply to UserMemory recentChatBuffer
+  try {
+    const memToUpdate = await UserMemory.findOne({ senderId });
+    if (memToUpdate) {
+      memToUpdate.recentChatBuffer = (memToUpdate.recentChatBuffer || []).slice(-9);
+      memToUpdate.recentChatBuffer.push({
+        role: 'assistant',
+        text: replyText || (stickerType ? `[Sent ${stickerType} sticker]` : ''),
+        timestamp: new Date()
+      });
+      await memToUpdate.save();
+    }
+  } catch (bufErr) {}
 
   // Turn off typing
   await instagramService.sendSenderAction(senderId, 'typing_off');

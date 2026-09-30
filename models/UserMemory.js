@@ -55,6 +55,19 @@ const UserMemorySchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  dob: {
+    type: String,
+    default: '',
+  },
+  roastStyle: {
+    type: String,
+    default: '',
+  },
+  recentChatBuffer: [{
+    role: { type: String, enum: ['user', 'assistant'] },
+    text: { type: String },
+    timestamp: { type: Date, default: Date.now },
+  }],
   facts: [{
     fact: { type: String, required: true },
     addedAt: { type: Date, default: Date.now },

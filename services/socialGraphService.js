@@ -7,174 +7,59 @@ class SocialGraphService {
   }
 
   /**
-   * Seed / update default social graph nodes for Sam's circle
+   * Initializes and syncs social graph network directly from live MongoDB database (zero hardcoding)
    */
   async seedInitialGraph() {
     try {
-      const defaultNodes = [
-        {
-          name: 'Rajveer',
-          aliases: ['rajveer', 'gs', 'unpredictable_2k26', 'rajveerr', 'rajveerrrrrrrrrrrrr'],
-          instagramHandle: '@unpredictable_2k26',
-          senderId: '877566845441453',
-          gender: 'male',
-          relationshipToSam: 'Day-one Homie / Brother',
-          connections: [
-            { targetName: 'Roni', relationship: 'close buddy / favorite running joke target', notes: 'Constantly trolls Roni uncle about his bank account, legal team, and Toji soul.' },
-            { targetName: 'Moksha', relationship: 'close friend / banter partner', notes: 'Very close with Moksha; sometimes texts from her Instagram account saying "This is Rajveer".' },
-            { targetName: 'Fami', relationship: 'friend in circle', notes: 'Plots to ragebait Fami with inside jokes.' }
-          ],
-          lore: [
-            'Calls himself drama king; talks in Hinglish and Hindi ("bhai", "bro", "lmao").',
-            'Running gag about Roni uncle: fake bank account, court cases, axe of justice, Nami simping.',
-            'Threatens to nuke chats or cry dramatically. When he roasts or insults, roast him back hard like guy friends do.'
-          ],
-          languages: ['Hindi', 'Hinglish', 'English'],
-          roastStyle: 'Savage Hindi/Hinglish bro banter: "abe chal na lode", "aukaat mein reh bsdk", "dramebaaz chup baith", "teri itni himmat lodu".',
-        },
-        {
-          name: 'Roni',
-          aliases: ['roni', 'roni uncle', 'roni_uncle', 'roniuncle'],
-          instagramHandle: '',
-          senderId: '',
-          gender: 'male',
-          relationshipToSam: 'Close friend / Group running joke legend',
-          connections: [
-            { targetName: 'Rajveer', relationship: 'close buddy', notes: 'Rajveer and Sam constantly clown Roni.' }
-          ],
-          lore: [
-            'Legendary running gag friend of the circle (referred to as "roni uncle").',
-            'Jokes: Roni bank account, legal team on speed dial, Area 51 research, alien biryani 2024, Toji cursed energy fusion, "axe of justice", simping over Nami and Robin.',
-            'Whenever Rajveer or anyone brings up Roni, immediately lean into this lore with playful banter! We know exactly who Roni is!'
-          ],
-          languages: ['Hinglish', 'English'],
-          roastStyle: 'Clown his anime protagonist delusions, legal team, and axe of justice jokes.',
-        },
-        {
-          name: 'Moksha',
-          aliases: ['moksha', '1fyz_2', 'fyz', 'mokshaaa'],
-          instagramHandle: '@1fyz_2',
-          senderId: '1337018008317393',
-          gender: 'female',
-          relationshipToSam: 'Close friend / Sister figure / Drama queen',
-          connections: [
-            { targetName: 'Rajveer', relationship: 'close friend / account sharer', notes: 'Very close with Rajveer; Rajveer sometimes texts from her account.' },
-            { targetName: 'Fami', relationship: 'friend', notes: 'Enjoys ragebaiting Fami together.' }
-          ],
-          lore: [
-            'High-voltage drama queen. Uses hardcore Hindi cuss words when angry or teasing ("abey lovde", "teri gaaand faad dungi", "bkl", "mkc", "samm").',
-            'NEVER be a polite assistant with her. When she cusses, cuss and roast her right back in Hindi: "chup kar chudail", "apni gaand mat phula dramebaaz", "bkl chill kar", "teri aukaat nahi hai", "abe lodu chup baith".'
-          ],
-          languages: ['Hindi', 'Hinglish', 'English'],
-          roastStyle: 'Savage Hindi sister/drama queen roast: "chup kar chudail", "abe lodu chup baith", "bkl drama factory", "apni gaand mat phula dramebaaz".',
-        },
-        {
-          name: 'Fami',
-          aliases: ['fami', 'fami_', 'famine', 'mavis', 'm4visyzx', 'moi', 'mavisyzx', 'ო𝗈ꪱᜒ'],
-          instagramHandle: '@m4visyzx',
-          senderId: '2144547476275057',
-          gender: 'female',
-          relationshipToSam: 'Very close friend ("moi" / Fami)',
-          connections: [
-            { targetName: 'Rajveer', relationship: 'friend / teasing target', notes: 'Gets easily ragebaited by Rajveer; Rajveer and Moksha love plotting against her.' },
-            { targetName: 'Moksha', relationship: 'friend / circle', notes: 'Moksha and Rajveer plot to ragebait Fami with inside jokes.' }
-          ],
-          lore: [
-            'Goes by Fami (Instagram: @m4visyzx, display name "moi" / "ო𝗈ꪱᜒ").',
-            'Very close friend of Sam with high emotional connection (often texts "Oyy", "Please reply", "Byy").',
-            'Friend in the circle who gets super easily ragebaited by Rajveer and Moksha ("fami will get so ragebaited").',
-            'Also jokingly referenced with the Chainsaw Man Famine Devil character.',
-            'Strictly NEVER call her "da", "bro", or "man". Be warm, sweet, playful, and responsive to her cute "oyy / please reply" energy.'
-          ],
-          languages: ['English'],
-          roastStyle: 'Cute playful banter, tease her when she gets ragebaited or confused.',
-        },
-        {
-          name: 'Arun',
-          aliases: ['arun', 'graphicsbyarun'],
-          instagramHandle: '@graphicsbyarun',
-          senderId: '1144338295203170',
-          gender: 'male',
-          relationshipToSam: 'Close Tamil homie / Graphic designer bro',
-          connections: [
-            { targetName: 'Rubesh', relationship: 'homie / inside joke couple', notes: 'Sam and friends jokingly call Arun and Rubesh gay lovers.' }
-          ],
-          lore: [
-            'Texts in Tamil and Tanglish ("dei", "summa irunga", "gay Lord", "one moon one sun you only gay").',
-            'When he roasts or calls Sam gay, abuse him back in Tamil: "dei mooditu poda gomma", "otha summa iru da", "ne tha da periya gay lord", "poi vela paaru da baadu", "vantaan periya ivan maari".'
-          ],
-          languages: ['Tamil', 'Tanglish', 'English'],
-          roastStyle: 'Tamil roast: "dei poi vela paaru da", "ne tha da gay lord", "otha mooditu po gomma", "vantaan periya ivan maari".',
-        },
-        {
-          name: 'Rubesh',
-          aliases: ['rubesh', 'rupesh'],
-          instagramHandle: '',
-          senderId: '',
-          gender: 'male',
-          relationshipToSam: 'Friend in the group',
-          connections: [
-            { targetName: 'Arun', relationship: 'homie / inside joke couple', notes: 'Shipped as a couple with Arun as a running joke.' }
-          ],
-          lore: [
-            'Running joke partner with Arun ("U and Rubesh gay lovers breakup ha").'
-          ],
-          languages: ['Tamil', 'English'],
-          roastStyle: 'Bring up the Arun ship joke.',
-        },
-        {
-          name: 'Bhavani',
-          aliases: ['bhavani', 'bhanvani', 'yk_bhavani._.xo', 'bhavani🐹', 'yk_bhavani'],
-          instagramHandle: '@yk_bhavani._.xo',
-          senderId: '29005624469042002',
-          gender: 'female',
-          relationshipToSam: 'Closest online friend / Medicine student',
-          connections: [
-            { targetName: 'Annie', relationship: 'talking with Sam\'s sister Annie', notes: 'Currently talking with Sam\'s sister Annie.' }
-          ],
-          lore: [
-            'Bhanvani / Bhavani is one of Sam\'s closest online friends.',
-            'Her dad is in the Indian Army, and she is studying medicine.',
-            'Shares a Netflix subscription with Sam (she recently added one of her new friends to their plan).',
-            'Currently talking with Sam\'s sister Annie.',
-            'Loves hamsters (hamster obsession 🐹) and is obsessed with reading books.',
-            'Birthday is on 12th March 2007.',
-            'Loves teasing Sam and joking around with playful personality.',
-            'Strictly NEVER call her bro, da, or man. Speak warmly, tease back gently.'
-          ],
-          languages: ['English', 'Tamil'],
-          roastStyle: 'Playful and gentle teasing, no hard insults. Tease her about her hamster obsession or Netflix password sharing.',
-        },
-        {
-          name: 'Annie',
-          aliases: ['annie', 'ann', 'sister', 'annies_hepsiba', 'annies hepsiba', 'annies'],
-          instagramHandle: '@annies_hepsiba',
-          senderId: '2173928080193783',
-          gender: 'female',
-          relationshipToSam: 'Sister',
-          connections: [
-            { targetName: 'Bhavani', relationship: 'talking / friends with Bhavani', notes: 'Bhavani is currently talking with Annie.' }
-          ],
-          lore: [
-            'Sam\'s sister (Instagram: @annies_hepsiba).',
-            'Currently talking with Bhavani.'
-          ],
-          languages: ['English', 'Tamil'],
-          roastStyle: 'Sisterly teasing.',
-        }
-      ];
+      await this.sanitizeExistingNodes();
 
-      for (const node of defaultNodes) {
-        await SocialGraph.findOneAndUpdate(
-          { name: node.name },
-          { $set: node },
-          { upsert: true, returnDocument: 'after' }
-        );
-      }
+      // Read purely from live MongoDB database
+      const allNodes = await SocialGraph.find({});
       this.clearCache();
-      console.log('✅ [SocialGraph] Seeded & synced default friend network tree chain.');
+      for (const n of allNodes) {
+        this.cache.set(n.name.toLowerCase(), n);
+        if (n.senderId) this.cache.set(n.senderId, n);
+        for (const a of n.aliases || []) {
+          this.cache.set(a.toLowerCase(), n);
+        }
+      }
+      this.lastCacheTime = Date.now();
+      console.log(`✅ [SocialGraph] Connected live to MongoDB: loaded ${allNodes.length} contacts dynamically from DB (zero hardcoded).`);
     } catch (err) {
-      console.error('❌ [SocialGraph] Error seeding graph:', err.message);
+      console.error('❌ [SocialGraph] Error loading graph from MongoDB:', err.message);
+  }
+
+  /**
+   * Sanitizes existing database records to remove any old, repetitive abusive curse phrases
+   */
+  async sanitizeExistingNodes() {
+    try {
+      const allNodes = await SocialGraph.find({});
+      for (const node of allNodes) {
+        let changed = false;
+        if (node.roastStyle && /gomma|otha|baadu|lode|bsdk|lodu/i.test(node.roastStyle)) {
+          if (node.name.toLowerCase() === 'arun') {
+            node.roastStyle = 'Dynamic witty Tamil/Tanglish bro banter: "dei enna da over ah panra", "loosu maari pesadha", "poi vela paaru da", "seri seri podhum", "semma comic da". Never repeat canned insults.';
+            changed = true;
+          }
+        }
+        if (Array.isArray(node.lore)) {
+          const cleanLore = node.lore.map(l => {
+            if (/gomma|otha|baadu/i.test(l)) {
+              changed = true;
+              return 'Texts in Tamil and Tanglish (dei, summa irunga, enna da, semma). Banter playfully without static bad words.';
+            }
+            return l;
+          });
+          if (changed) node.lore = cleanLore;
+        }
+        if (changed) {
+          await node.save();
+          console.log(`🧼 [Sanitized Node]: Cleaned outdated roast words for ${node.name}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Node sanitization note:', err.message);
     }
   }
 
