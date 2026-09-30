@@ -1168,11 +1168,33 @@ app.post('/api/social-graph/node', async (req, res) => {
       }
     }
 
+    const cleanName = name.trim();
+    const cleanOldName = (req.body.oldName || req.body.previousName || '').trim();
+
+    // Determine query to find existing document to update
+    let findQuery = { name: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') };
+    if (cleanOldName && cleanOldName.toLowerCase() !== cleanName.toLowerCase()) {
+      findQuery = {
+        $or: [
+          { name: new RegExp(`^${escapeRegex(cleanOldName)}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') },
+          ...(finalSenderId ? [{ senderId: finalSenderId }] : [])
+        ]
+      };
+    } else if (finalSenderId) {
+      findQuery = {
+        $or: [
+          { name: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') },
+          { senderId: finalSenderId }
+        ]
+      };
+    }
+
     const updated = await SocialGraph.findOneAndUpdate(
-      { name: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') },
+      findQuery,
       {
         $set: {
-          name: name.trim(),
+          name: cleanName,
           aliases: parsedAliases,
           instagramHandle: finalHandle,
           senderId: finalSenderId || '',
@@ -1191,13 +1213,38 @@ app.post('/api/social-graph/node', async (req, res) => {
       { upsert: true, returnDocument: 'after' }
     );
 
+    // If this node was renamed, clean up any old name documents in SocialGraph
+    if (cleanOldName && cleanOldName.toLowerCase() !== cleanName.toLowerCase()) {
+      await SocialGraph.deleteMany({
+        name: new RegExp(`^${escapeRegex(cleanOldName)}$`, 'i'),
+        _id: { $ne: updated._id }
+      });
+      // Also update any connection in other friend nodes that referenced the old name
+      await SocialGraph.updateMany(
+        { 'connections.targetName': new RegExp(`^${escapeRegex(cleanOldName)}$`, 'i') },
+        { $set: { 'connections.$[elem].targetName': cleanName } },
+        { arrayFilters: [{ 'elem.targetName': new RegExp(`^${escapeRegex(cleanOldName)}$`, 'i') }] }
+      );
+    }
+
+    // Clean up any other duplicate names specified
+    const dupsToDelete = Array.isArray(req.body.duplicateNamesToDelete) ? req.body.duplicateNamesToDelete : [];
+    for (const dup of dupsToDelete) {
+      if (dup && typeof dup === 'string' && dup.trim().toLowerCase() !== cleanName.toLowerCase()) {
+        await SocialGraph.deleteMany({
+          name: new RegExp(`^${escapeRegex(dup.trim())}$`, 'i'),
+          _id: { $ne: updated._id }
+        });
+      }
+    }
+
     if (finalSenderId) {
       await UserMemory.findOneAndUpdate(
         { senderId: finalSenderId },
         {
           $set: {
-            name: name.trim(),
-            nickname: name.trim(),
+            name: cleanName,
+            nickname: cleanName,
             ...(finalDob ? { importantDates: [{ title: 'Birthday', date: finalDob }] } : {})
           }
         }
@@ -1299,9 +1346,12 @@ app.delete('/api/social-graph/node/:identifier', async (req, res) => {
       { $pull: { connections: { targetName: new RegExp(`^${escapeRegex(targetName)}$`, 'i') } } }
     );
 
-    // 4. Delete corresponding UserMemory if exists
-    if (targetSenderId) {
-      await UserMemory.deleteMany({ senderId: targetSenderId });
+    // 4. Delete corresponding UserMemory if exists (safeguard: do not delete if another node still uses this senderId)
+    if (targetSenderId && req.query.keepMemory !== 'true') {
+      const remainingNode = await SocialGraph.findOne({ senderId: targetSenderId });
+      if (!remainingNode) {
+        await UserMemory.deleteMany({ senderId: targetSenderId });
+      }
     }
 
     socialGraphService.clearCache();

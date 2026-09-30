@@ -411,11 +411,15 @@ export default function RelationshipsPage() {
       return;
     }
 
+    const newName = formData.name.trim();
+    const oldName = (selectedPerson?.name || '').trim();
+    const isRenamed = oldName && oldName.toLowerCase() !== newName.toLowerCase();
     const cleanHandle = formData.handle.trim() ? (formData.handle.startsWith('@') ? formData.handle.trim() : `@${formData.handle.trim()}`) : '';
 
     const updated = {
       ...selectedPerson,
-      name: formData.name.trim(),
+      name: newName,
+      oldName: isRenamed ? oldName : undefined,
       handle: cleanHandle,
       instagramHandle: cleanHandle,
       senderId: formData.senderId.trim() || selectedPerson.senderId || '',
@@ -430,7 +434,7 @@ export default function RelationshipsPage() {
       roastStyle: formData.roastStyle.trim()
     };
 
-    await saveNode(updated);
+    await saveNode(updated, isRenamed ? [oldName] : []);
     setSelectedPerson(updated);
     showToast(`Saved details for ${updated.name}`);
   };

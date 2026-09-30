@@ -221,9 +221,6 @@ export function deduplicateNodes(nodesList) {
       // 3. Exact name match
       const mName = (m.name || '').toLowerCase().trim();
       if (cleanNameLower && mName && cleanNameLower === mName) return true;
-      // 4. Special canonical aliases (Roni, Annie)
-      if (cleanNameLower.includes('roni') && mName.includes('roni')) return true;
-      if (cleanNameLower.includes('annie') && mName.includes('annie')) return true;
       return false;
     });
 
@@ -231,6 +228,11 @@ export function deduplicateNodes(nodesList) {
       merged.push({ ...node });
     } else {
       const existing = merged[existingIndex];
+      // Keep the updated/more specific name
+      if (node.name && node.name.trim() && node.name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+        existing.name = node.name.trim();
+        existing.id = existing.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
       // Merge best non-empty attributes
       if (!existing.handle && node.handle) existing.handle = node.handle;
       if (!existing.senderId && node.senderId) existing.senderId = node.senderId;
@@ -384,12 +386,16 @@ export function AppProvider({ children }) {
             };
           });
 
-          // Add truly new server contacts (not in local state, not deleted)
+          // Add truly new server contacts (not in local state, not deleted, not duplicate senderId/handle)
           data.nodes.forEach(sn => {
             const snNameLower = (sn.name || '').toLowerCase();
             if (!snNameLower) return;
             if (deletedNames.has(snNameLower)) return; // skip deleted
             if (localMap.has(snNameLower)) return; // already exists locally
+            // Skip if senderId or handle already exists in updatedNodes
+            if (sn.senderId && updatedNodes.some(u => u.senderId && u.senderId === sn.senderId)) return;
+            const snHandle = (sn.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
+            if (snHandle && updatedNodes.some(u => (u.handle || '').replace(/^@/, '').toLowerCase().trim() === snHandle)) return;
             // New person from server — add them
             const defaultMatch = DEFAULT_GRAPH_DATA.find(d => d.name.toLowerCase() === snNameLower);
             updatedNodes.push({
@@ -427,7 +433,12 @@ export function AppProvider({ children }) {
               if (dn.isRoot) return;
               const dnLower = dn.name.toLowerCase();
               if (deletedNames.has(dnLower)) return;
-              if (updatedNodes.some(n => !n.isRoot && n.name.toLowerCase() === dnLower)) return;
+              const dnHandle = (dn.handle || '').replace(/^@/, '').toLowerCase().trim();
+              if (updatedNodes.some(n => !n.isRoot && (
+                n.name.toLowerCase() === dnLower ||
+                (n.senderId && dn.senderId && n.senderId === dn.senderId) ||
+                (dnHandle && (n.handle || '').replace(/^@/, '').toLowerCase().trim() === dnHandle)
+              ))) return;
               updatedNodes.push(dn);
             });
           }
@@ -465,13 +476,38 @@ export function AppProvider({ children }) {
     if (!accumulatedNode?.name) return;
 
     const cleanName = accumulatedNode.name.trim();
+    let oldName = (accumulatedNode.oldName || '').trim();
+
+    // Auto-detect oldName if renaming an existing node
+    if (!oldName) {
+      const match = nodes.find(n =>
+        !n.isRoot && (
+          (accumulatedNode.senderId && n.senderId && n.senderId === accumulatedNode.senderId) ||
+          (accumulatedNode.id && n.id === accumulatedNode.id) ||
+          (accumulatedNode.handle && n.handle && n.handle.replace(/^@/, '').toLowerCase() === (accumulatedNode.handle || accumulatedNode.instagramHandle || '').replace(/^@/, '').toLowerCase())
+        )
+      );
+      if (match && match.name.toLowerCase() !== cleanName.toLowerCase()) {
+        oldName = match.name.trim();
+      }
+    }
+
     const id = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const toDelete = Array.isArray(duplicateNamesToDelete) ? duplicateNamesToDelete : (accumulatedNode.duplicateNamesToDelete || []);
+    const toDelete = Array.isArray(duplicateNamesToDelete) ? [...duplicateNamesToDelete] : [...(accumulatedNode.duplicateNamesToDelete || [])];
+    if (oldName && oldName.toLowerCase() !== cleanName.toLowerCase() && !toDelete.some(d => d.toLowerCase() === oldName.toLowerCase())) {
+      toDelete.push(oldName);
+    }
 
     // Mark as pending save so syncBackend won't overwrite during the save round-trip
     pendingSavedNamesRef.current.add(cleanName.toLowerCase());
-    // If this is a rename, make sure old name is NOT in deletedNames (it was never deleted)
-    // and remove the pending flag 6 seconds after save (enough time for server to update)
+    if (oldName) {
+      deletedNamesRef.current.add(oldName.toLowerCase());
+      persistDeletedNames(deletedNamesRef.current);
+    }
+    // Make sure new cleanName is NOT marked as deleted
+    deletedNamesRef.current.delete(cleanName.toLowerCase());
+    persistDeletedNames(deletedNamesRef.current);
+
     setTimeout(() => {
       pendingSavedNamesRef.current.delete(cleanName.toLowerCase());
     }, 6000);
@@ -505,17 +541,28 @@ export function AppProvider({ children }) {
     };
 
     setNodes(prev => {
-      // Filter out duplicate names
+      const toDeleteLower = new Set(toDelete.map(d => d.toLowerCase()));
+      if (oldName) toDeleteLower.add(oldName.toLowerCase());
+
+      // Filter out duplicate and old names
       const filtered = prev.filter(n => {
-        const nNameLower = n.name.toLowerCase();
-        return !toDelete.some(d => d.toLowerCase() === nNameLower);
+        if (n.isRoot) return true;
+        return !toDeleteLower.has((n.name || '').toLowerCase());
       });
 
-      const existingIdx = filtered.findIndex(n => n.name.toLowerCase() === cleanName.toLowerCase());
+      // Match by cleanName, senderId, or id
+      const existingIdx = filtered.findIndex(n =>
+        !n.isRoot && (
+          n.name.toLowerCase() === cleanName.toLowerCase() ||
+          (formattedNode.senderId && n.senderId && n.senderId === formattedNode.senderId) ||
+          (accumulatedNode.id && n.id === accumulatedNode.id)
+        )
+      );
+
       let next;
       if (existingIdx >= 0) {
         next = [...filtered];
-        next[existingIdx] = { ...next[existingIdx], ...formattedNode };
+        next[existingIdx] = { ...next[existingIdx], ...formattedNode, id, name: cleanName };
       } else {
         next = [...filtered, formattedNode];
       }
@@ -537,6 +584,8 @@ export function AppProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: cleanName,
+          oldName: oldName || '',
+          duplicateNamesToDelete: toDelete,
           instagramHandle: formattedNode.handle,
           senderId: formattedNode.senderId,
           relationshipToSam: formattedNode.relationship,
@@ -554,9 +603,11 @@ export function AppProvider({ children }) {
       });
 
       for (const dup of toDelete) {
-        await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(dup)}`, {
-          method: 'DELETE'
-        });
+        if (dup && dup.trim().toLowerCase() !== cleanName.toLowerCase()) {
+          await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(dup)}?keepMemory=true`, {
+            method: 'DELETE'
+          });
+        }
       }
     } catch (err) {
       console.warn('Backend node save error:', err.message);
