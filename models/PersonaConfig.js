@@ -52,6 +52,7 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     "i do not have personal feelings",
     "delighted to help",
     "certainly!",
+    "baddu",
   ],
   globalBotActive: {
     type: Boolean,
