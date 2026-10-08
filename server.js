@@ -544,6 +544,37 @@ async function dispatchDebouncedReply(queueEntry) {
     if (stickerMatch) {
       stickerType = stickerMatch[1].toLowerCase();
       replyText = replyText.replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+    } else {
+      // 50% PRIORITY & KEYWORD ENFORCEMENT:
+      // If AI didn't tag an attachment, check if incoming text had strong reaction keywords or roll a ~45% random chance!
+      const lowerIn = (combinedText || '').toLowerCase();
+      const lowerReply = (replyText || '').toLowerCase();
+
+      let detectedCat = null;
+      if (lowerIn.includes('sus') || lowerIn.includes('ai') || lowerIn.includes('bot') || lowerIn.includes('robot') || lowerIn.includes('fake') || lowerIn.includes('doubt')) {
+        detectedCat = 'side_eye';
+      } else if (lowerIn.includes('lol') || lowerIn.includes('lmao') || lowerIn.includes('dead') || lowerIn.includes('haha') || lowerIn.includes('rofl') || lowerReply.includes('😂') || lowerReply.includes('💀')) {
+        detectedCat = 'lol';
+      } else if (lowerIn.includes('what') || lowerIn.includes('huh') || lowerIn.includes('why') || lowerIn.includes('confus')) {
+        detectedCat = 'confused';
+      } else if (lowerIn.includes('omg') || lowerIn.includes('shock') || lowerIn.includes('wow') || lowerIn.includes('damn') || lowerIn.includes('no way')) {
+        detectedCat = 'wonder';
+      } else if (lowerIn.includes('sad') || lowerIn.includes('cry') || lowerIn.includes('sob') || lowerIn.includes('hurt') || lowerReply.includes('😭') || lowerReply.includes('🥺')) {
+        detectedCat = 'sad';
+      } else if (lowerIn.includes('love') || lowerIn.includes('hype') || lowerIn.includes('happy') || lowerIn.includes('yay') || lowerReply.includes('❤️') || lowerReply.includes('🔥')) {
+        detectedCat = 'happy';
+      } else if (lowerIn.includes('cool') || lowerIn.includes('chill') || lowerIn.includes('bro') || lowerReply.includes('😎')) {
+        detectedCat = 'cool';
+      } else if (Math.random() < 0.45) {
+        // ~45% random roll (approx 2 out of 5 messages): pick a lively visual reaction
+        const pool = ['joy', 'lol', 'side_eye', 'cool', 'cat'];
+        detectedCat = pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      if (detectedCat) {
+        stickerType = detectedCat;
+        console.log(`🎯 [Reaction Booster Triggered]: Auto-attached [${detectedCat}] (keyword or 50% frequency rule)`);
+      }
     }
 
     // Calculate dynamic human-realistic typing latency:
