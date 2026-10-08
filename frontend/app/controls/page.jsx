@@ -313,7 +313,7 @@ export default function ControlsPage() {
       </div>
 
       {/* Contacts List & Policy Controls */}
-      <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+      <div className="controls-card-container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
@@ -375,6 +375,7 @@ export default function ControlsPage() {
             return (
               <div
                 key={contact.id || contact.name}
+                className="control-contact-card"
                 style={{
                   background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
                   border: '1px solid',
@@ -388,7 +389,7 @@ export default function ControlsPage() {
                 }}
               >
                 {/* Top Row: Checkbox + DP + Info */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0, width: '100%' }}>
                   <div
                     onClick={() => {
                       if (isEveryoneMode) return;
@@ -401,9 +402,10 @@ export default function ControlsPage() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '10px',
+                      gap: '8px',
                       cursor: isEveryoneMode ? 'default' : 'pointer',
                       flex: 1,
+                      minWidth: 0,
                       opacity: isEveryoneMode ? 0.75 : 1
                     }}
                   >
@@ -420,7 +422,8 @@ export default function ControlsPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#ffffff'
+                        color: '#ffffff',
+                        flexShrink: 0
                       }}
                     >
                       {isChecked && <Check size={12} strokeWidth={3} />}
@@ -428,7 +431,7 @@ export default function ControlsPage() {
 
                     <ContactAvatar contact={contact} size={36} showStatus={true} />
 
-                    <div style={{ overflow: 'hidden' }}>
+                    <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         {contact.name}
                       </div>
@@ -449,7 +452,8 @@ export default function ControlsPage() {
                       background: '#f4f4f5',
                       color: '#09090b',
                       border: '1px solid #e4e4e7',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
                     }}
                   >
                     {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
@@ -457,11 +461,12 @@ export default function ControlsPage() {
                 </div>
 
                 {/* Bottom Row: AI Mode Selector Buttons */}
-                <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid #f4f4f5' }}>
+                <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid #f4f4f5', width: '100%' }}>
                   <button
                     onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' })}
                     style={{
                       flex: 1,
+                      minWidth: 0,
                       padding: '6px 4px',
                       borderRadius: '6px',
                       fontSize: '0.7rem',
@@ -474,17 +479,19 @@ export default function ControlsPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px'
+                      gap: '4px',
+                      overflow: 'hidden'
                     }}
                   >
-                    <Bot size={11} />
-                    <span>Full AI</span>
+                    <Bot size={11} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Full AI</span>
                   </button>
 
                   <button
                     onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'reels_only' })}
                     style={{
                       flex: 1,
+                      minWidth: 0,
                       padding: '6px 4px',
                       borderRadius: '6px',
                       fontSize: '0.7rem',
@@ -497,17 +504,19 @@ export default function ControlsPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px'
+                      gap: '4px',
+                      overflow: 'hidden'
                     }}
                   >
-                    <Film size={11} />
-                    <span>Reels Only</span>
+                    <Film size={11} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Reels Only</span>
                   </button>
 
                   <button
                     onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' })}
                     style={{
                       flex: 1,
+                      minWidth: 0,
                       padding: '6px 4px',
                       borderRadius: '6px',
                       fontSize: '0.7rem',
@@ -520,11 +529,12 @@ export default function ControlsPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px'
+                      gap: '4px',
+                      overflow: 'hidden'
                     }}
                   >
-                    <Pause size={11} />
-                    <span>Stop AI</span>
+                    <Pause size={11} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Stop AI</span>
                   </button>
                 </div>
               </div>

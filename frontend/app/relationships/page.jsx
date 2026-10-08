@@ -80,7 +80,9 @@ export default function RelationshipsPage() {
     category: 'online_friend',
     relationship: '',
     personalNotes: '',
-    roastStyle: ''
+    roastStyle: '',
+    chatsCount: 0,
+    reelsCount: 0
   });
 
   const [isAutofilling, setIsAutofilling] = useState(false);
@@ -122,7 +124,9 @@ export default function RelationshipsPage() {
         category: selectedPerson.category || 'online_friend',
         relationship: selectedPerson.relationship || selectedPerson.relationshipToSam || '',
         personalNotes: selectedPerson.personalNotes || (selectedPerson.lore || []).join('\n'),
-        roastStyle: selectedPerson.roastStyle || ''
+        roastStyle: selectedPerson.roastStyle || '',
+        chatsCount: selectedPerson.chatsCount ?? selectedPerson.messageCount ?? 0,
+        reelsCount: selectedPerson.reelsCount ?? 0
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -342,7 +346,10 @@ export default function RelationshipsPage() {
       relationshipToSam: formData.relationship.trim(),
       personalNotes: formData.personalNotes.trim(),
       lore: formData.personalNotes.trim().split('\n').map(l => l.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean),
-      roastStyle: formData.roastStyle.trim()
+      roastStyle: formData.roastStyle.trim(),
+      chatsCount: parseInt(formData.chatsCount, 10) || 0,
+      reelsCount: parseInt(formData.reelsCount, 10) || 0,
+      messageCount: parseInt(formData.chatsCount, 10) || 0
     };
 
     await saveNode(updated, isRenamed ? [oldName] : []);
@@ -1243,6 +1250,43 @@ export default function RelationshipsPage() {
                 onChange={(e) => setFormData({ ...formData, roastStyle: e.target.value })}
                 placeholder="e.g. Playful teasing, Hindi bro banter, sweet concise shortcuts..."
               />
+            </div>
+
+            {/* Row 6: Lifetime Interaction Statistics (Chats & Reels) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', paddingTop: '10px', borderTop: '1px solid #f4f4f5' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                  Total DMs Exchanged
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.chatsCount}
+                  onChange={(e) => setFormData({ ...formData, chatsCount: parseInt(e.target.value, 10) || 0 })}
+                  placeholder="0"
+                  style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}
+                />
+                <span style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '3px', display: 'block' }}>
+                  Cumulative lifetime chats (preserved across message cleanups)
+                </span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                  Total Reels Shared
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.reelsCount}
+                  onChange={(e) => setFormData({ ...formData, reelsCount: parseInt(e.target.value, 10) || 0 })}
+                  placeholder="0"
+                  style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}
+                />
+                <span style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '3px', display: 'block' }}>
+                  Cumulative reels shared by this contact
+                </span>
+              </div>
             </div>
 
           </form>
