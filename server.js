@@ -522,13 +522,12 @@ async function dispatchDebouncedReply(queueEntry) {
       replyText = replyText.replace(/\[STICKER:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
     }
 
-    // Refresh typing indicator right before delay so it stays active
-    await instagramService.sendSenderAction(senderId, 'typing_on');
-
     // Calculate dynamic human-realistic typing latency:
-    // 1. Emoji / ultra-short reaction (<= 4 chars or pure emoji): reply very fast (350ms - 650ms), mimicking a quick emoji tap / reaction!
-    // 2. Short line / reel reply (5 - 30 chars): swift text reply (750ms - 1500ms)
-    // 3. Multi-line paragraph / 2+ lines (> 30 chars): authentic typing latency (1800ms - 4500ms) with typing_on indicator active.
+    // - Emojis / reactions (<= 4 chars or pure emoji): quick tap (1800ms - 3000ms)
+    // - 1 short line (5 - 35 chars): 3500ms - 6500ms
+    // - 1-2 medium lines (36 - 90 chars): 7000ms - 12000ms
+    // - 2-3 lines (91 - 180 chars): 13000ms - 20000ms
+    // - Multi-line paragraph / 4+ lines (> 180 chars): 21000ms - 34000ms (authentic phone typing pacing)
     const trimmedReply = (replyText || '').trim();
     const charLength = trimmedReply.length;
     const isEmojiOnly = /^[\p{Emoji}\s\d\p{P}]+$/u.test(trimmedReply);
@@ -536,14 +535,30 @@ async function dispatchDebouncedReply(queueEntry) {
 
     let humanTypingDelayMs;
     if (isUltraShort || (isReelOrShare && charLength <= 8)) {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 25 + 350, 350), 650);
-    } else if (charLength <= 30) {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 30 + 550, 750), 1500);
+      humanTypingDelayMs = Math.min(Math.max(charLength * 40 + 1500, 1800), 3000);
+    } else if (charLength <= 35) {
+      humanTypingDelayMs = Math.min(Math.max(charLength * 90 + 2000, 3500), 6500);
+    } else if (charLength <= 90) {
+      humanTypingDelayMs = Math.min(Math.max(charLength * 100 + 2500, 7000), 12000);
+    } else if (charLength <= 180) {
+      humanTypingDelayMs = Math.min(Math.max(charLength * 95 + 3000, 13000), 20000);
     } else {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 36 + 800, 1800), 4500);
+      humanTypingDelayMs = Math.min(Math.max(charLength * 90 + 4000, 21000), 34000);
     }
-    console.log(`⏳ [Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
-    await new Promise(resolve => setTimeout(resolve, humanTypingDelayMs));
+
+    console.log(`⏳ [Realistic Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
+
+    // Keep typing indicator actively pulsing on Instagram every 3.5 seconds so it NEVER drops while typing
+    await instagramService.sendSenderAction(senderId, 'typing_on');
+    const typingPulseInterval = setInterval(() => {
+      instagramService.sendSenderAction(senderId, 'typing_on').catch(() => {});
+    }, 3500);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, humanTypingDelayMs));
+    } finally {
+      clearInterval(typingPulseInterval);
+    }
 
     console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Sticker: ${stickerType}]` : ''}`);
 
