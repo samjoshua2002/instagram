@@ -110,6 +110,10 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     trim: true,
     lowercase: true,
   }],
+  giphyApiKey: {
+    type: String,
+    default: 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);

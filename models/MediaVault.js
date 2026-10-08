@@ -28,6 +28,11 @@ const mediaVaultSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  keywords: [{
+    type: String,
+    trim: true,
+    lowercase: true
+  }],
   isDefault: {
     type: Boolean,
     default: false

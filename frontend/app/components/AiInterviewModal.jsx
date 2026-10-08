@@ -331,31 +331,6 @@ export default function AiInterviewModal() {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .mobile-header-save-btn {
-          display: none;
-        }
-
-        @media (max-width: 768px) {
-          .mobile-header-save-btn {
-            display: inline-flex !important;
-          }
-          .interview-modal-container {
-            flex-direction: column !important;
-            height: 92vh !important;
-            max-height: 92vh !important;
-          }
-          .interview-chat-pane {
-            flex: 1 !important;
-            border-right: none !important;
-            border-bottom: 1px solid #e4e4e7 !important;
-          }
-          .interview-preview-pane {
-            display: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

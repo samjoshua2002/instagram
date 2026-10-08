@@ -199,67 +199,6 @@ export default function Sidebar() {
           </button>
         </div>
       </aside>
-
-      <style jsx>{`
-        .mobile-header {
-          display: none;
-        }
-
-        .floating-sidebar {
-          position: fixed;
-          top: 16px;
-          left: 16px;
-          bottom: 16px;
-          width: 250px;
-          background: #ffffff;
-          border: 1px solid #e4e4e7;
-          border-radius: 12px;
-          padding: 18px 14px;
-          display: flex;
-          flex-direction: column;
-          justifyContent: space-between;
-          z-index: 50;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-        }
-
-        @media (max-width: 768px) {
-          .mobile-header {
-            display: flex;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background: #ffffff;
-            border-bottom: 1px solid #e4e4e7;
-            align-items: center;
-            justifyContent: space-between;
-            padding: 0 16px;
-            z-index: 60;
-          }
-
-          .floating-sidebar {
-            top: 56px;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            border-radius: 0;
-            border-left: none;
-            border-right: none;
-            border-bottom: none;
-            transform: translateY(-100%);
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.25s ease;
-          }
-
-          .floating-sidebar.mobile-open {
-            transform: translateY(0);
-            opacity: 1;
-            pointer-events: auto;
-          }
-        }
-      `}</style>
     </>
   );
 }

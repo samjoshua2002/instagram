@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import {
   UserCheck, Save, Sparkles, MessageSquare, AlertCircle,
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
-  Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert
+  Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -31,7 +31,13 @@ export default function SettingsPage() {
     forbiddenWords: [],
     sampleConversations: [],
     typingDelaySeconds: 1.5,
+    giphyApiKey: 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
   });
+
+  // State for Giphy API Key
+  const [testingGiphy, setTestingGiphy] = useState(false);
+  const [giphyStatus, setGiphyStatus] = useState(null); // 'success' | 'error' | null
+  const [showGiphyKey, setShowGiphyKey] = useState(false);
 
   // State for adding forbidden word
   const [newForbiddenWord, setNewForbiddenWord] = useState('');
@@ -72,6 +78,7 @@ export default function SettingsPage() {
           forbiddenWords: Array.isArray(data.forbiddenWords) ? data.forbiddenWords : [],
           sampleConversations: Array.isArray(data.sampleConversations) ? data.sampleConversations : [],
           typingDelaySeconds: data.typingDelaySeconds || 1.5,
+          giphyApiKey: data.giphyApiKey || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
         });
       }
     } catch (err) {
@@ -79,6 +86,28 @@ export default function SettingsPage() {
       setErrorMsg('Could not fetch settings from server. Check your connection.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestGiphyKey = async () => {
+    setTestingGiphy(true);
+    setGiphyStatus(null);
+    try {
+      const keyToTest = formData.giphyApiKey?.trim() || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+      const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${keyToTest}&limit=1`);
+      const data = await res.json();
+      if (res.ok && data.meta?.status === 200) {
+        setGiphyStatus('success');
+        showToast('GIPHY API key is valid and working!', 'success');
+      } else {
+        setGiphyStatus('error');
+        showToast(data.message || 'GIPHY API key invalid', 'error');
+      }
+    } catch (e) {
+      setGiphyStatus('error');
+      showToast('Connection failed to GIPHY', 'error');
+    } finally {
+      setTestingGiphy(false);
     }
   };
 
@@ -207,6 +236,7 @@ export default function SettingsPage() {
     { id: 'texting', label: 'How To Text', icon: MessageSquare },
     { id: 'replying', label: 'How To Reply', icon: Zap },
     { id: 'examples', label: 'Chat Examples', icon: Code },
+    { id: 'integrations', label: 'API Keys & Giphy', icon: Key },
     { id: 'simulator', label: 'Test My Clone', icon: Send },
   ];
 
@@ -782,6 +812,130 @@ export default function SettingsPage() {
                 <Plus size={14} />
                 <span>Add Example</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: API KEYS & INTEGRATIONS */}
+      {activeTab === 'integrations' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* GIPHY Developer Key Card */}
+          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={18} style={{ color: '#09090b' }} />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', margin: 0 }}>
+                  GIPHY API & Reaction GIFs
+                </h3>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {giphyStatus === 'success' ? (
+                  <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={12} />
+                    <span>Connected & Verified</span>
+                  </span>
+                ) : giphyStatus === 'error' ? (
+                  <span style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertCircle size={12} />
+                    <span>Connection Failed</span>
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.72rem', background: '#f4f4f5', color: '#09090b', padding: '4px 10px', borderRadius: '20px', fontWeight: '700' }}>
+                    Saved in Database
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.84rem', color: '#71717a', marginBottom: '18px', maxWidth: '720px' }}>
+              Your Giphy API Key powers instant GIF searches, predefined reactions, and automatically attaches relevant comedic media at 50% priority frequency in Instagram DMs when friends text trigger keywords (e.g., &quot;u sus&quot;, &quot;why chatting like ai&quot;, &quot;lol&quot;).
+            </p>
+
+            {/* Input with Show/Hide toggle */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                GIPHY API Key
+              </label>
+              <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
+                <input
+                  type={showGiphyKey ? 'text' : 'password'}
+                  value={formData.giphyApiKey || ''}
+                  onChange={e => setFormData({ ...formData, giphyApiKey: e.target.value })}
+                  placeholder="Enter Giphy API Key (e.g. qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2)"
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '0.86rem',
+                    letterSpacing: showGiphyKey ? '0.02em' : '0.12em',
+                    paddingRight: '40px'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGiphyKey(!showGiphyKey)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#71717a',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title={showGiphyKey ? 'Hide Key' : 'Show Key'}
+                >
+                  {showGiphyKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={handleTestGiphyKey}
+                disabled={testingGiphy}
+                className="btn"
+                style={{ fontSize: '0.8rem', padding: '8px 16px' }}
+              >
+                {testingGiphy ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Verifying with Giphy API...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={13} />
+                    <span>Test GIPHY Connection</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="btn btn-primary"
+                style={{ fontSize: '0.8rem', padding: '8px 18px' }}
+              >
+                <Save size={13} />
+                <span>Save Key to DB</span>
+              </button>
+            </div>
+
+            {/* Features callout */}
+            <div style={{ marginTop: '20px', padding: '16px', background: '#fafafa', borderRadius: '8px', border: '1px solid #f4f4f5' }}>
+              <div style={{ fontSize: '0.76rem', fontWeight: '800', color: '#09090b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                How This Key Is Used In Real Chats
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: '#71717a', lineHeight: 1.6 }}>
+                <li><strong>50% Priority Attachments:</strong> In ~2 out of 5 DMs, the bot automatically selects a GIF matching the emotional context instead of sending plain text.</li>
+                <li><strong>Trigger Words:</strong> Friend says &quot;u sus&quot; or &quot;why like ai&quot; &rarr; Bot automatically replies with side-eye / Chloe / dog doubt GIF.</li>
+                <li><strong>Curated & Custom Vault:</strong> Browse, preview, and 1-click import trending reaction GIFs in the Media Vault tab.</li>
+              </ul>
             </div>
           </div>
         </div>
