@@ -1,6 +1,7 @@
 const { AzureOpenAI } = require('openai');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
+const stickerService = require('./stickerService');
 
 class AzureOpenAIService {
   constructor() {
@@ -22,6 +23,15 @@ class AzureOpenAIService {
     if (!config) {
       config = await PersonaConfig.create({});
     }
+
+    // 1b. Fetch active reaction categories from user's Media Vault
+    let availableCategoriesStr = 'joy, lol, wonder, sad, happy, side_eye, confused, cool';
+    try {
+      const allCats = await stickerService.getAllCategories();
+      if (allCats && allCats.length > 0) {
+        availableCategoriesStr = allCats.map(c => c.id).join(', ');
+      }
+    } catch (_) {}
 
     // 2. Fetch social knowledge graph context (tree chain linking friends & lore)
     const socialTreeContext = await socialGraphService.getContextForConversation(
@@ -202,15 +212,12 @@ STORY / NOTE REPLIES:
 - Story reply: React casually like a creator — short, genuine, related to the story content.
 - Note reply: Banter back directly about the note topic.
 
-OPTIONAL REACTION GIFS & MEMES (RARE — USE SPARINGLY):
-- Default behavior: 95% of replies should ONLY be normal text and emojis. Do NOT append a GIF to every message!
-- If a reaction GIF genuinely enhances a punchline or funny moment, append one tag at the very end:
-  * [STICKER: laugh] or [STICKER: skull] → laughing / dead meme gif
-  * [STICKER: side_eye] → bombastic side eye meme
-  * [STICKER: shock] → shocked / jaw drop reaction gif
-  * [STICKER: crying] → dramatic funny crying gif
-  * [STICKER: confused] → confused meme gif
-  * [STICKER: cat] → funny relatable cat meme gif
+OPTIONAL REACTION GIFS & MEDIA ATTACHMENTS (RARE — USE SPARINGLY):
+- Default behavior: 95% of replies should ONLY be normal text and emojis. Do NOT append media to every message!
+- You have access to Sam's personal reaction media vault across these emotional categories:
+  [${availableCategoriesStr}]
+- If a reaction attachment genuinely fits the punchline or emotional moment, you may append one tag at the very end of your message:
+  * [ATTACHMENT: <category>] (e.g. [ATTACHMENT: joy], [ATTACHMENT: lol], [ATTACHMENT: wonder], [ATTACHMENT: sad], [ATTACHMENT: happy], [ATTACHMENT: side_eye], [ATTACHMENT: confused], [ATTACHMENT: cool])
 - STRICTLY FORBIDDEN: NEVER USE GENSHIN IMPACT, ANIME, OR WEIRD CARTOON STICKERS.
 
 HUMAN TEXTING & AUTHENTIC TONE RULES:
