@@ -166,10 +166,10 @@ export function AppProvider({ children }) {
 
     syncBackend();
 
-    // Live background polling every 4 seconds to sync chat & reel counts in real time
+    // Live background polling every 8 seconds to sync chat & reel counts smoothly
     const interval = setInterval(() => {
       syncBackend();
-    }, 4000);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, []);
@@ -185,6 +185,8 @@ export function AppProvider({ children }) {
         const serverContacts = data.nodes.map(sn => {
           const snName = sn.name || '';
           const snId = snName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+          const chatsCount = typeof sn.chatsCount === 'number' ? sn.chatsCount : (sn.messageCount || 0);
+          const reelsCount = typeof sn.reelsCount === 'number' ? sn.reelsCount : 0;
           return {
             id: snId,
             _id: sn._id,
@@ -195,9 +197,9 @@ export function AppProvider({ children }) {
             aiEnabled: sn.aiEnabled !== false,
             replyToMessages: sn.replyToMessages !== false,
             replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
-            chatsCount: sn.chatsCount || 0,
-            reelsCount: sn.reelsCount || 0,
-            messageCount: sn.chatsCount || 0,
+            chatsCount,
+            reelsCount,
+            messageCount: chatsCount,
             relationship: sn.relationshipToSam || 'Friend',
             category: sn.category || 'online_friend',
             dob: sn.dob || '',
@@ -232,6 +234,29 @@ export function AppProvider({ children }) {
           });
 
           const deduplicated = deduplicateNodes([root, ...mergedContacts]);
+
+          // Prevent unnecessary re-render if data has not changed
+          if (prev.length === deduplicated.length) {
+            let hasChanged = false;
+            for (let i = 0; i < prev.length; i++) {
+              const p = prev[i];
+              const d = deduplicated[i];
+              if (
+                p.id !== d.id ||
+                p.chatsCount !== d.chatsCount ||
+                p.reelsCount !== d.reelsCount ||
+                p.aiEnabled !== d.aiEnabled ||
+                (p.facts || []).length !== (d.facts || []).length
+              ) {
+                hasChanged = true;
+                break;
+              }
+            }
+            if (!hasChanged) {
+              return prev; // Same reference -> no re-render!
+            }
+          }
+
           try { localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated)); } catch(e) {}
           return deduplicated;
         });
@@ -327,6 +352,9 @@ export function AppProvider({ children }) {
       aiEnabled: accumulatedNode.aiEnabled !== false,
       replyToMessages: accumulatedNode.replyToMessages !== false,
       replyToReelsAndPosts: accumulatedNode.replyToReelsAndPosts !== false,
+      chatsCount: typeof accumulatedNode.chatsCount === 'number' ? accumulatedNode.chatsCount : (accumulatedNode.messageCount || 0),
+      reelsCount: typeof accumulatedNode.reelsCount === 'number' ? accumulatedNode.reelsCount : 0,
+      messageCount: typeof accumulatedNode.chatsCount === 'number' ? accumulatedNode.chatsCount : (accumulatedNode.messageCount || 0),
       idleHours: 4,
       reminderEligible: true
     };
