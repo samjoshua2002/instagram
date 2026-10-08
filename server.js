@@ -625,7 +625,7 @@ async function dispatchDebouncedReply(queueEntry) {
     // If a sticker or media attachment was chosen, send the image/GIF directly to Instagram DM!
     let stickerSendResult = null;
     if (stickerType && stickerService.hasSticker(stickerType)) {
-      const stickerUrl = await stickerService.getStickerUrl(stickerType);
+      const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText + ' ' + (replyText || ''));
       if (stickerUrl) {
         if (hasText) {
           await new Promise(resolve => setTimeout(resolve, 600));
@@ -985,6 +985,7 @@ app.put('/api/persona', async (req, res) => {
       autoShareReelsEnabled,
       autoShareReelsFrequencyHours,
       autoShareReelsTopics,
+      giphyApiKey,
     } = req.body;
 
     if (creatorName !== undefined) config.creatorName = creatorName;
@@ -1008,9 +1009,50 @@ app.put('/api/persona', async (req, res) => {
     if (autoShareReelsEnabled !== undefined) config.autoShareReelsEnabled = autoShareReelsEnabled;
     if (autoShareReelsFrequencyHours !== undefined) config.autoShareReelsFrequencyHours = autoShareReelsFrequencyHours;
     if (autoShareReelsTopics !== undefined) config.autoShareReelsTopics = autoShareReelsTopics;
+    if (giphyApiKey !== undefined) config.giphyApiKey = giphyApiKey.trim();
 
     await config.save();
     res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GIPHY API Proxy: lets frontend search & preview trending reaction GIFs securely
+app.get('/api/giphy/search', async (req, res) => {
+  try {
+    const { q, limit = 20, rating = 'pg-13' } = req.query;
+    const config = await PersonaConfig.findOne();
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'GIPHY API Key not configured' });
+    }
+
+    const query = q ? encodeURIComponent(q) : 'reaction';
+    const giphyUrl = `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${query}&limit=${limit}&rating=${rating}`;
+    const response = await fetch(giphyUrl);
+    const data = await response.json();
+    res.json({ success: true, data: data.data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/giphy/trending', async (req, res) => {
+  try {
+    const { limit = 20, rating = 'pg-13' } = req.query;
+    const config = await PersonaConfig.findOne();
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'GIPHY API Key not configured' });
+    }
+
+    const giphyUrl = `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=${limit}&rating=${rating}`;
+    const response = await fetch(giphyUrl);
+    const data = await response.json();
+    res.json({ success: true, data: data.data || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1137,7 +1179,7 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
     if (!req.file) {
       return res.status(400).json({ error: 'No media file was uploaded.' });
     }
-    const { category = 'joy', name, caption } = req.body;
+    const { category = 'joy', name, caption, keywords } = req.body;
     const cleanCat = (category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
     const mime = (req.file.mimetype || '').toLowerCase();
@@ -1149,15 +1191,20 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
     const baseUrl = (process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
     const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
+    const parsedKeywords = Array.isArray(keywords)
+      ? keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
+      : (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+
     const newMedia = await MediaVault.create({
       name: name && name.trim() ? name.trim() : req.file.originalname,
       category: cleanCat,
       url: fileUrl,
       mediaType,
       caption: caption || '',
+      keywords: parsedKeywords,
     });
 
-    console.log(`📸 [Media Vault Upload]: Saved ${mediaType} under category "${cleanCat}": ${fileUrl}`);
+    console.log(`📸 [Media Vault Upload]: Saved ${mediaType} under category "${cleanCat}": ${fileUrl} (keywords: ${parsedKeywords.join(', ')})`);
     res.json({ success: true, item: newMedia });
   } catch (err) {
     console.error('❌ Media Vault upload error:', err);
@@ -1168,11 +1215,15 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
 // URL-based add (for direct Tenor / Giphy / image URLs)
 app.post('/api/media-vault', async (req, res) => {
   try {
-    const { url, category = 'joy', name, caption, mediaType = 'gif' } = req.body;
+    const { url, category = 'joy', name, caption, mediaType = 'gif', keywords } = req.body;
     if (!url || !url.trim()) {
       return res.status(400).json({ error: 'Media URL is required' });
     }
     const cleanCat = (category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+
+    const parsedKeywords = Array.isArray(keywords)
+      ? keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
+      : (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
     const newMedia = await MediaVault.create({
       name: name && name.trim() ? name.trim() : 'Reaction Media',
@@ -1180,9 +1231,69 @@ app.post('/api/media-vault', async (req, res) => {
       url: url.trim(),
       mediaType: mediaType || 'gif',
       caption: caption || '',
+      keywords: parsedKeywords,
     });
 
     res.json({ success: true, item: newMedia });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Batch add multiple media items (e.g. multi-select from GIPHY search)
+app.post('/api/media-vault/batch', async (req, res) => {
+  try {
+    const { items: itemsToInsert } = req.body;
+    if (!Array.isArray(itemsToInsert) || itemsToInsert.length === 0) {
+      return res.status(400).json({ error: 'Array of items is required' });
+    }
+
+    const created = [];
+    for (const item of itemsToInsert) {
+      if (!item.url) continue;
+      const cleanCat = (item.category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+      const parsedKeywords = Array.isArray(item.keywords)
+        ? item.keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
+        : (item.keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+
+      // Check if duplicate URL already in vault
+      const existing = await MediaVault.findOne({ url: item.url.trim() });
+      if (existing) continue;
+
+      const newMedia = await MediaVault.create({
+        name: item.name && item.name.trim() ? item.name.trim() : 'Reaction GIF',
+        category: cleanCat,
+        url: item.url.trim(),
+        mediaType: item.mediaType || 'gif',
+        caption: item.caption || '',
+        keywords: parsedKeywords,
+      });
+      created.push(newMedia);
+    }
+
+    res.json({ success: true, count: created.length, items: created });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update media item (title, category, keywords, caption)
+app.put('/api/media-vault/:id', async (req, res) => {
+  try {
+    const { name, category, keywords, caption } = req.body;
+    const update = {};
+    if (name !== undefined) update.name = name.trim();
+    if (category !== undefined) update.category = category.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+    if (caption !== undefined) update.caption = caption.trim();
+    if (keywords !== undefined) {
+      update.keywords = Array.isArray(keywords)
+        ? keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
+        : (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    }
+
+    const updated = await MediaVault.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Media not found' });
+    res.json({ success: true, item: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1205,6 +1316,26 @@ app.delete('/api/media-vault/:id', async (req, res) => {
 
     await MediaVault.findByIdAndDelete(req.params.id);
     res.json({ success: true, deletedId: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Predefined GIF Library endpoints
+app.get('/api/media-vault/predefined', (req, res) => {
+  try {
+    const predefined = stickerService.getPredefinedList();
+    res.json({ success: true, predefined });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/media-vault/import-predefined', async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    const results = await stickerService.seedPredefinedIntoVault(ids);
+    res.json({ success: true, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1237,6 +1368,33 @@ app.post('/api/media-vault/categories', async (req, res) => {
       config.customReactionCategories.push(cleanCat);
       await config.save();
     }
+
+    const categories = await stickerService.getAllCategories();
+    res.json({ success: true, categories });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rename / Edit existing category
+app.put('/api/media-vault/categories/:name', async (req, res) => {
+  try {
+    const oldCat = req.params.name.toLowerCase().trim();
+    const { newCategory } = req.body;
+    if (!newCategory || !newCategory.trim()) {
+      return res.status(400).json({ error: 'New category name is required' });
+    }
+    const cleanNew = newCategory.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+
+    // 1. Update in PersonaConfig
+    let config = await PersonaConfig.findOne();
+    if (config && config.customReactionCategories) {
+      config.customReactionCategories = config.customReactionCategories.map(c => c === oldCat ? cleanNew : c);
+      await config.save();
+    }
+
+    // 2. Cascade update all MediaVault items from old category to new category
+    await MediaVault.updateMany({ category: oldCat }, { category: cleanNew });
 
     const categories = await stickerService.getAllCategories();
     res.json({ success: true, categories });
