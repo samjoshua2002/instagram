@@ -105,6 +105,11 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     type: Number,
     default: 5,
   },
+  customReactionCategories: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);
