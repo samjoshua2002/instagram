@@ -1,3 +1,5 @@
+
+
 const MediaVault = require('../models/MediaVault');
 const PersonaConfig = require('../models/PersonaConfig');
 
@@ -380,76 +382,140 @@ class StickerService {
   }
 
   /**
-   * Retrieves image/GIF URL.
-   * Priority 1: User's custom uploads in MediaVault (matching keywords / category)
-   * Priority 2: Direct GIPHY API live search using API key
-   * Priority 3: Curated fallback reaction GIFs
+   * Retrieves image/GIF URL with smart semantic relevance matching.
+   * Priority 1: User's saved media in MediaVault (scored by semantic keywords & context intent)
+   * Priority 2: Predefined curated high-relevance GIFs
+   * Priority 3: Direct live GIPHY search (if not rate limited)
+   * Never returns an irrelevant random GIF. Returns null if no relevant match is found.
    */
   async getStickerUrl(type, contextText = '') {
     if (!type) return null;
     const cleanType = type.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
-    // Strictly reject any genshin / anime stickers
+    // Strictly reject any genshin / anime cartoon stickers
     if (cleanType.includes('genshin') || cleanType.includes('paimon') || cleanType.includes('furina') || cleanType.includes('klee')) {
       return null;
     }
 
+    const lowerContext = (contextText || '').toLowerCase();
+
+    // STRICT SAFETY CHECK:
+    // If category is 'sad', ensure context has genuine sorrow/heartbreak.
+    // NEVER send a sad GIF if user is discussing Furina, Genshin, anime, drama queens, or laughing!
+    if (cleanType === 'sad') {
+      const isFurinaOrAnime = /furina|genshin|fontaine|anime|archon|drama queen/.test(lowerContext);
+      const isLaughing = /😂|💀|lol|lmao|rofl|haha|dead|dying/.test(lowerContext);
+      const isGenuineSorrow = /heartbroken|depressed|so sad rn|crying inside|hurting|grief/.test(lowerContext);
+      if (isFurinaOrAnime || isLaughing || !isGenuineSorrow) {
+        console.log(`🛡️ [Sticker Filter]: Rejected 'sad' sticker for context: "${contextText.slice(0, 60)}" (not genuine sorrow)`);
+        return null;
+      }
+    }
+
     // 1. FIRST PRIORITY: User's custom uploaded media in MongoDB MediaVault
     try {
-      // Find items that user uploaded or saved
-      const categoryItems = await MediaVault.find({ category: cleanType });
-      const allVaultItems = await MediaVault.find({});
+      let allVaultItems = await MediaVault.find({});
+      // Auto-seed predefined catalog if vault is empty
+      if (!allVaultItems || allVaultItems.length === 0) {
+        console.log(`📦 [MediaVault Auto-Seed]: Vault is empty. Auto-seeding curated meme collection into DB...`);
+        await this.seedPredefinedIntoVault();
+        allVaultItems = await MediaVault.find({});
+      }
 
-      const lowerContext = (contextText || '').toLowerCase();
-      const contextWords = lowerContext.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+      const stopWords = new Set(['the', 'and', 'with', 'you', 'are', 'for', 'this', 'that', 'from', 'have', 'what', 'like', 'just', 'your', 'about', 'some', 'they', 'them', 'when', 'then', 'will', 'been', 'there', 'here', 'can', 'not', 'but', 'all', 'bro', 'man']);
+      const contextWords = lowerContext
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w));
 
-      const pool = categoryItems.length > 0 ? categoryItems : allVaultItems;
+      // Emotional cues detection
+      const isLaughter = /lol|lmao|rofl|haha|dead|dying|wheeze|crying laughing|😂|💀/.test(lowerContext);
+      const isSuspicion = /sus|bot|ai|robot|fake|doubt|skeptic|cheat|fishy/.test(lowerContext);
+      const isShock = /shock|wow|omg|no way|mind blown|insane|wild|gasp/.test(lowerContext);
+      const isConfused = /confus|what do you mean|lost|where|idk|huh\?/.test(lowerContext);
+      const isHype = /hype|cheers|celebrate|party|fire|dance|groove|congrats/.test(lowerContext);
+      const isCool = /cool|chill|cat|vibe|vibing|deal with it|smooth|thumbs up/.test(lowerContext);
+
       const scoredItems = [];
 
-      for (const item of pool) {
-        let score = (item.category === cleanType) ? 5 : 0;
-        const itemName = (item.name || '').toLowerCase();
-        const itemKeywords = (item.keywords || []).map(k => (k || '').toLowerCase());
-
-        // Check if context text matches the item title/label
-        for (const word of contextWords) {
-          if (itemName.includes(word)) score += 3;
-          if (itemKeywords.some(k => k.includes(word) || word.includes(k))) score += 4;
+      for (const item of allVaultItems) {
+        const itemCat = (item.category || '').toLowerCase();
+        // Never evaluate sad items unless genuine sorrow
+        if (itemCat === 'sad' && !/heartbroken|depressed|so sad rn|crying inside/.test(lowerContext)) {
+          continue;
         }
 
-        // Exact match with category tag
-        if (itemKeywords.includes(cleanType)) score += 5;
+        let score = 0;
+        if (itemCat === cleanType) score += 12;
 
-        scoredItems.push({ item, score });
+        // Semantic emotional intent boosters
+        const itemKeywords = (item.keywords || []).map(k => (k || '').toLowerCase());
+        const itemName = (item.name || '').toLowerCase();
+        const itemCaption = (item.caption || '').toLowerCase();
+
+        if (isLaughter && (itemCat === 'lol' || itemCat === 'joy' || itemKeywords.some(k => /laugh|kekw|wheez|skull|dying|lol/.test(k)))) score += 16;
+        if (isSuspicion && (itemCat === 'side_eye' || itemKeywords.some(k => /sus|side eye|doubt|ai|bot|judg|rock|chloe/.test(k)))) score += 20;
+        if (isShock && (itemCat === 'wonder' || itemKeywords.some(k => /shock|blown|omg|gasp|pratt/.test(k)))) score += 18;
+        if (isConfused && (itemCat === 'confused' || itemKeywords.some(k => /confus|travolta|lost|blinking|math/.test(k)))) score += 18;
+        if (isHype && (itemCat === 'happy' || itemKeywords.some(k => /cheers|dance|carlton|snoopy|gatsby/.test(k)))) score += 16;
+        if (isCool && (itemCat === 'cool' || itemKeywords.some(k => /cool|cat|vibing|sunglasses|popcat/.test(k)))) score += 16;
+
+        // Word-level matching
+        for (const word of contextWords) {
+          if (itemKeywords.includes(word)) score += 8;
+          else if (itemKeywords.some(k => k.includes(word))) score += 4;
+          if (itemName.includes(word)) score += 6;
+          if (itemCaption.includes(word)) score += 4;
+        }
+
+        if (score > 0) {
+          scoredItems.push({ item, score });
+        }
       }
 
       scoredItems.sort((a, b) => b.score - a.score);
 
-      // If top candidate has a strong keyword/title match from user vault, use it!
-      if (scoredItems.length > 0 && scoredItems[0].score > 5) {
-        const topItem = scoredItems[0].item;
-        console.log(`🎯 [Media Vault Priority Match]: Picked "${topItem.name}" for category [${cleanType}] with score ${scoredItems[0].score}: ${topItem.url}`);
-        return topItem.url;
+      // If we found relevant candidate matches in MediaVault, pick among top matches!
+      if (scoredItems.length > 0 && scoredItems[0].score >= 12) {
+        const topScore = scoredItems[0].score;
+        // Take top items tied or within 5 points of top score for natural variety
+        const topCandidates = scoredItems.filter(s => s.score >= topScore - 5).slice(0, 3);
+        const picked = topCandidates[Math.floor(Math.random() * topCandidates.length)].item;
+        console.log(`🎯 [MediaVault Relevant Match]: Picked "${picked.name}" [${picked.category}] (score: ${topScore}) for context: "${contextText.slice(0, 40)}..."`);
+        return picked.url;
       }
 
-      // If category has user uploaded items, pick random
-      if (categoryItems.length > 0) {
-        const idx = Math.floor(Math.random() * categoryItems.length);
-        console.log(`🎬 [Media Vault Category Item]: Selected "${categoryItems[idx].name}" for category [${cleanType}]: ${categoryItems[idx].url}`);
-        return categoryItems[idx].url;
+      // If category items exist and no negative condition, pick the best category item
+      const categoryMatches = allVaultItems.filter(item => (item.category || '').toLowerCase() === cleanType);
+      if (categoryMatches.length > 0 && cleanType !== 'sad') {
+        const picked = categoryMatches[Math.floor(Math.random() * categoryMatches.length)];
+        console.log(`🎬 [MediaVault Category Match]: Picked "${picked.name}" [${picked.category}]`);
+        return picked.url;
       }
     } catch (e) {
       console.warn('⚠️ MediaVault DB check error:', e.message);
     }
 
-    // 2. SECOND PRIORITY: Direct live GIPHY API search using user's API Key
-    try {
-      const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText);
-      if (liveGiphyUrl) {
-        return liveGiphyUrl;
+    // 2. SECOND PRIORITY: In-memory Predefined Curated GIFs (instant & relevant fallback)
+    const predefinedList = this.getPredefinedList();
+    const relevantPredefined = predefinedList.filter(item => {
+      if (item.category === 'sad' && !/heartbroken|depressed|so sad rn/.test(lowerContext)) return false;
+      return item.category === cleanType;
+    });
+    if (relevantPredefined.length > 0) {
+      const picked = relevantPredefined[Math.floor(Math.random() * relevantPredefined.length)];
+      console.log(`⚡ [Predefined Fallback Match]: Picked "${picked.name}" [${picked.category}]: ${picked.url}`);
+      return picked.url;
+    }
+
+    // 3. THIRD PRIORITY: Direct live GIPHY API search (only if not rate-limited)
+    if (!this.isGiphyRateLimited || Date.now() > this.rateLimitResetTime) {
+      try {
+        const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText);
+        if (liveGiphyUrl) return liveGiphyUrl;
+      } catch (err) {
+        console.warn('⚠️ Live Giphy API search failed, falling back:', err.message);
       }
-    } catch (err) {
-      console.warn('⚠️ Live Giphy API search failed, falling back:', err.message);
     }
 
     // 3. THIRD PRIORITY: Built-in curated reaction GIF catalog fallback
@@ -511,6 +577,12 @@ class StickerService {
 
       const url = `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(searchQuery)}&limit=12&rating=pg-13`;
       const res = await fetch(url);
+      if (res.status === 429) {
+        this.isGiphyRateLimited = true;
+        this.rateLimitResetTime = Date.now() + 3600000; // block for 1 hour
+        console.warn('⚠️ [GIPHY 429 Rate Limit]: API rate limit exceeded. Automatically using saved MediaVault GIFs for 1 hour.');
+        return null;
+      }
       const data = await res.json();
 
       if (data && data.data && data.data.length > 0) {
