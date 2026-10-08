@@ -151,37 +151,57 @@ export default function AiInterviewModal() {
       }}
     >
       <div
+        className="interview-modal-container"
         style={{
           background: '#ffffff',
           border: '1px solid #e4e4e7',
           borderRadius: '14px',
           width: '100%',
           maxWidth: '860px',
-          height: '82vh',
+          height: '84vh',
           maxHeight: '680px',
           display: 'flex',
-          flexDirection: 'row',
           overflow: 'hidden',
           boxShadow: '0 20px 45px rgba(0,0,0,0.1)'
         }}
       >
         {/* Left: Chat Interviewer */}
-        <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e4e4e7', background: '#ffffff' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e4e4e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="interview-chat-pane" style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e4e4e7', background: '#ffffff' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #e4e4e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ background: '#09090b', color: '#ffffff', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
                 <Sparkles size={14} />
               </div>
-              <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.92rem' }}>
+              <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.9rem' }}>
                 Add Person (AI Interview)
               </span>
             </div>
-            <button
-              onClick={() => setIsAiModalOpen(false)}
-              style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
-            >
-              <X size={18} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {accumulatedNode?.name && (
+                <button
+                  onClick={handleSave}
+                  className="mobile-header-save-btn"
+                  style={{
+                    background: '#09090b',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.74rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save
+                </button>
+              )}
+              <button
+                onClick={() => setIsAiModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -233,7 +253,7 @@ export default function AiInterviewModal() {
         </div>
 
         {/* Right: Live Preview & Save */}
-        <div style={{ flex: 0.85, padding: '22px', background: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div className="interview-preview-pane" style={{ flex: 0.85, padding: '22px', background: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
               LIVE PROFILE PREVIEW
@@ -311,6 +331,31 @@ export default function AiInterviewModal() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .mobile-header-save-btn {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .mobile-header-save-btn {
+            display: inline-flex !important;
+          }
+          .interview-modal-container {
+            flex-direction: column !important;
+            height: 92vh !important;
+            max-height: 92vh !important;
+          }
+          .interview-chat-pane {
+            flex: 1 !important;
+            border-right: none !important;
+            border-bottom: 1px solid #e4e4e7 !important;
+          }
+          .interview-preview-pane {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

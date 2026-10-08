@@ -580,6 +580,31 @@ export default function RelationshipsPage() {
     showToast('Fact added & linked to personal lore');
   };
 
+  // Remove custom fact from memory and update node
+  const handleRemoveFact = async (factToRemove) => {
+    if (!selectedPerson) return;
+    const currentFacts = (selectedPerson.facts || selectedPerson.lore || []);
+    const filtered = currentFacts.filter(f => f !== factToRemove);
+    const updated = {
+      ...selectedPerson,
+      facts: filtered,
+      lore: filtered
+    };
+    await saveNode(updated);
+    setSelectedPerson(updated);
+
+    if (selectedPerson.senderId) {
+      try {
+        await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/facts`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fact: factToRemove })
+        });
+      } catch (e) {}
+    }
+    showToast('Fact removed from memory');
+  };
+
   // Force AI learning from DMs
   const handleForceLearn = async () => {
     if (!selectedPerson?.senderId) {
@@ -636,7 +661,7 @@ export default function RelationshipsPage() {
     const isFullAi = currentAiMode === 'full_ai';
 
     return (
-      <div style={{ padding: '32px 36px 80px 36px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="page-container" style={{ maxWidth: '1200px' }}>
         {/* Top Back Navigation Bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '20px', borderBottom: '1px solid #e4e4e7', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -1450,58 +1475,117 @@ export default function RelationshipsPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
-              <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>AUTO-SYNCING FROM DMs</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.72rem', background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+                {(selectedPerson.facts || selectedPerson.lore || []).length} Facts Captured
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
+                <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>AUTO-SYNCING</span>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-            {(selectedPerson.facts || selectedPerson.lore || []).map((fact, i) => (
-              <div
-                key={i}
-                style={{
-                  background: '#f4f4f5',
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '8px',
-                  padding: '9px 14px',
-                  fontSize: '0.82rem',
-                  color: '#09090b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#09090b' }} />
-                <span>{fact}</span>
+          {/* Optimized Scrollable Intel Container */}
+          <div className="facts-scroll-container" style={{ maxHeight: '250px', overflowY: 'auto', marginBottom: '16px' }}>
+            {((selectedPerson.facts || selectedPerson.lore || []).length === 0) ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '0.8rem', border: '1px dashed #e4e4e7', borderRadius: '8px', background: '#fafafa' }}>
+                No facts captured yet. Chatter OS automatically synthesizes profile intel as you chat in live Instagram DMs.
               </div>
-            ))}
+            ) : (
+              (selectedPerson.facts || selectedPerson.lore || []).map((fact, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: '#f4f4f5',
+                    border: '1px solid #e4e4e7',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '0.82rem',
+                    color: '#09090b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#09090b', flexShrink: 0 }} />
+                    <span style={{ wordBreak: 'break-word', lineHeight: '1.4' }}>{fact}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFact(fact)}
+                    title="Remove this fact from memory"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#a1a1aa',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: '4px',
+                      flexShrink: 0
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
 
-          <form onSubmit={handleAddFact} style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              placeholder="Add custom remembered fact (automatically syncs with personal notes)..."
-              value={newFactInput}
-              onChange={(e) => setNewFactInput(e.target.value)}
-              style={{ flex: 1 }}
-            />
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <form onSubmit={handleAddFact} style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '240px' }}>
+              <input
+                type="text"
+                placeholder="Add custom remembered fact (automatically syncs with personal notes)..."
+                value={newFactInput}
+                onChange={(e) => setNewFactInput(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="submit"
+                style={{
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: '6px',
+                  fontSize: '0.82rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Add Fact
+              </button>
+            </form>
+
             <button
-              type="submit"
+              type="button"
+              onClick={handleForceLearn}
+              disabled={isLearning}
               style={{
-                background: '#09090b',
-                color: '#ffffff',
-                border: 'none',
-                padding: '9px 18px',
+                background: '#ffffff',
+                color: '#09090b',
+                border: '1px solid #e4e4e7',
+                padding: '9px 14px',
                 borderRadius: '6px',
-                fontSize: '0.82rem',
+                fontSize: '0.8rem',
                 fontWeight: '700',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap'
               }}
             >
-              Add Fact
+              <Sparkles size={13} />
+              <span>{isLearning ? 'Learning...' : 'Sync DM Memory'}</span>
             </button>
-          </form>
+          </div>
         </div>
       </div>
     );
@@ -1511,7 +1595,7 @@ export default function RelationshipsPage() {
   // VIEW 2: ALL PEOPLE DIRECTORY (Shadcn Light Monochrome Table & Dashboard)
   // =========================================================================
   return (
-    <div style={{ padding: '32px 36px 80px 36px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="page-container" style={{ maxWidth: '1400px' }}>
       {/* Top Header */}
       <div className="directory-header-row page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>
         <div style={{ minWidth: 0, flex: 1 }}>

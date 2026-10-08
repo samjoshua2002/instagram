@@ -58,13 +58,20 @@ class MemoryService {
 
       recentMessages.reverse();
 
-      if (recentMessages.length < 2) {
-        // Not enough context yet to update memory
+      let messagesToAnalyze = recentMessages;
+      if (messagesToAnalyze.length === 0 && memory.recentChatBuffer && memory.recentChatBuffer.length > 0) {
+        messagesToAnalyze = memory.recentChatBuffer.map(b => ({
+          role: b.role,
+          text: b.text
+        }));
+      }
+
+      if (!messagesToAnalyze || messagesToAnalyze.length === 0) {
         return;
       }
 
-      const formattedChat = recentMessages
-        .map(m => `${m.role === 'assistant' ? 'Sam' : 'User'}: ${m.text}`)
+      const formattedChat = messagesToAnalyze
+        .map(m => `${m.role === 'assistant' ? 'Sam' : (memory.name || 'User')}: ${m.text}`)
         .join('\n');
 
       const currentFacts = (memory.facts || []).map(f => f.fact).join('; ');
@@ -91,6 +98,7 @@ ${formattedChat}
 
 Return a valid JSON object with EXACTLY this structure:
 {
+  "name": "Their real name or first name if explicitly stated or introduced (e.g. 'Sarah', 'Kavya', 'Rahul') else empty string",
   "nickname": "Extracted nickname or what they prefer to be called (leave empty if none)",
   "dob": "Exact birthday or birthdate if stated or referenced (e.g. 'May 18' or '18th May 2005' or '12 March') else empty string",
   "schoolOrCollege": "School, college, academy, or workplace if mentioned else empty string",
@@ -129,6 +137,13 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       });
 
       const parsed = JSON.parse(response.choices[0].message.content.trim());
+
+      if (parsed.name && parsed.name.trim() !== '') {
+        const cleanExtractedName = parsed.name.trim();
+        if (!memory.name || memory.name.startsWith('User_') || memory.name.startsWith('ig_tester_')) {
+          memory.name = cleanExtractedName;
+        }
+      }
 
       if (parsed.nickname && parsed.nickname.trim() !== '') {
         memory.nickname = parsed.nickname.trim();
@@ -329,9 +344,15 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
           }
           if (memory.profilePic) node.profilePic = memory.profilePic;
           if (memory.gender && node.gender === 'unknown') node.gender = memory.gender;
+          if (memory.relationshipType && memory.relationshipType !== 'stranger' && (!node.relationshipToSam || node.relationshipToSam.toLowerCase() === 'friend')) {
+            node.relationshipToSam = memory.relationshipType.charAt(0).toUpperCase() + memory.relationshipType.slice(1);
+          }
+          if (memory.name && !memory.name.startsWith('User_') && (node.name.startsWith('User_') || node.name.startsWith('ig_tester_'))) {
+            node.name = memory.name;
+          }
           node.updatedAt = new Date();
           await node.save();
-          console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for ${node.name} (DOB: "${node.dob || ''}", Lore: ${node.lore.length})`);
+          console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for ${node.name} (DOB: "${node.dob || ''}", Rel: "${node.relationshipToSam}", Lore: ${node.lore.length})`);
         } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU)) {
           await SocialGraph.create({
             name: displayName,

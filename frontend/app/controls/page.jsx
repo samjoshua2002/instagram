@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
 import {
@@ -19,6 +19,22 @@ export default function ControlsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
+
+  const saveQueueRef = useRef(Promise.resolve());
+  const currentConfigRef = useRef(routingConfig);
+  useEffect(() => {
+    currentConfigRef.current = routingConfig;
+  }, [routingConfig]);
+
+  const queueSave = (newConfig) => {
+    currentConfigRef.current = newConfig;
+    setRoutingConfig(newConfig);
+    const savePromise = saveQueueRef.current.then(() => saveRouting(newConfig));
+    saveQueueRef.current = savePromise.catch(err => {
+      console.warn('Serialized routing save error:', err);
+    });
+    return saveQueueRef.current;
+  };
 
   const filteredFriends = useMemo(() => {
     if (!search.trim()) return friendNodes;
@@ -39,7 +55,8 @@ export default function ControlsPage() {
 
   const isExcluded = (contact) => {
     const key = getContactKey(contact);
-    const excluded = (routingConfig.excludedContactIds || []).filter(Boolean);
+    const configToUse = currentConfigRef.current || routingConfig;
+    const excluded = (configToUse.excludedContactIds || []).filter(Boolean);
     return (
       excluded.includes(key) ||
       (contact.senderId && excluded.includes(contact.senderId)) ||
@@ -51,7 +68,8 @@ export default function ControlsPage() {
 
   const isIncluded = (contact) => {
     const key = getContactKey(contact);
-    const included = (routingConfig.includedContactIds || []).filter(Boolean);
+    const configToUse = currentConfigRef.current || routingConfig;
+    const included = (configToUse.includedContactIds || []).filter(Boolean);
     return (
       included.includes(key) ||
       (contact.senderId && included.includes(contact.senderId)) ||
@@ -62,7 +80,8 @@ export default function ControlsPage() {
 
   const handleToggleExclude = (contact) => {
     const key = getContactKey(contact);
-    const current = (routingConfig.excludedContactIds || []).filter(Boolean);
+    const baseConfig = currentConfigRef.current || routingConfig;
+    const current = (baseConfig.excludedContactIds || []).filter(Boolean);
     const alreadyExcluded = isExcluded(contact);
 
     let next;
@@ -73,15 +92,21 @@ export default function ControlsPage() {
         id !== (contact.handle ? contact.handle.replace(/^@/, '').toLowerCase() : '') &&
         id !== contact.id
       );
+      // If contact was excluded because aiEnabled was false, enable AI in 1 click
+      if (contact.aiEnabled === false) {
+        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
+      }
     } else {
       next = [...current, key];
     }
-    setRoutingConfig(prev => ({ ...prev, excludedContactIds: next }));
+    const updated = { ...baseConfig, excludedContactIds: next };
+    queueSave(updated);
   };
 
   const handleToggleInclude = (contact) => {
     const key = getContactKey(contact);
-    const current = (routingConfig.includedContactIds || []).filter(Boolean);
+    const baseConfig = currentConfigRef.current || routingConfig;
+    const current = (baseConfig.includedContactIds || []).filter(Boolean);
     const alreadyIncluded = isIncluded(contact);
 
     let next;
@@ -94,31 +119,49 @@ export default function ControlsPage() {
       );
     } else {
       next = [...current, key];
+      // Ensure AI is active for the included contact
+      if (contact.aiEnabled === false) {
+        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
+      }
     }
-    setRoutingConfig(prev => ({ ...prev, includedContactIds: next }));
+    const updated = { ...baseConfig, includedContactIds: next };
+    queueSave(updated);
   };
 
   const handleSelectAll = () => {
     const allKeys = friendNodes.map(n => getContactKey(n)).filter(Boolean);
-    if (routingConfig.chatMode === 'everyone_except') {
-      setRoutingConfig(prev => ({ ...prev, excludedContactIds: allKeys }));
-    } else if (routingConfig.chatMode === 'only_selected') {
-      setRoutingConfig(prev => ({ ...prev, includedContactIds: allKeys }));
+    const baseConfig = currentConfigRef.current || routingConfig;
+    let updated;
+    if (baseConfig.chatMode === 'everyone_except') {
+      updated = { ...baseConfig, excludedContactIds: allKeys };
+    } else if (baseConfig.chatMode === 'only_selected') {
+      updated = { ...baseConfig, includedContactIds: allKeys };
+    }
+    if (updated) {
+      queueSave(updated);
     }
   };
 
   const handleClearAll = () => {
-    if (routingConfig.chatMode === 'everyone_except') {
-      setRoutingConfig(prev => ({ ...prev, excludedContactIds: [] }));
-    } else if (routingConfig.chatMode === 'only_selected') {
-      setRoutingConfig(prev => ({ ...prev, includedContactIds: [] }));
+    const baseConfig = currentConfigRef.current || routingConfig;
+    let updated;
+    if (baseConfig.chatMode === 'everyone_except') {
+      updated = { ...baseConfig, excludedContactIds: [] };
+    } else if (baseConfig.chatMode === 'only_selected') {
+      updated = { ...baseConfig, includedContactIds: [] };
+    }
+    if (updated) {
+      queueSave(updated);
     }
   };
 
   const onSave = async () => {
     setIsSaving(true);
-    await saveRouting(routingConfig);
-    setIsSaving(false);
+    try {
+      await queueSave(currentConfigRef.current || routingConfig);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const activeCount = routingConfig.chatMode === 'everyone_except'
@@ -126,7 +169,7 @@ export default function ControlsPage() {
     : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
 
   return (
-    <div style={{ padding: '32px 36px 80px 36px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="page-container" style={{ maxWidth: '1200px' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
@@ -141,7 +184,7 @@ export default function ControlsPage() {
       </div>
 
       {/* 3 Main Mode Selector Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+      <div className="responsive-grid-3" style={{ marginBottom: '24px' }}>
         {[
           {
             id: 'everyone',
@@ -166,7 +209,10 @@ export default function ControlsPage() {
           return (
             <div
               key={mode.id}
-              onClick={() => setRoutingConfig(prev => ({ ...prev, chatMode: mode.id }))}
+              onClick={() => {
+                const updated = { ...(currentConfigRef.current || routingConfig), chatMode: mode.id };
+                queueSave(updated);
+              }}
               style={{
                 background: isSelected ? '#09090b' : '#ffffff',
                 color: isSelected ? '#ffffff' : '#09090b',
@@ -315,7 +361,7 @@ export default function ControlsPage() {
         </div>
 
         {/* Contact Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+        <div className="responsive-contacts-grid">
           {filteredFriends.map(contact => {
             const isEveryoneMode = routingConfig.chatMode === 'everyone';
             const isChecked = isEveryoneMode
