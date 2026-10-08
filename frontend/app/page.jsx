@@ -282,67 +282,6 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
-
-      <style jsx>{`
-        .dashboard-container {
-          padding: 36px 36px 80px 36px;
-          max-width: 1300px;
-          margin: 0 auto;
-        }
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-        .charts-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 14px;
-          margin-bottom: 14px;
-        }
-        .bottom-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-        @media (max-width: 1024px) {
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .charts-grid {
-            grid-template-columns: 1fr;
-          }
-          .bottom-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-        @media (max-width: 768px) {
-          .dashboard-container {
-            padding: 16px 14px 80px 14px;
-          }
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8px !important;
-          }
-          .stat-card-item {
-            padding: 12px 14px !important;
-            min-height: 96px !important;
-          }
-          .stat-card-value {
-            font-size: 1.6rem !important;
-            letter-spacing: -0.8px !important;
-          }
-          .charts-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-          .bottom-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-        }
-      `}</style>
     </div>
   );
 }

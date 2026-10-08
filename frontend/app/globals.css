@@ -346,3 +346,153 @@ input:focus, textarea:focus, select:focus {
   z-index: 100;
 }
 
+/* ═══════════════════════════════════════════
+   Floating Sidebar & Mobile Header
+   ═══════════════════════════════════════════ */
+.mobile-header {
+  display: none;
+}
+
+.floating-sidebar {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  bottom: 16px;
+  width: 250px;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 768px) {
+  .mobile-header {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #ffffff;
+    border-bottom: 1px solid #e4e4e7;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 60;
+  }
+
+  .floating-sidebar {
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.25s ease;
+  }
+
+  .floating-sidebar.mobile-open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Dashboard & Analytics Grid
+   ═══════════════════════════════════════════ */
+.dashboard-container {
+  padding: 36px 36px 80px 36px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px 14px 80px 14px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .stat-card-item {
+    padding: 12px 14px !important;
+    min-height: 96px !important;
+  }
+  .stat-card-value {
+    font-size: 1.6rem !important;
+    letter-spacing: -0.8px !important;
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .bottom-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   AI Interview Modal
+   ═══════════════════════════════════════════ */
+.mobile-header-save-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-header-save-btn {
+    display: inline-flex !important;
+  }
+  .interview-modal-container {
+    flex-direction: column !important;
+    height: 92vh !important;
+    max-height: 92vh !important;
+  }
+  .interview-chat-pane {
+    flex: 1 !important;
+    border-right: none !important;
+    border-bottom: 1px solid #e4e4e7 !important;
+  }
+  .interview-preview-pane {
+    display: none !important;
+  }
+}
+
