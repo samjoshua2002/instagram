@@ -109,10 +109,10 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div style={{ padding: '36px 36px 80px 36px', maxWidth: '1300px', margin: '0 auto' }}>
+    <div className="page-container dashboard-container">
 
       {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '28px' }}>
         <div>
           <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em' }}>COMMAND CENTER</div>
           <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-0.7px', marginTop: '4px', color: '#09090b' }}>Analytics Overview</h1>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
       </div>
 
       {/* STAT CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div className="stats-grid">
         {statCards.map((c, i) => (
           <div key={i} style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -146,7 +146,7 @@ export default function DashboardPage() {
       </div>
 
       {/* MAIN 3-COL CHARTS */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+      <div className="charts-grid">
 
         {/* Donut: Circle Breakdown */}
         <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
       </div>
 
       {/* BOTTOM ROW: AI Status + Routing */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div className="bottom-grid">
 
         {/* AI Split */}
         <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
@@ -253,7 +253,7 @@ export default function DashboardPage() {
             <Shield size={14} style={{ color: '#a1a1aa' }} />
           </div>
           <div style={{ background: '#09090b', borderRadius: '10px', padding: '16px 18px', marginBottom: '12px' }}>
-            <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace', fontWeight: '700', letterSpacing: '0.08em", marginBottom: '5px' }}>CURRENT MODE</div>
+            <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em', marginBottom: '5px' }}>CURRENT MODE</div>
             <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#fff', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
               {routingConfig.chatMode.replace(/_/g, ' ')}
             </div>
@@ -282,6 +282,64 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      <style jsx>{`
+        .dashboard-container {
+          padding: 36px 36px 80px 36px;
+          max-width: 1300px;
+          margin: 0 auto;
+        }
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+        .charts-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 14px;
+          margin-bottom: 14px;
+        }
+        .bottom-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        @media (max-width: 1024px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .charts-grid {
+            grid-template-columns: 1fr;
+          }
+          .bottom-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 768px) {
+          .dashboard-container {
+            padding: 16px 14px 80px 14px;
+          }
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .charts-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+          .bottom-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+        }
+        @media (max-width: 480px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </div>
   );
 }

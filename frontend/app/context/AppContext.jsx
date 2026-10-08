@@ -116,13 +116,21 @@ export function AppProvider({ children }) {
   };
   // Track names that were saved locally but not yet confirmed by server (prevent sync overwrite)
   const pendingSavedNamesRef = useRef(new Set());
+  const lastRoutingEditTimeRef = useRef(0);
+  const activeRoutingSavesRef = useRef(0);
+  const routingSaveQueueRef = useRef(Promise.resolve());
   const [selectedNode, setSelectedNode] = useState(null);
-  const [routingConfig, setRoutingConfig] = useState({
+  const [routingConfig, setRoutingConfigState] = useState({
     chatMode: 'everyone_except',
     excludedContactIds: ['29005624469042002', '877566845441453'], // Bhavani & Rajveer excluded by default for Sam's manual chat
     includedContactIds: [],
     globalBotActive: true
   });
+
+  const setRoutingConfig = useCallback((updater) => {
+    lastRoutingEditTimeRef.current = Date.now();
+    setRoutingConfigState(updater);
+  }, []);
   const [toastMessage, setToastMessage] = useState('');
 
   // AI Interview Modal State
@@ -150,7 +158,7 @@ export function AppProvider({ children }) {
       }
       const cachedConfig = localStorage.getItem(STORAGE_CONFIG_KEY);
       if (cachedConfig) {
-        setRoutingConfig(prev => ({ ...prev, ...JSON.parse(cachedConfig) }));
+        setRoutingConfigState(prev => ({ ...prev, ...JSON.parse(cachedConfig) }));
       }
     } catch (e) {
       console.warn('LocalStorage hydration note:', e);
@@ -230,21 +238,24 @@ export function AppProvider({ children }) {
       }
 
       // 2. Sync persona config
+      const editTimestampBefore = lastRoutingEditTimeRef.current;
       const personaRes = await fetch(`${API_BASE}/api/persona`);
       const pData = await personaRes.json();
       if (pData && (pData.chatMode || pData.globalBotActive !== undefined)) {
-        setRoutingConfig({
-          chatMode: pData.chatMode || 'everyone_except',
-          excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
-          includedContactIds: (pData.includedContactIds || []).filter(Boolean),
-          globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
-        });
-        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify({
-          chatMode: pData.chatMode || 'everyone_except',
-          excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
-          includedContactIds: (pData.includedContactIds || []).filter(Boolean),
-          globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
-        }));
+        if (activeRoutingSavesRef.current === 0 && lastRoutingEditTimeRef.current === editTimestampBefore && Date.now() - editTimestampBefore > 6000) {
+          setRoutingConfigState({
+            chatMode: pData.chatMode || 'everyone_except',
+            excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
+            includedContactIds: (pData.includedContactIds || []).filter(Boolean),
+            globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
+          });
+          localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify({
+            chatMode: pData.chatMode || 'everyone_except',
+            excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
+            includedContactIds: (pData.includedContactIds || []).filter(Boolean),
+            globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
+          }));
+        }
       }
     } catch (e) {
       console.warn('Backend sync note (using cached):', e.message);
@@ -593,35 +604,51 @@ export function AppProvider({ children }) {
 
   // Save Routing Rules
   const saveRouting = async (newConfig) => {
+    activeRoutingSavesRef.current += 1;
     setRoutingConfig(newConfig);
     try {
       localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(newConfig));
-      await fetch(`${API_BASE}/api/persona`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newConfig)
+      const putOperation = routingSaveQueueRef.current.then(async () => {
+        const res = await fetch(`${API_BASE}/api/persona`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newConfig)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
       });
+      routingSaveQueueRef.current = putOperation.catch(() => {});
+      await putOperation;
       showToast(`💾 Saved chat routing! Mode: ${newConfig.chatMode.toUpperCase()}`);
     } catch (e) {
       showToast(`💾 Saved locally! Mode: ${newConfig.chatMode.toUpperCase()}`);
+    } finally {
+      activeRoutingSavesRef.current = Math.max(0, activeRoutingSavesRef.current - 1);
     }
   };
 
   // Toggle Global Bot
   const toggleGlobalBot = async () => {
+    activeRoutingSavesRef.current += 1;
     const nextState = !routingConfig.globalBotActive;
     const nextConfig = { ...routingConfig, globalBotActive: nextState };
     setRoutingConfig(nextConfig);
     try {
       localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(nextConfig));
-      await fetch(`${API_BASE}/api/persona`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ globalBotActive: nextState })
+      const putOperation = routingSaveQueueRef.current.then(async () => {
+        const res = await fetch(`${API_BASE}/api/persona`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ globalBotActive: nextState })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
       });
+      routingSaveQueueRef.current = putOperation.catch(() => {});
+      await putOperation;
       showToast(nextState ? '🟢 Global Bot Activated!' : '⏸️ Global Bot Paused!');
     } catch (e) {
-      showToast(nextState ? '🟢 Global Bot Activated!' : '⏸️ Global Bot Paused!');
+      showToast(`⚠️ Saved locally (offline): ${nextState ? 'Global Bot Active' : 'Global Bot Paused'}`);
+    } finally {
+      activeRoutingSavesRef.current = Math.max(0, activeRoutingSavesRef.current - 1);
     }
   };
 

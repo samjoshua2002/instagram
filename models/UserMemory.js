@@ -100,6 +100,10 @@ const UserMemorySchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  reelsCount: {
+    type: Number,
+    default: 0,
+  },
   lastInteraction: {
     type: Date,
     default: Date.now,

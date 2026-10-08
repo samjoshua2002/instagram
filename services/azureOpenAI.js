@@ -107,25 +107,19 @@ class AzureOpenAIService {
     // Decide the actual directive based on context
     let knowledgeGapDirective;
 
-    if (msgCount < 5) {
-      // Brand new contact: just be warm and friendly. Zero questions. Let them lead.
-      knowledgeGapDirective = `This is a new contact (only ${msgCount} messages exchanged). PRIORITY: Be warm, genuine, and friendly. DO NOT ask any questions yet. Just vibe and respond naturally to what they say. Learn passively from what they share.`;
-
-    } else if (theyDeflected) {
-      // They gave a very short answer to our question — back off completely
-      knowledgeGapDirective = `They gave a very short response (possible deflection). DO NOT ask any follow-up question this reply. Just reply naturally and keep the vibe going.`;
-
+    if (theyDeflected) {
+      knowledgeGapDirective = `They gave a short reply to your previous question. Don't push or stack questions right now. Just vibe and text back naturally.`;
     } else if (alreadyAskedRecently) {
-      // We already asked something recently — don't stack questions
-      knowledgeGapDirective = `You already asked a question recently. DO NOT ask another one this reply. Just respond to what they said naturally.`;
-
-    } else if (topGap && msgCount >= 5 && msgCount % 5 === 0) {
-      // Allow ONE casual intel question every ~5 exchanges, only if conversation is flowing
-      knowledgeGapDirective = `Profile score: ${knowledgeScore}/100. If and ONLY IF the conversation has a natural pause or they asked you something back, you may casually drop in a question about: "${topGap}". Make it sound completely natural — like a friend asking mid-conversation, NOT like a form. If the conversation is mid-topic, skip the question entirely this reply.`;
-
+      knowledgeGapDirective = `You recently asked a question. Give them space to chat naturally without interrogation. Vibe smoothly.`;
+    } else if (topGap && knowledgeScore < 85) {
+      knowledgeGapDirective = `Current Intel Completeness: ${knowledgeScore}%.
+To naturally deepen your memory and learn who they are, casually weave in friendly curiosity about: "${topGap}".
+CRITICAL STYLE RULES:
+- Never interrogate or sound like an AI assistant or survey.
+- Talk like a real friend texting from their phone (e.g. "wait what's your name btw?", "what are u studying or working on rn?", "when's your bday btw?", "how do u know my page?").
+- If they asked you something, answer them first, then casually ask. Keep it super short (1 line) and natural.`;
     } else {
-      // Normal reply — learn passively from what they say, no active questioning
-      knowledgeGapDirective = `Profile score: ${knowledgeScore}/100. Just have a natural conversation. Passively pick up on any info they share (facts, dates, favorites, life updates) — the memory system will capture it automatically. Do NOT ask any questions this reply.`;
+      knowledgeGapDirective = `Profile Intel is strong (${knowledgeScore}%). Vibe comfortably like close friends. Passively absorb any new stories they share.`;
     }
 
 
@@ -141,6 +135,7 @@ ${config.toneGuidelines}
 
 TEXTING STYLE RULES:
 - TEXT LIKE A REAL HUMAN: No formal punctuation, no ending periods, no robotic grammar. Casual lowercase, chill phrases.
+- NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
 - KEEP IT CONCISE: 1–2 short lines max. Quick, natural, immediate DM replies.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths — sometimes 1 word, sometimes an emoji alone, sometimes a one-liner. Keep it unpredictable.
 - TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they've told you before naturally like a close friend would.
@@ -253,9 +248,9 @@ INSTRUCTIONS FOR THIS REPLY:
     try {
       const response = await this.client.chat.completions.create({
         messages,
-        temperature: 0.85,
-        frequency_penalty: 0.7,
-        presence_penalty: 0.6,
+        temperature: 0.95,
+        frequency_penalty: 0.35,
+        presence_penalty: 0.35,
         max_tokens: 250,
       });
 

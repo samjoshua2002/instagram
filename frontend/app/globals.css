@@ -131,8 +131,22 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ═══════════════════════════════════════════
-   RESPONSIVE — Desktop Table vs Mobile Cards
+   RESPONSIVE — Desktop Table vs Mobile Cards & Page Containers
    ═══════════════════════════════════════════ */
+
+/* Universal Page Container */
+.page-container {
+  padding: 32px 36px 80px 36px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
 
 /* Default (Desktop & Tablet) */
 .desktop-table-container {
@@ -142,7 +156,55 @@ input:focus, textarea:focus, select:focus {
   display: none;
 }
 
+/* Responsive 3-col Grid */
+.responsive-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+/* Responsive Contacts Grid */
+.responsive-contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* Responsive 2-col Form Grid */
+.responsive-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Facts / Intel Bounded Scroll List */
+.facts-scroll-container {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
 @media (max-width: 768px) {
+  .page-container {
+    padding: 16px 14px 70px 14px !important;
+  }
+
+  .responsive-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .responsive-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .responsive-contacts-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   /* Outer page padding */
   [data-page="relationships"] {
     padding: 14px !important;
