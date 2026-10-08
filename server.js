@@ -457,7 +457,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
  * Dispatches a single, smart AI reply after user finishes typing their message(s)
  */
 async function dispatchDebouncedReply(queueEntry) {
-  const { senderId, recipientId, userMemory, config, messages, lastMid } = queueEntry;
+  const { senderId, recipientId, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
 
   // Combine multiple messages if user sent a cluster
   const combinedText = messages.map(m => m.text).join('\n');
@@ -499,11 +499,21 @@ async function dispatchDebouncedReply(queueEntry) {
 
     // Generate response mimicking Sam Joshua
     console.log(`🤖 Generating Sam's response via Azure OpenAI...`);
-    replyText = await azureOpenAI.generateReply({
-      userMemory,
-      messageHistory: history,
-      incomingText: combinedText,
-    });
+    try {
+      replyText = await azureOpenAI.generateReply({
+        userMemory,
+        messageHistory: history,
+        incomingText: combinedText,
+      });
+    } catch (aiErr) {
+      console.error(`❌ [AI Generation Error]:`, aiErr.message);
+      // Fallback to natural short reply so recipient is never left on read
+      replyText = isReelOrShare ? '😂😂' : 'yoo wassup!';
+    }
+
+    if (!replyText || replyText.trim().length === 0) {
+      replyText = isReelOrShare ? '😂😂' : 'yoo wassup!';
+    }
 
     // Extract optional sticker tag
     const stickerMatch = replyText.match(/\[STICKER:\s*([a-zA-Z0-9_-]+)\]/i);
