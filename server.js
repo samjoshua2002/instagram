@@ -887,6 +887,10 @@ app.put('/api/persona', async (req, res) => {
       creatorName,
       instagramHandle,
       personaBio,
+      aboutMe,
+      characteristics,
+      textingHabits,
+      replyRules,
       toneGuidelines,
       sampleConversations,
       customKnowledge,
@@ -906,6 +910,10 @@ app.put('/api/persona', async (req, res) => {
     if (creatorName !== undefined) config.creatorName = creatorName;
     if (instagramHandle !== undefined) config.instagramHandle = instagramHandle;
     if (personaBio !== undefined) config.personaBio = personaBio;
+    if (aboutMe !== undefined) config.aboutMe = aboutMe;
+    if (characteristics !== undefined) config.characteristics = characteristics;
+    if (textingHabits !== undefined) config.textingHabits = textingHabits;
+    if (replyRules !== undefined) config.replyRules = replyRules;
     if (toneGuidelines !== undefined) config.toneGuidelines = toneGuidelines;
     if (sampleConversations !== undefined) config.sampleConversations = sampleConversations;
     if (customKnowledge !== undefined) config.customKnowledge = customKnowledge;
@@ -1072,15 +1080,20 @@ app.post('/api/cleanup', async (req, res) => {
 });
 
 // Social Graph Tree Chain Endpoints (auto-discovers newly talked contacts & enriches with live DP & per-person AI settings)
+let lastTrainGraphTime = 0;
 app.get('/api/social-graph', async (req, res) => {
   try {
-    // 1. Train and link graph from DB first so newly talked people appear immediately
-    await socialGraphService.trainGraphFromDB(UserMemory, Message);
+    // Only run trainGraphFromDB at most once every 5 minutes to prevent CPU blocking
+    const now = Date.now();
+    if (now - lastTrainGraphTime > 5 * 60 * 1000) {
+      lastTrainGraphTime = now;
+      socialGraphService.trainGraphFromDB(UserMemory, Message).catch(e => console.warn('trainGraph error:', e.message));
+    }
 
-    // 2. Fetch all social graph nodes
+    // Fetch all social graph nodes
     const nodes = await SocialGraph.find({}).sort({ updatedAt: -1 });
 
-    // 3. Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
+    // Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
     const enrichedNodes = await Promise.all(nodes.map(async (n) => {
       let memory = null;
       let effectiveSenderId = n.senderId || '';
@@ -1094,24 +1107,19 @@ app.get('/api/social-graph', async (req, res) => {
         if (memory && !effectiveSenderId) {
           effectiveSenderId = memory.senderId;
           // Persist the discovered senderId to social graph node
-          await SocialGraph.updateOne({ _id: n._id }, { senderId: effectiveSenderId });
+          SocialGraph.updateOne({ _id: n._id }, { senderId: effectiveSenderId }).catch(() => {});
         }
       }
 
       const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
 
-      // Retrieve persistent cumulative lifetime chats & reels count (immune to message pruning)
-      let chatsCount = n.chatsCount || 0;
-      let reelsCount = n.reelsCount || 0;
+      // Authoritative persistent cumulative lifetime chats & reels count (immune to message pruning)
+      const chatsCount = Math.max(n.chatsCount || 0, memory?.messageCount || 0);
+      const reelsCount = Math.max(n.reelsCount || 0, memory?.reelsCount || 0);
 
-      // Seed uninitialized SocialGraph counters from persistent UserMemory if available
-      if (chatsCount === 0 && memory?.messageCount > 0) {
-        chatsCount = memory.messageCount;
-        SocialGraph.updateOne({ _id: n._id, $or: [{ chatsCount: 0 }, { chatsCount: { $exists: false } }] }, { chatsCount }).catch(() => {});
-      }
-      if (reelsCount === 0 && memory?.reelsCount > 0) {
-        reelsCount = memory.reelsCount;
-        SocialGraph.updateOne({ _id: n._id, $or: [{ reelsCount: 0 }, { reelsCount: { $exists: false } }] }, { reelsCount }).catch(() => {});
+      // Keep database in sync in the background if either counter was higher
+      if (chatsCount > (n.chatsCount || 0) || reelsCount > (n.reelsCount || 0)) {
+        SocialGraph.updateOne({ _id: n._id }, { chatsCount, reelsCount }).catch(() => {});
       }
 
       return {

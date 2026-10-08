@@ -6,7 +6,8 @@ import { usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard, Users, Sliders, MessageSquare,
-  Sparkles, Terminal, Menu, X, Play, Pause, Bot
+  Sparkles, Terminal, Menu, X, Play, Pause, Bot,
+  UserCheck
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -18,7 +19,7 @@ export default function Sidebar() {
     { href: '/', label: 'Analytics Dashboard', icon: LayoutDashboard, code: '01' },
     { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
     { href: '/controls', label: 'Chat Control Rules', icon: Sliders, code: '03' },
-    { href: '/simulator', label: 'DM Simulator', icon: MessageSquare, code: '04' },
+    { href: '/settings', label: 'My Persona & Style', icon: UserCheck, code: '04' },
   ];
 
   const activeModeCount = routingConfig.chatMode === 'everyone_except'
