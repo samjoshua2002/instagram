@@ -128,126 +128,37 @@ export default function RelationshipsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id, selectedPerson?.name]);
 
-  // Live-refresh: poll server for updated profile every 15s while inner page is open
-  // This auto-fills birthday, facts, notes from live DM learning without manual refresh
+  // Optional background fetch of latest memory on person open (one-shot, non-blocking, no addFact loop)
   useEffect(() => {
     if (!selectedPerson?.senderId) return;
-    let cancelled = false;
+    let isCancelled = false;
 
-    const pollMemory = async () => {
+    const fetchLatestMemory = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/memory`);
-        if (!res.ok || cancelled) return;
+        if (!res.ok || isCancelled) return;
         const data = await res.json();
-        if (!data.memory || cancelled) return;
+        if (!data.memory || isCancelled) return;
         const mem = data.memory;
 
-        // Auto-fill birthday if server learned it from DMs and field is still empty
         const bday = (mem.importantDates || []).find(d =>
           d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
         );
         const autoDob = mem.dob || bday?.date || '';
-        if (autoDob) {
+        if (autoDob && !formData.dob) {
           setFormData(prev => ({ ...prev, dob: prev.dob || autoDob }));
         }
-
-        // Auto-update personal notes if server has richer summary
-        if (mem.personalNotes) {
-          setFormData(prev => ({
-            ...prev,
-            personalNotes: (!prev.personalNotes || prev.personalNotes.length < mem.personalNotes.length)
-              ? mem.personalNotes
-              : prev.personalNotes
-          }));
-        }
-
-        // Auto-add facts from memory learning
-        if (mem.facts?.length > 0 && selectedPerson) {
-          mem.facts.forEach(f => addFact(selectedPerson.id, f.fact || f));
-        }
-      } catch (e) { /* silent */ }
-    };
-
-    const interval = setInterval(pollMemory, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [selectedPerson?.senderId, selectedPerson?.id, addFact]);
-
-
-
-  // Auto-fetch & live sync intel from DMs when a person is opened
-  useEffect(() => {
-    if (!selectedPerson) return;
-    let isCancelled = false;
-
-    const autoSyncFromDMs = async () => {
-      try {
-        // Step 1: Trigger server-side memory extraction from live DMs (auto-learn + auto-cleanup)
-        if (selectedPerson.senderId) {
-          try {
-            const learnRes = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/learn`, { method: 'POST' });
-            const learnData = await learnRes.json();
-
-            // Step 2: If server returned updated memory, auto-fill birthday and important dates
-            if (learnData.memory && !isCancelled) {
-              const mem = learnData.memory;
-
-              // Auto-fill DOB if not already set
-              const bdayEntry = (mem.importantDates || []).find(d =>
-                d.title?.toLowerCase().includes('birth') || d.title?.toLowerCase().includes('bday')
-              );
-              const autoDob = mem.dob || bdayEntry?.date || '';
-              if (autoDob) {
-                setFormData(prev => ({
-                  ...prev,
-                  dob: prev.dob || autoDob
-                }));
-              }
-
-              // Auto-fill personal notes from rolling summary if empty
-              if (mem.personalNotes && !isCancelled) {
-                setFormData(prev => ({
-                  ...prev,
-                  personalNotes: prev.personalNotes || mem.personalNotes
-                }));
-              }
-
-              // Auto-fill facts from memory
-              if (Array.isArray(mem.facts) && mem.facts.length > 0 && selectedPerson) {
-                mem.facts.forEach(f => addFact(selectedPerson.id, f.fact || f));
-              }
-            }
-          } catch (learnErr) {
-            // non-critical — continue with AI autofill fallback
-          }
-        }
-
-        // Step 3: AI autofill from social graph as fallback
-        const autofill = await aiAutofillPerson(selectedPerson.name);
-        if (autofill && !isCancelled) {
-          setFormData(prev => ({
-            ...prev,
-            category: prev.category === 'online_friend' && autofill.category ? autofill.category : prev.category,
-            relationship: !prev.relationship && autofill.relationshipToSam ? autofill.relationshipToSam : prev.relationship,
-            dob: !prev.dob && autofill.dob ? autofill.dob : prev.dob,
-            personalNotes: prev.personalNotes ? (prev.personalNotes.includes(autofill.personalNotes || '') ? prev.personalNotes : `${prev.personalNotes}\n${autofill.personalNotes || ''}`) : (autofill.personalNotes || ''),
-            roastStyle: !prev.roastStyle && autofill.banterStyle ? autofill.banterStyle : prev.roastStyle
-          }));
-
-          if (Array.isArray(autofill.facts)) {
-            autofill.facts.forEach(f => addFact(selectedPerson.id, f));
-          }
+        if (mem.personalNotes && !formData.personalNotes) {
+          setFormData(prev => ({ ...prev, personalNotes: prev.personalNotes || mem.personalNotes }));
         }
       } catch (e) {
-        // silent background sync
+        // silent
       }
     };
 
-    autoSyncFromDMs();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [selectedPerson?.name, selectedPerson?.senderId, aiAutofillPerson, addFact]);
+    fetchLatestMemory();
+    return () => { isCancelled = true; };
+  }, [selectedPerson?.senderId]);
 
 
   // Overall Dashboard Metrics
