@@ -32,6 +32,54 @@ function escapeRegex(string) {
   return (string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// =========================================================================
+// MEDIA ATTACHMENT GOVERNOR (CONVERSATION PACING & HOURLY RATE-LIMITER)
+// Rules:
+// 1. Hourly rate cap: Safely protect against 100/hr limit (max 60/hr globally).
+// 2. Chat pacing: Must reply with at least 2 plain text messages before next GIF.
+// 3. Randomness: ~1 in 6 chance ("bullet in trigger out of 6") when eligible.
+// =========================================================================
+const userMediaTracker = new Map(); // senderId -> { textCountSinceMedia: number, lastMediaTime: number }
+const globalMediaTimestamps = []; // sliding 1-hour window timestamps of media sent
+
+function canSendMedia(senderId, isExplicitRequest = false) {
+  const now = Date.now();
+  // Prune timestamps older than 1 hour (3600000ms)
+  while (globalMediaTimestamps.length > 0 && globalMediaTimestamps[0] < now - 3600000) {
+    globalMediaTimestamps.shift();
+  }
+  // Hard cap to safeguard API quota
+  if (globalMediaTimestamps.length >= 60) {
+    console.log(`🛡️ [Media Governor]: Global hourly limit reached (${globalMediaTimestamps.length}/60 per hour). Suppressing media attachment.`);
+    return false;
+  }
+  // If user explicitly asks ("send a gif", "send meme"), allow immediately
+  if (isExplicitRequest) return true;
+
+  // Conversational pacing: at least 2 plain text replies before another GIF
+  const tracker = userMediaTracker.get(senderId) || { textCountSinceMedia: 3, lastMediaTime: 0 };
+  if (tracker.textCountSinceMedia < 2) {
+    console.log(`🛡️ [Media Governor]: User ${senderId} has only received ${tracker.textCountSinceMedia} text reply since last media (minimum 2 required). Suppressing media.`);
+    return false;
+  }
+  return true;
+}
+
+function recordMediaSent(senderId) {
+  const now = Date.now();
+  globalMediaTimestamps.push(now);
+  const tracker = userMediaTracker.get(senderId) || { textCountSinceMedia: 0, lastMediaTime: 0 };
+  tracker.textCountSinceMedia = 0;
+  tracker.lastMediaTime = now;
+  userMediaTracker.set(senderId, tracker);
+}
+
+function recordTextSent(senderId) {
+  const tracker = userMediaTracker.get(senderId) || { textCountSinceMedia: 0, lastMediaTime: 0 };
+  tracker.textCountSinceMedia = (tracker.textCountSinceMedia || 0) + 1;
+  userMediaTracker.set(senderId, tracker);
+}
+
 // Ensure public/uploads directory exists
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -544,36 +592,51 @@ async function dispatchDebouncedReply(queueEntry) {
     if (stickerMatch) {
       stickerType = stickerMatch[1].toLowerCase();
       replyText = replyText.replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
-    } else {
-      // 50% PRIORITY & KEYWORD ENFORCEMENT:
-      // If AI didn't tag an attachment, check if incoming text had strong reaction keywords or roll a ~45% random chance!
-      const lowerIn = (combinedText || '').toLowerCase();
-      const lowerReply = (replyText || '').toLowerCase();
+    }
 
+    const lowerIn = (combinedText || '').toLowerCase();
+    const lowerReply = (replyText || '').toLowerCase();
+    const isExplicitMediaRequest = /send (?:gif|meme|pic|image)|gif send|send a (?:gif|meme)|meme anupu|gif anupu/i.test(lowerIn);
+
+    // 1. SAFETY FILTER: Block any invalid 'sad' tag if discussing Furina, Genshin, anime, laughing, or no genuine sorrow
+    if (stickerType === 'sad') {
+      const isFurinaOrAnime = /furina|genshin|fontaine|anime|archon|drama queen/.test(lowerIn);
+      const isLaughing = /😂|💀|lol|lmao|rofl|haha|dead|dying/.test(lowerIn) || /😂|💀|lol|lmao/.test(lowerReply);
+      const isGenuineSorrow = /heartbroken|depressed|so sad rn|crying inside|hurting|grief/.test(lowerIn);
+      if (isFurinaOrAnime || isLaughing || !isGenuineSorrow) {
+        console.log(`🛡️ [Media Governor]: Rejected false-positive 'sad' tag for Furina/casual context.`);
+        stickerType = null;
+      }
+    }
+
+    // 2. GOVERNOR RATE & PACING CHECK:
+    // If AI appended an attachment, check if governor permits it (chat pacing: 2-3 text replies, and hourly limit < 60/hr)
+    if (stickerType && !canSendMedia(senderId, isExplicitMediaRequest)) {
+      console.log(`🛡️ [Media Governor]: Suppressed AI attachment [${stickerType}] to enforce 2-3 text pacing or hourly limit.`);
+      stickerType = null;
+    }
+
+    // 3. SPORADIC MEDIA DISPATCH (Only when Governor permits):
+    // Cadence: Reply 2 or 3 text messages in a row, then ~1 in 6 random chance ("bullet in trigger out of 6") or high-confidence reaction
+    if (!stickerType && canSendMedia(senderId, isExplicitMediaRequest)) {
       let detectedCat = null;
-      if (lowerIn.includes('sus') || lowerIn.includes('ai') || lowerIn.includes('bot') || lowerIn.includes('robot') || lowerIn.includes('fake') || lowerIn.includes('doubt')) {
+      if (isExplicitMediaRequest) {
+        detectedCat = 'joy';
+      } else if (lowerIn.includes('sus') || lowerIn.includes('are you a bot') || lowerIn.includes('ur a bot') || lowerIn.includes('fake ai') || lowerIn.includes('you are ai') || lowerIn.includes('doubt')) {
         detectedCat = 'side_eye';
-      } else if (lowerIn.includes('lol') || lowerIn.includes('lmao') || lowerIn.includes('dead') || lowerIn.includes('haha') || lowerIn.includes('rofl') || lowerReply.includes('😂') || lowerReply.includes('💀')) {
+      } else if (lowerIn.includes('lmao') || lowerIn.includes('rofl') || lowerIn.includes('dead af') || lowerIn.includes('dying rn')) {
         detectedCat = 'lol';
-      } else if (lowerIn.includes('what') || lowerIn.includes('huh') || lowerIn.includes('why') || lowerIn.includes('confus')) {
-        detectedCat = 'confused';
-      } else if (lowerIn.includes('omg') || lowerIn.includes('shock') || lowerIn.includes('wow') || lowerIn.includes('damn') || lowerIn.includes('no way')) {
+      } else if (lowerIn.includes('mind blown') || lowerIn.includes('shocking') || lowerIn.includes('no way bro')) {
         detectedCat = 'wonder';
-      } else if (lowerIn.includes('sad') || lowerIn.includes('cry') || lowerIn.includes('sob') || lowerIn.includes('hurt') || lowerReply.includes('😭') || lowerReply.includes('🥺')) {
-        detectedCat = 'sad';
-      } else if (lowerIn.includes('love') || lowerIn.includes('hype') || lowerIn.includes('happy') || lowerIn.includes('yay') || lowerReply.includes('❤️') || lowerReply.includes('🔥')) {
-        detectedCat = 'happy';
-      } else if (lowerIn.includes('cool') || lowerIn.includes('chill') || lowerIn.includes('bro') || lowerReply.includes('😎')) {
-        detectedCat = 'cool';
-      } else if (Math.random() < 0.45) {
-        // ~45% random roll (approx 2 out of 5 messages): pick a lively visual reaction
-        const pool = ['joy', 'lol', 'side_eye', 'cool', 'cat'];
+      } else if (Math.random() < (1 / 6)) {
+        // "Bullet in trigger out of 6" (~16.7% random chance when eligible after text messages):
+        const pool = ['joy', 'lol', 'side_eye', 'cool'];
         detectedCat = pool[Math.floor(Math.random() * pool.length)];
       }
 
       if (detectedCat) {
         stickerType = detectedCat;
-        console.log(`🎯 [Reaction Booster Triggered]: Auto-attached [${detectedCat}] (keyword or 50% frequency rule)`);
+        console.log(`🎯 [Media Governor Triggered]: Auto-attached [${detectedCat}] (cadence satisfied & 1/6 bullet chance hit)`);
       }
     }
 
@@ -624,15 +687,20 @@ async function dispatchDebouncedReply(queueEntry) {
 
     // If a sticker or media attachment was chosen, send the image/GIF directly to Instagram DM!
     let stickerSendResult = null;
+    let mediaWasSent = false;
     if (stickerType && stickerService.hasSticker(stickerType)) {
-      const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText + ' ' + (replyText || ''));
+      // GIFs react to the HUMAN'S chat message, never our AI reply text
+      const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText);
       if (stickerUrl) {
         if (hasText) {
           await new Promise(resolve => setTimeout(resolve, 600));
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending accessory ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
             const accRes = await instagramService.sendImageMessage(senderId, stickerUrl);
-            if (!accRes?.success) {
+            if (accRes?.success) {
+              mediaWasSent = true;
+              recordMediaSent(senderId);
+            } else {
               console.warn(`⚠️ [Sticker Dispatch]: Sticker accessory send unsuccessful:`, accRes?.error);
             }
           } catch (e) {
@@ -642,7 +710,10 @@ async function dispatchDebouncedReply(queueEntry) {
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending sticker-only ${stickerType} (${stickerUrl}) to ${senderId}...`);
             stickerSendResult = await instagramService.sendImageMessage(senderId, stickerUrl);
-            if (!stickerSendResult?.success) {
+            if (stickerSendResult?.success) {
+              mediaWasSent = true;
+              recordMediaSent(senderId);
+            } else {
               console.warn(`⚠️ [Sticker Dispatch]: Sticker-only send unsuccessful:`, stickerSendResult?.error);
             }
           } catch (e) {
@@ -655,6 +726,11 @@ async function dispatchDebouncedReply(queueEntry) {
     // Only persist if text delivery succeeded, or if sticker-only dispatch succeeded
     const textDelivered = hasText && sendResult?.success === true;
     const stickerDelivered = !hasText && stickerSendResult?.success === true;
+
+    // Track conversational text count if text was delivered without media
+    if (textDelivered && !mediaWasSent) {
+      recordTextSent(senderId);
+    }
 
     if (textDelivered || stickerDelivered) {
       const persistedText = textDelivered ? replyText : `[Sent ${stickerType} sticker]`;
@@ -2218,6 +2294,9 @@ app.listen(PORT, '0.0.0.0', () => {
   socialGraphService.seedInitialGraph().then(() => {
     return socialGraphService.trainGraphFromDB(UserMemory, Message);
   }).catch(e => console.error('❌ SocialGraph init error:', e.message));
+
+  // Seed predefined meme collection in MediaVault so DB always has relevant GIFs ready
+  stickerService.seedPredefinedIntoVault().catch(e => console.warn('MediaVault seed warning:', e.message));
 
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
