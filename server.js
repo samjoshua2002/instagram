@@ -1305,12 +1305,24 @@ app.post('/api/social-graph/node', async (req, res) => {
           lore: parsedLore,
           roastStyle: roastStyle || 'Banter back naturally matching their energy.',
           connections: parsedConnections,
+          ...(typeof req.body.chatsCount === 'number' ? { chatsCount: req.body.chatsCount } : {}),
+          ...(typeof req.body.reelsCount === 'number' ? { reelsCount: req.body.reelsCount } : {}),
           ...(finalProfilePic ? { profilePic: finalProfilePic } : {}),
           updatedAt: new Date()
         }
       },
       { upsert: true, returnDocument: 'after' }
     );
+
+    // Keep UserMemory in sync with any custom counts
+    if (finalSenderId) {
+      const memUpdates = {};
+      if (typeof req.body.chatsCount === 'number') memUpdates.messageCount = req.body.chatsCount;
+      if (typeof req.body.reelsCount === 'number') memUpdates.reelsCount = req.body.reelsCount;
+      if (Object.keys(memUpdates).length > 0) {
+        UserMemory.updateOne({ senderId: finalSenderId }, { $set: memUpdates }).catch(() => {});
+      }
+    }
 
     // If this node was renamed, clean up any old name documents in SocialGraph
     if (cleanOldName && cleanOldName.toLowerCase() !== cleanName.toLowerCase()) {

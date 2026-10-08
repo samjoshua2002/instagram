@@ -127,13 +127,13 @@ export default function DashboardPage() {
       {/* STAT CARDS */}
       <div className="stats-grid">
         {statCards.map((c, i) => (
-          <div key={i} style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
+          <div key={i} className="stat-card-item" style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{c.label}</span>
               <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>{c.icon}</div>
             </div>
             <div>
-              <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>{c.value}</div>
+              <div className="stat-card-value" style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>{c.value}</div>
               <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>{c.sub}</div>
             </div>
             {c.href ? (
@@ -322,8 +322,16 @@ export default function DashboardPage() {
             padding: 16px 14px 80px 14px;
           }
           .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          .stat-card-item {
+            padding: 12px 14px !important;
+            min-height: 96px !important;
+          }
+          .stat-card-value {
+            font-size: 1.6rem !important;
+            letter-spacing: -0.8px !important;
           }
           .charts-grid {
             grid-template-columns: 1fr;
@@ -332,11 +340,6 @@ export default function DashboardPage() {
           .bottom-grid {
             grid-template-columns: 1fr;
             gap: 12px;
-          }
-        }
-        @media (max-width: 480px) {
-          .stats-grid {
-            grid-template-columns: 1fr;
           }
         }
       `}</style>
