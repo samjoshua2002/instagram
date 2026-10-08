@@ -187,9 +187,44 @@ input:focus, textarea:focus, select:focus {
   padding-right: 4px;
 }
 
+/* Settings Full-Width Container */
+.settings-fullwidth {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 24px 32px 80px 32px !important;
+  margin: 0 !important;
+}
+
+/* Controls Card Container */
+.controls-card-container {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.control-contact-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
 @media (max-width: 768px) {
   .page-container {
     padding: 16px 14px 70px 14px !important;
+  }
+
+  .settings-fullwidth {
+    padding: 16px 14px 70px 14px !important;
+  }
+
+  .controls-card-container {
+    padding: 14px 12px !important;
+  }
+
+  .control-contact-card {
+    padding: 12px !important;
   }
 
   .responsive-form-grid {
@@ -198,11 +233,14 @@ input:focus, textarea:focus, select:focus {
   }
 
   .responsive-grid-3 {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
   }
 
   .responsive-contacts-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+    gap: 10px !important;
   }
 
   /* Outer page padding */
@@ -216,7 +254,8 @@ input:focus, textarea:focus, select:focus {
   }
 
   /* Stats grid: 2x2 compact on tablet/mobile */
-  .metrics-summary-grid {
+  .metrics-summary-grid,
+  .stats-grid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;

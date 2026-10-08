@@ -220,7 +220,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="page-container" style={{ maxWidth: '1100px' }}>
+    <div className="page-container settings-fullwidth" style={{ maxWidth: '100%', width: '100%' }}>
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
