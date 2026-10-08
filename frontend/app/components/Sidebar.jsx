@@ -7,7 +7,7 @@ import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard, Users, Sliders, MessageSquare,
   Sparkles, Terminal, Menu, X, Play, Pause, Bot,
-  UserCheck
+  UserCheck, Image as ImageIcon
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -20,6 +20,7 @@ export default function Sidebar() {
     { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
     { href: '/controls', label: 'Chat Control Rules', icon: Sliders, code: '03' },
     { href: '/settings', label: 'My Persona & Style', icon: UserCheck, code: '04' },
+    { href: '/vault', label: 'Media & Reaction Vault', icon: ImageIcon, code: '05' },
   ];
 
   const activeModeCount = routingConfig.chatMode === 'everyone_except'

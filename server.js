@@ -3,12 +3,15 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const connectDB = require('./config/db');
 
 // Models
 const UserMemory = require('./models/UserMemory');
 const Message = require('./models/Message');
 const PersonaConfig = require('./models/PersonaConfig');
+const MediaVault = require('./models/MediaVault');
 
 // Services
 const instagramService = require('./services/instagramService');
@@ -29,11 +32,32 @@ function escapeRegex(string) {
   return (string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Ensure public/uploads directory exists
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Multer Disk Storage Configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname).toLowerCase() || '.gif';
+    cb(null, `${unique}${ext}`);
+  }
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 } // 15MB limit
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(uploadsDir));
 
 // Webhook Verification Token
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secret_2025';
@@ -515,11 +539,11 @@ async function dispatchDebouncedReply(queueEntry) {
       replyText = isReelOrShare ? '😂😂' : 'yoo wassup!';
     }
 
-    // Extract optional sticker tag
-    const stickerMatch = replyText.match(/\[STICKER:\s*([a-zA-Z0-9_-]+)\]/i);
+    // Extract optional sticker or attachment tag (e.g. [ATTACHMENT: joy], [STICKER: lol])
+    const stickerMatch = replyText.match(/\[(?:STICKER|ATTACHMENT):\s*([a-zA-Z0-9_-]+)\]/i);
     if (stickerMatch) {
       stickerType = stickerMatch[1].toLowerCase();
-      replyText = replyText.replace(/\[STICKER:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+      replyText = replyText.replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
     }
 
     // Calculate dynamic human-realistic typing latency:
@@ -560,17 +584,17 @@ async function dispatchDebouncedReply(queueEntry) {
       clearInterval(typingPulseInterval);
     }
 
-    console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Sticker: ${stickerType}]` : ''}`);
+    console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Media/Sticker: ${stickerType}]` : ''}`);
 
     const hasText = !!(replyText && replyText.trim().length > 0);
     if (hasText) {
       sendResult = await instagramService.sendTextMessage(senderId, replyText, null, lastMid);
     }
 
-    // If a sticker was chosen, send the sticker image directly to Instagram DM!
+    // If a sticker or media attachment was chosen, send the image/GIF directly to Instagram DM!
     let stickerSendResult = null;
     if (stickerType && stickerService.hasSticker(stickerType)) {
-      const stickerUrl = stickerService.getStickerUrl(stickerType);
+      const stickerUrl = await stickerService.getStickerUrl(stickerType);
       if (stickerUrl) {
         if (hasText) {
           await new Promise(resolve => setTimeout(resolve, 600));
@@ -1056,6 +1080,152 @@ app.post('/api/test-token', async (req, res) => {
   } catch (err) {
     const errData = err.response ? err.response.data : err.message;
     res.status(400).json({ success: false, error: errData });
+  }
+});
+
+// ==========================================
+// MEDIA VAULT / REACTION MEDIA ATTACHMENTS API
+// ==========================================
+
+// Get all uploaded media and active categories
+app.get('/api/media-vault', async (req, res) => {
+  try {
+    const { category } = req.query;
+    const filter = category && category !== 'all' ? { category: category.toLowerCase().trim() } : {};
+    const items = await MediaVault.find(filter).sort({ createdAt: -1 });
+    const categories = await stickerService.getAllCategories();
+    res.json({ success: true, items, categories });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// File upload endpoint (multi-part form for JPG, PNG, GIF, WebP)
+app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No media file was uploaded.' });
+    }
+    const { category = 'joy', name, caption } = req.body;
+    const cleanCat = (category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+
+    const mime = (req.file.mimetype || '').toLowerCase();
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    let mediaType = 'image';
+    if (mime.includes('gif') || ext === '.gif') mediaType = 'gif';
+    else if (mime.includes('video') || ext === '.mp4') mediaType = 'video';
+
+    const baseUrl = (process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
+    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+
+    const newMedia = await MediaVault.create({
+      name: name && name.trim() ? name.trim() : req.file.originalname,
+      category: cleanCat,
+      url: fileUrl,
+      mediaType,
+      caption: caption || '',
+    });
+
+    console.log(`📸 [Media Vault Upload]: Saved ${mediaType} under category "${cleanCat}": ${fileUrl}`);
+    res.json({ success: true, item: newMedia });
+  } catch (err) {
+    console.error('❌ Media Vault upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// URL-based add (for direct Tenor / Giphy / image URLs)
+app.post('/api/media-vault', async (req, res) => {
+  try {
+    const { url, category = 'joy', name, caption, mediaType = 'gif' } = req.body;
+    if (!url || !url.trim()) {
+      return res.status(400).json({ error: 'Media URL is required' });
+    }
+    const cleanCat = (category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+
+    const newMedia = await MediaVault.create({
+      name: name && name.trim() ? name.trim() : 'Reaction Media',
+      category: cleanCat,
+      url: url.trim(),
+      mediaType: mediaType || 'gif',
+      caption: caption || '',
+    });
+
+    res.json({ success: true, item: newMedia });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete media item
+app.delete('/api/media-vault/:id', async (req, res) => {
+  try {
+    const item = await MediaVault.findById(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Media not found' });
+
+    // If locally uploaded file, delete from disk
+    if (item.url && item.url.includes('/uploads/')) {
+      const filename = path.basename(item.url);
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (_) {}
+      }
+    }
+
+    await MediaVault.findByIdAndDelete(req.params.id);
+    res.json({ success: true, deletedId: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all categories
+app.get('/api/media-vault/categories', async (req, res) => {
+  try {
+    const categories = await stickerService.getAllCategories();
+    res.json({ success: true, categories });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add new custom category
+app.post('/api/media-vault/categories', async (req, res) => {
+  try {
+    const { category } = req.body;
+    if (!category || !category.trim()) {
+      return res.status(400).json({ error: 'Category identifier is required' });
+    }
+    const cleanCat = category.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+
+    let config = await PersonaConfig.findOne();
+    if (!config) config = await PersonaConfig.create({});
+
+    config.customReactionCategories = config.customReactionCategories || [];
+    if (!config.customReactionCategories.includes(cleanCat)) {
+      config.customReactionCategories.push(cleanCat);
+      await config.save();
+    }
+
+    const categories = await stickerService.getAllCategories();
+    res.json({ success: true, categories });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete custom category
+app.delete('/api/media-vault/categories/:name', async (req, res) => {
+  try {
+    const catName = req.params.name.toLowerCase().trim();
+    let config = await PersonaConfig.findOne();
+    if (config && config.customReactionCategories) {
+      config.customReactionCategories = config.customReactionCategories.filter(c => c !== catName);
+      await config.save();
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
