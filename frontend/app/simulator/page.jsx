@@ -52,7 +52,7 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div style={{ padding: '36px 32px 60px 32px', maxWidth: '850px', margin: '0 auto', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="page-container" style={{ maxWidth: '850px', height: '100%', minHeight: 'calc(100vh - 70px)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ marginBottom: '20px' }}>
         <div style={{ fontSize: '0.72rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace", fontWeight: 'bold' }}>
           // INSTANT PERSONA TESTING PLAYGROUND

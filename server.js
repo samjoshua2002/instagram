@@ -325,6 +325,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   userMemory.lastInteraction = msgTime;
   userMemory.lastReminderSentAt = null;
   userMemory.messageCount = (userMemory.messageCount || 0) + 1;
+  if (isReelOrShare) {
+    userMemory.reelsCount = (userMemory.reelsCount || 0) + 1;
+  }
   userMemory.recentChatBuffer = (userMemory.recentChatBuffer || []).slice(-9);
   userMemory.recentChatBuffer.push({
     role: 'user',
@@ -332,6 +335,32 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     timestamp: msgTime,
   });
   await userMemory.save();
+
+  // Atomically persist cumulative counts to SocialGraph node
+  (async () => {
+    try {
+      const incPayload = {
+        chatsCount: 1,
+        ...(isReelOrShare ? { reelsCount: 1 } : {})
+      };
+      const res = await SocialGraph.updateOne({ senderId }, { $inc: incPayload });
+      if (res.matchedCount === 0) {
+        const cleanU = (userMemory.username || '').replace(/^@/, '').trim();
+        if (cleanU) {
+          await SocialGraph.updateOne(
+            {
+              $or: [
+                { instagramHandle: `@${cleanU}` },
+                { instagramHandle: cleanU },
+                { aliases: cleanU.toLowerCase() }
+              ]
+            },
+            { $inc: incPayload }
+          );
+        }
+      }
+    } catch (_) {}
+  })();
 
   // ─────────────────────────────────────────────────────────────────────────
   // ALWAYS LEARN — regardless of AI being paused, enabled, or globally off.
@@ -436,13 +465,8 @@ async function dispatchDebouncedReply(queueEntry) {
     console.log(`🧠 [Anti-Spam Batching]: Aggregated ${messages.length} messages from ${senderId}:\n"${combinedText}"`);
   }
 
-  // Send typing indicator to Instagram
+  // Send read receipt immediately
   await instagramService.sendSenderAction(senderId, 'mark_seen');
-  await instagramService.sendSenderAction(senderId, 'typing_on');
-
-  // Realistic typing delay
-  const delayMs = (config.typingDelaySeconds || 1.5) * 1000;
-  await new Promise(resolve => setTimeout(resolve, delayMs));
 
   // Fetch recent conversation history
   let history = await Message.find({
@@ -465,73 +489,125 @@ async function dispatchDebouncedReply(queueEntry) {
     }));
   }
 
-  // Generate response mimicking Sam Joshua
-  console.log(`🤖 Generating Sam's response via Azure OpenAI...`);
-  let replyText = await azureOpenAI.generateReply({
-    userMemory,
-    messageHistory: history,
-    incomingText: combinedText,
-  });
-
-  // Extract optional sticker tag
-  const stickerMatch = replyText.match(/\[STICKER:\s*([a-zA-Z0-9_-]+)\]/i);
+  let replyText = '';
   let stickerType = null;
-  if (stickerMatch) {
-    stickerType = stickerMatch[1].toLowerCase();
-    replyText = replyText.replace(/\[STICKER:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
-  }
-
-  console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Sticker: ${stickerType}]` : ''}`);
-
-  // Send reply via Instagram Graph API (swipe-to-reply quoting the last message in the batch)
   let sendResult = null;
-  if (replyText && replyText.trim().length > 0) {
-    sendResult = await instagramService.sendTextMessage(senderId, replyText, null, lastMid);
-  }
 
-  // If a sticker was chosen, send the sticker image directly to Instagram DM!
-  if (stickerType && stickerService.hasSticker(stickerType)) {
-    const stickerUrl = stickerService.getStickerUrl(stickerType);
-    if (stickerUrl) {
-      const delay = (replyText && replyText.trim().length > 0) ? 600 : 0;
-      setTimeout(async () => {
-        try {
-          console.log(`🖼️ [Sticker Dispatch]: Sending ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
-          await instagramService.sendImageMessage(senderId, stickerUrl);
-        } catch (e) {
-          console.error(`❌ [Sticker Error]: Failed to send sticker:`, e.message);
-        }
-      }, delay);
-    }
-  }
-
-  // Save outgoing message in DB
-  await Message.create({
-    senderId: recipientId,
-    recipientId: senderId,
-    role: 'assistant',
-    text: replyText || (stickerType ? `[Sent ${stickerType} sticker]` : ''),
-    mid: sendResult?.data?.message_id || `out_${Date.now()}`,
-    sentByAI: true,
-    timestamp: new Date(),
-  });
-
-  // Also append outgoing assistant reply to UserMemory recentChatBuffer
   try {
-    const memToUpdate = await UserMemory.findOne({ senderId });
-    if (memToUpdate) {
-      memToUpdate.recentChatBuffer = (memToUpdate.recentChatBuffer || []).slice(-9);
-      memToUpdate.recentChatBuffer.push({
-        role: 'assistant',
-        text: replyText || (stickerType ? `[Sent ${stickerType} sticker]` : ''),
-        timestamp: new Date()
-      });
-      await memToUpdate.save();
-    }
-  } catch (bufErr) {}
+    // Turn on typing indicator while generating
+    await instagramService.sendSenderAction(senderId, 'typing_on');
 
-  // Turn off typing
-  await instagramService.sendSenderAction(senderId, 'typing_off');
+    // Generate response mimicking Sam Joshua
+    console.log(`🤖 Generating Sam's response via Azure OpenAI...`);
+    replyText = await azureOpenAI.generateReply({
+      userMemory,
+      messageHistory: history,
+      incomingText: combinedText,
+    });
+
+    // Extract optional sticker tag
+    const stickerMatch = replyText.match(/\[STICKER:\s*([a-zA-Z0-9_-]+)\]/i);
+    if (stickerMatch) {
+      stickerType = stickerMatch[1].toLowerCase();
+      replyText = replyText.replace(/\[STICKER:\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+    }
+
+    // Refresh typing indicator right before delay so it stays active
+    await instagramService.sendSenderAction(senderId, 'typing_on');
+
+    // Calculate dynamic human-realistic typing latency:
+    // 1. Emoji / ultra-short reaction (<= 4 chars or pure emoji): reply very fast (350ms - 650ms), mimicking a quick emoji tap / reaction!
+    // 2. Short line / reel reply (5 - 30 chars): swift text reply (750ms - 1500ms)
+    // 3. Multi-line paragraph / 2+ lines (> 30 chars): authentic typing latency (1800ms - 4500ms) with typing_on indicator active.
+    const trimmedReply = (replyText || '').trim();
+    const charLength = trimmedReply.length;
+    const isEmojiOnly = /^[\p{Emoji}\s\d\p{P}]+$/u.test(trimmedReply);
+    const isUltraShort = charLength <= 4 || isEmojiOnly;
+
+    let humanTypingDelayMs;
+    if (isUltraShort || (isReelOrShare && charLength <= 8)) {
+      humanTypingDelayMs = Math.min(Math.max(charLength * 25 + 350, 350), 650);
+    } else if (charLength <= 30) {
+      humanTypingDelayMs = Math.min(Math.max(charLength * 30 + 550, 750), 1500);
+    } else {
+      humanTypingDelayMs = Math.min(Math.max(charLength * 36 + 800, 1800), 4500);
+    }
+    console.log(`⏳ [Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
+    await new Promise(resolve => setTimeout(resolve, humanTypingDelayMs));
+
+    console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Sticker: ${stickerType}]` : ''}`);
+
+    const hasText = !!(replyText && replyText.trim().length > 0);
+    if (hasText) {
+      sendResult = await instagramService.sendTextMessage(senderId, replyText, null, lastMid);
+    }
+
+    // If a sticker was chosen, send the sticker image directly to Instagram DM!
+    let stickerSendResult = null;
+    if (stickerType && stickerService.hasSticker(stickerType)) {
+      const stickerUrl = stickerService.getStickerUrl(stickerType);
+      if (stickerUrl) {
+        if (hasText) {
+          await new Promise(resolve => setTimeout(resolve, 600));
+          try {
+            console.log(`🖼️ [Sticker Dispatch]: Sending accessory ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
+            const accRes = await instagramService.sendImageMessage(senderId, stickerUrl);
+            if (!accRes?.success) {
+              console.warn(`⚠️ [Sticker Dispatch]: Sticker accessory send unsuccessful:`, accRes?.error);
+            }
+          } catch (e) {
+            console.error(`❌ [Sticker Error]: Failed to send sticker:`, e.message);
+          }
+        } else {
+          try {
+            console.log(`🖼️ [Sticker Dispatch]: Sending sticker-only ${stickerType} (${stickerUrl}) to ${senderId}...`);
+            stickerSendResult = await instagramService.sendImageMessage(senderId, stickerUrl);
+            if (!stickerSendResult?.success) {
+              console.warn(`⚠️ [Sticker Dispatch]: Sticker-only send unsuccessful:`, stickerSendResult?.error);
+            }
+          } catch (e) {
+            console.error(`❌ [Sticker Error]: Failed to send sticker:`, e.message);
+          }
+        }
+      }
+    }
+
+    // Only persist if text delivery succeeded, or if sticker-only dispatch succeeded
+    const textDelivered = hasText && sendResult?.success === true;
+    const stickerDelivered = !hasText && stickerSendResult?.success === true;
+
+    if (textDelivered || stickerDelivered) {
+      const persistedText = textDelivered ? replyText : `[Sent ${stickerType} sticker]`;
+
+      // Save outgoing message in DB
+      await Message.create({
+        senderId: recipientId,
+        recipientId: senderId,
+        role: 'assistant',
+        text: persistedText,
+        mid: sendResult?.data?.message_id || stickerSendResult?.data?.message_id || `out_${Date.now()}`,
+        sentByAI: true,
+        timestamp: new Date(),
+      });
+
+      // Also append outgoing assistant reply to UserMemory recentChatBuffer
+      try {
+        const memToUpdate = await UserMemory.findOne({ senderId });
+        if (memToUpdate) {
+          memToUpdate.recentChatBuffer = (memToUpdate.recentChatBuffer || []).slice(-9);
+          memToUpdate.recentChatBuffer.push({
+            role: 'assistant',
+            text: persistedText,
+            timestamp: new Date()
+          });
+          await memToUpdate.save();
+        }
+      } catch (bufErr) {}
+    }
+  } finally {
+    // Ensure typing indicator is always turned off
+    await instagramService.sendSenderAction(senderId, 'typing_off').catch(() => {});
+  }
 
   // Memory update already triggered earlier (ALWAYS-LEARN block) — no duplicate needed here.
   // But re-trigger if the reply itself contained new info (e.g. we asked a curiosity question)
@@ -912,6 +988,23 @@ app.post('/api/simulator/chat', async (req, res) => {
   }
 });
 
+// Remove fact from UserMemory
+app.delete('/api/conversations/:senderId/facts', async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    const { fact } = req.body;
+    if (!fact) return res.status(400).json({ error: 'Fact is required' });
+
+    await UserMemory.updateOne(
+      { senderId },
+      { $pull: { facts: { fact } } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Test Instagram Token Validity
 app.post('/api/test-token', async (req, res) => {
   try {
@@ -1007,27 +1100,18 @@ app.get('/api/social-graph', async (req, res) => {
 
       const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
 
-      // Compute total chats count and reels count (ONLY count their messages, not Sam's or AI's replies)
-      let chatsCount = 0;
-      let reelsCount = 0;
-      if (effectiveSenderId) {
-        try {
-          // Count only incoming messages sent by the contact
-          chatsCount = await Message.countDocuments({
-            senderId: effectiveSenderId,
-            role: 'user'
-          });
+      // Retrieve persistent cumulative lifetime chats & reels count (immune to message pruning)
+      let chatsCount = n.chatsCount || 0;
+      let reelsCount = n.reelsCount || 0;
 
-          // Count only reels shared by the contact
-          reelsCount = await Message.countDocuments({
-            senderId: effectiveSenderId,
-            role: 'user',
-            $or: [
-              { text: { $regex: /\[Shared an Instagram Reel|reel/i } },
-              { isReelOrShare: true }
-            ]
-          });
-        } catch (cntErr) {}
+      // Seed uninitialized SocialGraph counters from persistent UserMemory if available
+      if (chatsCount === 0 && memory?.messageCount > 0) {
+        chatsCount = memory.messageCount;
+        SocialGraph.updateOne({ _id: n._id, $or: [{ chatsCount: 0 }, { chatsCount: { $exists: false } }] }, { chatsCount }).catch(() => {});
+      }
+      if (reelsCount === 0 && memory?.reelsCount > 0) {
+        reelsCount = memory.reelsCount;
+        SocialGraph.updateOne({ _id: n._id, $or: [{ reelsCount: 0 }, { reelsCount: { $exists: false } }] }, { reelsCount }).catch(() => {});
       }
 
       return {

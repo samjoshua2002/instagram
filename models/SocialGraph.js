@@ -65,6 +65,14 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: 'Banter back naturally matching their energy.',
   },
+  chatsCount: {
+    type: Number,
+    default: 0,
+  },
+  reelsCount: {
+    type: Number,
+    default: 0,
+  },
   updatedAt: {
     type: Date,
     default: Date.now,
