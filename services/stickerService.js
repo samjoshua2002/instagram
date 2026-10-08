@@ -1,142 +1,98 @@
-const fs = require('fs');
-const path = require('path');
-
 /**
- * Curated catalog of reaction stickers matching Gen-Z chat habits & kawaii Genshin Impact emojis
+ * Curated catalog of universal, funny reaction GIFs & memes (Tenor / Giphy style)
+ * Replaces hardcoded Genshin stickers with relatable, funny reaction GIFs.
  */
 class StickerService {
   constructor() {
-    this.baseUrl = (process.env.RENDER_EXTERNAL_URL || 'https://instagram-ai-bot-64tf.onrender.com').replace(/\/+$/, '');
-    this.stickersDir = path.join(__dirname, '..', 'public', 'stickers');
     this.stickers = {};
-    this.allGenshinStickers = [];
-
+    this.allMemes = [];
     this.initCatalog();
   }
 
   initCatalog() {
-    // Standard reaction GIF / image backups
     this.stickers = {
-      crying: [
-        `${this.baseUrl}/stickers/crying.jpg`,
-        'https://media.giphy.com/media/L95W4wv8nnb9K/giphy.gif',
-        'https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif',
-      ],
-      big_eyes: [
-        `${this.baseUrl}/stickers/big_eyes.jpg`,
-        'https://media.giphy.com/media/vFKqnCdLPNOKc/giphy.gif',
+      laugh: [
+        'https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif',
+        'https://media.giphy.com/media/WpaVhEcp3nnBAj2LAc/giphy.gif',
       ],
       skull: [
         'https://media.giphy.com/media/vjjCsx3izfRSq4Ze05/giphy.gif',
       ],
-      fire: [
-        'https://media.giphy.com/media/nrXif9YExO9EI/giphy.gif',
-      ],
       side_eye: [
         'https://media.giphy.com/media/H5C8CevNMbpBqNqFjl/giphy.gif',
+      ],
+      shock: [
+        'https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif',
+      ],
+      crying: [
+        'https://media.giphy.com/media/L95W4wv8nnb9K/giphy.gif',
+      ],
+      confused: [
+        'https://media.giphy.com/media/g01ZnwAUvutuK8GIQn/giphy.gif',
+        'https://media.giphy.com/media/l3q2K5jinAlChoCLS/giphy.gif',
+      ],
+      cat: [
+        'https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif',
+        'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif',
+        'https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif',
+      ],
+      fire: [
+        'https://media.giphy.com/media/nrXif9YExO9EI/giphy.gif',
       ],
       heart: [
         'https://media.giphy.com/media/26BRv0ThflsDTjDUs/giphy.gif',
       ],
-      genshin: [],
-      kawaii: [],
-      paimon: [],
-      hutao: [],
-      klee: [],
-      nahida: [],
-      furina: [],
-      raiden: [],
-      yaemiko: [],
-      ganyu: [],
-      xiao: [],
-      venti: [],
-      qiqi: [],
-      keqing: [],
-      mona: [],
-      amber: [],
     };
 
-    // Scan public/stickers directory and load all available files dynamically
-    try {
-      if (fs.existsSync(this.stickersDir)) {
-        const files = fs.readdirSync(this.stickersDir);
-        for (const file of files) {
-          const lower = file.toLowerCase();
-          const fileUrl = `${this.baseUrl}/stickers/${file}`;
-
-          if (lower.startsWith('genshin_')) {
-            this.allGenshinStickers.push(fileUrl);
-            this.stickers.genshin.push(fileUrl);
-            this.stickers.kawaii.push(fileUrl);
-
-            // Categorize by character
-            if (lower.includes('paimon')) this.stickers.paimon.push(fileUrl);
-            if (lower.includes('hu_tao') || lower.includes('hutao')) this.stickers.hutao.push(fileUrl);
-            if (lower.includes('klee')) this.stickers.klee.push(fileUrl);
-            if (lower.includes('nahida')) this.stickers.nahida.push(fileUrl);
-            if (lower.includes('furina')) this.stickers.furina.push(fileUrl);
-            if (lower.includes('raiden')) this.stickers.raiden.push(fileUrl);
-            if (lower.includes('yae')) this.stickers.yaemiko.push(fileUrl);
-            if (lower.includes('ganyu')) this.stickers.ganyu.push(fileUrl);
-            if (lower.includes('xiao')) this.stickers.xiao.push(fileUrl);
-            if (lower.includes('venti')) this.stickers.venti.push(fileUrl);
-            if (lower.includes('qiqi')) this.stickers.qiqi.push(fileUrl);
-            if (lower.includes('keqing')) this.stickers.keqing.push(fileUrl);
-            if (lower.includes('mona')) this.stickers.mona.push(fileUrl);
-            if (lower.includes('amber')) this.stickers.amber.push(fileUrl);
-          } else if (lower.includes('crying')) {
-            this.stickers.crying.unshift(fileUrl);
-          } else if (lower.includes('big_eyes')) {
-            this.stickers.big_eyes.unshift(fileUrl);
-            this.stickers.kawaii.push(fileUrl);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[StickerService] Failed to read public/stickers directory:', err.message);
-    }
-
-    console.log(`[StickerService] Indexed ${this.allGenshinStickers.length} Genshin stickers across ${Object.keys(this.stickers).length} categories.`);
+    // Flatten all into general meme pool
+    this.allMemes = Object.values(this.stickers).flat();
   }
 
   hasSticker(type) {
     if (!type) return false;
     const cleanType = type.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
-    if (this.stickers[cleanType] && this.stickers[cleanType].length > 0) return true;
-    if (cleanType.includes('genshin') || cleanType.includes('chibi') || cleanType.includes('anime') || cleanType.includes('cute')) {
-      return this.allGenshinStickers.length > 0;
+    // Strictly reject genshin / anime stickers
+    if (cleanType.includes('genshin') || cleanType.includes('paimon') || cleanType.includes('furina') || cleanType.includes('klee')) {
+      return false;
     }
-    return false;
+    return true;
   }
 
   getStickerUrl(type) {
     if (!type) return null;
     const cleanType = type.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
-    // Direct match
-    let list = this.stickers[cleanType];
-
-    // Fuzzy character matching
-    if (!list || list.length === 0) {
-      if (cleanType.includes('paimon')) list = this.stickers.paimon;
-      else if (cleanType.includes('tao')) list = this.stickers.hutao;
-      else if (cleanType.includes('klee')) list = this.stickers.klee;
-      else if (cleanType.includes('nahida')) list = this.stickers.nahida;
-      else if (cleanType.includes('furina')) list = this.stickers.furina;
-      else if (cleanType.includes('raiden')) list = this.stickers.raiden;
-      else if (cleanType.includes('yae')) list = this.stickers.yaemiko;
-      else if (cleanType.includes('ganyu')) list = this.stickers.ganyu;
-      else if (cleanType.includes('xiao')) list = this.stickers.xiao;
-      else if (cleanType.includes('cry') || cleanType.includes('sad')) list = this.stickers.crying;
-      else if (cleanType.includes('eye') || cleanType.includes('plead')) list = this.stickers.big_eyes;
-      else if (cleanType.includes('genshin') || cleanType.includes('chibi') || cleanType.includes('kawaii') || cleanType.includes('cute')) {
-        list = this.allGenshinStickers;
-      }
+    // Strictly reject any genshin / anime stickers
+    if (cleanType.includes('genshin') || cleanType.includes('paimon') || cleanType.includes('furina') || cleanType.includes('klee')) {
+      return null;
     }
 
+    let list = this.stickers[cleanType];
+
+    // Fuzzy matching for reaction types
     if (!list || list.length === 0) {
-      // Fallback to random Genshin sticker if any
-      list = this.allGenshinStickers;
+      if (cleanType.includes('laugh') || cleanType.includes('haha') || cleanType.includes('lmao') || cleanType.includes('rofl')) {
+        list = this.stickers.laugh;
+      } else if (cleanType.includes('skull') || cleanType.includes('dead')) {
+        list = this.stickers.skull;
+      } else if (cleanType.includes('side') || cleanType.includes('sus') || cleanType.includes('bombastic')) {
+        list = this.stickers.side_eye;
+      } else if (cleanType.includes('shock') || cleanType.includes('omg') || cleanType.includes('wow') || cleanType.includes('what')) {
+        list = this.stickers.shock;
+      } else if (cleanType.includes('cry') || cleanType.includes('sad') || cleanType.includes('tear')) {
+        list = this.stickers.crying;
+      } else if (cleanType.includes('confus') || cleanType.includes('idk') || cleanType.includes('travolta')) {
+        list = this.stickers.confused;
+      } else if (cleanType.includes('cat') || cleanType.includes('kitten')) {
+        list = this.stickers.cat;
+      } else if (cleanType.includes('fire') || cleanType.includes('lit') || cleanType.includes('hype')) {
+        list = this.stickers.fire;
+      } else if (cleanType.includes('heart') || cleanType.includes('love')) {
+        list = this.stickers.heart;
+      } else {
+        // Fallback to random funny cat/laugh meme
+        list = this.stickers.cat.concat(this.stickers.laugh);
+      }
     }
 
     if (!list || list.length === 0) return null;
