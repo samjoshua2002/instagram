@@ -120,6 +120,13 @@ export function AppProvider({ children }) {
   const activeRoutingSavesRef = useRef(0);
   const routingSaveQueueRef = useRef(Promise.resolve());
   const [selectedNode, setSelectedNode] = useState(null);
+  
+  // Authentication & Session State
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+
   const [routingConfig, setRoutingConfigState] = useState({
     chatMode: 'everyone_except',
     excludedContactIds: ['29005624469042002', '877566845441453'], // Bhavani & Rajveer excluded by default for Sam's manual chat
@@ -140,9 +147,73 @@ export function AppProvider({ children }) {
   // Link Instagram ID Modal State
   const [linkingTargetPerson, setLinkingTargetPerson] = useState(null);
 
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg, type = 'info') => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 4000);
+  }, []);
+
+  const login = useCallback((jwtToken, userData) => {
+    localStorage.setItem('chatter_jwt_token', jwtToken);
+    setToken(jwtToken);
+    setUser(userData);
+    showToast?.(`Welcome back, ${userData?.firstName || 'Sam'}!`, 'success');
+  }, [showToast]);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('chatter_jwt_token');
+    setToken(null);
+    setUser(null);
+    showToast?.('Signed out successfully.', 'info');
+  }, [showToast]);
+
+  const updateUserProfile = useCallback((updatedUser) => {
+    setUser(prev => ({ ...prev, ...updatedUser }));
+  }, []);
+
+  // Intercept window.fetch to automatically attach Bearer token and check on load
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const originalFetch = window.fetch;
+    window.fetch = async (url, options = {}) => {
+      const storedToken = localStorage.getItem('chatter_jwt_token');
+      if (storedToken && typeof url === 'string') {
+        const headers = new Headers(options.headers || {});
+        if (!headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${storedToken}`);
+        }
+        return originalFetch(url, { ...options, headers });
+      }
+      return originalFetch(url, options);
+    };
+
+    const savedToken = localStorage.getItem('chatter_jwt_token');
+    if (savedToken) {
+      setToken(savedToken);
+      originalFetch(`${API_BASE}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${savedToken}` }
+      })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Session expired');
+      })
+      .then(userData => {
+        setUser(userData);
+        setAuthLoading(false);
+      })
+      .catch(() => {
+        localStorage.removeItem('chatter_jwt_token');
+        setToken(null);
+        setUser(null);
+        setAuthLoading(false);
+      });
+    } else {
+      setAuthLoading(false);
+    }
+
+    return () => {
+      window.fetch = originalFetch;
+    };
   }, []);
 
   // Hydration from LocalStorage with instant deduplication & live polling
@@ -827,7 +898,15 @@ export function AppProvider({ children }) {
         lookupContact,
         extractFromRawChat,
         syncBackend,
-        API_BASE
+        API_BASE,
+        user,
+        token,
+        authLoading,
+        login,
+        logout,
+        updateUserProfile,
+        isPasskeyModalOpen,
+        setIsPasskeyModalOpen,
       }}
     >
       {children}
