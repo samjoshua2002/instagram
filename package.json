@@ -12,13 +12,19 @@
   "description": "",
   "dependencies": {
     "@marcbachmann/cel-js": "^8.0.0",
+    "@simplewebauthn/server": "^14.0.3",
     "axios": "^1.20.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
     "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.2",
     "multer": "^2.4.0",
-    "openai": "^7.23.0"
+    "nodemailer": "^10.1.7",
+    "openai": "^7.23.0",
+    "otplib": "^13.5.0",
+    "qrcode": "^1.5.4"
   }
 }

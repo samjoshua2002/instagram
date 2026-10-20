@@ -22,12 +22,16 @@ const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
+const { router: authRouter, requireAuth } = require('./routes/auth');
+const authService = require('./services/authService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB & Initialize owner account
+connectDB().then(() => {
+  authService.ensureOwnerUser();
+});
 
 function escapeRegex(string) {
   return (string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -107,6 +111,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(uploadsDir));
+
+// Authentication & Passkey Endpoints
+app.use('/api/auth', authRouter);
+
+// Secure private dashboard endpoints (requires valid JWT session or Passkey)
+app.use('/api/conversations', requireAuth);
+app.use('/api/social-graph', requireAuth);
+app.use('/api/persona', requireAuth);
+app.use('/api/media-vault', requireAuth);
+app.use('/api/simulator', requireAuth);
+app.use('/api/memory', requireAuth);
+app.use('/api/contacts', requireAuth);
+app.use('/api/giphy', requireAuth);
 
 // Webhook Verification Token
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secret_2025';

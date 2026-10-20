@@ -7,12 +7,12 @@ import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard, Users, Sliders, MessageSquare,
   Sparkles, Terminal, Menu, X, Play, Pause, Bot,
-  UserCheck, Image as ImageIcon
+  UserCheck, Image as ImageIcon, Fingerprint, LogOut
 } from 'lucide-react';
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { routingConfig, toggleGlobalBot, startAiInterview } = useApp();
+  const { routingConfig, toggleGlobalBot, startAiInterview, user, logout, setIsPasskeyModalOpen } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -197,6 +197,84 @@ export default function Sidebar() {
               </>
             )}
           </button>
+
+          {/* User Profile & Security Footer */}
+          <div style={{
+            marginTop: '8px',
+            padding: '10px',
+            background: '#fafafa',
+            border: '1px solid #e4e4e7',
+            borderRadius: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  background: '#09090b',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: '700'
+                }}>
+                  {user?.firstName ? user.firstName.charAt(0) : 'S'}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#09090b', lineHeight: 1.2 }}>
+                    {user?.firstName || 'Sam'} {user?.lastName || 'Joshua'}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#71717a' }}>
+                    @{user?.instagramUsername || 'catovidz'} • {user?.accountType || 'Personal'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={logout}
+                title="Sign out of Chatter OS"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+
+            <button
+              onClick={() => setIsPasskeyModalOpen(true)}
+              style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1px solid #e4e4e7',
+                borderRadius: '6px',
+                padding: '6px 8px',
+                fontSize: '0.72rem',
+                fontWeight: '600',
+                color: '#09090b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <Fingerprint size={13} color="#09090b" />
+              <span>Passkeys & 2FA</span>
+            </button>
+          </div>
         </div>
       </aside>
     </>
