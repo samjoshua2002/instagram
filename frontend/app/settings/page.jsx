@@ -60,12 +60,27 @@ export default function SettingsPage() {
   }, []);
 
   const fetchPersona = async () => {
-    setLoading(true);
+    // Only show skeleton if no cached persona data is already loaded
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('chatter_persona_cached');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.creatorName) {
+            setFormData(prev => ({ ...prev, ...parsed }));
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        // ignore localStorage parse error
+      }
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/persona`);
       if (res.ok) {
         const data = await res.json();
-        setFormData({
+        const updated = {
           creatorName: data.creatorName || 'Sam Joshua',
           instagramHandle: data.instagramHandle || '@catovidz',
           personaBio: data.personaBio || '',
@@ -79,7 +94,11 @@ export default function SettingsPage() {
           sampleConversations: Array.isArray(data.sampleConversations) ? data.sampleConversations : [],
           typingDelaySeconds: data.typingDelaySeconds || 1.5,
           giphyApiKey: data.giphyApiKey || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
-        });
+        };
+        setFormData(updated);
+        try {
+          localStorage.setItem('chatter_persona_cached', JSON.stringify(updated));
+        } catch (e) {}
       }
     } catch (err) {
       console.error('Failed to load persona config:', err);
@@ -242,9 +261,75 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <RefreshCw size={28} className="animate-spin" style={{ color: '#09090b', marginBottom: '16px' }} />
-        <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#71717a' }}>Loading your persona settings...</h3>
+      <div className="page-container settings-fullwidth" style={{ maxWidth: '100%', width: '100%' }}>
+        {/* Skeleton Page Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <div className="skeleton" style={{ width: '82px', height: '22px', borderRadius: '4px' }} />
+              <div className="skeleton" style={{ width: '180px', height: '14px', borderRadius: '4px' }} />
+            </div>
+            <div className="skeleton" style={{ width: '320px', height: '32px', borderRadius: '6px', marginBottom: '10px' }} />
+            <div className="skeleton" style={{ width: '480px', maxWidth: '100%', height: '16px', borderRadius: '4px' }} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="skeleton" style={{ width: '84px', height: '36px', borderRadius: '6px' }} />
+            <div className="skeleton" style={{ width: '124px', height: '36px', borderRadius: '6px' }} />
+          </div>
+        </div>
+
+        {/* Skeleton Navigation Tabs */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', borderBottom: '1px solid #e4e4e7' }}>
+          {[120, 140, 110, 115, 125, 135, 120].map((w, idx) => (
+            <div
+              key={idx}
+              className="skeleton"
+              style={{
+                width: `${w}px`,
+                height: '38px',
+                borderRadius: '8px',
+                flexShrink: 0
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Skeleton Form Cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+            <div className="skeleton" style={{ width: '180px', height: '20px', marginBottom: '16px' }} />
+            <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
+              <div>
+                <div className="skeleton" style={{ width: '100px', height: '14px', marginBottom: '8px' }} />
+                <div className="skeleton" style={{ width: '100%', height: '40px' }} />
+              </div>
+              <div>
+                <div className="skeleton" style={{ width: '120px', height: '14px', marginBottom: '8px' }} />
+                <div className="skeleton" style={{ width: '100%', height: '40px' }} />
+              </div>
+            </div>
+            <div>
+              <div className="skeleton" style={{ width: '160px', height: '14px', marginBottom: '8px' }} />
+              <div className="skeleton" style={{ width: '100%', height: '40px' }} />
+            </div>
+          </div>
+
+          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div className="skeleton" style={{ width: '220px', height: '20px' }} />
+              <div className="skeleton" style={{ width: '100px', height: '20px' }} />
+            </div>
+            <div className="skeleton" style={{ width: '70%', height: '14px', marginBottom: '16px' }} />
+            <div className="skeleton" style={{ width: '100%', height: '130px' }} />
+          </div>
+
+          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+            <div className="skeleton" style={{ width: '280px', height: '20px', marginBottom: '12px' }} />
+            <div className="skeleton" style={{ width: '60%', height: '14px', marginBottom: '16px' }} />
+            <div className="skeleton" style={{ width: '100%', height: '110px' }} />
+          </div>
+        </div>
       </div>
     );
   }
