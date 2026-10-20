@@ -239,6 +239,80 @@ router.post('/oneauth/verify-setup-otp', async (req, res) => {
 ;
 
 /**
+ * GET /api/auth/oneauth/qr
+ * Direct QR Code retrieval for easy phone scanning on the login screen
+ */
+router.get('/oneauth/qr', async (req, res) => {
+  try {
+    const email = (req.query.email || 'guidetalk.app@gmail.com').trim().toLowerCase();
+    let user = await User.findOne({
+      $or: [{ email }, { username: email }]
+    });
+    if (!user) {
+      user = await User.findOne({ username: 'samjoshua' });
+    }
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.twoFactor?.secret) {
+      const { generateSecret } = require('otplib');
+      user.twoFactor = user.twoFactor || {};
+      user.twoFactor.secret = generateSecret();
+      user.twoFactor.enabled = true;
+      await user.save();
+    }
+
+    const totpData = await authService.getTotpQrCode(user);
+    res.json({
+      success: true,
+      ...totpData,
+    });
+  } catch (err) {
+    console.error('❌ OneAuth QR error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password/verify-oneauth
+ * Reset password instantly using Zoho OneAuth code (bypasses email timeouts completely)
+ */
+router.post('/forgot-password/verify-oneauth', async (req, res) => {
+  try {
+    const { identifier = 'guidetalk.app@gmail.com', totpCode, newPassword } = req.body;
+    if (!identifier || !totpCode || !newPassword) {
+      return res.status(400).json({ error: 'Username/Email, OneAuth code, and new password are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    const cleanIdentifier = identifier.trim().toLowerCase();
+    const user = await User.findOne({
+      $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }]
+    });
+
+    if (!user || !user.twoFactor?.secret) {
+      return res.status(400).json({ error: 'OneAuth not configured for this account' });
+    }
+
+    const isValid = authService.verifyTotp(user, totpCode);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid 6-digit OneAuth code. Check your app and try again.' });
+    }
+
+    user.passwordHash = await User.hashPassword(newPassword);
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
+  } catch (err) {
+    console.error('❌ OneAuth password reset error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/auth/forgot-password/send-otp
  * Generates and sends a 6-digit OTP code to Sam's email
  */
@@ -250,7 +324,6 @@ router.post('/forgot-password/send-otp', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      // Return success anyway to avoid user enumeration
       return res.json({ success: true, message: 'If this email exists, a verification code has been sent.' });
     }
 
@@ -266,7 +339,7 @@ router.post('/forgot-password/send-otp', async (req, res) => {
     res.json({ success: true, message: `A 6-digit verification code has been sent to ${user.email}` });
   } catch (err) {
     console.error('❌ Send OTP error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Email delivery failed or timed out. You can also reset password using your Zoho OneAuth app code directly!' });
   }
 });
 
