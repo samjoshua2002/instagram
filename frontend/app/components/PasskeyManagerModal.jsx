@@ -89,9 +89,19 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
+  const getAuthHeaders = () => {
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : '');
+    return {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+    };
+  };
+
   const loadUserData = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/me`);
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setPasskeys(data.passkeys || []);
@@ -121,27 +131,38 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     try {
       const optionsRes = await fetch(`${API_BASE}/api/auth/passkey/register-options`, {
         method: 'POST',
+        headers: getAuthHeaders(),
       });
-      if (!optionsRes.ok) throw new Error('Failed to start passkey registration');
-      const options = await optionsRes.json();
+      const options = await optionsRes.json().catch(() => ({}));
+      if (!optionsRes.ok) throw new Error(options.error || 'Failed to start passkey registration');
 
       const registration = await startRegistration({ optionsJSON: options });
-
       const finalDeviceName = passkeyName.trim() || detectCurrentDevice();
 
       const verifyRes = await fetch(`${API_BASE}/api/auth/passkey/register-verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           response: registration,
           name: finalDeviceName,
         }),
       });
-      const verifyData = await verifyRes.json();
+      const verifyData = await verifyRes.json().catch(() => ({}));
       if (!verifyRes.ok) throw new Error(verifyData.error || 'Failed to verify passkey');
 
       showToast?.(`Passkey for ${finalDeviceName} linked successfully!`, 'success');
       loadUserData();
+      // Update remembered account in localStorage
+      try {
+        const cached = localStorage.getItem('chatter_remembered_account');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          localStorage.setItem('chatter_remembered_account', JSON.stringify({
+            ...parsed,
+            hasPasskeys: true,
+          }));
+        }
+      } catch (e) {}
     } catch (err) {
       if (err.name === 'NotAllowedError') {
         showToast?.('Passkey registration was cancelled.', 'warning');
@@ -158,6 +179,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     try {
       const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         showToast?.('Passkey removed', 'success');
@@ -173,7 +195,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     try {
       const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: editingPasskeyName.trim() }),
       });
       if (res.ok) {
@@ -189,7 +211,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
   const loadTotpQrCode = async () => {
     setTotpLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/totp-setup`);
+      const res = await fetch(`${API_BASE}/api/auth/totp-setup`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setTotpData(data);
@@ -201,24 +225,60 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     }
   };
 
-  // Image Upload handler (converts image file to data URL)
-  const handleImageFileChange = (e) => {
+  // Client-side image compression downscales large phone/camera images
+  const compressImage = (file, maxWidth = 480, maxHeight = 480, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target.result;
+      };
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Image Upload handler (compresses to smooth lightweight JPEG)
+  const handleImageFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast?.('Please choose an image under 2MB', 'warning');
-      return;
+    try {
+      const compressedDataUrl = await compressImage(file, 480, 480, 0.85);
+      setProfileData(prev => ({ ...prev, profilePicUrl: compressedDataUrl }));
+    } catch (err) {
+      console.warn('Image compression fallback:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64Url = event.target?.result;
+        if (base64Url) {
+          setProfileData(prev => ({ ...prev, profilePicUrl: base64Url }));
+        }
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64Url = event.target?.result;
-      if (base64Url) {
-        setProfileData(prev => ({ ...prev, profilePicUrl: base64Url }));
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async (e) => {
@@ -227,16 +287,29 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     try {
       const res = await fetch(`${API_BASE}/api/auth/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(profileData),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update profile');
 
       updateUserProfile?.(data.user);
+      // Update remembered account in localStorage so avatar reflects on login page too
+      try {
+        const cached = localStorage.getItem('chatter_remembered_account');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          localStorage.setItem('chatter_remembered_account', JSON.stringify({
+            ...parsed,
+            profilePicUrl: data.user?.profilePicUrl || profileData.profilePicUrl,
+            firstName: data.user?.firstName || profileData.firstName,
+            lastName: data.user?.lastName || profileData.lastName,
+          }));
+        }
+      } catch (e) {}
       showToast?.('Profile updated successfully!', 'success');
     } catch (err) {
-      showToast?.(err.message, 'error');
+      showToast?.(err.message || 'Failed to update profile', 'error');
     } finally {
       setProfileSaving(false);
     }
