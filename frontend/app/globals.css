@@ -496,3 +496,62 @@ input:focus, textarea:focus, select:focus {
   }
 }
 
+/* ═══════════════════════════════════════════
+   Login & Registration Full-Page Responsive
+   ═══════════════════════════════════════════ */
+.login-split-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.login-art-panel {
+  flex: 0 0 46%;
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 44px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: #09090b;
+}
+
+.login-form-panel {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 32px;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .login-art-panel {
+    display: none !important;
+  }
+  .login-form-panel {
+    width: 100vw !important;
+    padding: 28px 20px !important;
+    justify-content: flex-start !important;
+    padding-top: 40px !important;
+  }
+  .login-form-container {
+    max-width: 100% !important;
+  }
+}
+
+
