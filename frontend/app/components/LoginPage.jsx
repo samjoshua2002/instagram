@@ -19,7 +19,8 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
-  Shield
+  Shield,
+  Layers
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
@@ -28,8 +29,8 @@ export default function LoginPage({ onLoginSuccess }) {
   // Tabs: 'oneauth' | 'passkey' | 'password'
   const [activeTab, setActiveTab] = useState('oneauth');
 
-  // Credentials
-  const [identifier, setIdentifier] = useState('guidetalk.app@gmail.com');
+  // Input states (empty by default so different users can enter their own credentials)
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ export default function LoginPage({ onLoginSuccess }) {
   // Password tab secondary TOTP requirement
   const [showSecondaryTotp, setShowSecondaryTotp] = useState(false);
 
-  // Direct QR Code display on Zoho OneAuth tab
+  // Dynamic QR Code display for OneAuth
   const [showQrCode, setShowQrCode] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrData, setQrData] = useState(null);
@@ -49,7 +50,7 @@ export default function LoginPage({ onLoginSuccess }) {
   // Forgot Password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotMethod, setForgotMethod] = useState('oneauth'); // 'oneauth' | 'email'
-  const [forgotEmail, setForgotEmail] = useState('guidetalk.app@gmail.com');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [forgotTotpCode, setForgotTotpCode] = useState('');
   const [forgotOtpCode, setForgotOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -58,23 +59,31 @@ export default function LoginPage({ onLoginSuccess }) {
   const [forgotError, setForgotError] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
 
-  // Automatically fetch QR code when toggle is opened
+  // Toggle QR Code specifically for the entered email/user
   const toggleQrCode = async () => {
     if (showQrCode) {
       setShowQrCode(false);
       return;
     }
-    setShowQrCode(true);
-    if (qrData) return;
 
+    const emailToFetch = (identifier || '').trim();
+    if (!emailToFetch) {
+      setError('Please enter your email or username above first to view your QR code.');
+      return;
+    }
+
+    setError('');
+    setShowQrCode(true);
     setQrLoading(true);
+
     try {
-      const res = await fetch(`${API_BASE}/api/auth/oneauth/qr?email=${encodeURIComponent(identifier)}`);
+      const res = await fetch(`${API_BASE}/api/auth/oneauth/qr?email=${encodeURIComponent(emailToFetch)}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load QR code');
+      if (!res.ok) throw new Error(data.error || 'Failed to generate OneAuth QR code');
       setQrData(data);
     } catch (err) {
-      setError('Could not load OneAuth QR code: ' + err.message);
+      setError(err.message || 'Could not load QR code');
+      setShowQrCode(false);
     } finally {
       setQrLoading(false);
     }
@@ -93,18 +102,23 @@ export default function LoginPage({ onLoginSuccess }) {
     e?.preventDefault();
     setError('');
     setInfoMessage('');
+
+    if (!identifier.trim()) {
+      setError('Please enter your email or username.');
+      return;
+    }
+    if (!totpCode || totpCode.trim().length !== 6) {
+      setError('Please enter the 6-digit code from your Zoho OneAuth app.');
+      return;
+    }
+
     setLoading(true);
-
     try {
-      if (!totpCode || totpCode.trim().length !== 6) {
-        throw new Error('Please enter the 6-digit code from your Zoho OneAuth app');
-      }
-
       const res = await fetch(`${API_BASE}/api/auth/oneauth-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier,
+          identifier: identifier.trim(),
           code: totpCode.trim(),
         }),
       });
@@ -128,10 +142,15 @@ export default function LoginPage({ onLoginSuccess }) {
   const handlePasskeyLogin = async () => {
     setError('');
     setInfoMessage('');
-    setPasskeyLoading(true);
 
+    if (!identifier.trim()) {
+      setError('Please enter your account email or username.');
+      return;
+    }
+
+    setPasskeyLoading(true);
     try {
-      const optionsRes = await fetch(`${API_BASE}/api/auth/passkey/login-options?email=${encodeURIComponent(identifier)}`);
+      const optionsRes = await fetch(`${API_BASE}/api/auth/passkey/login-options?email=${encodeURIComponent(identifier.trim())}`);
       if (!optionsRes.ok) {
         const errData = await optionsRes.json();
         throw new Error(errData.error || 'Failed to fetch passkey challenge');
@@ -144,7 +163,7 @@ export default function LoginPage({ onLoginSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: identifier,
+          email: identifier.trim(),
           response: assertion,
         }),
       });
@@ -159,7 +178,7 @@ export default function LoginPage({ onLoginSuccess }) {
       }
     } catch (err) {
       if (err.name === 'NotAllowedError') {
-        setError('Biometric verification cancelled or timed out.');
+        setError('Biometric verification was cancelled.');
       } else {
         setError(err.message || 'Passkey authentication failed.');
       }
@@ -173,14 +192,23 @@ export default function LoginPage({ onLoginSuccess }) {
     e?.preventDefault();
     setError('');
     setInfoMessage('');
-    setLoading(true);
 
+    if (!identifier.trim()) {
+      setError('Please enter your email or username.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier,
+          identifier: identifier.trim(),
           password,
           totpCode: showSecondaryTotp ? totpCode : undefined,
         }),
@@ -193,7 +221,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       if (data.requireTotp) {
         setShowSecondaryTotp(true);
-        setInfoMessage('Please enter your 6-digit OneAuth code to continue.');
+        setInfoMessage('Enter the 6-digit code from your Zoho OneAuth app.');
         setLoading(false);
         return;
       }
@@ -208,7 +236,7 @@ export default function LoginPage({ onLoginSuccess }) {
     }
   };
 
-  // Password Reset via Zoho OneAuth (Zero email delay / No timeout!)
+  // Password Reset via Zoho OneAuth (Zero wait, instant)
   const handleResetViaOneAuth = async (e) => {
     e?.preventDefault();
     setForgotError('');
@@ -220,7 +248,7 @@ export default function LoginPage({ onLoginSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier: forgotEmail,
+          identifier: forgotEmail.trim(),
           totpCode: forgotTotpCode.trim(),
           newPassword,
         }),
@@ -231,6 +259,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       setForgotSuccess('Password updated successfully! You can now log in.');
       setPassword(newPassword);
+      setIdentifier(forgotEmail);
       setTimeout(() => {
         setShowForgotModal(false);
         setForgotTotpCode('');
@@ -255,7 +284,7 @@ export default function LoginPage({ onLoginSuccess }) {
       const res = await fetch(`${API_BASE}/api/auth/forgot-password/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail }),
+        body: JSON.stringify({ email: forgotEmail.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send verification code');
@@ -280,7 +309,7 @@ export default function LoginPage({ onLoginSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: forgotEmail,
+          email: forgotEmail.trim(),
           otpCode: forgotOtpCode.trim(),
           newPassword,
         }),
@@ -290,6 +319,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       setForgotSuccess('Password updated! Redirecting to login...');
       setPassword(newPassword);
+      setIdentifier(forgotEmail);
       setTimeout(() => {
         setShowForgotModal(false);
         setOtpSent(false);
@@ -306,294 +336,360 @@ export default function LoginPage({ onLoginSuccess }) {
 
   return (
     <div style={{
-      minHeight: '100vh',
       width: '100vw',
-      background: '#f8fafc',
-      color: '#0f172a',
+      height: '100vh',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, sans-serif",
-      padding: '24px 16px',
-      boxSizing: 'border-box'
+      overflow: 'hidden',
+      background: '#ffffff',
+      color: '#09090b',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
     }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '440px',
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '20px',
-        padding: '36px 32px',
-        boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
-        boxSizing: 'border-box',
-      }}>
-        {/* Modern Clean Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+      {/* LEFT PANEL: ARCHITECTURAL ARTWORK (Desktop & Tablet) */}
+      <div
+        className="login-left-panel"
+        style={{
+          width: '50%',
+          height: '100vh',
+          position: 'relative',
+          background: '#09090b',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: '48px',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* Background Image with Fallback */}
+        <picture style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}>
+          <source srcSet="/login-art.jpg" type="image/jpeg" />
+          <img
+            src="/login-art.png"
+            alt="Potsdamer Platz Architecture"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center',
+              filter: 'grayscale(100%) contrast(1.15) brightness(0.95)',
+            }}
+          />
+        </picture>
+
+        {/* Artistic Gradient Overlay */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, rgba(9, 9, 11, 0.35) 0%, rgba(9, 9, 11, 0.15) 50%, rgba(9, 9, 11, 0.85) 100%)',
+          zIndex: 1
+        }} />
+
+        {/* Top Branding Pill */}
+        <div style={{ position: 'relative', zIndex: 2 }}>
           <div style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-            color: '#ffffff',
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px',
-            boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.3)',
-            fontWeight: '700',
-            fontSize: '1.25rem',
-            letterSpacing: '-0.5px'
+            gap: '8px',
+            background: 'rgba(255, 255, 255, 0.12)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            color: '#ffffff',
+            padding: '7px 14px',
+            borderRadius: '999px',
+            fontSize: '0.74rem',
+            fontWeight: '600',
+            letterSpacing: '0.6px',
+            textTransform: 'uppercase'
           }}>
-            SJ
+            <Layers size={14} />
+            <span>Chatter OS // Workspace</span>
           </div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: '700', letterSpacing: '-0.3px', margin: '0 0 4px 0', color: '#0f172a' }}>
-            Sam Joshua
-          </h1>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-            Instagram Intelligence & Workspace
+        </div>
+
+        {/* Bottom Architectural Caption */}
+        <div style={{ position: 'relative', zIndex: 2, color: '#ffffff', maxWidth: '420px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: '800', letterSpacing: '-0.8px', margin: '0 0 8px 0', lineHeight: 1.2 }}>
+            Potsdamer Platz
+          </h2>
+          <p style={{ fontSize: '0.86rem', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.5, margin: 0 }}>
+            Precision intelligence, few-shot style calibration, and automated Instagram creator workflows.
           </p>
         </div>
+      </div>
 
-        {/* Crisp Segmented Tabs */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '4px',
-          background: '#f1f5f9',
-          padding: '4px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          border: '1px solid #e2e8f0'
-        }}>
-          <button
-            type="button"
-            onClick={() => { setActiveTab('oneauth'); setError(''); setInfoMessage(''); }}
-            style={{
-              background: activeTab === 'oneauth' ? '#ffffff' : 'transparent',
-              color: activeTab === 'oneauth' ? '#0f172a' : '#64748b',
-              border: activeTab === 'oneauth' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
-              borderRadius: '9px',
-              padding: '8px 4px',
-              fontSize: '0.78rem',
-              fontWeight: activeTab === 'oneauth' ? '600' : '500',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'oneauth' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none'
-            }}
-          >
-            <Smartphone size={16} color={activeTab === 'oneauth' ? '#2563eb' : '#94a3b8'} />
-            <span>OneAuth</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setActiveTab('passkey'); setError(''); setInfoMessage(''); }}
-            style={{
-              background: activeTab === 'passkey' ? '#ffffff' : 'transparent',
-              color: activeTab === 'passkey' ? '#0f172a' : '#64748b',
-              border: activeTab === 'passkey' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
-              borderRadius: '9px',
-              padding: '8px 4px',
-              fontSize: '0.78rem',
-              fontWeight: activeTab === 'passkey' ? '600' : '500',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'passkey' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none'
-            }}
-          >
-            <Fingerprint size={16} color={activeTab === 'passkey' ? '#16a34a' : '#94a3b8'} />
-            <span>Passkey</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setActiveTab('password'); setError(''); setInfoMessage(''); }}
-            style={{
-              background: activeTab === 'password' ? '#ffffff' : 'transparent',
-              color: activeTab === 'password' ? '#0f172a' : '#64748b',
-              border: activeTab === 'password' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
-              borderRadius: '9px',
-              padding: '8px 4px',
-              fontSize: '0.78rem',
-              fontWeight: activeTab === 'password' ? '600' : '500',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'password' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none'
-            }}
-          >
-            <Lock size={16} color={activeTab === 'password' ? '#d97706' : '#94a3b8'} />
-            <span>Password</span>
-          </button>
-        </div>
-
-        {/* Alerts */}
-        {error && (
-          <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#b91c1c',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            fontSize: '0.82rem',
-            marginBottom: '18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            lineHeight: 1.4
-          }}>
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {infoMessage && (
-          <div style={{
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            color: '#15803d',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            fontSize: '0.82rem',
-            marginBottom: '18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
-            <span>{infoMessage}</span>
-          </div>
-        )}
-
-        {/* TAB 1: ZOHO ONEAUTH (Passwordless) */}
-        {activeTab === 'oneauth' && (
-          <div>
-            {/* Quick QR Code Scan Drawer / Box */}
+      {/* RIGHT PANEL: COMPACT LOGIN DETAILS */}
+      <div style={{
+        flex: 1,
+        height: '100vh',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '36px 28px',
+        boxSizing: 'border-box',
+        background: '#ffffff'
+      }}>
+        <div style={{ width: '100%', maxWidth: '380px' }}>
+          {/* Header */}
+          <div style={{ marginBottom: '28px' }}>
             <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '12px',
-              padding: '12px 14px',
-              marginBottom: '20px'
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#09090b',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px',
+              fontWeight: '800',
+              fontSize: '1rem',
+              letterSpacing: '-0.5px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <QrCode size={18} color="#2563eb" />
-                  <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#1e293b' }}>
-                    Need to link Zoho OneAuth?
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={toggleQrCode}
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    color: '#334155',
-                    borderRadius: '7px',
-                    padding: '5px 10px',
-                    fontSize: '0.74rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <span>{showQrCode ? 'Hide QR' : 'Show QR to Scan'}</span>
-                  {showQrCode ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-              </div>
-
-              {showQrCode && (
-                <div style={{ marginTop: '14px', textAlign: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-                  {qrLoading ? (
-                    <div style={{ padding: '24px', color: '#64748b', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>Generating QR Code...</span>
-                    </div>
-                  ) : qrData ? (
-                    <div>
-                      <div style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '12px',
-                        display: 'inline-block',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.04)'
-                      }}>
-                        <img
-                          src={qrData.qrDataUrl}
-                          alt="OneAuth QR Code"
-                          style={{ width: '180px', height: '180px', display: 'block' }}
-                        />
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: '#475569', margin: '10px 0 6px', fontWeight: '500' }}>
-                        1. Open Zoho OneAuth on your phone & tap <b>+</b><br/>
-                        2. Point camera to scan this QR code
-                      </p>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
-                          Key: {qrData.secret?.slice(0, 16)}...
-                        </span>
-                        <button
-                          type="button"
-                          onClick={copySecret}
-                          style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', padding: 0, fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
-                        >
-                          {copiedSecret ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
-                          <span>{copiedSecret ? 'Copied' : 'Copy Key'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              )}
+              C
             </div>
+            <h1 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.5px', margin: '0 0 6px 0', color: '#09090b' }}>
+              Sign in to Chatter
+            </h1>
+            <p style={{ fontSize: '0.84rem', color: '#71717a', margin: 0 }}>
+              Enter your credentials to access your Instagram dashboard.
+            </p>
+          </div>
 
-            <form onSubmit={handleOneAuthLogin}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                  Email or Username
-                </label>
-                <div style={{ position: 'relative' }}>
+          {/* Segmented Mode Selector */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '4px',
+            background: '#f4f4f5',
+            padding: '3px',
+            borderRadius: '10px',
+            marginBottom: '22px',
+            border: '1px solid #e4e4e7'
+          }}>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('oneauth'); setError(''); setInfoMessage(''); }}
+              style={{
+                background: activeTab === 'oneauth' ? '#ffffff' : 'transparent',
+                color: activeTab === 'oneauth' ? '#09090b' : '#71717a',
+                border: activeTab === 'oneauth' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                borderRadius: '7px',
+                padding: '7px 4px',
+                fontSize: '0.78rem',
+                fontWeight: activeTab === 'oneauth' ? '600' : '500',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: activeTab === 'oneauth' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+              }}
+            >
+              <Smartphone size={14} />
+              <span>OneAuth</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setActiveTab('passkey'); setError(''); setInfoMessage(''); }}
+              style={{
+                background: activeTab === 'passkey' ? '#ffffff' : 'transparent',
+                color: activeTab === 'passkey' ? '#09090b' : '#71717a',
+                border: activeTab === 'passkey' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                borderRadius: '7px',
+                padding: '7px 4px',
+                fontSize: '0.78rem',
+                fontWeight: activeTab === 'passkey' ? '600' : '500',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: activeTab === 'passkey' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+              }}
+            >
+              <Fingerprint size={14} />
+              <span>Passkey</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setActiveTab('password'); setError(''); setInfoMessage(''); }}
+              style={{
+                background: activeTab === 'password' ? '#ffffff' : 'transparent',
+                color: activeTab === 'password' ? '#09090b' : '#71717a',
+                border: activeTab === 'password' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                borderRadius: '7px',
+                padding: '7px 4px',
+                fontSize: '0.78rem',
+                fontWeight: activeTab === 'password' ? '600' : '500',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: activeTab === 'password' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+              }}
+            >
+              <Lock size={14} />
+              <span>Password</span>
+            </button>
+          </div>
+
+          {/* Feedback Messages */}
+          {error && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#b91c1c',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              fontSize: '0.8rem',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              lineHeight: 1.4
+            }}>
+              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {infoMessage && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              color: '#15803d',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              fontSize: '0.8rem',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+              <span>{infoMessage}</span>
+            </div>
+          )}
+
+          {/* TAB 1: ZOHO ONEAUTH (COMPACT FLOW) */}
+          {activeTab === 'oneauth' && (
+            <div>
+              <form onSubmit={handleOneAuthLogin}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '5px' }}>
+                    Email or Username
+                  </label>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="name@example.com or username"
                     required
                     style={{
                       width: '100%',
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '10px',
-                      padding: '11px 12px 11px 36px',
-                      color: '#0f172a',
+                      background: '#ffffff',
+                      border: '1px solid #e4e4e7',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      color: '#09090b',
                       fontSize: '0.88rem',
                       boxSizing: 'border-box',
                       outline: 'none',
+                      transition: 'border-color 0.15s ease'
                     }}
                   />
-                  <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 </div>
-              </div>
 
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                  6-Digit OneAuth Code
-                </label>
-                <div style={{ position: 'relative' }}>
+                {/* Compact QR Code toggle drawer */}
+                <div style={{
+                  background: '#fafafa',
+                  border: '1px solid #f4f4f5',
+                  borderRadius: '8px',
+                  padding: '9px 12px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#52525b', fontWeight: '500' }}>
+                      Pair Zoho OneAuth app
+                    </span>
+                    <button
+                      type="button"
+                      onClick={toggleQrCode}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        color: '#09090b',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <QrCode size={12} />
+                      <span>{showQrCode ? 'Hide QR' : 'Show QR'}</span>
+                    </button>
+                  </div>
+
+                  {showQrCode && (
+                    <div style={{ marginTop: '12px', textAlign: 'center', borderTop: '1px solid #e4e4e7', paddingTop: '12px' }}>
+                      {qrLoading ? (
+                        <div style={{ padding: '16px', color: '#71717a', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span>Generating QR for {identifier}...</span>
+                        </div>
+                      ) : qrData ? (
+                        <div>
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1px solid #e4e4e7',
+                            borderRadius: '10px',
+                            padding: '8px',
+                            display: 'inline-block'
+                          }}>
+                            <img
+                              src={qrData.qrDataUrl}
+                              alt="OneAuth QR"
+                              style={{ width: '150px', height: '150px', display: 'block' }}
+                            />
+                          </div>
+                          <p style={{ fontSize: '0.74rem', color: '#52525b', margin: '8px 0 4px', fontWeight: '500' }}>
+                            Scan with Zoho OneAuth on your phone
+                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: 'monospace' }}>
+                              {qrData.secret?.slice(0, 14)}...
+                            </span>
+                            <button
+                              type="button"
+                              onClick={copySecret}
+                              style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.72rem', cursor: 'pointer', padding: 0, fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                            >
+                              {copiedSecret ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
+                              <span>{copiedSecret ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '5px' }}>
+                    6-Digit Verification Code
+                  </label>
                   <input
                     type="text"
                     maxLength={6}
@@ -605,189 +701,153 @@ export default function LoginPage({ onLoginSuccess }) {
                     style={{
                       width: '100%',
                       background: '#ffffff',
-                      border: '1px solid #2563eb',
-                      borderRadius: '10px',
-                      padding: '12px 12px 12px 36px',
-                      color: '#0f172a',
-                      fontSize: '1.4rem',
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                      letterSpacing: '8px',
+                      border: '1px solid #09090b',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      color: '#09090b',
+                      fontSize: '1.25rem',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: '6px',
                       textAlign: 'center',
                       boxSizing: 'border-box',
-                      outline: 'none',
-                      boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                      outline: 'none'
                     }}
                   />
-                  <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <p style={{ fontSize: '0.72rem', color: '#71717a', margin: '6px 0 0', textAlign: 'center' }}>
+                    Enter the live code from Zoho OneAuth app
+                  </p>
                 </div>
-                <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '6px 0 0', textAlign: 'center' }}>
-                  Open Zoho OneAuth on your phone and enter the live 6-digit code.
-                </p>
+
+                <button
+                  type="submit"
+                  disabled={loading || !identifier || totpCode.length !== 6}
+                  style={{
+                    width: '100%',
+                    background: '#09090b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '11px',
+                    fontWeight: '600',
+                    fontSize: '0.88rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: (loading || !identifier || totpCode.length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (loading || !identifier || totpCode.length !== 6) ? 0.6 : 1,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {loading ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                  <span>{loading ? 'Verifying...' : 'Sign In with OneAuth'}</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 2: BIOMETRIC PASSKEY */}
+          {activeTab === 'passkey' && (
+            <div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '5px' }}>
+                  Email or Username
+                </label>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="name@example.com or username"
+                  required
+                  style={{
+                    width: '100%',
+                    background: '#ffffff',
+                    border: '1px solid #e4e4e7',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    color: '#09090b',
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
               </div>
 
               <button
-                type="submit"
-                disabled={loading || !totpCode || totpCode.length !== 6}
+                type="button"
+                onClick={handlePasskeyLogin}
+                disabled={passkeyLoading || !identifier.trim()}
                 style={{
                   width: '100%',
-                  background: '#0f172a',
+                  background: '#09090b',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '10px',
-                  padding: '13px',
+                  borderRadius: '8px',
+                  padding: '12px',
                   fontWeight: '600',
-                  fontSize: '0.9rem',
+                  fontSize: '0.88rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  cursor: (loading || !totpCode || totpCode.length !== 6) ? 'not-allowed' : 'pointer',
-                  opacity: (loading || !totpCode || totpCode.length !== 6) ? 0.6 : 1,
+                  cursor: (passkeyLoading || !identifier.trim()) ? 'not-allowed' : 'pointer',
+                  opacity: (passkeyLoading || !identifier.trim()) ? 0.6 : 1,
                   transition: 'all 0.15s ease'
                 }}
               >
-                {loading ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-                <span>{loading ? 'Verifying...' : 'Sign In with OneAuth'}</span>
+                {passkeyLoading ? (
+                  <RefreshCw size={16} className="animate-spin" />
+                ) : (
+                  <Fingerprint size={16} color="#4ade80" />
+                )}
+                <span>{passkeyLoading ? 'Authenticating...' : 'Sign In with Touch ID'}</span>
               </button>
-            </form>
-          </div>
-        )}
-
-        {/* TAB 2: BIOMETRIC PASSKEY */}
-        {activeTab === 'passkey' && (
-          <div>
-            <div style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '12px',
-              padding: '16px',
-              textAlign: 'center',
-              marginBottom: '20px'
-            }}>
-              <div style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                background: '#dcfce7',
-                color: '#15803d',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '10px'
-              }}>
-                <Fingerprint size={24} />
-              </div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: '600', margin: '0 0 4px', color: '#166534' }}>
-                Touch ID / Face ID
-              </h3>
-              <p style={{ fontSize: '0.78rem', color: '#15803d', margin: 0 }}>
-                Instant passwordless biometric authentication
+              <p style={{ fontSize: '0.72rem', color: '#71717a', textAlign: 'center', marginTop: '10px' }}>
+                Use Touch ID, Face ID, or your physical security key
               </p>
             </div>
+          )}
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                Account Email
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '10px',
-                    padding: '11px 12px 11px 36px',
-                    color: '#0f172a',
-                    fontSize: '0.88rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                  }}
-                />
-                <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handlePasskeyLogin}
-              disabled={passkeyLoading}
-              style={{
-                width: '100%',
-                background: '#0f172a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '14px',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: passkeyLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {passkeyLoading ? (
-                <RefreshCw size={18} className="animate-spin" />
-              ) : (
-                <Fingerprint size={18} color="#4ade80" />
-              )}
-              <span>{passkeyLoading ? 'Authenticating...' : 'Sign In with Passkey'}</span>
-            </button>
-            <p style={{ fontSize: '0.74rem', color: '#64748b', textAlign: 'center', marginTop: '12px' }}>
-              Requires a registered passkey on this browser or phone.
-            </p>
-          </div>
-        )}
-
-        {/* TAB 3: PASSWORD */}
-        {activeTab === 'password' && (
-          <form onSubmit={handlePasswordLogin}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                Email or Username
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '10px',
-                    padding: '11px 12px 11px 36px',
-                    color: '#0f172a',
-                    fontSize: '0.88rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                  }}
-                />
-                <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: showSecondaryTotp ? '14px' : '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.76rem', fontWeight: '600', color: '#475569' }}>
-                  Password
+          {/* TAB 3: PASSWORD */}
+          {activeTab === 'password' && (
+            <form onSubmit={handlePasswordLogin}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '5px' }}>
+                  Email or Username
                 </label>
-                <button
-                  type="button"
-                  onClick={() => { setShowForgotModal(true); setForgotEmail(identifier); }}
-                  style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '500' }}
-                >
-                  Forgot password?
-                </button>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="name@example.com or username"
+                  required
+                  style={{
+                    width: '100%',
+                    background: '#ffffff',
+                    border: '1px solid #e4e4e7',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    color: '#09090b',
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
               </div>
-              <div style={{ position: 'relative' }}>
+
+              <div style={{ marginBottom: showSecondaryTotp ? '12px' : '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                  <label style={{ fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46' }}>
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgotModal(true); setForgotEmail(identifier); }}
+                    style={{ background: 'none', border: 'none', color: '#71717a', fontSize: '0.72rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <input
                   type="password"
                   value={password}
@@ -796,93 +856,93 @@ export default function LoginPage({ onLoginSuccess }) {
                   required
                   style={{
                     width: '100%',
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '10px',
-                    padding: '11px 12px 11px 36px',
-                    color: '#0f172a',
-                    fontSize: '0.88rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                  }}
-                />
-                <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              </div>
-            </div>
-
-            {showSecondaryTotp && (
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '14px',
-                marginBottom: '20px',
-              }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#1e293b', marginBottom: '6px' }}>
-                  OneAuth 6-Digit Code
-                </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  autoFocus
-                  style={{
-                    width: '100%',
                     background: '#ffffff',
-                    border: '1px solid #2563eb',
+                    border: '1px solid #e4e4e7',
                     borderRadius: '8px',
                     padding: '10px 12px',
-                    color: '#0f172a',
-                    fontSize: '1.2rem',
-                    fontFamily: 'monospace',
-                    letterSpacing: '4px',
+                    color: '#09090b',
+                    fontSize: '0.88rem',
                     boxSizing: 'border-box',
-                    outline: 'none',
-                    textAlign: 'center'
+                    outline: 'none'
                   }}
                 />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%',
-                background: '#0f172a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '13px',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {loading ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-              <span>{showSecondaryTotp ? 'Verify & Enter' : 'Sign In with Password'}</span>
-            </button>
-          </form>
-        )}
+              {showSecondaryTotp && (
+                <div style={{
+                  background: '#fafafa',
+                  border: '1px solid #e4e4e7',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#09090b', marginBottom: '5px' }}>
+                    OneAuth 6-Digit Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="000000"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      background: '#ffffff',
+                      border: '1px solid #09090b',
+                      borderRadius: '6px',
+                      padding: '8px',
+                      color: '#09090b',
+                      fontSize: '1.1rem',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: '4px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      textAlign: 'center'
+                    }}
+                  />
+                </div>
+              )}
 
-        <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.74rem', color: '#94a3b8' }}>
-          Personal Dashboard • End-to-End Authenticated
+              <button
+                type="submit"
+                disabled={loading || !identifier.trim() || !password}
+                style={{
+                  width: '100%',
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '11px',
+                  fontWeight: '600',
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: (loading || !identifier.trim() || !password) ? 'not-allowed' : 'pointer',
+                  opacity: (loading || !identifier.trim() || !password) ? 0.6 : 1,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {loading ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                <span>{showSecondaryTotp ? 'Verify & Enter' : 'Sign In with Password'}</span>
+              </button>
+            </form>
+          )}
+
+          <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.72rem', color: '#a1a1aa' }}>
+            Chatter OS • End-to-End Encrypted Session
+          </div>
         </div>
       </div>
 
-      {/* Forgot Password Light Modal */}
+      {/* Forgot Password Modal */}
       {showForgotModal && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
+          background: 'rgba(9, 9, 11, 0.45)',
           backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
@@ -892,21 +952,21 @@ export default function LoginPage({ onLoginSuccess }) {
         }}>
           <div style={{
             background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '18px',
+            border: '1px solid #e4e4e7',
+            borderRadius: '16px',
             width: '100%',
-            maxWidth: '420px',
-            padding: '28px',
+            maxWidth: '380px',
+            padding: '24px',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
             boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <KeyRound size={22} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f4f4f5', color: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <KeyRound size={18} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', margin: 0, color: '#0f172a' }}>Reset Password</h3>
-                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0 }}>Choose your preferred recovery method</p>
+                <h3 style={{ fontSize: '0.98rem', fontWeight: '700', margin: 0, color: '#09090b' }}>Reset Password</h3>
+                <p style={{ fontSize: '0.74rem', color: '#71717a', margin: 0 }}>Choose your recovery method</p>
               </div>
             </div>
 
@@ -915,83 +975,84 @@ export default function LoginPage({ onLoginSuccess }) {
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '4px',
-              background: '#f1f5f9',
+              background: '#f4f4f5',
               padding: '3px',
-              borderRadius: '9px',
-              marginBottom: '16px'
+              borderRadius: '8px',
+              marginBottom: '14px'
             }}>
               <button
                 type="button"
                 onClick={() => { setForgotMethod('oneauth'); setForgotError(''); setForgotSuccess(''); }}
                 style={{
                   background: forgotMethod === 'oneauth' ? '#ffffff' : 'transparent',
-                  color: forgotMethod === 'oneauth' ? '#0f172a' : '#64748b',
+                  color: forgotMethod === 'oneauth' ? '#09090b' : '#71717a',
                   border: 'none',
-                  borderRadius: '7px',
-                  padding: '7px',
-                  fontSize: '0.76rem',
+                  borderRadius: '6px',
+                  padding: '6px',
+                  fontSize: '0.74rem',
                   fontWeight: '600',
                   cursor: 'pointer'
                 }}
               >
-                Via OneAuth (Instant)
+                OneAuth (Instant)
               </button>
               <button
                 type="button"
                 onClick={() => { setForgotMethod('email'); setForgotError(''); setForgotSuccess(''); }}
                 style={{
                   background: forgotMethod === 'email' ? '#ffffff' : 'transparent',
-                  color: forgotMethod === 'email' ? '#0f172a' : '#64748b',
+                  color: forgotMethod === 'email' ? '#09090b' : '#71717a',
                   border: 'none',
-                  borderRadius: '7px',
-                  padding: '7px',
-                  fontSize: '0.76rem',
+                  borderRadius: '6px',
+                  padding: '6px',
+                  fontSize: '0.74rem',
                   fontWeight: '600',
                   cursor: 'pointer'
                 }}
               >
-                Via Email OTP
+                Email OTP
               </button>
             </div>
 
             {forgotError && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '8px', padding: '8px 12px', fontSize: '0.78rem', marginBottom: '14px', lineHeight: 1.4 }}>
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '6px', padding: '8px 10px', fontSize: '0.76rem', marginBottom: '12px' }}>
                 {forgotError}
               </div>
             )}
             {forgotSuccess && (
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', borderRadius: '8px', padding: '8px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', borderRadius: '6px', padding: '8px 10px', fontSize: '0.76rem', marginBottom: '12px' }}>
                 {forgotSuccess}
               </div>
             )}
 
-            {/* Method A: Instant Reset via Zoho OneAuth Code (No email needed!) */}
+            {/* Instant Reset via OneAuth Code */}
             {forgotMethod === 'oneauth' && (
               <form onSubmit={handleResetViaOneAuth}>
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
-                    Registered Email
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                    Account Email
                   </label>
                   <input
                     type="email"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="name@example.com"
                     required
                     style={{
                       width: '100%',
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '9px 12px',
-                      color: '#0f172a',
-                      fontSize: '0.86rem',
+                      background: '#ffffff',
+                      border: '1px solid #e4e4e7',
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      color: '#09090b',
+                      fontSize: '0.84rem',
                       boxSizing: 'border-box'
                     }}
                   />
                 </div>
 
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
                     Live 6-Digit OneAuth Code
                   </label>
                   <input
@@ -1004,12 +1065,12 @@ export default function LoginPage({ onLoginSuccess }) {
                     style={{
                       width: '100%',
                       background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '10px 12px',
-                      color: '#0f172a',
-                      fontSize: '1.2rem',
-                      fontFamily: 'monospace',
+                      border: '1px solid #e4e4e7',
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      color: '#09090b',
+                      fontSize: '1.1rem',
+                      fontFamily: "'JetBrains Mono', monospace",
                       letterSpacing: '4px',
                       textAlign: 'center',
                       boxSizing: 'border-box'
@@ -1017,8 +1078,8 @@ export default function LoginPage({ onLoginSuccess }) {
                   />
                 </div>
 
-                <div style={{ marginBottom: '18px' }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
                     New Password
                   </label>
                   <input
@@ -1029,12 +1090,12 @@ export default function LoginPage({ onLoginSuccess }) {
                     required
                     style={{
                       width: '100%',
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '9px 12px',
-                      color: '#0f172a',
-                      fontSize: '0.86rem',
+                      background: '#ffffff',
+                      border: '1px solid #e4e4e7',
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      color: '#09090b',
+                      fontSize: '0.84rem',
                       boxSizing: 'border-box'
                     }}
                   />
@@ -1044,14 +1105,14 @@ export default function LoginPage({ onLoginSuccess }) {
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(false)}
-                    style={{ background: 'none', border: '1px solid #cbd5e1', color: '#64748b', borderRadius: '8px', padding: '9px 14px', fontSize: '0.82rem', cursor: 'pointer' }}
+                    style={{ background: 'none', border: '1px solid #e4e4e7', color: '#71717a', borderRadius: '6px', padding: '8px 12px', fontSize: '0.78rem', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={forgotLoading || !forgotTotpCode || !newPassword}
-                    style={{ background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '9px 16px', fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer' }}
+                    style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '0.78rem', cursor: 'pointer' }}
                   >
                     {forgotLoading ? 'Updating...' : 'Reset Password'}
                   </button>
@@ -1059,27 +1120,28 @@ export default function LoginPage({ onLoginSuccess }) {
               </form>
             )}
 
-            {/* Method B: Standard Email OTP */}
+            {/* Email OTP Flow */}
             {forgotMethod === 'email' && (
               !otpSent ? (
                 <form onSubmit={handleSendEmailOtp}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
-                      Registered Email
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      Account Email
                     </label>
                     <input
                       type="email"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="name@example.com"
                       required
                       style={{
                         width: '100%',
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '9px 12px',
-                        color: '#0f172a',
-                        fontSize: '0.86rem',
+                        background: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        color: '#09090b',
+                        fontSize: '0.84rem',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -1088,23 +1150,23 @@ export default function LoginPage({ onLoginSuccess }) {
                     <button
                       type="button"
                       onClick={() => setShowForgotModal(false)}
-                      style={{ background: 'none', border: '1px solid #cbd5e1', color: '#64748b', borderRadius: '8px', padding: '9px 14px', fontSize: '0.82rem', cursor: 'pointer' }}
+                      style={{ background: 'none', border: '1px solid #e4e4e7', color: '#71717a', borderRadius: '6px', padding: '8px 12px', fontSize: '0.78rem', cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={forgotLoading}
-                      style={{ background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '9px 16px', fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer' }}
+                      style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '0.78rem', cursor: 'pointer' }}
                     >
-                      {forgotLoading ? 'Sending...' : 'Send Email OTP'}
+                      {forgotLoading ? 'Sending...' : 'Send OTP'}
                     </button>
                   </div>
                 </form>
               ) : (
                 <form onSubmit={handleVerifyEmailOtp}>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
                       6-Digit Email Code
                     </label>
                     <input
@@ -1117,20 +1179,20 @@ export default function LoginPage({ onLoginSuccess }) {
                       style={{
                         width: '100%',
                         background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '10px 12px',
-                        color: '#0f172a',
-                        fontSize: '1.2rem',
-                        fontFamily: 'monospace',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        color: '#09090b',
+                        fontSize: '1.1rem',
+                        fontFamily: "'JetBrains Mono', monospace",
                         letterSpacing: '4px',
                         textAlign: 'center',
                         boxSizing: 'border-box'
                       }}
                     />
                   </div>
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
                       New Password
                     </label>
                     <input
@@ -1141,12 +1203,12 @@ export default function LoginPage({ onLoginSuccess }) {
                       required
                       style={{
                         width: '100%',
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '9px 12px',
-                        color: '#0f172a',
-                        fontSize: '0.86rem',
+                        background: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        color: '#09090b',
+                        fontSize: '0.84rem',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -1155,14 +1217,14 @@ export default function LoginPage({ onLoginSuccess }) {
                     <button
                       type="button"
                       onClick={() => setOtpSent(false)}
-                      style={{ background: 'none', border: '1px solid #cbd5e1', color: '#64748b', borderRadius: '8px', padding: '9px 14px', fontSize: '0.82rem', cursor: 'pointer' }}
+                      style={{ background: 'none', border: '1px solid #e4e4e7', color: '#71717a', borderRadius: '6px', padding: '8px 12px', fontSize: '0.78rem', cursor: 'pointer' }}
                     >
                       Back
                     </button>
                     <button
                       type="submit"
                       disabled={forgotLoading}
-                      style={{ background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '9px 16px', fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer' }}
+                      style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '8px 14px', fontWeight: '600', fontSize: '0.78rem', cursor: 'pointer' }}
                     >
                       {forgotLoading ? 'Updating...' : 'Update Password'}
                     </button>
@@ -1173,6 +1235,15 @@ export default function LoginPage({ onLoginSuccess }) {
           </div>
         </div>
       )}
+
+      {/* Responsive Style for Mobile Screens */}
+      <style jsx>{`
+        @media (max-width: 899px) {
+          .login-left-panel {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

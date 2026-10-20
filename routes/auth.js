@@ -244,15 +244,21 @@ router.post('/oneauth/verify-setup-otp', async (req, res) => {
  */
 router.get('/oneauth/qr', async (req, res) => {
   try {
-    const email = (req.query.email || 'guidetalk.app@gmail.com').trim().toLowerCase();
-    let user = await User.findOne({
-      $or: [{ email }, { username: email }]
-    });
-    if (!user) {
-      user = await User.findOne({ username: 'samjoshua' });
+    const rawEmail = (req.query.email || '').trim().toLowerCase();
+    let user = null;
+    if (rawEmail) {
+      user = await User.findOne({
+        $or: [{ email: rawEmail }, { username: rawEmail }]
+      });
+    }
+    // If no email specified, fallback to owner account
+    if (!user && !rawEmail) {
+      user = await User.findOne({
+        $or: [{ email: 'guidetalk.app@gmail.com' }, { username: 'samjoshua' }]
+      });
     }
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: `Account for "${rawEmail}" was not found. Please verify your email or username.` });
     }
 
     if (!user.twoFactor?.secret) {
@@ -266,6 +272,8 @@ router.get('/oneauth/qr', async (req, res) => {
     const totpData = await authService.getTotpQrCode(user);
     res.json({
       success: true,
+      email: user.email,
+      username: user.username,
       ...totpData,
     });
   } catch (err) {
