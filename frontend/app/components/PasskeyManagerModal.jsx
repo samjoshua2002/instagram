@@ -290,10 +290,29 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
         headers: getAuthHeaders(),
         body: JSON.stringify(profileData),
       });
-      const data = await res.json().catch(() => ({}));
+      const responseText = await res.text();
+      let data = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        throw new Error('Server returned an invalid response. Image may be too large.');
+      }
       if (!res.ok) throw new Error(data.error || 'Failed to update profile');
 
-      updateUserProfile?.(data.user);
+      if (data.user) {
+        updateUserProfile?.(data.user);
+        setProfileData(prev => ({
+          ...prev,
+          profilePicUrl: data.user.profilePicUrl || prev.profilePicUrl,
+          firstName: data.user.firstName || prev.firstName,
+          lastName: data.user.lastName || prev.lastName,
+          mobileNumber: data.user.mobileNumber || prev.mobileNumber,
+          whatsappNumber: data.user.whatsappNumber || prev.whatsappNumber,
+          instagramUsername: data.user.instagramUsername || prev.instagramUsername,
+          address: data.user.address || prev.address,
+        }));
+      }
+
       // Update remembered account in localStorage so avatar reflects on login page too
       try {
         const cached = localStorage.getItem('chatter_remembered_account');
@@ -606,32 +625,42 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile}>
               {/* Profile Picture Upload Section */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '18px', borderBottom: '1px solid #f4f4f5' }}>
-                <div style={{ position: 'relative' }}>
+              <div style={{
+                background: '#fafafa',
+                border: '1px solid #e4e4e7',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px'
+              }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
                   {profileData.profilePicUrl ? (
                     <img
                       src={profileData.profilePicUrl}
                       alt="Profile Avatar"
                       style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '50%',
+                        width: '72px',
+                        height: '72px',
+                        borderRadius: '16px',
                         objectFit: 'cover',
-                        border: '2px solid #e4e4e7'
+                        border: '2px solid #09090b',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                       }}
                     />
                   ) : (
                     <div style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '16px',
                       background: '#09090b',
                       color: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.5rem',
-                      fontWeight: '700'
+                      fontSize: '1.6rem',
+                      fontWeight: '800'
                     }}>
                       {profileData.firstName ? profileData.firstName.charAt(0).toUpperCase() : 'U'}
                     </div>
@@ -643,21 +672,22 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     title="Upload avatar"
                     style={{
                       position: 'absolute',
-                      right: '-4px',
-                      bottom: '-4px',
+                      right: '-6px',
+                      bottom: '-6px',
                       background: '#09090b',
                       color: '#ffffff',
                       border: '2px solid #ffffff',
                       borderRadius: '50%',
-                      width: '26px',
-                      height: '26px',
+                      width: '28px',
+                      height: '28px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
                     }}
                   >
-                    <Camera size={13} />
+                    <Camera size={14} />
                   </button>
                   <input
                     ref={fileInputRef}
@@ -669,60 +699,49 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                 </div>
 
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>
-                    Profile Picture URL or Upload
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input
-                      type="url"
-                      value={profileData.profilePicUrl}
-                      onChange={(e) => setProfileData({ ...profileData, profilePicUrl: e.target.value })}
-                      placeholder="https://example.com/avatar.jpg"
-                      style={{
-                        flex: 1,
-                        background: '#fafafa',
-                        border: '1px solid #e4e4e7',
-                        borderRadius: '6px',
-                        padding: '6px 10px',
-                        fontSize: '0.8rem',
-                        outline: 'none'
-                      }}
-                    />
+                  <div style={{ fontSize: '0.86rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                    Profile Picture
+                  </div>
+                  <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '0 0 10px', lineHeight: 1.35 }}>
+                    Upload any photo from your phone or device. Automatically compressed for instant load times.
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       style={{
-                        background: '#f4f4f5',
-                        border: '1px solid #e4e4e7',
-                        color: '#09090b',
+                        background: '#09090b',
+                        color: '#ffffff',
+                        border: 'none',
                         borderRadius: '6px',
-                        padding: '6px 10px',
+                        padding: '6px 12px',
                         fontSize: '0.76rem',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '5px'
                       }}
                     >
                       <Upload size={13} />
-                      <span>Upload</span>
+                      <span>{profileData.profilePicUrl ? 'Change Photo' : 'Upload Photo'}</span>
                     </button>
                     {profileData.profilePicUrl && (
                       <button
                         type="button"
-                        onClick={() => setProfileData({ ...profileData, profilePicUrl: '' })}
+                        onClick={() => setProfileData(prev => ({ ...prev, profilePicUrl: '' }))}
                         style={{
-                          background: 'none',
+                          background: '#ffffff',
                           border: '1px solid #e4e4e7',
-                          color: '#ef4444',
+                          color: '#b91c1c',
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: '0.76rem',
+                          fontWeight: '600',
                           cursor: 'pointer'
                         }}
                       >
-                        Clear
+                        Remove
                       </button>
                     )}
                   </div>
