@@ -201,15 +201,24 @@ export function AppProvider({ children }) {
         localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
       } catch (e) {}
     }
+    try {
+      sessionStorage.setItem('chatter_session_active', 'true');
+    } catch (e) {}
     setToken(jwtToken);
     setUser(userData);
     setAuthLoading(false);
     showToast?.(`Welcome back, ${userData?.firstName || userData?.username || 'User'}!`, 'success');
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.location.replace('/');
+    }
   }, [showToast]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
+    try {
+      sessionStorage.removeItem('chatter_session_active');
+    } catch (e) {}
     setToken(null);
     setUser(null);
     showToast?.('Signed out successfully.', 'info');
