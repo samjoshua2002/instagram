@@ -2335,6 +2335,8 @@ app.listen(PORT, '0.0.0.0', () => {
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
 
-  // Start automatic 3-day old chat cleanup scheduler to conserve DB storage
-  memoryService.startDailyCleanup(3);
+  // Safe chat retention & daily maintenance scheduler (keeps full 1-month chat history)
+  if (memoryService && typeof memoryService.startDailyCleanup === 'function') {
+    memoryService.startDailyCleanup();
+  }
 });
