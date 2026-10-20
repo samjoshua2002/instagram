@@ -169,7 +169,7 @@ export default function ControlsPage() {
     : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
 
   return (
-    <div className="page-container" style={{ maxWidth: '1200px' }}>
+    <div className="page-container" style={{ maxWidth: '1400px' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
