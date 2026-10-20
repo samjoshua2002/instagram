@@ -1,60 +1,141 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useApp } from './context/AppContext';
 import {
   Users, Sliders, Sparkles, ArrowRight,
   MessageSquare, Film, Bot, Shield
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, animate } from 'framer-motion';
 
-// Pure SVG Donut Chart – no external dep needed
+// Framer Motion Animated Number Counter (60fps smooth count-up)
+function AnimatedNumber({ value, duration = 1.0 }) {
+  const numericValue = typeof value === 'number' ? value : parseInt(value, 10) || 0;
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    const controls = animate(0, numericValue, {
+      duration,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (latest) => setDisplayValue(Math.round(latest))
+    });
+    return () => controls.stop();
+  }, [numericValue, duration]);
+
+  return <span>{displayValue.toLocaleString()}</span>;
+}
+
+// Framer Motion Animated SVG Donut Chart
 function DonutChart({ segments, size = 130, stroke = 20 }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
   let offset = 0;
+
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f4f4f5" strokeWidth={stroke} />
+    <motion.svg
+      initial={{ rotate: -90, scale: 0.92, opacity: 0 }}
+      animate={{ rotate: -90, scale: 1, opacity: 1 }}
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ overflow: 'visible' }}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="#f4f4f5"
+        strokeWidth={stroke}
+      />
       {segments.map((seg, i) => {
         const dash = (seg.value / total) * circ;
-        const el = (
-          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none"
-            stroke={seg.color} strokeWidth={stroke}
-            strokeDasharray={`${dash} ${circ - dash}`}
-            strokeDashoffset={-offset} strokeLinecap="butt" />
-        );
+        const currentOffset = offset;
         offset += dash;
-        return el;
+        return (
+          <motion.circle
+            key={i}
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={stroke}
+            initial={{ strokeDasharray: `0 ${circ}`, strokeDashoffset: -currentOffset }}
+            animate={{ strokeDasharray: `${dash} ${circ - dash}`, strokeDashoffset: -currentOffset }}
+            transition={{
+              duration: 1.1,
+              delay: 0.15 + i * 0.12,
+              ease: [0.16, 1, 0.3, 1]
+            }}
+            strokeLinecap="butt"
+          />
+        );
       })}
-    </svg>
+    </motion.svg>
   );
 }
 
-// Horizontal bar row for leaderboards
+// Horizontal bar row for leaderboards with animated progress bar & counter
 function BarRow({ label, handle, value, max, index }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   const shades = ['#09090b', '#27272a', '#52525b', '#a1a1aa', '#d4d4d8'];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f4f4f5' }}>
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.4, delay: 0.15 + index * 0.08 }}
+      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f4f4f5' }}
+    >
       <span style={{ width: '16px', fontSize: '0.66rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textAlign: 'right', flexShrink: 0 }}>
         {index + 1}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
           <span style={{ fontSize: '0.81rem', fontWeight: '700', color: '#09090b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>{label}</span>
-          <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: '8px' }}>{value}</span>
+          <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: '8px' }}>
+            <AnimatedNumber value={value} duration={0.9} />
+          </span>
         </div>
-        <div style={{ width: '100%', height: '5px', background: '#f4f4f5', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: shades[index] || '#d4d4d8', borderRadius: '3px', transition: 'width 0.6s ease' }} />
+        <div style={{ width: '100%', height: '6px', background: '#f4f4f5', borderRadius: '3px', overflow: 'hidden' }}>
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 1.0, delay: 0.2 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+            style={{ height: '100%', background: shades[index] || '#d4d4d8', borderRadius: '3px' }}
+          />
         </div>
         {handle && <div style={{ fontSize: '0.63rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>{handle}</div>}
       </div>
-    </div>
+    </motion.div>
   );
 }
+
+const statsContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05
+    }
+  }
+};
+
+const statCardVariants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.45,
+      ease: [0.16, 1, 0.3, 1]
+    }
+  }
+};
 
 export default function AnalyticsPage() {
   const { nodes, routingConfig } = useApp();
@@ -111,9 +192,9 @@ export default function AnalyticsPage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className="page-container dashboard-container"
     >
       {/* HEADER */}
@@ -125,16 +206,39 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* STAT CARDS */}
-      <div className="stats-grid">
+      {/* STAT CARDS WITH FRAMER MOTION STAGGER & NUMBER COUNTERS */}
+      <motion.div
+        variants={statsContainerVariants}
+        initial="hidden"
+        animate="visible"
+        className="stats-grid"
+      >
         {statCards.map((c, i) => (
-          <div key={i} className="stat-card-item" style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
+          <motion.div
+            key={i}
+            variants={statCardVariants}
+            whileHover={{ y: -3, transition: { duration: 0.2 } }}
+            className="stat-card-item"
+            style={{
+              background: '#fff',
+              border: '1px solid #e4e4e7',
+              borderRadius: '12px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              minHeight: '120px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{c.label}</span>
               <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>{c.icon}</div>
             </div>
             <div>
-              <div className="stat-card-value" style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>{c.value}</div>
+              <div className="stat-card-value" style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                <AnimatedNumber value={c.value} duration={1.1} />
+              </div>
               <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>{c.sub}</div>
             </div>
             {c.href ? (
@@ -142,12 +246,17 @@ export default function AnalyticsPage() {
                 <span>View</span><ArrowRight size={10} />
               </Link>
             ) : <div />}
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      {/* MAIN 3-COL CHARTS */}
-      <div className="charts-grid">
+      {/* MAIN 3-COL CHARTS WITH FRAMER MOTION PROGRESS BARS & ANIMATED COUNTERS */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        className="charts-grid"
+      >
         {/* Donut: Circle Breakdown */}
         <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
           <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>CIRCLE COMPOSITION</div>
@@ -155,7 +264,9 @@ export default function AnalyticsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '16px' }}>
             <DonutChart segments={donutSegments.length > 0 ? donutSegments : [{ value: 1, color: '#f4f4f5' }]} size={130} stroke={20} />
             <div style={{ position: 'absolute', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.7rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{friendNodes.length}</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>
+                <AnimatedNumber value={friendNodes.length} duration={1.0} />
+              </div>
               <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>TOTAL</div>
             </div>
           </div>
@@ -172,7 +283,9 @@ export default function AnalyticsPage() {
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                   <span style={{ color: '#52525b' }}>{s.label}</span>
                 </div>
-                <span style={{ fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</span>
+                <span style={{ fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <AnimatedNumber value={s.value} duration={0.8} />
+                </span>
               </div>
             ))}
           </div>
@@ -209,10 +322,15 @@ export default function AnalyticsPage() {
             <span>View all</span><ArrowRight size={10} />
           </Link>
         </div>
-      </div>
+      </motion.div>
 
       {/* BOTTOM ROW: AI Status + Routing */}
-      <div className="bottom-grid">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="bottom-grid"
+      >
         {/* AI Split */}
         <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
           <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>AI REPLY STATUS</div>
@@ -222,7 +340,12 @@ export default function AnalyticsPage() {
           </div>
           <div style={{ height: '8px', background: '#f4f4f5', borderRadius: '4px', overflow: 'hidden', marginBottom: '14px' }}>
             {friendNodes.length > 0 && (
-              <div style={{ width: `${(breakdown.aiActive / friendNodes.length) * 100}%`, height: '100%', background: '#09090b', transition: 'width 0.5s ease' }} />
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${(breakdown.aiActive / friendNodes.length) * 100}%` }}
+                transition={{ duration: 1.1, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                style={{ height: '100%', background: '#09090b', borderRadius: '4px' }}
+              />
             )}
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -233,7 +356,9 @@ export default function AnalyticsPage() {
               <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#09090b', letterSpacing: '-0.5px' }}>{s.value}</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#09090b', letterSpacing: '-0.5px' }}>
+                    <AnimatedNumber value={s.value} duration={0.9} />
+                  </div>
                   <div style={{ fontSize: '0.64rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>{s.label}</div>
                 </div>
               </div>
@@ -260,7 +385,7 @@ export default function AnalyticsPage() {
               {routingConfig.chatMode === 'everyone_except' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} excluded`}
               {routingConfig.chatMode === 'only_selected' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} selected`}
               {routingConfig.chatMode === 'everyone' && 'All contacts — global auto-reply'}
-              {routingConfig.chatMode === 'paused' && 'Silenced — Sam is chatting manually'}
+              {routingConfig.chatMode === 'paused' && 'Silenced — Manual chat active'}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -273,14 +398,16 @@ export default function AnalyticsPage() {
             </div>
             <div style={{ flex: 1, background: '#f4f4f5', borderRadius: '8px', padding: '9px 11px', border: '1px solid #e4e4e7' }}>
               <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '2px' }}>CONTACTS</div>
-              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#09090b' }}>{friendNodes.length} people</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#09090b' }}>
+                <AnimatedNumber value={friendNodes.length} duration={0.8} /> people
+              </span>
             </div>
           </div>
           <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
             <span>Adjust routing</span><ArrowRight size={10} />
           </Link>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

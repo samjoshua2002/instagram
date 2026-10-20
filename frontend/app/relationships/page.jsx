@@ -1035,7 +1035,7 @@ export default function RelationshipsPage() {
             >
               <Pause size={18} />
               <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: '800' }}>Stop AI (Sam Manual)</div>
+                <div style={{ fontSize: '0.82rem', fontWeight: '800' }}>Stop AI (Manual Chat)</div>
                 <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '1px' }}>AI silenced for manual chatting</div>
               </div>
             </button>
@@ -1212,10 +1212,10 @@ export default function RelationshipsPage() {
               </div>
             </div>
 
-            {/* Row 3: Relationship to Sam */}
+            {/* Row 3: Relationship */}
             <div>
               <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-                Specific Relationship To Sam
+                Specific Relationship To You
               </label>
               <input
                 type="text"

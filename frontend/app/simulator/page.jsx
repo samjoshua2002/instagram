@@ -61,7 +61,7 @@ export default function SimulatorPage() {
           Live DM Simulator
         </h1>
         <p style={{ color: '#a1a1aa', fontSize: '0.88rem', marginTop: '4px' }}>
-          Test how Sam Joshua&apos;s clone responds to specific friends like Bhavani or Rajveer without texting on Instagram.
+          Test how your AI persona responds to specific contacts without texting on Instagram.
         </p>
       </div>
 
@@ -114,7 +114,7 @@ export default function SimulatorPage() {
           ))}
           {isLoading && (
             <div style={{ alignSelf: 'flex-end', background: '#18181b', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', color: '#a1a1aa' }}>
-              Sam&apos;s clone is typing...
+              AI persona is typing...
             </div>
           )}
         </div>

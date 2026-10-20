@@ -41,9 +41,9 @@ export default function Sidebar() {
 
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName || ''}`.trim()
-    : (user?.username || 'Sam Joshua');
+    : (user?.username || 'User');
 
-  const displayHandle = user?.instagramUsername || user?.username || 'catovidz';
+  const displayHandle = user?.instagramUsername || user?.username || 'user';
 
   return (
     <>
