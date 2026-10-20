@@ -122,9 +122,27 @@ export function AppProvider({ children }) {
   const [selectedNode, setSelectedNode] = useState(null);
   
   // Authentication & Session State
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [token, setToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('chatter_jwt_token') || null;
+    }
+    return null;
+  });
+  const [user, setUser] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('chatter_remembered_account');
+        return cached ? JSON.parse(cached) : null;
+      } catch { return null; }
+    }
+    return null;
+  });
+  const [authLoading, setAuthLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('chatter_jwt_token');
+    }
+    return false;
+  });
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
 
   const [routingConfig, setRoutingConfigState] = useState({
