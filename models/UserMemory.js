@@ -63,6 +63,17 @@ const UserMemorySchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  samSpeakingStyleWithUser: {
+    type: String,
+    default: '',
+  },
+  insideJokes: [{
+    type: String,
+  }],
+  fewShotExchanges: [{
+    userMessage: { type: String, default: '' },
+    myReply: { type: String, default: '' },
+  }],
   recentChatBuffer: [{
     role: { type: String, enum: ['user', 'assistant'] },
     text: { type: String },

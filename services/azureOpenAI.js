@@ -2,15 +2,32 @@ const { AzureOpenAI } = require('openai');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
+const celRuleEngine = require('./celRuleEngine');
+const redisService = require('./redisService');
 
 class AzureOpenAIService {
   constructor() {
-    this.client = new AzureOpenAI({
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
-      deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o",
-    });
+    this.endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    this.apiKey = process.env.AZURE_OPENAI_API_KEY;
+    this.apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview";
+    this.defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
+    this.clients = {};
+  }
+
+  /**
+   * Retrieves or instantiates an AzureOpenAI client dedicated to a specific deployment
+   */
+  getClient(deploymentName) {
+    const deployment = deploymentName || this.defaultDeployment;
+    if (!this.clients[deployment]) {
+      this.clients[deployment] = new AzureOpenAI({
+        endpoint: this.endpoint,
+        apiKey: this.apiKey,
+        apiVersion: this.apiVersion,
+        deployment: deployment,
+      });
+    }
+    return this.clients[deployment];
   }
 
   /**
@@ -18,10 +35,14 @@ class AzureOpenAIService {
    * referencing remembered facts, and drawing upon the social graph network of friends.
    */
   async generateReply({ userMemory, messageHistory, incomingText }) {
-    // 1. Fetch persona config
-    let config = await PersonaConfig.findOne();
+    // 1. Fetch persona config (with Redis 10m cache)
+    let config = await redisService.getCachedPersonaConfig();
     if (!config) {
-      config = await PersonaConfig.create({});
+      config = await PersonaConfig.findOne();
+      if (!config) {
+        config = await PersonaConfig.create({});
+      }
+      await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
     }
 
     // 1b. Fetch active reaction categories from user's Media Vault
@@ -72,10 +93,16 @@ class AzureOpenAIService {
       .map(ev => `- ${ev.title} (${ev.dateOrTime || 'ongoing'}): ${ev.details || ''}`)
       .join('\n');
 
-    // 4. Format sample conversations for few-shot prompting
-    const samples = (config.sampleConversations || [])
-      .map(s => `User: "${s.userMessage}"\n${config.creatorName}: "${s.myReply}"`)
-      .join('\n\n');
+    // 4. Format sample conversations: PRIORITIZE real exchanges with THIS person learned from 1-month chat data!
+    let samples = '';
+    if (userMemory.fewShotExchanges && userMemory.fewShotExchanges.length > 0) {
+      samples = `REAL EXCHANGES FROM YOUR 1-MONTH CHAT HISTORY WITH THIS SPECIFIC PERSON (TALK EXACTLY LIKE THIS):\n` +
+        userMemory.fewShotExchanges.map(s => `User: "${s.userMessage}"\n${config.creatorName}: "${s.myReply}"`).join('\n\n');
+    } else {
+      samples = (config.sampleConversations || [])
+        .map(s => `User: "${s.userMessage}"\n${config.creatorName}: "${s.myReply}"`)
+        .join('\n\n');
+    }
 
     // 4b. Knowledge Gap System — context-aware, never robotic or pushy
     const msgCount = userMemory.messageCount || 0;
@@ -131,7 +158,6 @@ class AzureOpenAIService {
 
     // Decide the actual directive based on context
     let knowledgeGapDirective;
-
     if (theyDeflected) {
       knowledgeGapDirective = `They gave a short reply to your previous question. Don't push or stack questions right now. Just vibe and text back naturally.`;
     } else if (alreadyAskedRecently) {
@@ -147,8 +173,37 @@ CRITICAL STYLE RULES:
       knowledgeGapDirective = `Profile Intel is strong (${knowledgeScore}%). Vibe comfortably like close friends. Passively absorb any new stories they share.`;
     }
 
+    // 5. Evaluate dynamic talking style & anti-dossier rules using CEL Engine
+    const isReelOrShare = /\[Shared Reel|\[Shared Post|instagram\.com\/(?:p|reel|tv)\//i.test(incomingText);
+    const celResult = celRuleEngine.evaluate({
+      userMemory,
+      incomingText,
+      isReelShare: isReelOrShare
+    });
+    const { directives, shouldInjectFacts, styleMode, selectedModel, chatType } = celResult;
+    console.log(`🤖 [Model Routing]: Selected "${selectedModel}" for chatType "${chatType}" (@${userMemory.username || userMemory.senderId})`);
 
+    // 6. Memory facts (gated by CEL rule - prevents robotic dossier dumping while keeping full lore available)
+    let memoryFactsSection = '';
+    if (shouldInjectFacts) {
+      memoryFactsSection = `
+RELEVANT MEMORY (THE USER IS ASKING ABOUT / REFERENCING THIS - MENTION NATURALLY AS A CLOSE FRIEND):
+${factsList || '(none recorded)'}
+${datesList || '(none recorded)'}
+${favoritesList || '(none recorded)'}
+${eventsList || '(none recorded)'}
+`;
+    } else {
+      memoryFactsSection = `
+KNOWN PROFILE LORE (INTERNAL KNOWLEDGE ONLY - DO NOT UNPROMPTED DUMP OR LIST THIS):
+- Important dates: ${datesList || '(none)'}
+- Their favorite things: ${favoritesList || '(none)'}
+- Life situation: ${eventsList || '(none)'}
+- Remembered facts: ${factsList || '(none)'}
+Rule: Chat naturally about their current message. Do NOT prove you have a database by reciting their facts out of nowhere.`;
+    }
 
+    // 7. Construct Full, Deeply Structured System Prompt
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}). 
 You are texting directly on your phone in Instagram Direct Messages (DMs).
 
@@ -164,9 +219,15 @@ STYLE & TONE GUIDELINES:
 ${config.toneGuidelines}
 
 ${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${config.customKnowledge}\n` : ''}
+
+ACTIVE CEL DIRECTIVE FOR THIS EXACT CONVERSATION:
+${directives.modeInstruction}
+${directives.lengthInstruction}
+${directives.factInstruction}
+
 TEXTING STYLE RULES:
 - TEXT LIKE A REAL HUMAN: No formal punctuation, no ending periods, no robotic grammar. Casual lowercase, chill phrases.
-- NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
+- NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand", "delighted to help"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
 - KEEP IT CONCISE: 1–2 short lines max. Quick, natural, immediate DM replies.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths — sometimes 1 word, sometimes an emoji alone, sometimes a one-liner. Keep it unpredictable.
 - TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they've told you before naturally like a close friend would.
@@ -179,17 +240,15 @@ REEL & SHARED MEDIA REACTIONS:
 REAL CHAT EXAMPLES (HOW YOU TALK):
 ${samples}
 
-CURRENT PERSON YOU ARE CHATTING WITH:
+CURRENT PERSON YOU ARE CHATTING WITH (STRICT PERSON-SPECIFIC ADAPTATION):
 - Name/Username: ${userMemory.name || userMemory.username || 'Friend'}
-- Preferred Nickname: ${userMemory.nickname || 'use their first name or neutral terms'}
+- Preferred Nickname: ${userMemory.nickname || (userMemory.name ? userMemory.name.split(' ')[0] : 'neutral')}
 - Relationship to you: ${userMemory.relationshipType || 'stranger'}
 - Their texting style (mirror this): ${userMemory.conversationStyle || 'Casual'}
-- Personal notes about them: ${userMemory.personalNotes || 'None yet'}
-- Important dates: ${datesList || '(none recorded)'}
-- Their favorite things: ${favoritesList || '(none recorded)'}
-- Current life situation: ${eventsList || '(none recorded)'}
-- Remembered facts: ${factsList || '(none yet)'}
+- How you uniquely talk to them: ${userMemory.samSpeakingStyleWithUser || userMemory.roastStyle || 'Casual & authentic'}
+${userMemory.insideJokes && userMemory.insideJokes.length > 0 ? `- Shared Inside Jokes & Lore: ${userMemory.insideJokes.join(', ')}\n` : ''}- Personal notes about them: ${userMemory.personalNotes || 'None yet'}
 - Conversation summary so far: ${userMemory.rollingSummary || 'New conversation'}
+${memoryFactsSection}
 
 GENDER & ADDRESSING (CRITICAL):
 - This person's gender: ${userMemory.gender || 'unknown'}
@@ -199,19 +258,15 @@ GENDER & ADDRESSING (CRITICAL):
 
 BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - This person's specific banter/roast style: ${userMemory.roastStyle || 'match their energy naturally'}
-- When they use slang, cuss words, or trash talk: match their exact language and energy. Use whatever language THEY are writing in.
-- NEVER mix language styles — if they write in Tamil, reply in Tamil/Tanglish. If Hindi, reply in Hindi/Hinglish. If English, English only.
-- NEVER use a preset or repetitive slang list. Generate roast language naturally based on what they actually said and how they actually talk.
+- When they use slang, cuss words, or trash talk: match their exact language and energy.
 - STRICT ISOLATION: NEVER cross-contaminate banter across people. What you discuss or banter with Arun stays 100% with Arun. Never use rude banter or guy-slang with female friends or new contacts.
 - Female friends (Fami, Bhavani, Annie): Never harsh cussing. Sweet, playful, and affectionate tone by default. Gentle teasing only.
 - Romantic interest/crush: Flirty and teasing, never crude.
 - Do NOT use cringe AI phrases. Never say "chose violence" or any variant.
 
-TAMIL & TANGLISH MASTERY (FOR TAMIL CONTACTS & MESSAGES):
-- When the user texts in Tamil, Tanglish, or mixes Tamil/English (e.g. Arun, Rubesh, Tamil homies):
-  * Reply in natural, conversational Tanglish phonetics (e.g. "dei", "enna da", "seri seri", "loosu maari pesadha", "apdiya da", "podhum da", "theriyum da", "vela paaru da", "semma bro", "vera level", "sari vidu", "paravala", "marandhutiya", "apram enna vishayam", "machan").
-  * DYNAMIC & CREATIVE: Never repeat the same words or static insults. Use clever sarcasm, witty Tanglish banter, and playful mocking based on the actual message.
-  * NO REPETITIVE SWEARING: Avoid stale, repetitive curse words. Keep the banter lively, funny, and brotherly.
+LANGUAGE RULE:
+- DEFAULT TO ENGLISH: You and your friends usually chat in casual English.
+- If the user explicitly texts in Tamil, Tanglish, or mixes Tamil/English (e.g. Arun, Rubesh, Tamil homies), reply in natural, conversational Tanglish phonetics (dei, enna da, seri seri, apdiya da, semma bro, vera level, paravala). Otherwise, stay in casual English.
 
 HANDLING USER CORRECTIONS & PASSIVE LEARNING:
 - If the user corrects any detail (e.g. "no my bday is actually June 10", "no that's not my school", "i don't live in chennai"):
@@ -253,8 +308,7 @@ HUMAN TEXTING & AUTHENTIC TONE RULES:
 ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WORDS/PHRASES (NEVER SAY THESE): ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
 - Only return the raw message text. No quotation marks, no name prefix.`;
 
-
-    // 6. Build Messages array
+    // 8. Build Messages array
     const messages = [{ role: 'system', content: systemPrompt }];
 
     // Prepare conversation history (from Message history, falling back to recentChatBuffer)
@@ -268,7 +322,6 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
     // Add recent history (up to last 10 messages)
     if (effectiveHistory && effectiveHistory.length > 0) {
       for (const msg of effectiveHistory) {
-        // Prevent duplicate if the incoming message is already in the tail of history
         if (msg.text && msg.text.trim() === incomingText.trim() && msg.role === 'user') {
           continue;
         }
@@ -286,13 +339,27 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
     });
 
     try {
-      const response = await this.client.chat.completions.create({
+      let client = this.getClient(selectedModel);
+      let response;
+      const isGpt5 = selectedModel.startsWith('gpt-5');
+      const requestParams = {
         messages,
-        temperature: 0.95,
-        frequency_penalty: 0.35,
-        presence_penalty: 0.35,
-        max_tokens: 250,
-      });
+        ...(isGpt5 ? { max_completion_tokens: 220 } : { max_tokens: 220, temperature: 0.90, frequency_penalty: 0.35, presence_penalty: 0.35 }),
+      };
+
+      try {
+        response = await client.chat.completions.create(requestParams);
+      } catch (modelErr) {
+        console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
+        client = this.getClient('gpt-4o');
+        response = await client.chat.completions.create({
+          messages,
+          temperature: 0.90,
+          frequency_penalty: 0.35,
+          presence_penalty: 0.35,
+          max_tokens: 220,
+        });
+      }
 
       let reply = response.choices[0].message.content.trim();
 
@@ -300,6 +367,27 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
       reply = reply.replace(/^"|"$/g, '').trim();
       if (reply.startsWith(`${config.creatorName}:`)) {
         reply = reply.replace(`${config.creatorName}:`, '').trim();
+      }
+
+      // Preserve attachment tag if present
+      const attachmentMatch = reply.match(/(\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\])/i);
+      let attachmentTag = '';
+      if (attachmentMatch) {
+        attachmentTag = ' ' + attachmentMatch[1];
+        reply = reply.replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+      }
+
+      // Remove ending periods for casual authentic human DM texting
+      reply = reply.replace(/\.+$/, '').trim();
+
+      // Enforce casual lowercase on the reply body if casual texting
+      if (styleMode !== 'chill_creator' && !reply.startsWith('http')) {
+        reply = reply.toLowerCase();
+      }
+
+      // Re-attach sticker/attachment tag if it existed
+      if (attachmentTag) {
+        reply = reply + attachmentTag;
       }
 
       // Strictly purge forbidden words like "baddu"
@@ -316,9 +404,13 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
    * Generates a natural, friendly follow-up check-in when a conversation has been inactive for 5-6 hours
    */
   async generateFollowUpReminder({ userMemory, messageHistory }) {
-    let config = await PersonaConfig.findOne();
+    let config = await redisService.getCachedPersonaConfig();
     if (!config) {
-      config = await PersonaConfig.create({});
+      config = await PersonaConfig.findOne();
+      if (!config) {
+        config = await PersonaConfig.create({});
+      }
+      await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
     }
 
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}).
@@ -353,7 +445,8 @@ RULES:
     });
 
     try {
-      const response = await this.client.chat.completions.create({
+      const client = this.getClient('gpt-5.1-chat');
+      const response = await client.chat.completions.create({
         messages,
         temperature: 0.8,
         frequency_penalty: 0.5,
@@ -445,7 +538,8 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
     }
 
     try {
-      const response = await this.client.chat.completions.create({
+      const client = this.getClient('gpt-5.6-luna');
+      const response = await client.chat.completions.create({
         messages,
         temperature: 0.4,
         response_format: { type: 'json_object' }
@@ -497,7 +591,8 @@ Return a STRICT JSON object in this exact format:
 }`;
 
     try {
-      const response = await this.client.chat.completions.create({
+      const client = this.getClient('gpt-5.6-luna');
+      const response = await client.chat.completions.create({
         messages: [{ role: 'system', content: systemPrompt }],
         temperature: 0.3,
         response_format: { type: 'json_object' }
@@ -511,4 +606,3 @@ Return a STRICT JSON object in this exact format:
 }
 
 module.exports = new AzureOpenAIService();
-
