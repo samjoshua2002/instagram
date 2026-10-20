@@ -458,6 +458,22 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
   }
 
   /**
+   * Safe scheduler for chat retention. Preserves full 1-month+ chat history
+   * for continuous learning unless explicitly overridden via CHAT_RETENTION_DAYS.
+   */
+  startDailyCleanup(days = null) {
+    const retentionDays = parseInt(process.env.CHAT_RETENTION_DAYS || (days > 14 ? days : null), 10);
+    if (!retentionDays || retentionDays <= 0) {
+      console.log('📦 [Memory Service] Permanent chat history retention active (1-month+ memory preserved for AI learning).');
+      return;
+    }
+    console.log(`⏱️ Daily chat retention cleanup scheduled (${retentionDays} days retention).`);
+    setInterval(() => {
+      this.cleanOldMessages(retentionDays).catch(e => console.error('Cleanup error:', e.message));
+    }, 24 * 60 * 60 * 1000);
+  }
+
+  /**
    * Scans the 1-month chat history in MongoDB across all users,
    * analyzes their complete message streams, and updates their UserMemory,
    * SocialGraph lore, and Redis cache.
