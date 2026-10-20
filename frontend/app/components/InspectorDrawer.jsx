@@ -683,7 +683,7 @@ export default function InspectorDrawer() {
               <span>5–10H FOLLOW-UP REMINDER ACTIVE</span>
             </div>
             <p style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: '4px', margin: 0 }}>
-              If a genuine conversation with {selectedNode.name} is paused for 5–10 hours, Sam&apos;s AI will send a warm, contextual follow-up.
+              If a genuine conversation with {selectedNode.name} is paused for 5–10 hours, your AI will send a warm, contextual follow-up.
             </p>
           </div>
         </div>
