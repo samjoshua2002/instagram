@@ -5,6 +5,11 @@ import AuthGate from './components/AuthGate';
 export const metadata = {
   title: 'Chatter OS // Workspace',
   description: 'AI Instagram DM automation & intelligence dashboard with pure monochrome Shadcn UI',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }) {

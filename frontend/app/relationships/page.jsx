@@ -8,6 +8,7 @@ import {
   Plus, RefreshCw, MessageSquare, Shield, X, Users
 } from 'lucide-react';
 import ContactAvatar from '../components/ContactAvatar';
+import { motion } from 'framer-motion';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -60,7 +61,8 @@ export default function RelationshipsPage() {
     lookupContact,
     extractFromRawChat,
     API_BASE,
-    showToast
+    showToast,
+    isSyncingInitial
   } = useApp();
 
   // Navigation State: null = Directory Table view; Object = Full Inner Person Page
@@ -1550,7 +1552,13 @@ export default function RelationshipsPage() {
   // VIEW 2: ALL PEOPLE DIRECTORY (Shadcn Light Monochrome Table & Dashboard)
   // =========================================================================
   return (
-    <div className="page-container" style={{ maxWidth: '1400px' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="page-container"
+      style={{ maxWidth: '1400px' }}
+    >
       {/* Top Header */}
       <div className="directory-header-row page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -1564,29 +1572,6 @@ export default function RelationshipsPage() {
             Unified directory showing profiles, interaction statistics, and automated intelligence rules.
           </p>
         </div>
-
-        <button
-          onClick={() => startAiInterview(null)}
-          className="header-add-btn"
-          style={{
-            background: '#09090b',
-            color: '#ffffff',
-            border: 'none',
-            padding: '9px 16px',
-            borderRadius: '8px',
-            fontWeight: '700',
-            fontSize: '0.82rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            flexShrink: 0,
-            marginLeft: 'auto'
-          }}
-        >
-          <Sparkles size={14} />
-          <span>+ Add Person</span>
-        </button>
       </div>
 
       {/* ================= DASHBOARD METRICS SUMMARY ================= */}
@@ -1791,7 +1776,38 @@ export default function RelationshipsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pagedPeople.length === 0 ? (
+                {isSyncingInitial && pagedPeople.length === 0 ? (
+                  Array.from({ length: 6 }).map((_, idx) => (
+                    <tr key={`skel-${idx}`} style={{ borderBottom: '1px solid #f4f4f5' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div className="skeleton" style={{ width: '36px', height: '36px', borderRadius: '50%' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div className="skeleton" style={{ width: '130px', height: '16px', marginBottom: '4px' }} />
+                        <div className="skeleton" style={{ width: '60px', height: '11px' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div className="skeleton" style={{ width: '100px', height: '15px' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div className="skeleton" style={{ width: '85px', height: '15px' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div className="skeleton" style={{ width: '90px', height: '15px', marginBottom: '4px' }} />
+                        <div className="skeleton" style={{ width: '70px', height: '11px' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <div className="skeleton" style={{ width: '40px', height: '22px', margin: '0 auto' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <div className="skeleton" style={{ width: '40px', height: '22px', margin: '0 auto' }} />
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <div className="skeleton" style={{ width: '56px', height: '26px', marginLeft: 'auto' }} />
+                      </td>
+                    </tr>
+                  ))
+                ) : pagedPeople.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
                       {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
@@ -1966,7 +1982,29 @@ export default function RelationshipsPage() {
 
         {/* 2. Mobile Compact Cards View (screens <= 768px) */}
         <div className="mobile-people-cards" style={{ padding: '12px' }}>
-          {pagedPeople.length === 0 ? (
+          {isSyncingInitial && pagedPeople.length === 0 ? (
+            Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={`m-skel-${idx}`}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e4e4e7',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  marginBottom: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <div className="skeleton" style={{ width: '42px', height: '42px', borderRadius: '50%' }} />
+                  <div>
+                    <div className="skeleton" style={{ width: '120px', height: '16px', marginBottom: '4px' }} />
+                    <div className="skeleton" style={{ width: '80px', height: '12px' }} />
+                  </div>
+                </div>
+                <div className="skeleton" style={{ width: '100%', height: '36px' }} />
+              </div>
+            ))
+          ) : pagedPeople.length === 0 ? (
             <div style={{ padding: '32px 16px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px' }}>
               {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
             </div>
@@ -2246,6 +2284,6 @@ export default function RelationshipsPage() {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

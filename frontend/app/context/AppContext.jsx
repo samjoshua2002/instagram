@@ -102,6 +102,15 @@ const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [nodes, setNodes] = useState(DEFAULT_GRAPH_DATA);
+  const [isSyncingInitial, setIsSyncingInitial] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(STORAGE_NODES_KEY);
+        if (cached && JSON.parse(cached)?.length > 1) return false;
+      } catch (e) {}
+    }
+    return true;
+  });
   // Track names/ids that were explicitly deleted locally so syncBackend never re-adds them
   // Seeded from localStorage so deletes persist across page refreshes
   const deletedNamesRef = useRef((() => {
@@ -373,6 +382,8 @@ export function AppProvider({ children }) {
       }
     } catch (e) {
       console.warn('Backend sync note (using cached):', e.message);
+    } finally {
+      setIsSyncingInitial(false);
     }
   };
 
@@ -916,6 +927,7 @@ export function AppProvider({ children }) {
         lookupContact,
         extractFromRawChat,
         syncBackend,
+        isSyncingInitial,
         API_BASE,
         user,
         token,
