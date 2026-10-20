@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
+import { motion } from 'framer-motion';
 import {
   Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause
 } from 'lucide-react';
@@ -169,7 +170,13 @@ export default function ControlsPage() {
     : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
 
   return (
-    <div className="page-container" style={{ maxWidth: '1400px' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="page-container"
+      style={{ maxWidth: '1400px' }}
+    >
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
@@ -542,6 +549,6 @@ export default function ControlsPage() {
           })}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -8,6 +8,7 @@ import {
   Smile, Flame, Eye, Heart, HelpCircle, Frown, X, ExternalLink,
   Pencil, Tag, Search, Download, Key, Check, Layers
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function MediaVaultPage() {
   const { API_BASE, showToast } = useApp();
@@ -455,15 +456,19 @@ export default function MediaVaultPage() {
   };
 
   return (
-    <div className="page-container settings-fullwidth" style={{ maxWidth: '100%', width: '100%' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="page-container settings-fullwidth"
+      style={{ maxWidth: '1400px', width: '100%' }}
+    >
 
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: '#09090b', color: '#ffffff', letterSpacing: '0.05em' }}>
-              SECTION 05
-            </span>
+           
             <span style={{ fontSize: '0.76rem', color: '#71717a', fontWeight: '600' }}>
               REACTION VAULT & EMOTION ATTACHMENTS (50% PRIORITY)
             </span>
@@ -1757,6 +1762,6 @@ export default function MediaVaultPage() {
         </div>
       )}
 
-    </div>
+    </motion.div>
   );
 }
