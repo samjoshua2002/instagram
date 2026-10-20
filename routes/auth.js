@@ -475,13 +475,24 @@ router.post('/passkey/register-verify', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Failed to verify passkey registration' });
     }
 
-    // Set custom passkey device name if provided
-    if (name && req.user.passkeys.length > 0) {
-      req.user.passkeys[req.user.passkeys.length - 1].name = name;
+    // Set device name from client or detect dynamically from User-Agent
+    const userAgent = req.get('user-agent') || '';
+    let resolvedName = (name || '').trim();
+    if (!resolvedName) {
+      if (/iPhone/i.test(userAgent)) resolvedName = 'iPhone (Touch ID / Face ID)';
+      else if (/iPad/i.test(userAgent)) resolvedName = 'iPad (Touch ID)';
+      else if (/Android/i.test(userAgent)) resolvedName = 'Android (Fingerprint)';
+      else if (/Macintosh|Mac OS X/i.test(userAgent)) resolvedName = 'Mac (Touch ID)';
+      else if (/Windows/i.test(userAgent)) resolvedName = 'Windows PC (Windows Hello)';
+      else resolvedName = 'Security Key / Biometrics';
+    }
+
+    if (req.user.passkeys.length > 0) {
+      req.user.passkeys[req.user.passkeys.length - 1].name = resolvedName;
       await req.user.save();
     }
 
-    res.json({ success: true, message: 'Passkey added successfully!' });
+    res.json({ success: true, message: 'Passkey added successfully!', deviceName: resolvedName });
   } catch (err) {
     console.error('❌ Passkey register verify error:', err.message);
     res.status(500).json({ error: err.message });
@@ -514,6 +525,7 @@ router.get('/me', requireAuth, async (req, res) => {
     id: user._id,
     username: user.username,
     email: user.email,
+    profilePicUrl: user.profilePicUrl || '',
     firstName: user.firstName,
     lastName: user.lastName,
     mobileNumber: user.mobileNumber,
@@ -533,13 +545,14 @@ router.get('/me', requireAuth, async (req, res) => {
 
 /**
  * PUT /api/auth/profile (Protected)
- * Updates user profile details
+ * Updates user profile details including profile picture
  */
 router.put('/profile', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address } = req.body;
+    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl } = req.body;
 
+    if (profilePicUrl !== undefined) user.profilePicUrl = profilePicUrl;
     if (firstName !== undefined) user.firstName = firstName.trim();
     if (lastName !== undefined) user.lastName = lastName.trim();
     if (mobileNumber !== undefined) user.mobileNumber = mobileNumber.trim();
@@ -547,16 +560,39 @@ router.put('/profile', requireAuth, async (req, res) => {
     if (instagramUsername !== undefined) user.instagramUsername = instagramUsername.trim();
     if (address && typeof address === 'object') {
       user.address = {
-        street: address.street || user.address.street,
-        city: address.city || user.address.city,
-        state: address.state || user.address.state,
-        country: address.country || user.address.country,
-        postalCode: address.postalCode || user.address.postalCode,
+        street: address.street || user.address?.street || '',
+        city: address.city || user.address?.city || '',
+        state: address.state || user.address?.state || '',
+        country: address.country || user.address?.country || '',
+        postalCode: address.postalCode || user.address?.postalCode || '',
       };
     }
 
     await user.save();
     res.json({ success: true, message: 'Profile updated successfully', user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/auth/passkeys/:credentialId (Protected)
+ * Renames a registered passkey
+ */
+router.put('/passkeys/:credentialId', requireAuth, async (req, res) => {
+  try {
+    const { credentialId } = req.params;
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Passkey name is required' });
+    }
+    const passkey = (req.user.passkeys || []).find(p => p.credentialId === credentialId);
+    if (!passkey) {
+      return res.status(404).json({ error: 'Passkey not found' });
+    }
+    passkey.name = name.trim();
+    await req.user.save();
+    res.json({ success: true, message: 'Passkey renamed successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

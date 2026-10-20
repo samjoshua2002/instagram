@@ -3,7 +3,7 @@ import { AppProvider } from './context/AppContext';
 import AuthGate from './components/AuthGate';
 
 export const metadata = {
-  title: 'Chatter OS // Sam Joshua',
+  title: 'Chatter OS // Workspace',
   description: 'AI Instagram DM automation & intelligence dashboard with pure monochrome Shadcn UI',
 };
 

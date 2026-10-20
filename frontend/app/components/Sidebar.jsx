@@ -72,7 +72,7 @@ export default function Sidebar() {
                   CHATTER_OS
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                  v2.6 // SAM JOSHUA
+                  v2.6 // WORKSPACE
                 </div>
               </div>
             </div>
@@ -210,27 +210,43 @@ export default function Sidebar() {
             gap: '8px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '6px',
-                  background: '#09090b',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: '700'
-                }}>
-                  {user?.firstName ? user.firstName.charAt(0) : 'S'}
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#09090b', lineHeight: 1.2 }}>
-                    {user?.firstName || 'Sam'} {user?.lastName || 'Joshua'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                {user?.profilePicUrl ? (
+                  <img
+                    src={user.profilePicUrl}
+                    alt="Profile"
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      objectFit: 'cover',
+                      border: '1px solid #e4e4e7',
+                      flexShrink: 0
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '6px',
+                    background: '#09090b',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    flexShrink: 0
+                  }}>
+                    {user?.firstName ? user.firstName.charAt(0).toUpperCase() : (user?.username ? user.username.charAt(0).toUpperCase() : 'U')}
                   </div>
-                  <div style={{ fontSize: '0.68rem', color: '#71717a' }}>
-                    @{user?.instagramUsername || 'catovidz'} • {user?.accountType || 'Personal'}
+                )}
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#09090b', lineHeight: 1.2, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.username || 'User')}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#71717a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    @{user?.instagramUsername || user?.username || 'user'} • {user?.accountType || 'Personal'}
                   </div>
                 </div>
               </div>
