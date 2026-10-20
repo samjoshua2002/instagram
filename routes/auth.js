@@ -752,8 +752,26 @@ router.put('/profile', requireAuth, async (req, res) => {
     }
 
     await user.save();
-    res.json({ success: true, message: 'Profile updated successfully', user });
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        profilePicUrl: user.profilePicUrl || '',
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mobileNumber: user.mobileNumber,
+        whatsappNumber: user.whatsappNumber,
+        instagramUsername: user.instagramUsername,
+        accountType: user.accountType,
+        address: user.address,
+        hasPasskeys: (user.passkeys || []).length > 0,
+      }
+    });
   } catch (err) {
+    console.error('❌ Profile update error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
