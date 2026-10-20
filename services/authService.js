@@ -24,8 +24,13 @@ class AuthService {
     const pass = process.env.EMAIL_PASS;
     if (user && pass) {
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // SSL port 465 avoids cloud SMTP throttling
         auth: { user, pass },
+        connectionTimeout: 7000,
+        greetingTimeout: 7000,
+        socketTimeout: 9000,
       });
     }
   }
@@ -123,40 +128,46 @@ class AuthService {
   }
 
   /**
-   * Generates a 6-digit OTP code and sends it to the user's email via Gmail SMTP
+   * Generates a 6-digit OTP code and sends it to the user's email with strict timeout protection
    */
   async sendOtpEmail(toEmail, otpCode, purpose = 'Password Reset') {
     if (!this.transporter) this.initMailer();
     if (!this.transporter) {
-      throw new Error('Email service not configured. Please set EMAIL_USER and EMAIL_PASS in environment.');
+      throw new Error('Email service not configured. Please ensure EMAIL_USER and EMAIL_PASS are configured on Render.');
     }
 
     const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; color: #09090b;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a;">
         <div style="margin-bottom: 24px; text-align: center;">
-          <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.5px;">Chatter OS // Security</h1>
-          <p style="font-size: 13px; color: #71717a; margin: 0;">Authorized access code for Sam Joshua</p>
+          <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 4px; color: #0f172a;">Sam Joshua Dashboard</h2>
+          <p style="font-size: 13px; color: #64748b; margin: 0;">Identity verification code</p>
         </div>
-        <div style="background: #f4f4f5; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;">
-          <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #71717a; margin-bottom: 8px;">Your 6-Digit ${purpose} Code</div>
-          <div style="font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #09090b; font-family: monospace;">${otpCode}</div>
-          <p style="font-size: 12px; color: #a1a1aa; margin: 8px 0 0;">Valid for 10 minutes. Never share this code with anyone.</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px;">Your 6-Digit ${purpose} Code</div>
+          <div style="font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0f172a; font-family: monospace;">${otpCode}</div>
+          <p style="font-size: 12px; color: #94a3b8; margin: 10px 0 0;">Valid for 10 minutes. Do not share this code.</p>
         </div>
-        <p style="font-size: 13px; line-height: 1.5; color: #52525b; margin: 0 0 16px;">
-          If you did not request this verification code, please ignore this email. Your account remains protected.
+        <p style="font-size: 13px; line-height: 1.5; color: #475569; margin: 0 0 16px;">
+          If you did not request this verification code, please ignore this email.
         </p>
-        <div style="border-top: 1px solid #f4f4f5; padding-top: 16px; text-align: center; font-size: 11px; color: #a1a1aa;">
-          Chatter OS Automated Security • guidetalk.app@gmail.com
+        <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; text-align: center; font-size: 11px; color: #94a3b8;">
+          Authorized Access • guidetalk.app@gmail.com
         </div>
       </div>
     `;
 
-    return this.transporter.sendMail({
-      from: `"Chatter OS Security" <${process.env.EMAIL_USER}>`,
+    const sendPromise = this.transporter.sendMail({
+      from: `"Sam Joshua Security" <${process.env.EMAIL_USER}>`,
       to: toEmail,
-      subject: `[Chatter OS] Your ${purpose} Verification Code: ${otpCode}`,
+      subject: `[Verification] Your ${purpose} Code: ${otpCode}`,
       html,
     });
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Email server connection timed out after 8s. You can also reset password instantly using your Zoho OneAuth app code!')), 8000)
+    );
+
+    return Promise.race([sendPromise, timeoutPromise]);
   }
 
   /**
@@ -183,8 +194,16 @@ class AuthService {
   async getTotpQrCode(user) {
     const secret = user.twoFactor?.secret;
     if (!secret) return null;
-    const otpauthUrl = `otpauth://totp/${encodeURIComponent(RP_NAME)}:${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(RP_NAME)}&digits=6&period=30`;
-    const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+    const label = `${RP_NAME}:${user.email}`;
+    const otpauthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(RP_NAME)}&digits=6&period=30`;
+    const qrDataUrl = await QRCode.toDataURL(otpauthUrl, {
+      margin: 1,
+      width: 240,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+    });
     return {
       secret,
       otpauthUrl,
@@ -195,13 +214,25 @@ class AuthService {
   // --- WebAuthn / Passkey Methods ---
 
   getRpID(req) {
+    const origin = req.get('origin') || req.get('referer');
+    if (origin) {
+      try {
+        const parsed = new URL(origin);
+        return parsed.hostname;
+      } catch (e) {}
+    }
     const host = req.get('host') || 'localhost';
-    // Strip port
-    const hostname = host.split(':')[0];
-    return hostname;
+    return host.split(':')[0];
   }
 
   getOrigin(req) {
+    const origin = req.get('origin') || req.get('referer');
+    if (origin) {
+      try {
+        const parsed = new URL(origin);
+        return `${parsed.protocol}//${parsed.host}`;
+      } catch (e) {}
+    }
     const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
     const host = req.get('host') || 'localhost:3000';
     return `${proto}://${host}`;
@@ -239,8 +270,8 @@ class AuthService {
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge,
-      expectedOrigin: [expectedOrigin, 'http://localhost:3000', 'https://*.vercel.app'],
-      expectedRPID: [expectedRPID, 'localhost'],
+      expectedOrigin,
+      expectedRPID,
       requireUserVerification: false,
     });
 
@@ -301,8 +332,8 @@ class AuthService {
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge,
-      expectedOrigin: [expectedOrigin, 'http://localhost:3000', 'https://*.vercel.app'],
-      expectedRPID: [expectedRPID, 'localhost'],
+      expectedOrigin,
+      expectedRPID,
       credential: {
         id: passkey.credentialId,
         publicKey: Buffer.from(passkey.publicKey, 'base64'),
