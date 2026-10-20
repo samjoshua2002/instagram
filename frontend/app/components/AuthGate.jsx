@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import LoginPage from './LoginPage';
 import PasskeyManagerModal from './PasskeyManagerModal';
@@ -11,6 +12,8 @@ import LinkIdModal from './LinkIdModal';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function AuthGate({ children }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const {
     user,
     token,
@@ -19,6 +22,32 @@ export default function AuthGate({ children }) {
     isPasskeyModalOpen,
     setIsPasskeyModalOpen
   } = useApp();
+
+  // Fresh launch detector: when user closes tab/window and opens fresh,
+  // sessionStorage is cleared. We automatically redirect them to start on Dashboard (/)!
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const isSessionActive = sessionStorage.getItem('chatter_session_active');
+      if (!isSessionActive) {
+        sessionStorage.setItem('chatter_session_active', 'true');
+        if (pathname && pathname !== '/') {
+          router.replace('/');
+        }
+      }
+    } catch (e) {}
+  }, [pathname, router]);
+
+  // Handler for login from LoginPage to ensure immediate navigation to dashboard
+  const handleLogin = (jwtToken, userData) => {
+    login(jwtToken, userData);
+    try {
+      sessionStorage.setItem('chatter_session_active', 'true');
+    } catch (e) {}
+    if (pathname && pathname !== '/') {
+      router.replace('/');
+    }
+  };
 
   // Only block the screen with full loader if there is no cached token or user
   if (authLoading && (!token || !user)) {
@@ -47,7 +76,7 @@ export default function AuthGate({ children }) {
   }
 
   if (!token || !user) {
-    return <LoginPage onLoginSuccess={login} />;
+    return <LoginPage onLoginSuccess={handleLogin} />;
   }
 
   return (
