@@ -25,22 +25,22 @@ export default function AuthGate({ children }) {
       <div style={{
         width: '100vw',
         height: '100vh',
-        background: '#09090b',
-        color: '#ffffff',
+        background: '#ffffff',
+        color: '#09090b',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '16px',
+        gap: '14px',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       }}>
-        <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#ffffff', color: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ShieldCheck size={24} />
+        <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#09090b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ShieldCheck size={22} />
         </div>
-        <div style={{ fontSize: '0.9rem', fontWeight: '700', letterSpacing: '-0.3px', color: '#f4f4f5' }}>
+        <div style={{ fontSize: '0.86rem', fontWeight: '700', letterSpacing: '-0.3px', color: '#09090b' }}>
           CHATTER OS // AUTHENTICATING
         </div>
-        <RefreshCw size={18} className="animate-spin" color="#71717a" />
+        <RefreshCw size={16} className="animate-spin" color="#71717a" />
       </div>
     );
   }

@@ -59,13 +59,41 @@ export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin');
 
   // Cached / Remembered Account State
-  const [rememberedAccount, setRememberedAccount] = useState(null);
+  const [rememberedAccount, setRememberedAccount] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem('chatter_remembered_account');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [useAnotherAccount, setUseAnotherAccount] = useState(false);
 
   // Sign In Sub-State
   // activeSignInMethod: 'passkey' | 'password' | 'oneauth'
-  const [activeSignInMethod, setActiveSignInMethod] = useState('password');
-  const [identifier, setIdentifier] = useState('');
+  const [activeSignInMethod, setActiveSignInMethod] = useState(() => {
+    if (typeof window === 'undefined') return 'password';
+    try {
+      const cached = localStorage.getItem('chatter_remembered_account');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.hasPasskeys) return 'passkey';
+      }
+    } catch {}
+    return 'password';
+  });
+  const [identifier, setIdentifier] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const cached = localStorage.getItem('chatter_remembered_account');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.email || parsed?.username || '';
+      }
+    } catch {}
+    return '';
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [totpCode, setTotpCode] = useState('');
