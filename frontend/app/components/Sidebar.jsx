@@ -28,8 +28,8 @@ export default function Sidebar() {
   const { routingConfig, toggleGlobalBot, startAiInterview, user, logout, setIsPasskeyModalOpen } = useApp();
 
   const navItems = [
-    { href: '/', label: 'Analytics', icon: LayoutDashboard, code: '01' },
-    { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
+    { href: '/', label: 'People Directory', icon: Users, code: '01' },
+    { href: '/analytics', label: 'Analytics', icon: LayoutDashboard, code: '02' },
     { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
     { href: '/settings', label: 'Persona & Style', icon: UserCheck, code: '04' },
     { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '05' },
@@ -125,7 +125,7 @@ export default function Sidebar() {
           MOBILE BOTTOM NAVIGATION TABS (screens <= 768px)
           ═══════════════════════════════════════════════════════════ */}
       <nav className="mobile-bottom-tabs">
-        {/* Tab 1: Dashboard */}
+        {/* Tab 1: People Directory (Default view) */}
         <Link
           href="/"
           style={{
@@ -136,18 +136,18 @@ export default function Sidebar() {
             justifyContent: 'center',
             gap: '3px',
             textDecoration: 'none',
-            color: pathname === '/' ? '#09090b' : '#a1a1aa',
+            color: (pathname === '/' || pathname === '/relationships') ? '#09090b' : '#a1a1aa',
             transition: 'all 0.15s ease',
             padding: '6px 0'
           }}
         >
-          <LayoutDashboard size={19} strokeWidth={pathname === '/' ? 2.5 : 1.8} />
-          <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/' ? '700' : '500' }}>Dashboard</span>
+          <Users size={19} strokeWidth={(pathname === '/' || pathname === '/relationships') ? 2.5 : 1.8} />
+          <span style={{ fontSize: '0.66rem', fontWeight: (pathname === '/' || pathname === '/relationships') ? '700' : '500' }}>People</span>
         </Link>
 
-        {/* Tab 2: People Directory */}
+        {/* Tab 2: Analytics Dashboard */}
         <Link
-          href="/relationships"
+          href="/analytics"
           style={{
             flex: 1,
             display: 'flex',
@@ -156,13 +156,13 @@ export default function Sidebar() {
             justifyContent: 'center',
             gap: '3px',
             textDecoration: 'none',
-            color: pathname === '/relationships' ? '#09090b' : '#a1a1aa',
+            color: pathname === '/analytics' ? '#09090b' : '#a1a1aa',
             transition: 'all 0.15s ease',
             padding: '6px 0'
           }}
         >
-          <Users size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />
-          <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/relationships' ? '700' : '500' }}>People</span>
+          <LayoutDashboard size={19} strokeWidth={pathname === '/analytics' ? 2.5 : 1.8} />
+          <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/analytics' ? '700' : '500' }}>Analytics</span>
         </Link>
 
         {/* Center Quick Action (+ Add Person) */}
@@ -261,7 +261,7 @@ export default function Sidebar() {
             paddingBottom: '16px',
             borderBottom: '1px solid #e4e4e7'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
               <div style={{
                 width: '36px',
                 height: '36px',
@@ -285,7 +285,7 @@ export default function Sidebar() {
                   v2.6 // WORKSPACE
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Live Bot Pulse Dot */}
             <div

@@ -7,6 +7,7 @@ import {
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
   Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function SettingsPage() {
   const { API_BASE, showToast } = useApp();
@@ -261,7 +262,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="page-container settings-fullwidth" style={{ maxWidth: '100%', width: '100%' }}>
+      <div className="page-container settings-fullwidth" style={{ maxWidth: '1400px', width: '100%' }}>
         {/* Skeleton Page Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
           <div>
@@ -335,14 +336,18 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="page-container settings-fullwidth" style={{ maxWidth: '100%', width: '100%' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="page-container settings-fullwidth"
+      style={{ maxWidth: '1400px', width: '100%' }}
+    >
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: '#09090b', color: '#ffffff', letterSpacing: '0.05em' }}>
-              SECTION 04
-            </span>
+          
             <span style={{ fontSize: '0.76rem', color: '#71717a', fontWeight: '600' }}>
               AI PERSONA & STYLING ENGINE
             </span>
@@ -1122,6 +1127,6 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
