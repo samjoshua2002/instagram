@@ -49,7 +49,7 @@ function detectCurrentDevice() {
 }
 
 export default function PasskeyManagerModal({ isOpen, onClose }) {
-  const { user, updateUserProfile, showToast } = useApp();
+  const { user, token, updateUserProfile, showToast } = useApp();
   const [activeTab, setActiveTab] = useState('passkeys'); // 'passkeys' | 'profile' | 'oneauth'
 
   // Passkey state
@@ -90,7 +90,14 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
   }, [isOpen]);
 
   const getAuthHeaders = () => {
-    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : '');
+    let authToken = token;
+    if (!authToken && typeof window !== 'undefined') {
+      try {
+        authToken = localStorage.getItem('chatter_jwt_token') || '';
+      } catch (e) {
+        authToken = '';
+      }
+    }
     return {
       'Content-Type': 'application/json',
       ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
