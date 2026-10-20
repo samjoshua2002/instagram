@@ -27,14 +27,23 @@ const requireAuth = async (req, res, next) => {
 };
 
 /**
- * POST /api/auth/login
- * Dual-stage login: Password verification + Zoho OneAuth TOTP 6-digit code
+  * POST /api/auth/login
+ * Standard login: Password verification (+ optional OneAuth 2FA if enabled)
  */
 router.post('/login', async (req, res) => {
   try {
     const { identifier, password, totpCode } = req.body;
-    if (!identifier || !password) {
-      return res.status(400).json({ error: 'Email/Username and password are required' });
+    if (!identifier) {
+      return res.status(400).json({ error: 'Email or Username is required' });
+    }
+
+    // If totpCode is provided without password, route to OneAuth passwordless login
+    if (!password && totpCode) {
+      return handleOneAuthDirectLogin(req, res, identifier, totpCode);
+    }
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
     }
 
     const cleanIdentifier = identifier.trim().toLowerCase();
@@ -91,6 +100,143 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/**
+ * Helper to execute direct Zoho OneAuth login
+ */
+async function handleOneAuthDirectLogin(req, res, identifier, code) {
+  const cleanIdentifier = identifier.trim().toLowerCase();
+  const cleanCode = (code || '').toString().trim();
+
+  if (!cleanCode || !/^\d{6}$/.test(cleanCode)) {
+    return res.status(400).json({ error: 'Please enter the 6-digit verification code from your Zoho OneAuth app' });
+  }
+
+  const user = await User.findOne({
+    $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }]
+  });
+
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+
+  if (!user.twoFactor?.secret) {
+    return res.status(400).json({
+      error: 'Zoho OneAuth is not configured on this account yet. Please log in with password or passkey first to scan the QR code.',
+      needsSetup: true,
+    });
+  }
+
+  const isValidTotp = authService.verifyTotp(user, cleanCode);
+  if (!isValidTotp) {
+    return res.status(401).json({ error: 'Invalid or expired 6-digit code from Zoho OneAuth app. Please check your app and try again.' });
+  }
+
+  user.lastLogin = new Date();
+  await user.save();
+
+  const token = authService.generateToken(user);
+  return res.json({
+    success: true,
+    token,
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      mobileNumber: user.mobileNumber,
+      whatsappNumber: user.whatsappNumber,
+      instagramUsername: user.instagramUsername,
+      accountType: user.accountType,
+      hasPasskeys: (user.passkeys || []).length > 0,
+    },
+  });
+}
+
+/**
+ * POST /api/auth/oneauth-login
+ * Dedicated direct passwordless login using Zoho OneAuth 6-digit code
+ */
+router.post('/oneauth-login', async (req, res) => {
+  try {
+    const { identifier, code } = req.body;
+    if (!identifier || !code) {
+      return res.status(400).json({ error: 'Email/Username and 6-digit OneAuth code are required' });
+    }
+    return handleOneAuthDirectLogin(req, res, identifier, code);
+  } catch (err) {
+    console.error('❌ OneAuth login error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/oneauth/request-setup-otp
+ * Allows unauthenticated owner to verify identity via email OTP to retrieve Zoho OneAuth QR code
+ */
+router.post('/oneauth/request-setup-otp', async (req, res) => {
+  try {
+    const { email = 'guidetalk.app@gmail.com' } = req.body;
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetOtp = {
+      code: otpCode,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    };
+    await user.save();
+
+    await authService.sendOtpEmail(user.email, otpCode, 'Zoho OneAuth Setup');
+    res.json({ success: true, message: `A 6-digit verification code has been sent to ${user.email} to unlock OneAuth setup.` });
+  } catch (err) {
+    console.error('❌ Request OneAuth Setup OTP error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/oneauth/verify-setup-otp
+ * Verifies email OTP and returns the QR code & secret to link Zoho OneAuth app
+ */
+router.post('/oneauth/verify-setup-otp', async (req, res) => {
+  try {
+    const { email = 'guidetalk.app@gmail.com', otpCode } = req.body;
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (!user || !user.resetOtp?.code) {
+      return res.status(400).json({ error: 'Invalid or expired setup request' });
+    }
+
+    if (new Date() > new Date(user.resetOtp.expiresAt)) {
+      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    }
+
+    if (user.resetOtp.code !== (otpCode || '').trim()) {
+      return res.status(400).json({ error: 'Invalid 6-digit verification code' });
+    }
+
+    // Reset OTP code
+    user.resetOtp = { code: '', expiresAt: null };
+    await user.save();
+
+    // Return QR code and secret
+    const totpData = await authService.getTotpQrCode(user);
+    res.json({
+      success: true,
+      ...totpData,
+    });
+  } catch (err) {
+    console.error('❌ Verify OneAuth Setup OTP error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+;
 
 /**
  * POST /api/auth/forgot-password/send-otp
