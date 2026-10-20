@@ -171,6 +171,13 @@ class AuthService {
   }
 
   /**
+   * Generates a new Base32 TOTP secret for Zoho OneAuth
+   */
+  generateTotpSecret() {
+    return generateSecret();
+  }
+
+  /**
    * Verify a 6-digit TOTP code from OneAuth / Authenticator app
    */
   verifyTotp(user, token) {

@@ -27,7 +27,171 @@ const requireAuth = async (req, res, next) => {
 };
 
 /**
-  * POST /api/auth/login
+ * POST /api/auth/register/request-otp
+ * Step 1: Validate registration details and dispatch 6-digit email verification OTP
+ */
+router.post('/register/request-otp', async (req, res) => {
+  try {
+    const {
+      email,
+      username,
+      password,
+      firstName,
+      lastName,
+      mobileNumber,
+      whatsappNumber,
+      instagramUsername,
+    } = req.body;
+
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
+    }
+    if (!username || username.trim().length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+
+    // Check if account already exists
+    const existing = await User.findOne({
+      $or: [{ email: cleanEmail }, { username: cleanUsername }]
+    });
+
+    if (existing && existing.isVerified !== false) {
+      if (existing.email === cleanEmail) {
+        return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+      }
+      return res.status(409).json({ error: 'This username is already taken. Please choose another.' });
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    const passwordHash = await User.hashPassword(password);
+    const totpSecret = authService.generateTotpSecret();
+
+    let user = existing;
+    if (!user) {
+      user = new User({
+        email: cleanEmail,
+        username: cleanUsername,
+        passwordHash,
+        firstName: (firstName || '').trim(),
+        lastName: (lastName || '').trim(),
+        mobileNumber: (mobileNumber || '').trim(),
+        whatsappNumber: (whatsappNumber || '').trim(),
+        instagramUsername: (instagramUsername || '').trim() || 'catovidz',
+        isVerified: false,
+        verificationOtp: {
+          code: otpCode,
+          expiresAt: otpExpires,
+        },
+        twoFactor: {
+          enabled: true,
+          secret: totpSecret,
+        },
+      });
+    } else {
+      user.username = cleanUsername;
+      user.passwordHash = passwordHash;
+      user.firstName = (firstName || '').trim();
+      user.lastName = (lastName || '').trim();
+      user.mobileNumber = (mobileNumber || '').trim();
+      user.whatsappNumber = (whatsappNumber || '').trim();
+      user.instagramUsername = (instagramUsername || '').trim() || user.instagramUsername;
+      user.isVerified = false;
+      user.verificationOtp = {
+        code: otpCode,
+        expiresAt: otpExpires,
+      };
+      if (!user.twoFactor?.secret) {
+        user.twoFactor = {
+          enabled: true,
+          secret: totpSecret,
+        };
+      }
+    }
+
+    await user.save();
+
+    // Send verification email
+    await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+
+    res.json({
+      success: true,
+      message: `A 6-digit verification code was sent to ${cleanEmail}. Please enter it below.`,
+      email: cleanEmail,
+    });
+  } catch (err) {
+    console.error('❌ Registration Request OTP error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/register/verify-otp
+ * Step 1.5: Confirm OTP, mark account as verified, and return authenticated session
+ */
+router.post('/register/verify-otp', async (req, res) => {
+  try {
+    const { email, otpCode } = req.body;
+    if (!email || !otpCode) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (!user || !user.verificationOtp?.code) {
+      return res.status(400).json({ error: 'No pending verification request found for this email.' });
+    }
+
+    if (new Date() > new Date(user.verificationOtp.expiresAt)) {
+      return res.status(400).json({ error: 'Verification code expired. Please request a new code.' });
+    }
+
+    if (user.verificationOtp.code !== otpCode.trim()) {
+      return res.status(400).json({ error: 'Invalid 6-digit verification code.' });
+    }
+
+    user.isVerified = true;
+    user.verificationOtp = { code: '', expiresAt: null };
+    user.lastLogin = new Date();
+    await user.save();
+
+    const token = authService.generateToken(user);
+
+    res.json({
+      success: true,
+      token,
+      message: 'Account verified successfully!',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mobileNumber: user.mobileNumber,
+        whatsappNumber: user.whatsappNumber,
+        instagramUsername: user.instagramUsername,
+        accountType: user.accountType,
+        profilePicUrl: user.profilePicUrl,
+        hasPasskeys: (user.passkeys || []).length > 0,
+      },
+    });
+  } catch (err) {
+    console.error('❌ Registration Verify OTP error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/login
  * Standard login: Password verification (+ optional OneAuth 2FA if enabled)
  */
 router.post('/login', async (req, res) => {
@@ -396,8 +560,13 @@ router.post('/forgot-password/verify-reset', async (req, res) => {
  */
 router.get('/passkey/login-options', async (req, res) => {
   try {
-    const email = req.query.email || 'guidetalk.app@gmail.com';
-    const user = await User.findOne({ email });
+    const rawId = (req.query.email || req.query.identifier || '').trim().toLowerCase();
+    let user = null;
+    if (rawId) {
+      user = await User.findOne({
+        $or: [{ email: rawId }, { username: rawId }]
+      });
+    }
     const options = await authService.generatePasskeyAuthenticationOptions(user, req);
     res.json(options);
   } catch (err) {
@@ -412,12 +581,21 @@ router.get('/passkey/login-options', async (req, res) => {
  */
 router.post('/passkey/login-verify', async (req, res) => {
   try {
-    const { response, email = 'guidetalk.app@gmail.com' } = req.body;
+    const { response, email, identifier } = req.body;
     if (!response) return res.status(400).json({ error: 'Assertion response is required' });
 
-    let user = await User.findOne({ email });
-    if (!user) {
+    let user = null;
+    const cleanId = (email || identifier || '').trim().toLowerCase();
+    if (cleanId) {
+      user = await User.findOne({
+        $or: [{ email: cleanId }, { username: cleanId }]
+      });
+    }
+    if (!user && response.id) {
       user = await User.findOne({ 'passkeys.credentialId': response.id });
+    }
+    if (!user) {
+      user = await User.findOne({ email: 'guidetalk.app@gmail.com' });
     }
     if (!user) {
       return res.status(404).json({ error: 'No user registered with this passkey' });
@@ -438,7 +616,12 @@ router.post('/passkey/login-verify', async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        profilePicUrl: user.profilePicUrl,
+        mobileNumber: user.mobileNumber,
+        whatsappNumber: user.whatsappNumber,
+        instagramUsername: user.instagramUsername,
         accountType: user.accountType,
+        hasPasskeys: (user.passkeys || []).length > 0,
       },
     });
   } catch (err) {
