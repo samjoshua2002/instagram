@@ -1,11 +1,52 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
-import { Fingerprint, X, Shield, Plus, Trash2, QrCode, User, Phone, Instagram, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  Fingerprint,
+  X,
+  Shield,
+  Plus,
+  Trash2,
+  QrCode,
+  User,
+  Phone,
+  Instagram,
+  Check,
+  AlertCircle,
+  RefreshCw,
+  Camera,
+  Upload,
+  Edit2,
+  Save,
+  Laptop,
+  Smartphone,
+  MapPin
+} from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
+
+function detectCurrentDevice() {
+  if (typeof window === 'undefined') return 'Biometric Passkey';
+  const ua = navigator.userAgent || '';
+  if (/iPhone/i.test(ua)) return 'iPhone (Face ID / Touch ID)';
+  if (/iPad/i.test(ua)) return 'iPad (Touch ID)';
+  if (/Android/i.test(ua)) {
+    if (/Samsung/i.test(ua)) return 'Samsung Galaxy (Biometrics)';
+    if (/Pixel/i.test(ua)) return 'Google Pixel (Fingerprint)';
+    if (/Xiaomi|Redmi/i.test(ua)) return 'Xiaomi Phone (Fingerprint)';
+    if (/OnePlus/i.test(ua)) return 'OnePlus (Fingerprint)';
+    return 'Android Phone (Fingerprint)';
+  }
+  if (/Macintosh|Mac OS X/i.test(ua)) {
+    return 'MacBook (Touch ID)';
+  }
+  if (/Windows/i.test(ua)) return 'Windows PC (Windows Hello)';
+  if (/CrOS/i.test(ua)) return 'Chromebook (Fingerprint)';
+  if (/Linux/i.test(ua)) return 'Linux (Security Key)';
+  return 'Security Key / Biometrics';
+}
 
 export default function PasskeyManagerModal({ isOpen, onClose }) {
   const { user, updateUserProfile, showToast } = useApp();
@@ -14,24 +55,36 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
   // Passkey state
   const [passkeys, setPasskeys] = useState([]);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [passkeyName, setPasskeyName] = useState('My MacBook Touch ID');
+  const [passkeyName, setPasskeyName] = useState('Biometric Passkey');
+  const [editingPasskeyId, setEditingPasskeyId] = useState(null);
+  const [editingPasskeyName, setEditingPasskeyName] = useState('');
 
   // TOTP QR Code state
   const [totpData, setTotpData] = useState(null);
   const [totpLoading, setTotpLoading] = useState(false);
 
-  // Profile fields state
+  // Profile fields state (dynamic from user)
   const [profileData, setProfileData] = useState({
-    firstName: 'Sam',
-    lastName: 'Joshua',
-    mobileNumber: '8610866413',
-    whatsappNumber: '8610866413',
-    instagramUsername: 'catovidz',
+    profilePicUrl: '',
+    firstName: '',
+    lastName: '',
+    mobileNumber: '',
+    whatsappNumber: '',
+    instagramUsername: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      country: '',
+      postalCode: '',
+    }
   });
   const [profileSaving, setProfileSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
+      setPasskeyName(detectCurrentDevice());
       loadUserData();
     }
   }, [isOpen]);
@@ -43,11 +96,19 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
         const data = await res.json();
         setPasskeys(data.passkeys || []);
         setProfileData({
-          firstName: data.firstName || 'Sam',
-          lastName: data.lastName || 'Joshua',
-          mobileNumber: data.mobileNumber || '8610866413',
-          whatsappNumber: data.whatsappNumber || '8610866413',
-          instagramUsername: data.instagramUsername || 'catovidz',
+          profilePicUrl: data.profilePicUrl || '',
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          mobileNumber: data.mobileNumber || '',
+          whatsappNumber: data.whatsappNumber || '',
+          instagramUsername: data.instagramUsername || '',
+          address: {
+            street: data.address?.street || '',
+            city: data.address?.city || '',
+            state: data.address?.state || '',
+            country: data.address?.country || '',
+            postalCode: data.address?.postalCode || '',
+          }
         });
       }
     } catch (err) {
@@ -58,29 +119,28 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
   const handleRegisterPasskey = async () => {
     setPasskeyLoading(true);
     try {
-      // 1. Get WebAuthn creation options from server
       const optionsRes = await fetch(`${API_BASE}/api/auth/passkey/register-options`, {
         method: 'POST',
       });
       if (!optionsRes.ok) throw new Error('Failed to start passkey registration');
       const options = await optionsRes.json();
 
-      // 2. Prompt browser TouchID / FaceID prompt
       const registration = await startRegistration({ optionsJSON: options });
 
-      // 3. Verify registration with backend
+      const finalDeviceName = passkeyName.trim() || detectCurrentDevice();
+
       const verifyRes = await fetch(`${API_BASE}/api/auth/passkey/register-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           response: registration,
-          name: passkeyName || 'Biometric Touch ID',
+          name: finalDeviceName,
         }),
       });
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) throw new Error(verifyData.error || 'Failed to verify passkey');
 
-      showToast?.('Passkey added successfully! You can now log in with fingerprint.', 'success');
+      showToast?.(`Passkey for ${finalDeviceName} linked successfully!`, 'success');
       loadUserData();
     } catch (err) {
       if (err.name === 'NotAllowedError') {
@@ -108,6 +168,24 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     }
   };
 
+  const handleRenamePasskey = async (credentialId) => {
+    if (!editingPasskeyName.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingPasskeyName.trim() }),
+      });
+      if (res.ok) {
+        showToast?.('Passkey name updated', 'success');
+        setPasskeys(prev => prev.map(p => p.id === credentialId ? { ...p, name: editingPasskeyName.trim() } : p));
+        setEditingPasskeyId(null);
+      }
+    } catch (err) {
+      showToast?.(err.message, 'error');
+    }
+  };
+
   const loadTotpQrCode = async () => {
     setTotpLoading(true);
     try {
@@ -121,6 +199,26 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     } finally {
       setTotpLoading(false);
     }
+  };
+
+  // Image Upload handler (converts image file to data URL)
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast?.('Please choose an image under 2MB', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Url = event.target?.result;
+      if (base64Url) {
+        setProfileData(prev => ({ ...prev, profilePicUrl: base64Url }));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async (e) => {
@@ -150,23 +248,23 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0,0,0,0.7)',
+      background: 'rgba(9, 9, 11, 0.45)',
       backdropFilter: 'blur(6px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9998,
       padding: '20px',
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       <div style={{
         background: '#ffffff',
         border: '1px solid #e4e4e7',
-        borderRadius: '14px',
+        borderRadius: '16px',
         width: '100%',
         maxWidth: '560px',
         color: '#09090b',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
         overflow: 'hidden'
       }}>
         {/* Modal Header */}
@@ -178,12 +276,16 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
           borderBottom: '1px solid #f4f4f5'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#09090b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#09090b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield size={18} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, letterSpacing: '-0.3px' }}>Security & Profile Settings</h2>
-              <p style={{ fontSize: '0.74rem', color: '#71717a', margin: 0 }}>Passkeys, Zoho OneAuth 2FA, and Account Information</p>
+              <h2 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, letterSpacing: '-0.3px', color: '#09090b' }}>
+                Account & Security Settings
+              </h2>
+              <p style={{ fontSize: '0.74rem', color: '#71717a', margin: 0 }}>
+                Manage passkeys, profile picture, and Zoho OneAuth
+              </p>
             </div>
           </div>
           <button
@@ -232,7 +334,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
             }}
           >
             <QrCode size={16} />
-            <span>Zoho OneAuth 2FA</span>
+            <span>Zoho OneAuth</span>
           </button>
           <button
             onClick={() => setActiveTab('profile')}
@@ -251,33 +353,40 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
             }}
           >
             <User size={16} />
-            <span>Account Profile</span>
+            <span>Profile & Details</span>
           </button>
         </div>
 
         {/* Tab Body */}
-        <div style={{ padding: '24px', maxHeight: '480px', overflowY: 'auto' }}>
+        <div style={{ padding: '24px', maxHeight: '500px', overflowY: 'auto' }}>
           {/* TAB 1: PASSKEYS */}
           {activeTab === 'passkeys' && (
             <div>
               <div style={{ marginBottom: '18px' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px' }}>Fingerprint & Touch ID Sign-In</h4>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px', color: '#09090b' }}>
+                  Biometric Passkey Authentication
+                </h4>
                 <p style={{ fontSize: '0.78rem', color: '#71717a', margin: 0 }}>
-                  Link your MacBook Touch ID, iPhone Face ID, or Windows Hello key to sign in with 1 click without entering passwords.
+                  Add Face ID, Touch ID, or fingerprint sensors from any phone, laptop, or desktop.
                 </p>
               </div>
 
               {/* Add New Passkey Box */}
               <div style={{ background: '#f4f4f5', borderRadius: '10px', padding: '14px', marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Device Name
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: '600', color: '#52525b', textTransform: 'uppercase' }}>
+                    Device Label
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: '500' }}>
+                    Auto-detected
+                  </span>
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
                     value={passkeyName}
                     onChange={(e) => setPasskeyName(e.target.value)}
-                    placeholder="e.g. MacBook Pro Touch ID"
+                    placeholder="e.g. iPhone 15 Pro, Pixel 8, Windows Hello"
                     style={{
                       flex: 1,
                       background: '#ffffff',
@@ -285,7 +394,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                       borderRadius: '8px',
                       padding: '8px 12px',
                       fontSize: '0.84rem',
-                      outline: 'none'
+                      outline: 'none',
+                      color: '#09090b'
                     }}
                   />
                   <button
@@ -313,23 +423,56 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               </div>
 
               {/* Registered Passkeys List */}
-              <h5 style={{ fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', margin: '0 0 10px' }}>
-                Active Passkeys ({passkeys.length})
+              <h5 style={{ fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', margin: '0 0 10px' }}>
+                Your Registered Devices ({passkeys.length})
               </h5>
               {passkeys.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '24px 12px', color: '#a1a1aa', fontSize: '0.82rem', border: '1px dashed #e4e4e7', borderRadius: '10px' }}>
-                  No biometric passkeys registered yet. Click &quot;Add Passkey&quot; above to link your Touch ID.
+                  No biometric passkeys registered yet on this account.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {passkeys.map(p => (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Fingerprint size={20} color="#09090b" />
-                        <div>
-                          <div style={{ fontSize: '0.84rem', fontWeight: '700' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.72rem', color: '#71717a' }}>Added {new Date(p.createdAt).toLocaleDateString()}</div>
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                        <Fingerprint size={20} color="#09090b" style={{ flexShrink: 0 }} />
+                        {editingPasskeyId === p.id ? (
+                          <div style={{ display: 'flex', gap: '6px', flex: 1, marginRight: '10px' }}>
+                            <input
+                              type="text"
+                              value={editingPasskeyName}
+                              onChange={(e) => setEditingPasskeyName(e.target.value)}
+                              autoFocus
+                              style={{ flex: 1, padding: '4px 8px', border: '1px solid #09090b', borderRadius: '6px', fontSize: '0.82rem' }}
+                            />
+                            <button
+                              onClick={() => handleRenamePasskey(p.id)}
+                              style={{ background: '#09090b', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.74rem' }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingPasskeyId(null)}
+                              style={{ background: 'none', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.74rem' }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: '0.84rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>{p.name}</span>
+                              <button
+                                onClick={() => { setEditingPasskeyId(p.id); setEditingPasskeyName(p.name); }}
+                                style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: 0 }}
+                                title="Rename device"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#71717a' }}>Added {new Date(p.createdAt).toLocaleDateString()}</div>
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => handleDeletePasskey(p.id)}
@@ -349,9 +492,11 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
           {activeTab === 'oneauth' && (
             <div>
               <div style={{ marginBottom: '16px' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px' }}>Zoho OneAuth 2FA Configuration</h4>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px', color: '#09090b' }}>
+                  Zoho OneAuth 2FA
+                </h4>
                 <p style={{ fontSize: '0.78rem', color: '#71717a', margin: 0 }}>
-                  Scan this QR code in Zoho OneAuth or Google Authenticator to generate your 6-digit login codes.
+                  Scan this QR code in Zoho OneAuth or Google Authenticator to generate 6-digit codes.
                 </p>
               </div>
 
@@ -371,7 +516,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     {totpData.secret}
                   </div>
                   <p style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '12px' }}>
-                    Type this secret key manually into Zoho OneAuth if your camera cannot scan the code.
+                    Enter this secret key in Zoho OneAuth if scanning does not work.
                   </p>
                 </div>
               ) : (
@@ -384,9 +529,134 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* TAB 3: ACCOUNT PROFILE */}
+          {/* TAB 3: ACCOUNT PROFILE & PROFILE PICTURE */}
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile}>
+              {/* Profile Picture Upload Section */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '18px', borderBottom: '1px solid #f4f4f5' }}>
+                <div style={{ position: 'relative' }}>
+                  {profileData.profilePicUrl ? (
+                    <img
+                      src={profileData.profilePicUrl}
+                      alt="Profile Avatar"
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #e4e4e7'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      background: '#09090b',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.5rem',
+                      fontWeight: '700'
+                    }}>
+                      {profileData.firstName ? profileData.firstName.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Upload avatar"
+                    style={{
+                      position: 'absolute',
+                      right: '-4px',
+                      bottom: '-4px',
+                      background: '#09090b',
+                      color: '#ffffff',
+                      border: '2px solid #ffffff',
+                      borderRadius: '50%',
+                      width: '26px',
+                      height: '26px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Camera size={13} />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileChange}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>
+                    Profile Picture URL or Upload
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="url"
+                      value={profileData.profilePicUrl}
+                      onChange={(e) => setProfileData({ ...profileData, profilePicUrl: e.target.value })}
+                      placeholder="https://example.com/avatar.jpg"
+                      style={{
+                        flex: 1,
+                        background: '#fafafa',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        fontSize: '0.8rem',
+                        outline: 'none'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        background: '#f4f4f5',
+                        border: '1px solid #e4e4e7',
+                        color: '#09090b',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        fontSize: '0.76rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Upload size={13} />
+                      <span>Upload</span>
+                    </button>
+                    {profileData.profilePicUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setProfileData({ ...profileData, profilePicUrl: '' })}
+                        style={{
+                          background: 'none',
+                          border: '1px solid #e4e4e7',
+                          color: '#ef4444',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: '0.76rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Names */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>First Name</label>
@@ -394,6 +664,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     type="text"
                     value={profileData.firstName}
                     onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
+                    placeholder="First Name"
                     style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
@@ -403,11 +674,13 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     type="text"
                     value={profileData.lastName}
                     onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                    placeholder="Last Name"
                     style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
+              {/* Phone & WhatsApp */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>Mobile Number</label>
@@ -415,6 +688,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     type="text"
                     value={profileData.mobileNumber}
                     onChange={(e) => setProfileData({ ...profileData, mobileNumber: e.target.value })}
+                    placeholder="+91..."
                     style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
@@ -424,28 +698,77 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     type="text"
                     value={profileData.whatsappNumber}
                     onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value })}
+                    placeholder="+91..."
                     style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>Instagram Username</label>
+              {/* Instagram Handle */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>Instagram Handle / Username</label>
                 <input
                   type="text"
                   value={profileData.instagramUsername}
                   onChange={(e) => setProfileData({ ...profileData, instagramUsername: e.target.value })}
+                  placeholder="username without @"
                   style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                 />
+              </div>
+
+              {/* Address Fields */}
+              <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', border: '1px solid #f4f4f5', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <MapPin size={13} color="#71717a" />
+                  <span style={{ fontSize: '0.74rem', fontWeight: '600', color: '#52525b', textTransform: 'uppercase' }}>Address (Optional)</span>
+                </div>
+                <div style={{ marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    value={profileData.address?.street || ''}
+                    onChange={(e) => setProfileData({ ...profileData, address: { ...profileData.address, street: e.target.value } })}
+                    placeholder="Street Address"
+                    style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={profileData.address?.city || ''}
+                    onChange={(e) => setProfileData({ ...profileData, address: { ...profileData.address, city: e.target.value } })}
+                    placeholder="City"
+                    style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                  />
+                  <input
+                    type="text"
+                    value={profileData.address?.country || ''}
+                    onChange={(e) => setProfileData({ ...profileData, address: { ...profileData.address, country: e.target.value } })}
+                    placeholder="Country"
+                    style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="submit"
                   disabled={profileSaving}
-                  style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '10px 18px', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer' }}
+                  style={{
+                    background: '#09090b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '10px 18px',
+                    fontWeight: '700',
+                    fontSize: '0.82rem',
+                    cursor: profileSaving ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
                 >
-                  {profileSaving ? 'Saving...' : 'Save Profile'}
+                  {profileSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  <span>{profileSaving ? 'Saving...' : 'Save Profile Changes'}</span>
                 </button>
               </div>
             </form>

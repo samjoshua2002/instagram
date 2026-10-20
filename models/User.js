@@ -8,7 +8,6 @@ const UserSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     lowercase: true,
-    default: 'samjoshua',
   },
   email: {
     type: String,
@@ -16,30 +15,33 @@ const UserSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     lowercase: true,
-    default: 'guidetalk.app@gmail.com',
   },
   passwordHash: {
     type: String,
     required: true,
   },
+  profilePicUrl: {
+    type: String,
+    default: '',
+  },
   firstName: {
     type: String,
-    default: 'Sam',
+    default: '',
     trim: true,
   },
   lastName: {
     type: String,
-    default: 'Joshua',
+    default: '',
     trim: true,
   },
   mobileNumber: {
     type: String,
-    default: '8610866413',
+    default: '',
     trim: true,
   },
   whatsappNumber: {
     type: String,
-    default: '8610866413',
+    default: '',
     trim: true,
   },
   instagramUsername: {
