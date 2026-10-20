@@ -242,23 +242,36 @@ export function AppProvider({ children }) {
       originalFetch(`${API_BASE}/api/auth/me`, {
         headers: { Authorization: `Bearer ${savedToken}` }
       })
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Session expired');
+      .then(async res => {
+        if (res.status === 401) {
+          // Token is genuinely invalid or expired on server
+          localStorage.removeItem('chatter_jwt_token');
+          localStorage.removeItem('chatter_user_profile');
+          setToken(null);
+          setUser(null);
+          setAuthLoading(false);
+          return null;
+        }
+        if (res.ok) {
+          return res.json();
+        }
+        // Non-401 error (500, 502, 503, Render spin-up) - keep cached user & token
+        return null;
       })
       .then(userData => {
-        setUser(userData);
-        try {
-          localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
-          localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
-        } catch (e) {}
+        if (userData) {
+          setUser(userData);
+          try {
+            localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
+            localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
+          } catch (e) {}
+        }
         setAuthLoading(false);
       })
-      .catch(() => {
-        localStorage.removeItem('chatter_jwt_token');
-        localStorage.removeItem('chatter_user_profile');
-        setToken(null);
-        setUser(null);
+      .catch((err) => {
+        // Network error, connection reset, or fetch aborted on quick page refresh
+        // NEVER log out on network glitch or aborted request!
+        console.warn('Network issue during /api/auth/me, keeping cached session:', err?.message);
         setAuthLoading(false);
       });
     } else {
