@@ -11,10 +11,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@marcbachmann/cel-js": "^8.0.0",
     "axios": "^1.20.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
+    "ioredis": "^6.0.0",
     "mongoose": "^9.10.2",
     "multer": "^2.4.0",
     "openai": "^7.23.0"

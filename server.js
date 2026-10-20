@@ -21,6 +21,7 @@ const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const SocialGraph = require('./models/SocialGraph');
+const redisService = require('./services/redisService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -407,6 +408,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     timestamp: msgTime,
   });
   await userMemory.save();
+  await redisService.pushMessage(senderId, { role: 'user', text: messageText, timestamp: msgTime });
 
   // Atomically persist cumulative counts to SocialGraph node
   (async () => {
@@ -757,6 +759,8 @@ async function dispatchDebouncedReply(queueEntry) {
             timestamp: new Date()
           });
           await memToUpdate.save();
+          await redisService.pushMessage(senderId, { role: 'assistant', text: persistedText, timestamp: new Date() });
+          await redisService.cacheUserMemory(senderId, memToUpdate.toObject ? memToUpdate.toObject() : memToUpdate, 3600);
         }
       } catch (bufErr) {}
     }
@@ -986,6 +990,16 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
   }
 });
 
+// Batch Learn & Sync: process all 1-month chat history in MongoDB across all contacts
+app.post('/api/memory/sync-all-history', async (req, res) => {
+  try {
+    const results = await memoryService.batchSyncAllChatsFromMongo();
+    res.json({ success: true, count: results.length, contacts: results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Get live UserMemory for a person (used by frontend 15s auto-refresh poll)
 app.get('/api/conversations/:senderId/memory', async (req, res) => {
@@ -1088,6 +1102,7 @@ app.put('/api/persona', async (req, res) => {
     if (giphyApiKey !== undefined) config.giphyApiKey = giphyApiKey.trim();
 
     await config.save();
+    await redisService.invalidatePersonaConfig();
     res.json({ success: true, config });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1154,6 +1169,7 @@ app.post('/api/simulator/chat', async (req, res) => {
       text: messageText,
       timestamp: new Date(),
     });
+    await redisService.pushMessage(testSenderId, { role: 'user', text: messageText, timestamp: new Date() });
 
     // 3. Get recent history
     const history = await Message.find({
@@ -1180,6 +1196,7 @@ app.post('/api/simulator/chat', async (req, res) => {
       sentByAI: true,
       timestamp: new Date(),
     });
+    await redisService.pushMessage(testSenderId, { role: 'assistant', text: replyText, timestamp: new Date() });
 
     // 6. Asynchronously update memory
     await memoryService.updateMemoryAsync(testSenderId);

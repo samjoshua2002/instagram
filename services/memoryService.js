@@ -1,6 +1,7 @@
 const { AzureOpenAI } = require('openai');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
+const redisService = require('./redisService');
 
 class MemoryService {
   constructor() {
@@ -37,6 +38,8 @@ class MemoryService {
       }
       await memory.save();
     }
+    // Sync with Redis cache
+    await redisService.cacheUserMemory(senderId, memory.toObject ? memory.toObject() : memory, 3600);
     return memory;
   }
 
@@ -46,24 +49,46 @@ class MemoryService {
    */
   async updateMemoryAsync(senderId) {
     try {
-      const memory = await UserMemory.findOne({ senderId });
-      if (!memory) return;
+      let memory = await this.getOrCreateUserMemory(senderId);
 
-      // Fetch the last 15 messages for this user
-      const recentMessages = await Message.find({
+      // Intelligent message sampling: if > 100 messages, capture first 25 (origin/lore) + latest 75 (current style/inside jokes)
+      const totalMsgCount = await Message.countDocuments({
         $or: [{ senderId }, { recipientId: senderId }]
-      })
-      .sort({ createdAt: -1 })
-      .limit(15);
+      });
 
-      recentMessages.reverse();
+      let messagesToAnalyze = [];
+      if (totalMsgCount === 0) {
+        if (memory.recentChatBuffer && memory.recentChatBuffer.length > 0) {
+          messagesToAnalyze = memory.recentChatBuffer.map(b => ({
+            role: b.role,
+            senderId: b.role === 'assistant' ? '17841446877896232' : senderId,
+            text: b.text
+          }));
+        } else {
+          return;
+        }
+      } else if (totalMsgCount <= 100) {
+        messagesToAnalyze = await Message.find({
+          $or: [{ senderId }, { recipientId: senderId }]
+        }).sort({ createdAt: 1 });
+      } else {
+        const firstBatch = await Message.find({
+          $or: [{ senderId }, { recipientId: senderId }]
+        }).sort({ createdAt: 1 }).limit(25);
 
-      let messagesToAnalyze = recentMessages;
-      if (messagesToAnalyze.length === 0 && memory.recentChatBuffer && memory.recentChatBuffer.length > 0) {
-        messagesToAnalyze = memory.recentChatBuffer.map(b => ({
-          role: b.role,
-          text: b.text
-        }));
+        const recentBatch = await Message.find({
+          $or: [{ senderId }, { recipientId: senderId }]
+        }).sort({ createdAt: -1 }).limit(75);
+        recentBatch.reverse();
+
+        const seenIds = new Set();
+        for (const m of [...firstBatch, ...recentBatch]) {
+          const idStr = m._id.toString();
+          if (!seenIds.has(idStr)) {
+            seenIds.add(idStr);
+            messagesToAnalyze.push(m);
+          }
+        }
       }
 
       if (!messagesToAnalyze || messagesToAnalyze.length === 0) {
@@ -71,61 +96,95 @@ class MemoryService {
       }
 
       const formattedChat = messagesToAnalyze
-        .map(m => `${m.role === 'assistant' ? 'Sam' : (memory.name || 'User')}: ${m.text}`)
+        .map(m => {
+          const isSam = m.role === 'assistant' || m.senderId === '17841446877896232' || m.senderId === 'me';
+          const speaker = isSam ? 'Sam' : (memory.name || memory.username || 'User');
+          return `${speaker}: ${m.text}`;
+        })
         .join('\n');
 
       const currentFacts = (memory.facts || []).map(f => f.fact).join('; ');
       const currentDates = (memory.importantDates || []).map(d => `${d.title} (${d.date || 'TBD'}): ${d.details}`).join('; ');
       const currentFavorites = (memory.favoriteThings || []).map(fv => `${fv.category}: ${fv.item}`).join('; ');
       const currentEvents = (memory.lifeEvents || []).map(e => `${e.title}: ${e.details}`).join('; ');
+      const currentJokes = (memory.insideJokes || []).join('; ');
 
-      const prompt = `Analyze this Instagram DM exchange between Creator Sam Joshua and a user.
-Extract comprehensive intelligence and personal notes about this specific user so Sam can converse with them naturally like a close human friend.
-Return ONLY a valid JSON object.
+      const prompt = `Analyze this real Instagram DM exchange between Creator Sam Joshua (@catovidz) and a user.
+You are tasked with deeply learning this person's identity and training Sam's AI to speak and text back with this exact person authentically.
 
-EXISTING INTELLIGENCE:
-- Preferred Nickname: ${memory.nickname || 'None'}
-- User style: ${memory.conversationStyle}
-- Existing facts: ${currentFacts || 'None'}
-- Important dates: ${currentDates || 'None'}
-- Favorite things: ${currentFavorites || 'None'}
-- Life events: ${currentEvents || 'None'}
-- Personal notes: ${memory.personalNotes || 'None'}
-- Prior summary: ${memory.rollingSummary}
+CONTACT INFO:
+- Sender ID: ${senderId}
+- Current Name in DB: ${memory.name || 'Unknown'}
+- Username in DB: @${memory.username || 'Unknown'}
+- Existing Facts: ${currentFacts || 'None'}
+- Existing Dates: ${currentDates || 'None'}
+- Existing Favorites: ${currentFavorites || 'None'}
+- Existing Events: ${currentEvents || 'None'}
+- Inside Jokes: ${currentJokes || 'None'}
+- Existing Notes: ${memory.personalNotes || 'None'}
 
-RECENT CHAT LOG:
+CHAT LOG (${messagesToAnalyze.length} messages, chronologically ordered):
 ${formattedChat}
 
-Return a valid JSON object with EXACTLY this structure:
+INSTRUCTIONS:
+1. REAL IDENTITY & LORE:
+   - Identify their real first name or preferred name (look for introductions or how Sam addresses them).
+   - Any nicknames Sam uses for them or they use for Sam.
+   - Exact birthday / DOB if mentioned or celebrated anywhere in the chat.
+   - School, college, workplace, or city/location if mentioned.
+   - Gender: female, male, neutral, unknown (infer accurately from their name e.g. Mikasa/Priya is female, Alex/Sam/User is neutral/unknown unless stated, or from how they speak).
+   - Real facts about their life, family, pets, hobbies, struggles, projects.
+
+2. TEXTING STYLE (HOW THEY TEXT):
+   - Specific typing habits: lowercase, all-caps, emoji frequency, shortcuts (u, rn, fr, idk, wbu, lmao, omfg, etc.).
+   - Tone: sarcastic, emotional, high-energy, deadpan, sweet, formal, etc.
+
+3. SAM'S SPECIFIC SPEAKING STYLE WITH THIS PERSON (CRITICAL FOR TRAINING):
+   - How does Sam talk to THIS specific contact?
+   - Is it dry sarcastic one-liners, deadpan roasts ("Fym u", "is that mochis twin", "Like fr")?
+   - Is it hyper, all-caps, hysterical laughing ("IMCRINE WTF", "HEYYYYY MY LOVEEEE")?
+   - Is it Tamil/Tanglish bro banter ("dei", "semma", "vera level", "podhum")?
+   - Is it supportive, deep friendship reassurance?
+   - What inside jokes or shared lore exist between them?
+   - Roast style: Exactly how they tease, joke, or roast each other.
+
+4. FEW-SHOT EXCHANGES (AUTHENTIC TRAINING SAMPLES):
+   - Extract 3 to 6 REAL, verbatim exchanges from the chat log where the user said something and Sam replied in his signature voice.
+   - Format: { "userMessage": "...", "myReply": "..." }
+   - These will be used directly as in-context few-shot learning for Sam's AI!
+
+Return a valid JSON object matching EXACTLY this structure:
 {
-  "name": "Their real name or first name if explicitly stated or introduced (e.g. 'Sarah', 'Kavya', 'Rahul') else empty string",
-  "nickname": "Extracted nickname or what they prefer to be called (leave empty if none)",
-  "dob": "Exact birthday or birthdate if stated or referenced (e.g. 'May 18' or '18th May 2005' or '12 March') else empty string",
-  "schoolOrCollege": "School, college, academy, or workplace if mentioned else empty string",
-  "gender": "one of: female, male, neutral, unknown (infer accurately from their name e.g. Mikasa/Priya is female, Alex/Sam/User is neutral/unknown unless stated, bio, pronouns, or how they speak)",
-  "conversationStyle": "Short description of how they text: shortcuts they use (e.g. u, rn, fr, idk, wbu), lowercase or caps, energy level, emojis, slang",
-  "relationshipType": "one of: stranger, fan, client, collaborator, friend",
+  "name": "Real name if stated or clearly known, else empty string",
+  "nickname": "Extracted nickname or what Sam calls them, else empty string",
+  "dob": "Birthday e.g. 'Oct 12' or '18 May' if stated, else empty string",
+  "schoolOrCollege": "School/college/workplace if mentioned, else empty string",
+  "gender": "female | male | neutral | unknown",
+  "conversationStyle": "Detailed description of their texting style and tone",
+  "samSpeakingStyleWithUser": "Precise description of how Sam talks to them (slang, sarcasm, nicknames, teasing)",
+  "relationshipType": "stranger | fan | client | collaborator | friend",
   "newFacts": ["fact 1", "fact 2"],
   "importantDates": [
-    { "title": "e.g. Birthday / Final Exam / Vacation / Project Launch", "date": "e.g. Oct 12 or next week", "details": "context" }
+    { "title": "Birthday / Event / Exam", "date": "e.g. Oct 12", "details": "context" }
   ],
   "favoriteThings": [
-    { "category": "music/game/food/creator/hobby/general", "item": "name of favorite thing" }
+    { "category": "music/game/food/creator/hobby/general", "item": "favorite item" }
   ],
   "lifeEvents": [
-    { "title": "e.g. Moving to new apartment / Studying for exams / Starting new job", "details": "brief context", "dateOrTime": "timeframe" }
+    { "title": "Event title", "details": "context", "dateOrTime": "timeframe" }
   ],
-  "personalNotes": "1-2 sentence ongoing note of who this person is, their current vibe or emotional state, and what is happening in their life right now.",
-  "rollingSummary": "Concise 1-3 sentence summary of the ongoing relationship and conversation context.",
+  "personalNotes": "2-3 sentence ongoing note about who this person is, their vibe, their connection to Sam, and current life situation.",
+  "roastStyle": "Exact summary of how Sam and this person joke, tease, banter, or speak affectionately.",
+  "insideJokes": ["joke 1", "lore 2"],
+  "rollingSummary": "1-2 sentence summary of recent conversation and friendship status.",
+  "fewShotExchanges": [
+    { "userMessage": "what user texted", "myReply": "how Sam replied" }
+  ],
   "mentionedPeople": [
-    {
-      "name": "Name of any friend, relative, or person mentioned in the conversation (e.g. Roni, Rajveer, Moksha, Fami, Arun, etc.)",
-      "relationship": "Relationship term: sister, bro, friend, lover, relative, cousin",
-      "notes": "What was discussed or their role"
-    }
+    { "name": "Person name", "relationship": "friend/sister/bro", "notes": "context" }
   ]
 }
-Only extract genuine details explicitly stated or strongly implied by the user. Do not invent information. If an array has no new items, leave it empty.`;
+Only extract genuine details explicitly stated or strongly implied by the chat. Do not invent information. If an array has no items, return empty array.`;
 
       const response = await this.client.chat.completions.create({
         messages: [
@@ -154,7 +213,6 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       const detectedDob = (parsed.dob && parsed.dob.trim()) || bdayItem?.date || '';
       if (detectedDob) {
         memory.dob = detectedDob;
-        // Also ensure it is present in importantDates
         const hasBdayDate = (memory.importantDates || []).some(d => /birth|bday/i.test(d.title));
         if (!hasBdayDate) {
           memory.importantDates.push({
@@ -180,14 +238,32 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       if (parsed.conversationStyle) {
         memory.conversationStyle = parsed.conversationStyle;
       }
+      if (parsed.samSpeakingStyleWithUser) {
+        memory.samSpeakingStyleWithUser = parsed.samSpeakingStyleWithUser;
+      }
       if (parsed.relationshipType) {
-        memory.relationshipType = parsed.relationshipType;
+        const validRel = ['stranger', 'fan', 'client', 'collaborator', 'friend'];
+        const cleanRel = parsed.relationshipType.toLowerCase().trim();
+        memory.relationshipType = validRel.includes(cleanRel) ? cleanRel : 'friend';
       }
       if (parsed.personalNotes) {
         memory.personalNotes = parsed.personalNotes;
       }
+      if (parsed.roastStyle && parsed.roastStyle.trim()) {
+        memory.roastStyle = parsed.roastStyle.trim();
+      }
+      if (Array.isArray(parsed.insideJokes) && parsed.insideJokes.length > 0) {
+        const existingJokes = new Set(memory.insideJokes || []);
+        for (const j of parsed.insideJokes) {
+          if (j && j.trim()) existingJokes.add(j.trim());
+        }
+        memory.insideJokes = Array.from(existingJokes);
+      }
       if (parsed.rollingSummary) {
         memory.rollingSummary = parsed.rollingSummary;
+      }
+      if (Array.isArray(parsed.fewShotExchanges) && parsed.fewShotExchanges.length > 0) {
+        memory.fewShotExchanges = parsed.fewShotExchanges.filter(e => e.userMessage && e.myReply);
       }
 
       // Update social graph dynamically if friends/relationships were mentioned
@@ -267,30 +343,10 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
       memory.lastInteraction = new Date();
       await memory.save();
 
-      console.log(`🧠 [Deep Memory Updated] @${memory.username}: Dates=${memory.importantDates.length}, Favs=${memory.favoriteThings.length}, Events=${memory.lifeEvents.length}`);
+      // Immediate cache sync in Redis
+      await redisService.cacheUserMemory(senderId, memory.toObject ? memory.toObject() : memory, 3600);
 
-      // Auto-cleanup: keep recent 6 messages in Message collection for immediate active conversation continuity,
-      // and purge older raw messages so DB stays lean and private.
-      // (messageCount and reelsCount are integers on UserMemory — NOT on Message docs — so they're completely safe)
-      try {
-        const recentToKeep = await Message.find({
-          $or: [{ senderId }, { recipientId: senderId }]
-        })
-        .sort({ createdAt: -1 })
-        .limit(6)
-        .select('_id');
-
-        const keepIds = recentToKeep.map(m => m._id);
-        const cleaned = await Message.deleteMany({
-          $or: [{ senderId }, { recipientId: senderId }],
-          _id: { $nin: keepIds }
-        });
-        if (cleaned.deletedCount > 0) {
-          console.log(`🧹 [Auto-Cleanup] Pruned ${cleaned.deletedCount} older messages for ${senderId}. Kept active ${keepIds.length} messages for immediate conversation flow.`);
-        }
-      } catch (cleanErr) {
-        console.warn('⚠️ [MemoryService] Non-critical message cleanup error:', cleanErr.message);
-      }
+      console.log(`🧠 [Deep Memory Updated] @${memory.username}: Dates=${memory.importantDates.length}, Favs=${memory.favoriteThings.length}, Events=${memory.lifeEvents.length}, Exchanges=${(memory.fewShotExchanges || []).length}`);
 
       // Dynamically sync updated memory into SocialGraph so People Menu cards update in real time!
       try {
@@ -402,15 +458,61 @@ Only extract genuine details explicitly stated or strongly implied by the user. 
   }
 
   /**
-   * Starts a daily scheduler to auto-purge messages older than 3 days
+   * Scans the 1-month chat history in MongoDB across all users,
+   * analyzes their complete message streams, and updates their UserMemory,
+   * SocialGraph lore, and Redis cache.
    */
-  startDailyCleanup(days = 3) {
-    console.log(`🧹 Daily cleanup scheduler initialized: automatically deleting chat history older than ${days} days.`);
-    // Run once after 2 minutes
-    setTimeout(() => this.cleanOldMessages(days), 2 * 60 * 1000);
-    // Run every 12 hours
-    setInterval(() => this.cleanOldMessages(days), 12 * 60 * 60 * 1000);
+  async batchSyncAllChatsFromMongo() {
+    console.log('🔄 [Batch Memory Sync]: Starting full backfill from 1-month chat data in MongoDB...');
+    const botIds = ['me', '17841446877896232'];
+    const senders = await Message.distinct('senderId', { senderId: { $nin: botIds } });
+    const recipients = await Message.distinct('recipientId', { recipientId: { $nin: botIds } });
+    const memoryUsers = await UserMemory.distinct('senderId', { senderId: { $nin: botIds } });
+    const rawIds = [...new Set([...senders, ...recipients, ...memoryUsers])];
+
+    // Compute message counts and sort contacts by chat activity (most active first)
+    const contactsWithCounts = [];
+    for (const id of rawIds) {
+      const count = await Message.countDocuments({
+        $or: [{ senderId: id }, { recipientId: id }]
+      });
+      if (count > 0) {
+        contactsWithCounts.push({ id, count });
+      }
+    }
+    contactsWithCounts.sort((a, b) => b.count - a.count);
+
+    console.log(`📊 Discovered ${contactsWithCounts.length} contacts with active 1-month chat history in MongoDB.`);
+    const results = [];
+
+    for (let i = 0; i < contactsWithCounts.length; i++) {
+      const { id: senderId, count } = contactsWithCounts[i];
+      try {
+        console.log(`\n🧠 [${i + 1}/${contactsWithCounts.length}] Processing contact ${senderId} (${count} historical messages)...`);
+        await this.updateMemoryAsync(senderId);
+        const mem = await UserMemory.findOne({ senderId });
+        results.push({
+          senderId,
+          username: mem?.username,
+          name: mem?.name,
+          messageCount: count,
+          factsCount: mem?.facts?.length || 0,
+          datesCount: mem?.importantDates?.length || 0,
+          exchangesCount: (mem?.fewShotExchanges || []).length,
+          style: mem?.conversationStyle,
+          roastStyle: mem?.roastStyle,
+          samSpeakingStyle: mem?.samSpeakingStyleWithUser,
+        });
+        console.log(`✅ [${i + 1}/${contactsWithCounts.length}] Learned @${mem?.username || senderId} (${mem?.name || 'Unnamed'}): Style="${(mem?.conversationStyle || '').slice(0, 40)}...", FewShots=${(mem?.fewShotExchanges || []).length}, Facts=${mem?.facts?.length || 0}`);
+      } catch (err) {
+        console.error(`❌ Failed syncing historical memory for ${senderId}:`, err.message);
+      }
+    }
+
+    console.log(`\n🎉 [Batch Memory Sync Complete]: Successfully synthesized and trained style for ${results.length} contacts!`);
+    return results;
   }
+
 }
 
 module.exports = new MemoryService();
