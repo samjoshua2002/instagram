@@ -9,9 +9,9 @@ const STORAGE_CONFIG_KEY = 'chatter_persona_config_v8';
 const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 
 export const ROOT_NODE = {
-  id: 'sam',
-  name: 'Sam Joshua',
-  handle: '@catovidz',
+  id: 'root',
+  name: 'Account Owner',
+  handle: '@me',
   sub: 'Creator / Core Node',
   isRoot: true,
   relationship: 'Root Persona',
@@ -157,11 +157,22 @@ export function AppProvider({ children }) {
   });
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
 
-  const [routingConfig, setRoutingConfigState] = useState({
-    chatMode: 'everyone_except',
-    excludedContactIds: ['29005624469042002', '877566845441453'], // Bhavani & Rajveer excluded by default for Sam's manual chat
-    includedContactIds: [],
-    globalBotActive: true
+  const [routingConfig, setRoutingConfigState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(STORAGE_CONFIG_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.chatMode) return parsed;
+        }
+      } catch (e) {}
+    }
+    return {
+      chatMode: 'everyone',
+      excludedContactIds: [],
+      includedContactIds: [],
+      globalBotActive: true
+    };
   });
 
   const setRoutingConfig = useCallback((updater) => {
@@ -193,7 +204,7 @@ export function AppProvider({ children }) {
     setToken(jwtToken);
     setUser(userData);
     setAuthLoading(false);
-    showToast?.(`Welcome back, ${userData?.firstName || 'Sam'}!`, 'success');
+    showToast?.(`Welcome back, ${userData?.firstName || userData?.username || 'User'}!`, 'success');
   }, [showToast]);
 
   const logout = useCallback(() => {
@@ -684,7 +695,7 @@ export function AppProvider({ children }) {
     } else if (aiMode === 'reels_only') {
       showToast(`🎬 ${nameStr}: AI will ONLY react to shared Reels!`);
     } else if (aiMode === 'paused' || aiMode === 'manual') {
-      showToast(`⏸️ Stopped AI for ${nameStr}. Sam will chat manually!`);
+      showToast(`⏸️ Stopped AI for ${nameStr}. Manual chat active!`);
     } else if (aiMode) {
       showToast(`⚡ Full AI auto-reply enabled for ${nameStr}!`);
     }
