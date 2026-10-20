@@ -22,6 +22,77 @@ import {
   Settings,
   Plus
 } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+// Framer Motion Variants for Staggered Fade-in Animation
+const navContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.12
+    }
+  }
+};
+
+const navItemVariants = {
+  hidden: { opacity: 0, x: -12 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: {
+      duration: 0.45,
+      ease: [0.16, 1, 0.3, 1]
+    }
+  }
+};
+
+const footerContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.55
+    }
+  }
+};
+
+const footerItemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.45,
+      ease: [0.16, 1, 0.3, 1]
+    }
+  }
+};
+
+const mobileTabsContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const mobileTabVariant = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.35,
+      ease: [0.16, 1, 0.3, 1]
+    }
+  }
+};
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -35,10 +106,6 @@ export default function Sidebar() {
     { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '05' },
   ];
 
-  const activeModeCount = routingConfig.chatMode === 'everyone_except'
-    ? (routingConfig.excludedContactIds || []).length
-    : (routingConfig.chatMode === 'only_selected' ? (routingConfig.includedContactIds || []).length : 0);
-
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName || ''}`.trim()
     : (user?.username || 'User');
@@ -50,7 +117,12 @@ export default function Sidebar() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE TOP HEADER (screens <= 768px)
           ═══════════════════════════════════════════════════════════ */}
-      <header className="mobile-header">
+      <motion.header
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="mobile-header"
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
             width: '30px',
@@ -119,148 +191,173 @@ export default function Sidebar() {
             <LogOut size={16} />
           </button>
         </div>
-      </header>
+      </motion.header>
 
       {/* ═══════════════════════════════════════════════════════════
           MOBILE BOTTOM NAVIGATION TABS (screens <= 768px)
           ═══════════════════════════════════════════════════════════ */}
-      <nav className="mobile-bottom-tabs">
+      <motion.nav
+        variants={mobileTabsContainer}
+        initial="hidden"
+        animate="visible"
+        className="mobile-bottom-tabs"
+      >
         {/* Tab 1: Dashboard (Default view) */}
-        <Link
-          href="/"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            textDecoration: 'none',
-            color: pathname === '/' ? '#09090b' : '#a1a1aa',
-            transition: 'all 0.15s ease',
-            padding: '6px 0'
-          }}
-        >
-          <LayoutDashboard size={19} strokeWidth={pathname === '/' ? 2.5 : 1.8} />
-          <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/' ? '700' : '500' }}>Dashboard</span>
-        </Link>
+        <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
+          <Link
+            href="/"
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              textDecoration: 'none',
+              color: pathname === '/' ? '#09090b' : '#a1a1aa',
+              transition: 'all 0.15s ease',
+              padding: '6px 0'
+            }}
+          >
+            <LayoutDashboard size={19} strokeWidth={pathname === '/' ? 2.5 : 1.8} />
+            <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/' ? '700' : '500' }}>Dashboard</span>
+          </Link>
+        </motion.div>
 
         {/* Tab 2: People Directory */}
-        <Link
-          href="/relationships"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            textDecoration: 'none',
-            color: pathname === '/relationships' ? '#09090b' : '#a1a1aa',
-            transition: 'all 0.15s ease',
-            padding: '6px 0'
-          }}
-        >
-          <Users size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />
-          <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/relationships' ? '700' : '500' }}>People</span>
-        </Link>
+        <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
+          <Link
+            href="/relationships"
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              textDecoration: 'none',
+              color: pathname === '/relationships' ? '#09090b' : '#a1a1aa',
+              transition: 'all 0.15s ease',
+              padding: '6px 0'
+            }}
+          >
+            <Users size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />
+            <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/relationships' ? '700' : '500' }}>People</span>
+          </Link>
+        </motion.div>
 
         {/* Center Quick Action (+ Add Person) */}
-        <button
-          type="button"
-          onClick={() => startAiInterview(null)}
-          title="Add Person"
-          style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: '50%',
-            background: '#09090b',
-            color: '#ffffff',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(9, 9, 11, 0.25)',
-            cursor: 'pointer',
-            margin: '0 4px',
-            flexShrink: 0,
-            transform: 'translateY(-4px)',
-            transition: 'transform 0.15s ease'
-          }}
-        >
-          <Plus size={22} strokeWidth={2.5} />
-        </button>
+        <motion.div variants={mobileTabVariant} style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => startAiInterview(null)}
+            title="Add Person"
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              background: '#09090b',
+              color: '#ffffff',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(9, 9, 11, 0.25)',
+              cursor: 'pointer',
+              margin: '0 4px',
+              flexShrink: 0,
+              transform: 'translateY(-4px)',
+              transition: 'transform 0.15s ease'
+            }}
+          >
+            <Plus size={22} strokeWidth={2.5} />
+          </button>
+        </motion.div>
 
         {/* Tab 4: Rules */}
-        <Link
-          href="/controls"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            textDecoration: 'none',
-            color: pathname === '/controls' ? '#09090b' : '#a1a1aa',
-            transition: 'all 0.15s ease',
-            padding: '6px 0'
-          }}
-        >
-          <Sliders size={19} strokeWidth={pathname === '/controls' ? 2.5 : 1.8} />
-          <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/controls' ? '700' : '500' }}>Rules</span>
-        </Link>
+        <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
+          <Link
+            href="/controls"
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              textDecoration: 'none',
+              color: pathname === '/controls' ? '#09090b' : '#a1a1aa',
+              transition: 'all 0.15s ease',
+              padding: '6px 0'
+            }}
+          >
+            <Sliders size={19} strokeWidth={pathname === '/controls' ? 2.5 : 1.8} />
+            <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/controls' ? '700' : '500' }}>Rules</span>
+          </Link>
+        </motion.div>
 
         {/* Tab 5: Profile & Security Modal */}
-        <button
-          type="button"
-          onClick={() => setIsPasskeyModalOpen(true)}
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#a1a1aa',
-            padding: '6px 0'
-          }}
-        >
-          {user?.profilePicUrl ? (
-            <img
-              src={user.profilePicUrl}
-              alt=""
-              style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '1.5px solid #09090b'
-              }}
-            />
-          ) : (
-            <UserCheck size={19} strokeWidth={1.8} color="#09090b" />
-          )}
-          <span style={{ fontSize: '0.66rem', fontWeight: '600', color: '#09090b' }}>Profile</span>
-        </button>
-      </nav>
+        <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
+          <button
+            type="button"
+            onClick={() => setIsPasskeyModalOpen(true)}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#a1a1aa',
+              padding: '6px 0'
+            }}
+          >
+            {user?.profilePicUrl ? (
+              <img
+                src={user.profilePicUrl}
+                alt=""
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '1.5px solid #09090b'
+                }}
+              />
+            ) : (
+              <UserCheck size={19} strokeWidth={1.8} color="#09090b" />
+            )}
+            <span style={{ fontSize: '0.66rem', fontWeight: '600', color: '#09090b' }}>Profile</span>
+          </button>
+        </motion.div>
+      </motion.nav>
 
       {/* ═══════════════════════════════════════════════════════════
           DESKTOP FLOATING SIDEBAR (screens > 768px)
           ═══════════════════════════════════════════════════════════ */}
-      <aside className="floating-sidebar">
+      <motion.aside
+        initial={{ opacity: 0, x: -14 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="floating-sidebar"
+      >
         <div>
           {/* Brand Header */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingBottom: '16px',
-            borderBottom: '1px solid #e4e4e7'
-          }}>
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingBottom: '16px',
+              borderBottom: '1px solid #e4e4e7'
+            }}
+          >
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
               <div style={{
                 width: '36px',
@@ -317,69 +414,89 @@ export default function Sidebar() {
                 {routingConfig.globalBotActive ? 'LIVE' : 'OFF'}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Navigation Section */}
           <div style={{ marginTop: '20px' }}>
-            <div style={{
-              fontSize: '0.68rem',
-              fontWeight: '700',
-              color: '#a1a1aa',
-              letterSpacing: '0.8px',
-              textTransform: 'uppercase',
-              marginBottom: '8px',
-              paddingLeft: '6px'
-            }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.1 }}
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: '700',
+                color: '#a1a1aa',
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                marginBottom: '8px',
+                paddingLeft: '6px'
+              }}
+            >
               Workspace
-            </div>
+            </motion.div>
 
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {/* STAGGERED FADE-IN NAVIGATION ITEMS */}
+            <motion.nav
+              variants={navContainerVariants}
+              initial="hidden"
+              animate="visible"
+              style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+            >
               {navItems.map(item => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    style={{
-                      background: isActive ? '#09090b' : 'transparent',
-                      color: isActive ? '#ffffff' : '#52525b',
-                      border: '1px solid',
-                      borderColor: isActive ? '#09090b' : 'transparent',
-                      borderRadius: '9px',
-                      padding: '9px 12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      textDecoration: 'none',
-                      transition: 'all 0.15s ease',
-                      fontWeight: isActive ? '700' : '500',
-                      fontSize: '0.82rem',
-                      boxShadow: isActive ? '0 3px 10px rgba(9, 9, 11, 0.1)' : 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
-                      <span>{item.label}</span>
-                    </div>
-                    <span style={{
-                      fontSize: '0.65rem',
-                      fontFamily: "'JetBrains Mono', monospace",
-                      opacity: isActive ? 0.8 : 0.4
-                    }}>
-                      [{item.code}]
-                    </span>
-                  </Link>
+                  <motion.div key={item.href} variants={navItemVariants}>
+                    <Link
+                      href={item.href}
+                      style={{
+                        background: isActive ? '#09090b' : 'transparent',
+                        color: isActive ? '#ffffff' : '#52525b',
+                        border: '1px solid',
+                        borderColor: isActive ? '#09090b' : 'transparent',
+                        borderRadius: '9px',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        textDecoration: 'none',
+                        transition: 'all 0.15s ease',
+                        fontWeight: isActive ? '700' : '500',
+                        fontSize: '0.82rem',
+                        boxShadow: isActive ? '0 3px 10px rgba(9, 9, 11, 0.1)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
+                        <span>{item.label}</span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        opacity: isActive ? 0.8 : 0.4
+                      }}>
+                        [{item.code}]
+                      </span>
+                    </Link>
+                  </motion.div>
                 );
               })}
-            </nav>
+            </motion.nav>
           </div>
         </div>
 
-        {/* Footer Actions & Profile Card */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}>
+        {/* Footer Actions & Profile Card with Staggered Fade-in */}
+        <motion.div
+          variants={footerContainerVariants}
+          initial="hidden"
+          animate="visible"
+          style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}
+        >
           {/* Quick Add Person Action */}
-          <button
+          <motion.button
+            variants={footerItemVariants}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
             type="button"
             onClick={() => startAiInterview(null)}
             style={{
@@ -401,10 +518,13 @@ export default function Sidebar() {
           >
             <Sparkles size={14} color="#ffffff" />
             <span>+ Add Person</span>
-          </button>
+          </motion.button>
 
           {/* Bot State Switcher Button */}
-          <button
+          <motion.button
+            variants={footerItemVariants}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
             type="button"
             onClick={toggleGlobalBot}
             style={{
@@ -435,20 +555,23 @@ export default function Sidebar() {
                 <span>RESUME AUTOMATION</span>
               </>
             )}
-          </button>
+          </motion.button>
 
           {/* UPGRADED MODERN PROFILE CARD */}
-          <div style={{
-            marginTop: '6px',
-            padding: '10px 12px',
-            background: '#fafafa',
-            border: '1px solid #e4e4e7',
-            borderRadius: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            transition: 'all 0.15s ease'
-          }}>
+          <motion.div
+            variants={footerItemVariants}
+            style={{
+              marginTop: '6px',
+              padding: '10px 12px',
+              background: '#fafafa',
+              border: '1px solid #e4e4e7',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              transition: 'all 0.15s ease'
+            }}
+          >
             <div
               onClick={() => setIsPasskeyModalOpen(true)}
               style={{
@@ -573,9 +696,9 @@ export default function Sidebar() {
                 <LogOut size={13} />
               </button>
             </div>
-          </div>
-        </div>
-      </aside>
+          </motion.div>
+        </motion.div>
+      </motion.aside>
     </>
   );
 }
