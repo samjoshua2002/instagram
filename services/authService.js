@@ -167,9 +167,9 @@ class AuthService {
     const cleanToken = (token || '').toString().trim();
     if (!/^\d{6}$/.test(cleanToken)) return false;
 
-    // Check with TOTP
+    // Check with TOTP (support ±35s window for device clock drift)
     try {
-      const result = verifySync({ token: cleanToken, secret: user.twoFactor.secret });
+      const result = verifySync({ token: cleanToken, secret: user.twoFactor.secret, epochTolerance: 35 });
       return !!result?.valid;
     } catch (err) {
       console.warn('⚠️ [AuthService] TOTP verify error:', err.message);
