@@ -20,7 +20,8 @@ export default function AuthGate({ children }) {
     setIsPasskeyModalOpen
   } = useApp();
 
-  if (authLoading) {
+  // Only block the screen with full loader if there is no cached token or user
+  if (authLoading && (!token || !user)) {
     return (
       <div style={{
         width: '100vw',
@@ -38,7 +39,7 @@ export default function AuthGate({ children }) {
           <ShieldCheck size={22} />
         </div>
         <div style={{ fontSize: '0.86rem', fontWeight: '700', letterSpacing: '-0.3px', color: '#09090b' }}>
-          CHATTER OS // AUTHENTICATING
+          CHATTER OS
         </div>
         <RefreshCw size={16} className="animate-spin" color="#71717a" />
       </div>

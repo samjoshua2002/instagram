@@ -140,7 +140,7 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('chatter_remembered_account');
+        const cached = localStorage.getItem('chatter_user_profile') || localStorage.getItem('chatter_remembered_account');
         return cached ? JSON.parse(cached) : null;
       } catch { return null; }
     }
@@ -148,7 +148,10 @@ export function AppProvider({ children }) {
   });
   const [authLoading, setAuthLoading] = useState(() => {
     if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('chatter_jwt_token');
+      const hasToken = !!localStorage.getItem('chatter_jwt_token');
+      const hasUser = !!(localStorage.getItem('chatter_user_profile') || localStorage.getItem('chatter_remembered_account'));
+      // If we already have token and user, do NOT block the UI with a full-screen authenticating screen
+      return hasToken && !hasUser;
     }
     return false;
   });
@@ -181,13 +184,21 @@ export function AppProvider({ children }) {
 
   const login = useCallback((jwtToken, userData) => {
     localStorage.setItem('chatter_jwt_token', jwtToken);
+    if (userData) {
+      try {
+        localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
+        localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
+      } catch (e) {}
+    }
     setToken(jwtToken);
     setUser(userData);
+    setAuthLoading(false);
     showToast?.(`Welcome back, ${userData?.firstName || 'Sam'}!`, 'success');
   }, [showToast]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('chatter_jwt_token');
+    localStorage.removeItem('chatter_user_profile');
     setToken(null);
     setUser(null);
     showToast?.('Signed out successfully.', 'info');
@@ -226,10 +237,15 @@ export function AppProvider({ children }) {
       })
       .then(userData => {
         setUser(userData);
+        try {
+          localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
+          localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
+        } catch (e) {}
         setAuthLoading(false);
       })
       .catch(() => {
         localStorage.removeItem('chatter_jwt_token');
+        localStorage.removeItem('chatter_user_profile');
         setToken(null);
         setUser(null);
         setAuthLoading(false);
