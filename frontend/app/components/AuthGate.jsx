@@ -22,20 +22,25 @@ export default function AuthGate({ children }) {
     authLoading,
     login,
     isPasskeyModalOpen,
-    setIsPasskeyModalOpen
+    setIsPasskeyModalOpen,
+    isOnboardingModalOpen,
+    setIsOnboardingModalOpen,
   } = useApp();
 
   const [wizardDismissed, setWizardDismissed] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && user?._id) {
       try {
-        if (sessionStorage.getItem('chatter_onboarding_dismissed') === 'true') {
+        const userDismissKey = `chatter_onboarding_dismissed_${user._id}`;
+        if (sessionStorage.getItem(userDismissKey) === 'true') {
           setWizardDismissed(true);
+        } else {
+          setWizardDismissed(false);
         }
       } catch (e) {}
     }
-  }, []);
+  }, [user?._id]);
 
   // Fresh launch detector: when user closes tab/window and opens fresh,
   // sessionStorage is cleared. We automatically redirect them to start on Dashboard (/)!
@@ -110,8 +115,14 @@ export default function AuthGate({ children }) {
         onClose={() => setIsPasskeyModalOpen(false)}
       />
       <OnboardingWizard
-        isOpen={!!user && user.isOnboarded === false && user.role !== 'superadmin' && !wizardDismissed}
-        onClose={() => setWizardDismissed(true)}
+        isOpen={isOnboardingModalOpen || (!!user && user.isOnboarded === false && user.role !== 'superadmin' && !wizardDismissed)}
+        onClose={() => {
+          setWizardDismissed(true);
+          setIsOnboardingModalOpen(false);
+          if (user?._id) {
+            try { sessionStorage.setItem(`chatter_onboarding_dismissed_${user._id}`, 'true'); } catch (e) {}
+          }
+        }}
       />
     </>
   );

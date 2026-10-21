@@ -172,6 +172,8 @@ export function AppProvider({ children }) {
     return false;
   });
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const openOnboardingWizard = useCallback(() => setIsOnboardingModalOpen(true), []);
   const [adminSession, setAdminSession] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -1176,6 +1178,9 @@ export function AppProvider({ children }) {
         updateUserProfile,
         isPasskeyModalOpen,
         setIsPasskeyModalOpen,
+        isOnboardingModalOpen,
+        setIsOnboardingModalOpen,
+        openOnboardingWizard,
         adminSession,
         isImpersonating,
         enterWorkspace,

@@ -46,7 +46,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
 
   const handleCloseOrSkip = async () => {
     try {
-      sessionStorage.setItem('chatter_onboarding_dismissed', 'true');
+      const dismissKey = user?._id ? `chatter_onboarding_dismissed_${user._id}` : 'chatter_onboarding_dismissed';
+      sessionStorage.setItem(dismissKey, 'true');
     } catch (e) {}
 
     try {
