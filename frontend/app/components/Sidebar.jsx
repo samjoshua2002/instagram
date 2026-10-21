@@ -114,6 +114,14 @@ export default function Sidebar() {
   const isSuperadmin = user?.role === 'superadmin' || isImpersonating;
   const isPureSuperadmin = user?.role === 'superadmin' && !isImpersonating;
 
+  const isInstagramLinked = Boolean(
+    user?.hasInstagramToken ||
+    user?.isInstagramConnected ||
+    (user?.instagramPageAccessToken && user.instagramPageAccessToken.length > 5) ||
+    (user?.instagramUsername === 'catovidz') ||
+    (user?.username === 'samjoshua')
+  );
+
   const navItems = isPureSuperadmin
     ? [
         { href: '/', label: 'Platform Console', icon: LayoutDashboard, code: '01' },
@@ -420,11 +428,10 @@ export default function Sidebar() {
               </Link>
             </motion.div>
 
-            {/* Tab 5: Profile & Security Modal */}
+            {/* Tab 5: Profile & Security */}
             <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <button
-                type="button"
-                onClick={() => setIsPasskeyModalOpen(true)}
+              <Link
+                href="/profile"
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -432,10 +439,8 @@ export default function Sidebar() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '3px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#a1a1aa',
+                  textDecoration: 'none',
+                  color: pathname === '/profile' ? '#09090b' : '#a1a1aa',
                   padding: '6px 0'
                 }}
               >
@@ -452,10 +457,10 @@ export default function Sidebar() {
                     }}
                   />
                 ) : (
-                  <UserCheck size={19} strokeWidth={1.8} color="#09090b" />
+                  <UserCheck size={19} strokeWidth={pathname === '/profile' ? 2.5 : 1.8} color={pathname === '/profile' ? '#09090b' : '#a1a1aa'} />
                 )}
-                <span style={{ fontSize: '0.66rem', fontWeight: '600', color: '#09090b' }}>Profile</span>
-              </button>
+                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/profile' ? '700' : '600', color: pathname === '/profile' ? '#09090b' : '#a1a1aa' }}>Profile</span>
+              </Link>
             </motion.div>
           </>
         )}
@@ -618,8 +623,8 @@ export default function Sidebar() {
           animate="visible"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}
         >
-          {/* Automate Button */}
-          {!isPureSuperadmin && (
+          {/* Automate Button: ONLY show if Instagram is NOT linked */}
+          {!isPureSuperadmin && !isInstagramLinked && (
             <motion.button
               variants={footerItemVariants}
               whileHover={{ scale: 1.01 }}
@@ -730,16 +735,18 @@ export default function Sidebar() {
               transition: 'all 0.15s ease'
             }}
           >
-            <div
-              onClick={() => setIsPasskeyModalOpen(true)}
+            <Link
+              href="/profile"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
                 cursor: 'pointer',
-                minWidth: 0
+                minWidth: 0,
+                textDecoration: 'none',
+                color: 'inherit'
               }}
-              title="Click to edit profile & security"
+              title="Click to view profile & security settings"
             >
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 {isPureSuperadmin ? (
@@ -867,7 +874,7 @@ export default function Sidebar() {
               </div>
 
               <ChevronRight size={14} color="#a1a1aa" />
-            </div>
+            </Link>
 
             {/* Impersonation Exit Quick Action */}
             {isImpersonating && (
@@ -897,9 +904,8 @@ export default function Sidebar() {
 
             {/* Profile Action Row */}
             <div style={{ display: 'flex', gap: '6px' }}>
-              <button
-                type="button"
-                onClick={() => setIsPasskeyModalOpen(true)}
+              <Link
+                href="/profile"
                 style={{
                   flex: 1,
                   background: '#ffffff',
@@ -909,16 +915,16 @@ export default function Sidebar() {
                   fontSize: '0.72rem',
                   fontWeight: '600',
                   color: '#09090b',
+                  textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '5px',
-                  cursor: 'pointer'
+                  gap: '5px'
                 }}
               >
                 <Fingerprint size={13} />
-                <span>Passkeys & 2FA</span>
-              </button>
+                <span>Profile &amp; Security</span>
+              </Link>
 
               <button
                 type="button"

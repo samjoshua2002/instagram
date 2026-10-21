@@ -5,13 +5,14 @@ import { useApp } from '../context/AppContext';
 import {
   UserCheck, Save, Sparkles, MessageSquare, AlertCircle,
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
-  Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff
+  Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff, Instagram,
+  Copy, Check
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 
 export default function SettingsPage() {
-  const { API_BASE, showToast, user, isImpersonating } = useApp();
+  const { API_BASE, token, showToast, user, isImpersonating, updateUserProfile } = useApp();
 
   // If pure superadmin (not inside an impersonated creator workspace), show creator selector
   if (user?.role === 'superadmin' && !isImpersonating) {
@@ -33,7 +34,9 @@ export default function SettingsPage() {
   // Form State
   const [formData, setFormData] = useState({
     creatorName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.username || ''),
-    instagramHandle: user?.instagramUsername ? `@${user.instagramUsername}` : '',
+    instagramHandle: user?.instagramUsername ? `@${user.instagramUsername.replace(/^@/, '')}` : '',
+    instagramPageAccessToken: user?.instagramPageAccessToken || '',
+    instagramAccountId: user?.instagramId || user?.instagramAccountId || '',
     personaBio: '',
     aboutMe: '',
     characteristics: '',
@@ -46,6 +49,18 @@ export default function SettingsPage() {
     typingDelaySeconds: 1.5,
     giphyApiKey: '',
   });
+
+  const [showAccessToken, setShowAccessToken] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
+
+  // Helper to obtain authorization headers
+  const getAuthHeaders = () => {
+    const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    return {
+      'Content-Type': 'application/json',
+      ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
+    };
+  };
 
   // State for Giphy API Key
   const [testingGiphy, setTestingGiphy] = useState(false);
@@ -63,23 +78,24 @@ export default function SettingsPage() {
   const [testInput, setTestInput] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [testMessages, setTestMessages] = useState([
-    { role: 'user', text: 'hey bro love your video edits!' },
-    { role: 'assistant', text: 'yoo appreciate it so much man! 🙌 which reel did you watch?' }
+    { role: 'user', text: 'hey love your content!' },
+    { role: 'assistant', text: 'appreciate it so much! thanks for reaching out 🙌' }
   ]);
 
   // Fetch current persona on mount
   useEffect(() => {
     fetchPersona();
-  }, []);
+  }, [user?._id]);
 
   const fetchPersona = async () => {
-    // Only show skeleton if no cached persona data is already loaded
+    const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
+    // Only show cached persona if scoped to current user
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('chatter_persona_cached');
+        const cached = localStorage.getItem(userCacheKey);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.creatorName) {
+          if (parsed && (parsed.creatorName || parsed.instagramHandle)) {
             setFormData(prev => ({ ...prev, ...parsed }));
             setLoading(false);
           }
@@ -90,12 +106,18 @@ export default function SettingsPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/persona`);
+      const res = await fetch(`${API_BASE}/api/persona`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
+        const defaultName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.username || 'Creator');
+        const defaultHandle = user?.instagramUsername ? `@${user.instagramUsername.replace(/^@/, '')}` : (user?.username ? `@${user.username}` : '@handle');
         const updated = {
-          creatorName: data.creatorName || 'Sam Joshua',
-          instagramHandle: data.instagramHandle || '@catovidz',
+          creatorName: data.creatorName || defaultName,
+          instagramHandle: data.instagramHandle || defaultHandle,
+          instagramPageAccessToken: data.instagramPageAccessToken || user?.instagramPageAccessToken || '',
+          instagramAccountId: data.instagramAccountId || user?.instagramId || user?.instagramAccountId || '',
           personaBio: data.personaBio || '',
           aboutMe: data.aboutMe || '',
           characteristics: data.characteristics || '',
@@ -110,7 +132,7 @@ export default function SettingsPage() {
         };
         setFormData(updated);
         try {
-          localStorage.setItem('chatter_persona_cached', JSON.stringify(updated));
+          localStorage.setItem(userCacheKey, JSON.stringify(updated));
         } catch (e) {}
       }
     } catch (err) {
@@ -149,13 +171,31 @@ export default function SettingsPage() {
     try {
       const res = await fetch(`${API_BASE}/api/persona`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(formData),
       });
 
       if (res.ok) {
         setSaveSuccess(true);
-        showToast('Settings & Persona saved successfully! AI updated.');
+        if (typeof window !== 'undefined') {
+          const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
+          try {
+            localStorage.setItem(userCacheKey, JSON.stringify(formData));
+          } catch (e) {}
+        }
+
+        if (updateUserProfile) {
+          updateUserProfile({
+            hasInstagramToken: Boolean(formData.instagramPageAccessToken),
+            isInstagramConnected: Boolean(formData.instagramPageAccessToken),
+            instagramPageAccessToken: formData.instagramPageAccessToken,
+            instagramAccountId: formData.instagramAccountId,
+            instagramUsername: formData.instagramHandle?.replace(/^@/, ''),
+            firstName: formData.creatorName,
+          });
+        }
+
+        showToast('Settings & Persona saved successfully! AI updated.', 'success');
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
         const err = await res.json();
@@ -241,7 +281,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch(`${API_BASE}/api/simulator/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           testSenderId: 'test_friend_user',
           testUsername: 'alex_test',
@@ -471,7 +511,7 @@ export default function SettingsPage() {
                   type="text"
                   value={formData.creatorName}
                   onChange={e => setFormData({ ...formData, creatorName: e.target.value })}
-                  placeholder="e.g. Sam Joshua"
+                  placeholder="e.g. Alex Creator"
                 />
               </div>
 
@@ -483,7 +523,7 @@ export default function SettingsPage() {
                   type="text"
                   value={formData.instagramHandle}
                   onChange={e => setFormData({ ...formData, instagramHandle: e.target.value })}
-                  placeholder="e.g. @catovidz"
+                  placeholder="e.g. @username"
                 />
               </div>
             </div>
@@ -496,8 +536,119 @@ export default function SettingsPage() {
                 type="text"
                 value={formData.personaBio}
                 onChange={e => setFormData({ ...formData, personaBio: e.target.value })}
-                placeholder="I am Sam Joshua, creator of @catovidz. Video editor, coder, and creative director."
+                placeholder="Brief one-line summary of who you are, what you build, and your creator niche."
               />
+            </div>
+          </div>
+
+          {/* Instagram API & Page Access Token Card */}
+          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={18} />
+                <span>Instagram API &amp; Direct Message Credentials</span>
+              </h3>
+              <span style={{
+                fontSize: '0.72rem',
+                background: formData.instagramPageAccessToken ? '#ecfdf5' : '#fef3c7',
+                color: formData.instagramPageAccessToken ? '#047857' : '#b45309',
+                border: formData.instagramPageAccessToken ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontWeight: '700',
+                fontFamily: "'JetBrains Mono', monospace"
+              }}>
+                {formData.instagramPageAccessToken ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
+              </span>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px' }}>
+              Your Instagram Page Access Token and Instagram Account ID enable Chatter AI to send and receive messages on your behalf. You can view, copy, or update your credentials directly below.
+            </p>
+
+            <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                  Instagram Account / Page ID
+                </label>
+                <input
+                  type="text"
+                  value={formData.instagramAccountId}
+                  onChange={e => setFormData({ ...formData, instagramAccountId: e.target.value })}
+                  placeholder="e.g. 17841400000000000"
+                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px', display: 'block' }}>
+                  The Meta Graph API Instagram Business Account ID.
+                </span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                  Page Access Token
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showAccessToken ? 'text' : 'password'}
+                    value={formData.instagramPageAccessToken}
+                    onChange={e => setFormData({ ...formData, instagramPageAccessToken: e.target.value })}
+                    placeholder="EAA... (Meta Page Access Token)"
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.85rem',
+                      paddingRight: '80px',
+                      width: '100%'
+                    }}
+                  />
+                  <div style={{ position: 'absolute', right: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAccessToken(!showAccessToken)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#71717a',
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '4px'
+                      }}
+                      title={showAccessToken ? 'Hide Token' : 'Show Token'}
+                    >
+                      {showAccessToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                    {formData.instagramPageAccessToken && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (navigator?.clipboard) {
+                            navigator.clipboard.writeText(formData.instagramPageAccessToken);
+                            setCopiedToken(true);
+                            showToast?.('Page Access Token copied to clipboard!', 'success');
+                            setTimeout(() => setCopiedToken(false), 2000);
+                          }
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: copiedToken ? '#16a34a' : '#71717a',
+                          cursor: 'pointer',
+                          padding: '4px 6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          borderRadius: '4px'
+                        }}
+                        title="Copy Token"
+                      >
+                        {copiedToken ? <Check size={15} /> : <Copy size={15} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px', display: 'block' }}>
+                  Click the eye icon to view/edit your token. Click Save Settings in the top right to commit updates.
+                </span>
+              </div>
             </div>
           </div>
 
@@ -520,7 +671,7 @@ export default function SettingsPage() {
               rows={6}
               value={formData.aboutMe}
               onChange={e => setFormData({ ...formData, aboutMe: e.target.value })}
-              placeholder="e.g. I live in Tamil Nadu, India. Tech enthusiast and video editor. I love Premiere Pro, After Effects, and building web apps. I play Genshin Impact. Love tech gadgets, cameras, and creative visual effects. When friends talk with me, I share what I am currently working on..."
+              placeholder="Describe your background, location, passions, creative tools, hobbies, what you are building, and how you speak to friends and followers..."
               style={{ lineHeight: '1.5', resize: 'vertical' }}
             />
           </div>
@@ -539,7 +690,7 @@ export default function SettingsPage() {
               rows={5}
               value={formData.customKnowledge}
               onChange={e => setFormData({ ...formData, customKnowledge: e.target.value })}
-              placeholder="e.g.&#10;Account: @catovidz&#10;Editing Software: Premiere Pro & After Effects&#10;Collabs: Open for tech and creative edits. DM portfolio.&#10;Tutorials: Drop questions in DM, making a video soon."
+              placeholder="e.g.&#10;Account: @username&#10;Creator: Full Name&#10;Topics: Creative projects, tech, photography&#10;Location: City / Country&#10;Inquiries: DMs open for collaborations"
               style={{ lineHeight: '1.5', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.82rem' }}
             />
           </div>
