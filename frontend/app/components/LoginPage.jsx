@@ -229,6 +229,7 @@ export default function LoginPage({ onLoginSuccess }) {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
+  const [forgotPreviewOtp, setForgotPreviewOtp] = useState('');
 
   // 1. Initialize Cached Account from LocalStorage on mount
   useEffect(() => {
@@ -795,10 +796,14 @@ export default function LoginPage({ onLoginSuccess }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send verification code.');
 
+      if (data.previewOtp) {
+        setForgotPreviewOtp(data.previewOtp);
+        setForgotOtpCode(data.previewOtp);
+      }
       setOtpSent(true);
       setForgotSuccess(data.message || 'Verification code sent to your email.');
     } catch (err) {
-      setForgotError(err.message);
+      setForgotError(err.message || 'Network delay. You can also use OneAuth (Instant) to reset immediately.');
     } finally {
       setForgotLoading(false);
     }
@@ -2660,15 +2665,15 @@ export default function LoginPage({ onLoginSuccess }) {
 
                 <div style={{ marginBottom: '18px' }}>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
-                    New Password
+                    New Password (min. 8 characters)
                   </label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min. 6 characters"
+                    placeholder="Min. 8 characters"
                     required
-                    minLength={6}
+                    minLength={8}
                     style={{
                       width: '100%',
                       background: '#ffffff',
@@ -2684,7 +2689,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                 <button
                   type="submit"
-                  disabled={forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 6}
+                  disabled={forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 8}
                   style={{
                     width: '100%',
                     background: '#09090b',
@@ -2698,8 +2703,8 @@ export default function LoginPage({ onLoginSuccess }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    cursor: (forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 6) ? 'not-allowed' : 'pointer',
-                    opacity: (forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 6) ? 0.6 : 1
+                    cursor: (forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 8) ? 'not-allowed' : 'pointer',
+                    opacity: (forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 8) ? 0.6 : 1
                   }}
                 >
                   {forgotLoading ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
@@ -2761,6 +2766,35 @@ export default function LoginPage({ onLoginSuccess }) {
                   </form>
                 ) : (
                   <form onSubmit={handleVerifyEmailOtp}>
+                    {forgotPreviewOtp && (
+                      <div style={{
+                        background: '#f4f4f5',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        marginBottom: '14px',
+                        fontSize: '0.76rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span style={{ color: '#71717a' }}>Instant Verification Code:</span>
+                        <span style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontWeight: '800',
+                          fontSize: '0.92rem',
+                          letterSpacing: '2px',
+                          color: '#09090b',
+                          background: '#ffffff',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid #d4d4d8'
+                        }}>
+                          {forgotPreviewOtp}
+                        </span>
+                      </div>
+                    )}
+
                     <div style={{ marginBottom: '12px' }}>
                       <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
                         6-Digit Verification Code
@@ -2790,15 +2824,15 @@ export default function LoginPage({ onLoginSuccess }) {
 
                     <div style={{ marginBottom: '18px' }}>
                       <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
-                        Set New Password
+                        Set New Password (min. 8 characters)
                       </label>
                       <input
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Min. 6 characters"
+                        placeholder="Min. 8 characters"
                         required
-                        minLength={6}
+                        minLength={8}
                         style={{
                           width: '100%',
                           background: '#ffffff',
@@ -2814,7 +2848,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                     <button
                       type="submit"
-                      disabled={forgotLoading || forgotOtpCode.length !== 6 || newPassword.length < 6}
+                      disabled={forgotLoading || forgotOtpCode.length !== 6 || newPassword.length < 8}
                       style={{
                         width: '100%',
                         background: '#09090b',
@@ -2828,11 +2862,29 @@ export default function LoginPage({ onLoginSuccess }) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        cursor: (forgotLoading || forgotOtpCode.length !== 6 || newPassword.length < 6) ? 'not-allowed' : 'pointer'
+                        cursor: (forgotLoading || forgotOtpCode.length !== 6 || newPassword.length < 8) ? 'not-allowed' : 'pointer'
                       }}
                     >
                       {forgotLoading ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                       <span>Save Password & Return</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setOtpSent(false); setForgotError(''); setForgotSuccess(''); setForgotPreviewOtp(''); }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#71717a',
+                        fontSize: '0.74rem',
+                        marginTop: '12px',
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'center',
+                        fontWeight: '500'
+                      }}
+                    >
+                      ← Back / Use different email
                     </button>
                   </form>
                 )}
