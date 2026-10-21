@@ -137,18 +137,18 @@ router.post('/register/request-otp', async (req, res) => {
 
     await user.save();
 
-    // Send verification email safely (non-fatal if SMTP has transient latency)
+    // Send verification email
     try {
       await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
     } catch (mailErr) {
-      console.warn('⚠️ [Register OTP]: Email sending delayed or failed gracefully:', mailErr.message);
+      console.error('❌ [Register OTP] Email sending failed:', mailErr.message);
+      return res.status(500).json({ error: 'Failed to send verification email: ' + mailErr.message });
     }
 
     res.json({
       success: true,
-      message: `A 6-digit verification code was sent to ${cleanEmail}. Please enter it below.`,
+      message: `A 6-digit verification code was sent to ${cleanEmail}. Please check your inbox.`,
       email: cleanEmail,
-      previewOtp: otpCode,
     });
   } catch (err) {
     console.error('❌ Registration Request OTP error:', err.message);
@@ -184,14 +184,14 @@ router.post('/register/resend-otp', async (req, res) => {
     try {
       await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
     } catch (mailErr) {
-      console.warn('⚠️ [Resend OTP]: Email sending delayed:', mailErr.message);
+      console.error('❌ [Resend OTP] Email sending failed:', mailErr.message);
+      return res.status(500).json({ error: 'Failed to resend verification email: ' + mailErr.message });
     }
 
     res.json({
       success: true,
-      message: `New verification code sent to ${cleanEmail}.`,
+      message: `A fresh 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox.`,
       email: cleanEmail,
-      previewOtp: otpCode,
     });
   } catch (err) {
     console.error('❌ Resend OTP error:', err.message);
@@ -571,17 +571,17 @@ router.post('/forgot-password/send-otp', async (req, res) => {
     };
     await user.save();
 
-    // Send verification email safely (non-fatal if SMTP has transient connection timeout)
+    // Send verification email
     try {
       await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
     } catch (mailErr) {
-      console.warn('⚠️ [Password Reset OTP]: Email delivery delayed or timed out:', mailErr.message);
+      console.error('❌ [Password Reset OTP] Email delivery failed:', mailErr.message);
+      return res.status(500).json({ error: 'Failed to send verification email: ' + mailErr.message });
     }
 
     res.json({
       success: true,
-      message: `A 6-digit verification code has been generated for ${user.email}.`,
-      previewOtp: otpCode
+      message: `A 6-digit verification code has been sent to ${user.email}. Please check your inbox.`
     });
   } catch (err) {
     console.error('❌ Send OTP error:', err.message);
