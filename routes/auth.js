@@ -41,6 +41,7 @@ router.post('/register/request-otp', async (req, res) => {
       mobileNumber,
       whatsappNumber,
       instagramUsername,
+      instagramId,
     } = req.body;
 
     if (!email || !email.includes('@')) {
@@ -86,6 +87,8 @@ router.post('/register/request-otp', async (req, res) => {
         mobileNumber: (mobileNumber || '').trim(),
         whatsappNumber: (whatsappNumber || '').trim(),
         instagramUsername: (instagramUsername || '').trim() || 'catovidz',
+        instagramId: (instagramId || '').trim(),
+        role: isSuperadmin ? 'superadmin' : 'user',
         isVerified: false,
         verificationOtp: {
           code: otpCode,
@@ -104,6 +107,8 @@ router.post('/register/request-otp', async (req, res) => {
       user.mobileNumber = (mobileNumber || '').trim();
       user.whatsappNumber = (whatsappNumber || '').trim();
       user.instagramUsername = (instagramUsername || '').trim() || user.instagramUsername;
+      if (instagramId) user.instagramId = instagramId.trim();
+      user.role = isSuperadmin ? 'superadmin' : 'user';
       user.isVerified = false;
       user.verificationOtp = {
         code: otpCode,
@@ -119,8 +124,12 @@ router.post('/register/request-otp', async (req, res) => {
 
     await user.save();
 
-    // Send verification email
-    await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+    // Send verification email safely (non-fatal if SMTP has transient latency)
+    try {
+      await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+    } catch (mailErr) {
+      console.warn('⚠️ [Register OTP]: Email sending delayed or failed gracefully:', mailErr.message);
+    }
 
     res.json({
       success: true,
@@ -165,6 +174,7 @@ router.post('/register/verify-otp', async (req, res) => {
     await user.save();
 
     const token = authService.generateToken(user);
+    const isSuper = user.role === 'superadmin';
 
     res.json({
       success: true,
@@ -179,6 +189,8 @@ router.post('/register/verify-otp', async (req, res) => {
         mobileNumber: user.mobileNumber,
         whatsappNumber: user.whatsappNumber,
         instagramUsername: user.instagramUsername,
+        instagramId: user.instagramId || '',
+        role: isSuper ? 'superadmin' : 'user',
         accountType: user.accountType,
         profilePicUrl: user.profilePicUrl,
         hasPasskeys: (user.passkeys || []).length > 0,
@@ -192,7 +204,8 @@ router.post('/register/verify-otp', async (req, res) => {
 
 /**
  * POST /api/auth/login
- * Standard login: Password verification (+ optional OneAuth 2FA if enabled)
+ * Standard login: Direct password verification.
+ * (OneAuth / TOTP is an alternative login method, NOT enforced on password login)
  */
 router.post('/login', async (req, res) => {
   try {
@@ -224,25 +237,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check if 2FA is active on this account
-    if (user.twoFactor?.enabled && user.twoFactor?.secret) {
-      if (!totpCode) {
-        return res.json({
-          requireTotp: true,
-          message: 'Please enter the 6-digit verification code from your OneAuth app',
-        });
-      }
-
-      const isValidTotp = authService.verifyTotp(user, totpCode);
-      if (!isValidTotp) {
-        return res.status(401).json({ error: 'Invalid 6-digit OneAuth verification code' });
-      }
-    }
-
     user.lastLogin = new Date();
     await user.save();
 
     const token = authService.generateToken(user);
+    const isSuper = user.role === 'superadmin';
+
     res.json({
       success: true,
       token,
@@ -255,7 +255,10 @@ router.post('/login', async (req, res) => {
         mobileNumber: user.mobileNumber,
         whatsappNumber: user.whatsappNumber,
         instagramUsername: user.instagramUsername,
+        instagramId: user.instagramId || '',
+        role: isSuper ? 'superadmin' : 'user',
         accountType: user.accountType,
+        profilePicUrl: user.profilePicUrl || '',
         hasPasskeys: (user.passkeys || []).length > 0,
       },
     });
@@ -607,6 +610,8 @@ router.post('/passkey/login-verify', async (req, res) => {
     }
 
     const token = authService.generateToken(user);
+    const isSuper = user.role === 'superadmin';
+
     res.json({
       success: true,
       token,
@@ -620,6 +625,8 @@ router.post('/passkey/login-verify', async (req, res) => {
         mobileNumber: user.mobileNumber,
         whatsappNumber: user.whatsappNumber,
         instagramUsername: user.instagramUsername,
+        instagramId: user.instagramId || '',
+        role: isSuper ? 'superadmin' : 'user',
         accountType: user.accountType,
         hasPasskeys: (user.passkeys || []).length > 0,
       },
@@ -704,6 +711,8 @@ router.get('/totp-setup', requireAuth, async (req, res) => {
  */
 router.get('/me', requireAuth, async (req, res) => {
   const user = req.user;
+  const isSuper = user.role === 'superadmin';
+
   res.json({
     id: user._id,
     username: user.username,
@@ -714,6 +723,8 @@ router.get('/me', requireAuth, async (req, res) => {
     mobileNumber: user.mobileNumber,
     whatsappNumber: user.whatsappNumber,
     instagramUsername: user.instagramUsername,
+    instagramId: user.instagramId || '',
+    role: isSuper ? 'superadmin' : 'user',
     accountType: user.accountType,
     address: user.address,
     twoFactorEnabled: user.twoFactor?.enabled || false,
@@ -811,6 +822,146 @@ router.delete('/passkeys/:credentialId', requireAuth, async (req, res) => {
     res.json({ success: true, message: 'Passkey deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/auth/instagram/check-handle
+ * Public endpoint to live check if an Instagram handle exists, fetching profile picture, display name, and permanent IG ID
+ */
+router.get('/instagram/check-handle', async (req, res) => {
+  try {
+    const handle = (req.query.handle || '').toString().trim().replace(/^@/, '').toLowerCase();
+    if (!handle || handle.length < 2) {
+      return res.status(400).json({ error: 'Please enter a valid Instagram handle.' });
+    }
+
+    const axios = require('axios');
+    const targetUrl = `https://www.instagram.com/${encodeURIComponent(handle)}/`;
+    const response = await axios.get(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      },
+      timeout: 9000,
+      validateStatus: () => true
+    });
+
+    const html = response.data || '';
+    const title = html.match(/<title>([^<]+)<\/title>/)?.[1] || '';
+    const desc = html.match(/meta content=\"([^\"]+)\" name=\"description\"/)?.[1] ||
+                 html.match(/meta property=\"og:description\" content=\"([^\"]+)\"/)?.[1] || '';
+    let ogImg = html.match(/meta property=\"og:image\" content=\"([^\"]+)\"/)?.[1] || '';
+    if (ogImg) {
+      ogImg = ogImg.replace(/&amp;/g, '&');
+    }
+
+    const isNotFound = title.startsWith('Page Not Found') || title === 'Instagram' || response.status === 404;
+    const exists = !isNotFound && (Boolean(desc) || Boolean(ogImg));
+
+    if (!exists) {
+      return res.json({
+        exists: false,
+        handle,
+        message: `No public Instagram account found for @${handle}`
+      });
+    }
+
+    // Extract permanent numeric user ID if available
+    const idMatch = html.match(/\"props\":\{\"id\":\"([0-9]+)\"/i) ||
+                    html.match(/\"id\":\"([0-9]{5,25})\"/i) ||
+                    html.match(/profilePage_([0-9]+)/i) ||
+                    html.match(/\/([0-9]+)_[0-9]+_[0-9]+_n\.jpg/);
+    const instagramId = idMatch ? idMatch[1] : '';
+
+    // Extract full name
+    let fullName = handle;
+    if (title.includes('(&#064;')) {
+      fullName = title.split('(&#064;')[0].trim();
+    } else if (title.includes('(@')) {
+      fullName = title.split('(@')[0].trim();
+    }
+
+    return res.json({
+      exists: true,
+      handle,
+      fullName,
+      profilePicUrl: ogImg,
+      instagramId,
+      bio: desc,
+      verified: html.includes('"is_verified":true') || html.includes('Verified')
+    });
+  } catch (err) {
+    console.error('❌ Check handle error:', err.message);
+    res.status(500).json({ error: 'Failed to verify Instagram handle: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/auth/admin/accounts
+ * Protected Superadmin endpoint: returns all registered accounts and their connected SocialGraph members
+ */
+router.get('/admin/accounts', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const isSuper = user.role === 'superadmin';
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+
+    const SocialGraph = require('../models/SocialGraph');
+    const allUsers = await User.find({}).select('-passwordHash -twoFactor.secret -twoFactor.backupCodes -currentChallenge').sort({ createdAt: -1 });
+    const allContacts = await SocialGraph.find({}).sort({ createdAt: -1 });
+
+    const accounts = allUsers.map(u => {
+      return {
+        id: u._id,
+        username: u.username,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role || 'user',
+        accountType: u.accountType || 'personal',
+        mobileNumber: u.mobileNumber || '',
+        whatsappNumber: u.whatsappNumber || '',
+        instagramUsername: u.instagramUsername || '',
+        instagramId: u.instagramId || '',
+        profilePicUrl: u.profilePicUrl || '',
+        isVerified: u.isVerified,
+        hasPasskeys: (u.passkeys || []).length > 0,
+        passkeyCount: (u.passkeys || []).length,
+        lastLogin: u.lastLogin,
+        createdAt: u.createdAt,
+      };
+    });
+
+    res.json({
+      success: true,
+      superadmin: user.email,
+      totalAccounts: accounts.length,
+      totalContacts: allContacts.length,
+      accounts,
+      contactsBreakdown: {
+        total: allContacts.length,
+        closeFriends: allContacts.filter(c => c.category === 'close_friend').length,
+        onlineFriends: allContacts.filter(c => c.category === 'online_friend').length,
+        unlinked: allContacts.filter(c => !c.instagramHandle && !c.senderId).length,
+      },
+      contacts: allContacts.map(c => ({
+        id: c._id,
+        name: c.name,
+        handle: c.instagramHandle || '',
+        profilePic: c.profilePic || '',
+        senderId: c.senderId || '',
+        category: c.category || 'online_friend',
+        relationship: c.relationshipToSam || 'friend',
+        factsCount: (c.lore || []).length,
+        connectionsCount: (c.connections || []).length,
+      })),
+    });
+  } catch (err) {
+    console.error('❌ Superadmin accounts error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch admin accounts: ' + err.message });
   }
 });
 

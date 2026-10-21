@@ -278,9 +278,11 @@ input:focus, textarea:focus, select:focus {
     gap: 8px !important;
   }
 
-  /* On mobile: hide horizontal scroll table and show compact cards */
+  /* Mobile layout switcher support */
   .desktop-table-container {
-    display: none !important;
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
   .mobile-people-cards {
     display: flex !important;

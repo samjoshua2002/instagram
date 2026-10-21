@@ -120,6 +120,7 @@ export default function LoginPage({ onLoginSuccess }) {
     mobileNumber: '',
     whatsappNumber: '',
     instagramUsername: '',
+    instagramId: '',
     password: '',
   });
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -131,6 +132,54 @@ export default function LoginPage({ onLoginSuccess }) {
   const [regAuthUser, setRegAuthUser] = useState(null);
   const [regPasskeyLoading, setRegPasskeyLoading] = useState(false);
   const [regPasskeySuccess, setRegPasskeySuccess] = useState(false);
+
+  // Live Instagram Handle Recommendation & Validation State
+  const [instaChecking, setInstaChecking] = useState(false);
+  const [instaPreview, setInstaPreview] = useState(null);
+  const [instaError, setInstaError] = useState('');
+
+  // Debounced live Instagram profile lookup
+  useEffect(() => {
+    const handle = (regForm.instagramUsername || '').trim().replace(/^@/, '');
+    if (!handle || handle.length < 2) {
+      setInstaPreview(null);
+      setInstaError('');
+      setInstaChecking(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setInstaChecking(true);
+      setInstaError('');
+      try {
+        const res = await fetch(`${API_BASE}/api/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
+        const data = await res.json();
+        if (data.exists) {
+          setInstaPreview(data);
+          setInstaError('');
+          // Persist the permanent numeric instagramId in regForm!
+          setRegForm(prev => ({
+            ...prev,
+            instagramId: data.instagramId || '',
+            instagramUsername: data.username || handle
+          }));
+        } else {
+          setInstaPreview(null);
+          setInstaError(`No Instagram account found for @${handle}.`);
+          setRegForm(prev => ({
+            ...prev,
+            instagramId: ''
+          }));
+        }
+      } catch (err) {
+        console.warn('Instagram handle check error:', err);
+      } finally {
+        setInstaChecking(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [regForm.instagramUsername]);
 
   // Forgot Password Modal States
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -420,15 +469,24 @@ export default function LoginPage({ onLoginSuccess }) {
       setRegError('Password must be at least 6 characters.');
       return;
     }
+    if (instaError) {
+      setRegError('The specified Instagram handle does not exist. Please enter a valid account or clear the handle.');
+      return;
+    }
 
     setRegLoading(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+
       const res = await fetch(`${API_BASE}/api/auth/register/request-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(regForm),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       const data = await res.json();
 
@@ -440,10 +498,14 @@ export default function LoginPage({ onLoginSuccess }) {
         throw new Error(data.error || 'Failed to initiate account creation.');
       }
 
-      setRegSuccess(data.message || `Verification code sent to ${regForm.email}.`);
+      setRegSuccess(data.message || `Verification code sent to ${regForm.email}. Check your inbox!`);
       setRegStage('otp');
     } catch (err) {
-      setRegError(err.message);
+      if (err.name === 'AbortError') {
+        setRegError('Request timed out. Please check your network connection and try again.');
+      } else {
+        setRegError(err.message || 'Failed to initiate account creation.');
+      }
     } finally {
       setRegLoading(false);
     }
@@ -1759,26 +1821,29 @@ export default function LoginPage({ onLoginSuccess }) {
                   </div>
 
                   {/* Instagram Username & Mobile (Optional creator info) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
-                        Instagram Handle
+                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                        <span>Instagram Handle</span>
+                        {instaChecking && <RefreshCw size={11} className="animate-spin" style={{ color: '#71717a' }} />}
                       </label>
                       <input
                         type="text"
                         value={regForm.instagramUsername}
                         onChange={(e) => setRegForm({ ...regForm, instagramUsername: e.target.value.replace(/^@/, '') })}
-                        placeholder="catovidz"
+                        placeholder="username"
                         style={{
                           width: '100%',
                           background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          border: '1px solid',
+                          borderColor: instaPreview ? '#16a34a' : (instaError ? '#ef4444' : '#e4e4e7'),
                           borderRadius: '8px',
                           padding: '9px 11px',
                           color: '#09090b',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box',
-                          outline: 'none'
+                          outline: 'none',
+                          transition: 'border-color 0.15s ease'
                         }}
                       />
                     </div>
@@ -1790,7 +1855,7 @@ export default function LoginPage({ onLoginSuccess }) {
                         type="tel"
                         value={regForm.mobileNumber}
                         onChange={(e) => setRegForm({ ...regForm, mobileNumber: e.target.value })}
-                        placeholder="8610866413"
+                        placeholder="+1 555-0199"
                         style={{
                           width: '100%',
                           background: '#ffffff',
@@ -1805,6 +1870,73 @@ export default function LoginPage({ onLoginSuccess }) {
                       />
                     </div>
                   </div>
+
+                  {/* Instagram Live Account Recommendation Card */}
+                  {instaPreview && (
+                    <div style={{
+                      marginBottom: '14px',
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <img
+                        src={instaPreview.profilePicUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(instaPreview.username)}&background=09090b&color=fff`}
+                        alt={instaPreview.username}
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(instaPreview.username)}&background=09090b&color=fff`;
+                        }}
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '1.5px solid #16a34a',
+                          flexShrink: 0
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ fontWeight: '700', fontSize: '0.84rem', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {instaPreview.fullName || instaPreview.username}
+                          </span>
+                          {instaPreview.isVerified && (
+                            <span title="Verified Account" style={{ color: '#0284c7', display: 'flex' }}>
+                              <CheckCircle2 size={13} fill="#0284c7" color="#ffffff" />
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#52525b', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          @{instaPreview.username} {instaPreview.instagramId ? `• ID: ${instaPreview.instagramId}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d', fontSize: '0.68rem', fontWeight: '800', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, background: '#dcfce7', padding: '3px 7px', borderRadius: '4px' }}>
+                        <Check size={12} strokeWidth={3} />
+                        <span>FOUND</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {instaError && (
+                    <div style={{
+                      marginBottom: '14px',
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      padding: '7px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.74rem',
+                      color: '#b91c1c'
+                    }}>
+                      <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                      <span>{instaError}</span>
+                    </div>
+                  )}
 
                   {/* Password */}
                   <div style={{ marginBottom: '18px' }}>

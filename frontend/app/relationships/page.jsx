@@ -5,10 +5,11 @@ import { useApp } from '../context/AppContext';
 import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
   Trash2, Calendar, Bot, Film, Pause, Check, Save, User,
-  Plus, RefreshCw, MessageSquare, Shield, X, Users
+  Plus, RefreshCw, MessageSquare, Shield, X, Users,
+  LayoutGrid, List, AlignJustify, Table as TableIcon
 } from 'lucide-react';
 import ContactAvatar from '../components/ContactAvatar';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -96,6 +97,23 @@ export default function RelationshipsPage() {
   // Pagination state — table
   const TABLE_PAGE_SIZE = 10;
   const [tablePage, setTablePage] = useState(1);
+
+  // Layout switcher state: 'table' | 'grid' | 'dense'
+  const [layoutMode, setLayoutMode] = useState(() => {
+    if (typeof window === 'undefined') return 'table';
+    try {
+      return localStorage.getItem('chatter_people_layout') || 'table';
+    } catch {
+      return 'table';
+    }
+  });
+
+  const handleSetLayout = (mode) => {
+    setLayoutMode(mode);
+    try {
+      localStorage.setItem('chatter_people_layout', mode);
+    } catch {}
+  };
 
   // Pagination state — facts
   const FACTS_PAGE_SIZE = 8;
@@ -1716,20 +1734,68 @@ export default function RelationshipsPage() {
           })}
         </div>
 
-        {/* Search Input */}
-        <div style={{ position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
-          <input
-            type="text"
-            placeholder="Filter people by name, @username, birth date, relation, or lore..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              paddingLeft: '34px',
-              height: '38px',
-              fontSize: '0.82rem'
-            }}
-          />
+        {/* Search Input & Layout Mode Switcher */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+            <input
+              type="text"
+              placeholder="Filter people by name, @username, birth date, relation, or lore..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                paddingLeft: '34px',
+                height: '38px',
+                fontSize: '0.82rem',
+                width: '100%'
+              }}
+            />
+          </div>
+
+          {/* Layout Switcher Icons (Table / Grid / Dense) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            background: '#ffffff',
+            border: '1px solid #e4e4e7',
+            padding: '3px',
+            borderRadius: '8px',
+            flexShrink: 0
+          }}>
+            {[
+              { id: 'table', label: 'Table', icon: TableIcon },
+              { id: 'grid', label: 'Grid', icon: LayoutGrid },
+              { id: 'dense', label: 'Dense', icon: AlignJustify }
+            ].map(({ id, label, icon: Icon }) => {
+              const isActive = layoutMode === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleSetLayout(id)}
+                  title={`${label} Layout View`}
+                  style={{
+                    background: isActive ? '#09090b' : 'transparent',
+                    color: isActive ? '#ffffff' : '#71717a',
+                    border: 'none',
+                    padding: '6px 11px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontSize: '0.74rem',
+                    fontWeight: isActive ? '700' : '500',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Icon size={13} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -1743,10 +1809,11 @@ export default function RelationshipsPage() {
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}
       >
-        {/* 1. Desktop & Tablet Table View */}
-        <div className="desktop-table-container">
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+        {/* 1. Table View */}
+        {layoutMode === 'table' && (
+          <div className="desktop-table-container">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
                   <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '56px' }}>
@@ -1979,8 +2046,10 @@ export default function RelationshipsPage() {
             </table>
           </div>
         </div>
+      )}
 
-        {/* 2. Mobile Compact Cards View (screens <= 768px) */}
+      {/* 2. Mobile Compact Table View (screens <= 768px when in table mode) */}
+      {layoutMode === 'table' && (
         <div className="mobile-people-cards" style={{ padding: '12px' }}>
           {isSyncingInitial && pagedPeople.length === 0 ? (
             Array.from({ length: 4 }).map((_, idx) => (
@@ -2225,6 +2294,227 @@ export default function RelationshipsPage() {
             })
           )}
         </div>
+      )}
+
+      {/* 3. Grid Cards View */}
+      {layoutMode === 'grid' && (
+        <motion.div
+          key="view-grid"
+          layout
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.18 }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '14px',
+            padding: '16px'
+          }}
+        >
+          {pagedPeople.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
+              {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
+            </div>
+          ) : (
+            pagedPeople.map((person) => {
+              const hasHandle = Boolean(person.handle || person.instagramHandle);
+              const handleDisplay = person.handle || person.instagramHandle;
+              const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+              const chatsCount = person.chatsCount || person.messageCount || 0;
+              const reelsCount = person.reelsCount || 0;
+              const relDisplay = person.relationship || person.relationshipToSam || 'Friend';
+
+              return (
+                <motion.div
+                  key={person.id || person.senderId || person.name}
+                  layout
+                  whileHover={{ y: -2, boxShadow: '0 6px 16px rgba(0,0,0,0.06)' }}
+                  onClick={() => setSelectedPerson(person)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e4e4e7',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <ContactAvatar contact={person} size={42} showStatus={true} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.92rem', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {person.name}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {handleDisplay || 'No handle linked'}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.66rem', background: '#f4f4f5', padding: '2px 7px', borderRadius: '4px', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", border: '1px solid #e4e4e7' }}>
+                      {relDisplay}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: '#71717a', paddingTop: '8px', borderTop: '1px solid #f4f4f5' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={12} />
+                      <span>{dobDisplay || 'Birthday not set'}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <span style={{ fontWeight: '700', color: '#09090b' }}>💬 {chatsCount}</span>
+                      <span style={{ fontWeight: '700', color: '#09090b' }}>🎬 {reelsCount}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', paddingTop: '4px' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setSelectedPerson(person)}
+                      style={{
+                        flex: 1,
+                        background: '#09090b',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '7px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.76rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <span>Open Details</span>
+                      <ArrowRight size={12} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete ${person.name} from Database?`)) {
+                          deleteNode(person);
+                        }
+                      }}
+                      title="Delete Person"
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        color: '#71717a',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
+        </motion.div>
+      )}
+
+      {/* 4. Dense Minimal Row View */}
+      {layoutMode === 'dense' && (
+        <motion.div
+          key="view-dense"
+          layout
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18 }}
+          style={{
+            padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}
+        >
+          {pagedPeople.length === 0 ? (
+            <div style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
+              {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
+            </div>
+          ) : (
+            pagedPeople.map((person) => {
+              const hasHandle = Boolean(person.handle || person.instagramHandle);
+              const handleDisplay = person.handle || person.instagramHandle;
+              const chatsCount = person.chatsCount || person.messageCount || 0;
+              const reelsCount = person.reelsCount || 0;
+              const relDisplay = person.relationship || person.relationshipToSam || 'Friend';
+
+              return (
+                <motion.div
+                  key={person.id || person.senderId || person.name}
+                  layout
+                  onClick={() => setSelectedPerson(person)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: '#ffffff',
+                    border: '1px solid #f4f4f5',
+                    cursor: 'pointer',
+                    gap: '12px',
+                    transition: 'background-color 0.1s ease, border-color 0.1s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fafafa';
+                    e.currentTarget.style.borderColor = '#e4e4e7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                    e.currentTarget.style.borderColor = '#f4f4f5';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <ContactAvatar contact={person} size={28} showStatus={true} />
+                    <span style={{ fontWeight: '700', fontSize: '0.86rem', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {person.name}
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {handleDisplay || '—'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.68rem', background: '#f4f4f5', border: '1px solid #e4e4e7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                      {relDisplay}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#71717a' }}>
+                      💬 {chatsCount}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPerson(person);
+                      }}
+                      style={{
+                        background: '#09090b',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '4px 9px',
+                        borderRadius: '5px',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Open →
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
+        </motion.div>
+      )}
 
         {/* Table Pagination */}
         {totalTablePages > 1 && (

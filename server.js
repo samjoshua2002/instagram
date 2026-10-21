@@ -115,6 +115,16 @@ app.use('/uploads', express.static(uploadsDir));
 // Authentication & Passkey Endpoints
 app.use('/api/auth', authRouter);
 
+// Aliases for Instagram handle check and Admin accounts
+app.use('/api/instagram/check-handle', (req, res, next) => {
+  req.url = '/instagram/check-handle';
+  authRouter(req, res, next);
+});
+app.use('/api/admin/accounts', requireAuth, (req, res, next) => {
+  req.url = '/admin/accounts';
+  authRouter(req, res, next);
+});
+
 // Secure private dashboard endpoints (requires valid JWT session or Passkey)
 app.use('/api/conversations', requireAuth);
 app.use('/api/social-graph', requireAuth);
