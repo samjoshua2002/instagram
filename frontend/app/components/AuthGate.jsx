@@ -9,6 +9,7 @@ import Sidebar from './Sidebar';
 import Toast from './Toast';
 import AiInterviewModal from './AiInterviewModal';
 import LinkIdModal from './LinkIdModal';
+import OnboardingWizard from './OnboardingWizard';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function AuthGate({ children }) {
@@ -93,6 +94,9 @@ export default function AuthGate({ children }) {
       <PasskeyManagerModal
         isOpen={isPasskeyModalOpen}
         onClose={() => setIsPasskeyModalOpen(false)}
+      />
+      <OnboardingWizard
+        isOpen={!!user && user.isOnboarded === false}
       />
     </>
   );
