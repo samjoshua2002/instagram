@@ -124,6 +124,10 @@ app.use('/api/admin/accounts', requireAuth, (req, res, next) => {
   req.url = '/admin/accounts';
   authRouter(req, res, next);
 });
+app.use('/api/onboarding', requireAuth, (req, res, next) => {
+  req.url = '/onboarding';
+  authRouter(req, res, next);
+});
 
 // Secure private dashboard endpoints (requires valid JWT session or Passkey)
 app.use('/api/conversations', requireAuth);
