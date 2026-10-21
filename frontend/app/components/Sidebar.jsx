@@ -21,7 +21,8 @@ import {
   Layers,
   Settings,
   Plus,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Zap
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -106,7 +107,8 @@ export default function Sidebar() {
     switchAccount,
     setIsPasskeyModalOpen,
     isImpersonating,
-    exitWorkspace
+    exitWorkspace,
+    openOnboardingWizard
   } = useApp();
 
   const isSuperadmin = user?.role === 'superadmin' || isImpersonating;
@@ -616,6 +618,41 @@ export default function Sidebar() {
           animate="visible"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}
         >
+          {/* Setup Automation & Account Wizard */}
+          {!isPureSuperadmin && (
+            <motion.button
+              variants={footerItemVariants}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={openOnboardingWizard}
+              style={{
+                width: '100%',
+                background: (!user?.isOnboarded || !user?.instagramPageAccessToken)
+                  ? 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%)'
+                  : '#f4f4f5',
+                color: (!user?.isOnboarded || !user?.instagramPageAccessToken) ? '#ffffff' : '#09090b',
+                border: 'none',
+                padding: '9px 12px',
+                borderRadius: '9px',
+                fontWeight: '700',
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '7px',
+                boxShadow: (!user?.isOnboarded || !user?.instagramPageAccessToken)
+                  ? '0 3px 12px rgba(236, 72, 153, 0.25)'
+                  : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Zap size={14} />
+              <span>{(!user?.isOnboarded || !user?.instagramPageAccessToken) ? '⚡ Setup Automation & Connect' : '⚙️ Reconfigure Automation'}</span>
+            </motion.button>
+          )}
+
           {/* Quick Add Person Action (For regular user relationships) */}
           {!isPureSuperadmin && (
             <motion.button
