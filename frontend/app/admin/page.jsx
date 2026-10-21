@@ -6,7 +6,7 @@ import {
   Shield, Users, UserCheck, RefreshCw, Search,
   CheckCircle2, AlertCircle, Fingerprint, Mail,
   ExternalLink, Calendar, ChevronDown, ChevronUp,
-  Layers, Lock, Sparkles, Filter, Instagram, Smartphone
+  Layers, Lock, Sparkles, Filter, Instagram, Smartphone, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,6 +20,7 @@ export default function SuperadminPage() {
   const [activeTab, setActiveTab] = useState('accounts'); // 'accounts' | 'members'
   const [expandedAccountId, setExpandedAccountId] = useState(null);
   const [enteringId, setEnteringId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const isSuperadmin = user?.role === 'superadmin';
 
@@ -69,6 +70,34 @@ export default function SuperadminPage() {
       showToast?.(err.message || 'Failed to enter workspace.', 'error');
     } finally {
       setEnteringId(null);
+    }
+  };
+
+  const handleDeleteAccount = async (targetUser) => {
+    const handle = targetUser.instagramUsername || targetUser.username;
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete account @${handle} (${targetUser.email}) and all their workspace data? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
+
+    setDeletingId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/accounts/${targetUser.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${activeToken}` }
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to delete account.');
+      showToast?.(resData.message || `Account @${handle} deleted.`, 'success');
+      await fetchAdminData();
+    } catch (err) {
+      console.error('Delete account error:', err);
+      showToast?.(err.message || 'Failed to delete account.', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -524,6 +553,34 @@ export default function SuperadminPage() {
                         <Shield size={12} color="#22c55e" />
                         <span>{enteringId === account.id ? 'Opening...' : 'Manage'}</span>
                       </button>
+
+                      {account.id !== user?.id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAccount(account);
+                          }}
+                          disabled={deletingId === account.id}
+                          title="Permanently delete this account"
+                          style={{
+                            background: '#ffffff',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            borderRadius: '7px',
+                            padding: '6px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: '700',
+                            cursor: deletingId === account.id ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Trash2 size={12} />
+                          <span>{deletingId === account.id ? '...' : 'Delete'}</span>
+                        </button>
+                      )}
 
                       <div style={{
                         width: '32px',

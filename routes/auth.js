@@ -135,9 +135,53 @@ router.post('/register/request-otp', async (req, res) => {
       success: true,
       message: `A 6-digit verification code was sent to ${cleanEmail}. Please enter it below.`,
       email: cleanEmail,
+      previewOtp: otpCode,
     });
   } catch (err) {
     console.error('❌ Registration Request OTP error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/register/resend-otp
+ * Resend OTP to email address for pending unverified accounts
+ */
+router.post('/register/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ error: 'No account found with this email.' });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    user.verificationOtp = {
+      code: otpCode,
+      expiresAt: otpExpires,
+    };
+    await user.save();
+
+    try {
+      await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+    } catch (mailErr) {
+      console.warn('⚠️ [Resend OTP]: Email sending delayed:', mailErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: `New verification code sent to ${cleanEmail}.`,
+      email: cleanEmail,
+      previewOtp: otpCode,
+    });
+  } catch (err) {
+    console.error('❌ Resend OTP error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1121,6 +1165,59 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Impersonation error:', err);
     res.status(500).json({ error: 'Failed to switch workspace: ' + err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/accounts/:userId
+ * Superadmin can permanently delete any user workspace / account
+ */
+router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ error: 'Target userId is required.' });
+    }
+
+    if (req.user._id.toString() === userId.toString()) {
+      return res.status(400).json({ error: 'Cannot delete your own superadmin account.' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const targetHandle = targetUser.instagramUsername || targetUser.username;
+    const targetEmail = targetUser.email;
+
+    // Delete user from DB
+    await User.findByIdAndDelete(userId);
+
+    // Delete social graph / contacts associated with this user
+    try {
+      const SocialGraph = require('../models/SocialGraph');
+      await SocialGraph.deleteMany({
+        $or: [
+          { ownerId: userId },
+          { instagramHandle: targetUser.instagramUsername },
+          { senderId: targetUser.instagramId }
+        ]
+      });
+    } catch (e) {
+      console.warn('SocialGraph cleanup warning:', e.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Account @${targetHandle} (${targetEmail}) was permanently deleted.`
+    });
+  } catch (err) {
+    console.error('Superadmin delete account error:', err);
+    res.status(500).json({ error: 'Failed to delete account: ' + err.message });
   }
 });
 
