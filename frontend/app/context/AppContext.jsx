@@ -8,6 +8,11 @@ const STORAGE_NODES_KEY = 'chatter_social_nodes_v8';
 const STORAGE_CONFIG_KEY = 'chatter_persona_config_v8';
 const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 
+export function getStorageNodesKey(u) {
+  const uid = u?._id || u?.id || u?.username;
+  return uid ? `chatter_social_nodes_${uid}` : STORAGE_NODES_KEY;
+}
+
 export function getRootNode(user) {
   const name = user ? `${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || 'Account Owner')}` : 'Account Owner';
   const handle = user?.instagramUsername ? (user.instagramUsername.startsWith('@') ? user.instagramUsername : `@${user.instagramUsername}`) : (user?.username ? `@${user.username}` : '@me');
@@ -153,6 +158,10 @@ export function AppProvider({ children }) {
     }
     return null;
   });
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const [authLoading, setAuthLoading] = useState(() => {
     if (typeof window !== 'undefined') {
       const hasToken = !!localStorage.getItem('chatter_jwt_token');
@@ -407,13 +416,16 @@ export function AppProvider({ children }) {
   // Hydration from LocalStorage with instant deduplication & live polling
   useEffect(() => {
     try {
-      const cachedNodes = localStorage.getItem(STORAGE_NODES_KEY);
+      const userKey = getStorageNodesKey(user);
+      const cachedNodes = localStorage.getItem(userKey);
       if (cachedNodes) {
         const parsed = JSON.parse(cachedNodes);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const deduplicated = deduplicateNodes(parsed);
           setNodes(deduplicated);
         }
+      } else if (user) {
+        setNodes([getRootNode(user)]);
       }
       const cachedConfig = localStorage.getItem(STORAGE_CONFIG_KEY);
       if (cachedConfig) {
@@ -431,94 +443,105 @@ export function AppProvider({ children }) {
     }, 8000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user?._id || user?.username]);
 
   const syncBackend = async () => {
     try {
       // 1. Sync social graph directly from live MongoDB database
       const res = await fetch(`${API_BASE}/api/social-graph`);
       const data = await res.json();
-      if (data.success && Array.isArray(data.nodes) && data.nodes.length > 0) {
-        const pendingSaved = pendingSavedNamesRef.current;
+      if (data.success && Array.isArray(data.nodes)) {
+        const currentUser = userRef.current;
+        const userKey = getStorageNodesKey(currentUser);
 
-        const serverContacts = data.nodes.map(sn => {
-          const snName = sn.name || '';
-          const snId = snName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-          const chatsCount = typeof sn.chatsCount === 'number' ? sn.chatsCount : (sn.messageCount || 0);
-          const reelsCount = typeof sn.reelsCount === 'number' ? sn.reelsCount : 0;
-          return {
-            id: snId,
-            _id: sn._id,
-            name: snName,
-            handle: sn.instagramHandle || '',
-            senderId: sn.senderId || '',
-            profilePic: sn.profilePic || '',
-            aiEnabled: sn.aiEnabled !== false,
-            replyToMessages: sn.replyToMessages !== false,
-            replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
-            chatsCount,
-            reelsCount,
-            messageCount: chatsCount,
-            relationship: sn.relationshipToSam || 'Friend',
-            category: sn.category || 'online_friend',
-            dob: sn.dob || '',
-            gender: sn.gender || 'unknown',
-            personalNotes: sn.personalNotes || (sn.lore || []).join('\n'),
-            rollingSummary: sn.relationshipToSam || 'Friend in circle',
-            conversationStyle: 'Casual banter',
-            importantDates: sn.importantDates || [],
-            facts: sn.facts || (sn.lore || []),
-            lore: sn.lore || [],
-            connections: (sn.connections || []).map(c => ({
-              targetName: c.targetName || c.name || '',
-              rel: c.relationship || c.rel || 'connected'
-            })),
-            roastStyle: sn.roastStyle || '',
-            idleHours: 6,
-            reminderEligible: false
-          };
-        });
+        if (data.nodes.length === 0) {
+          const root = getRootNode(currentUser);
+          const emptyGraph = [root];
+          setNodes(emptyGraph);
+          try { localStorage.setItem(userKey, JSON.stringify(emptyGraph)); } catch(e) {}
+          setIsSyncingInitial(false);
+        } else {
+          const pendingSaved = pendingSavedNamesRef.current;
 
-        setNodes(prev => {
-          const root = prev.find(n => n.isRoot) || ROOT_NODE;
-          root.children = serverContacts.map(n => n.id);
-
-          // If a contact was saved in the last 6s locally, overlay recent edits
-          const mergedContacts = serverContacts.map(sn => {
-            const local = prev.find(p => !p.isRoot && p.name.toLowerCase() === sn.name.toLowerCase());
-            if (local && pendingSaved.has(sn.name.toLowerCase())) {
-              return { ...sn, ...local };
-            }
-            return sn;
+          const serverContacts = data.nodes.map(sn => {
+            const snName = sn.name || '';
+            const snId = snName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const chatsCount = typeof sn.chatsCount === 'number' ? sn.chatsCount : (sn.messageCount || 0);
+            const reelsCount = typeof sn.reelsCount === 'number' ? sn.reelsCount : 0;
+            return {
+              id: snId,
+              _id: sn._id,
+              name: snName,
+              handle: sn.instagramHandle || '',
+              senderId: sn.senderId || '',
+              profilePic: sn.profilePic || '',
+              aiEnabled: sn.aiEnabled !== false,
+              replyToMessages: sn.replyToMessages !== false,
+              replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
+              chatsCount,
+              reelsCount,
+              messageCount: chatsCount,
+              relationship: sn.relationshipToSam || 'Friend',
+              category: sn.category || 'online_friend',
+              dob: sn.dob || '',
+              gender: sn.gender || 'unknown',
+              personalNotes: sn.personalNotes || (sn.lore || []).join('\n'),
+              rollingSummary: sn.relationshipToSam || 'Friend in circle',
+              conversationStyle: 'Casual banter',
+              importantDates: sn.importantDates || [],
+              facts: sn.facts || (sn.lore || []),
+              lore: sn.lore || [],
+              connections: (sn.connections || []).map(c => ({
+                targetName: c.targetName || c.name || '',
+                rel: c.relationship || c.rel || 'connected'
+              })),
+              roastStyle: sn.roastStyle || '',
+              idleHours: 6,
+              reminderEligible: false
+            };
           });
 
-          const deduplicated = deduplicateNodes([root, ...mergedContacts]);
+          setNodes(prev => {
+            const root = prev.find(n => n.isRoot) || getRootNode(currentUser);
+            root.children = serverContacts.map(n => n.id);
 
-          // Prevent unnecessary re-render if data has not changed
-          if (prev.length === deduplicated.length) {
-            let hasChanged = false;
-            for (let i = 0; i < prev.length; i++) {
-              const p = prev[i];
-              const d = deduplicated[i];
-              if (
-                p.id !== d.id ||
-                p.chatsCount !== d.chatsCount ||
-                p.reelsCount !== d.reelsCount ||
-                p.aiEnabled !== d.aiEnabled ||
-                (p.facts || []).length !== (d.facts || []).length
-              ) {
-                hasChanged = true;
-                break;
+            // If a contact was saved in the last 6s locally, overlay recent edits
+            const mergedContacts = serverContacts.map(sn => {
+              const local = prev.find(p => !p.isRoot && p.name.toLowerCase() === sn.name.toLowerCase());
+              if (local && pendingSaved.has(sn.name.toLowerCase())) {
+                return { ...sn, ...local };
+              }
+              return sn;
+            });
+
+            const deduplicated = deduplicateNodes([root, ...mergedContacts]);
+
+            // Prevent unnecessary re-render if data has not changed
+            if (prev.length === deduplicated.length) {
+              let hasChanged = false;
+              for (let i = 0; i < prev.length; i++) {
+                const p = prev[i];
+                const d = deduplicated[i];
+                if (
+                  p.id !== d.id ||
+                  p.chatsCount !== d.chatsCount ||
+                  p.reelsCount !== d.reelsCount ||
+                  p.aiEnabled !== d.aiEnabled ||
+                  (p.facts || []).length !== (d.facts || []).length
+                ) {
+                  hasChanged = true;
+                  break;
+                }
+              }
+              if (!hasChanged) {
+                return prev; // Same reference -> no re-render!
               }
             }
-            if (!hasChanged) {
-              return prev; // Same reference -> no re-render!
-            }
-          }
 
-          try { localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated)); } catch(e) {}
-          return deduplicated;
-        });
+            try { localStorage.setItem(userKey, JSON.stringify(deduplicated)); } catch(e) {}
+            return deduplicated;
+          });
+        }
       }
 
       // 2. Sync persona config

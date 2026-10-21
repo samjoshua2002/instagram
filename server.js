@@ -851,7 +851,16 @@ app.get('/api/status', async (req, res) => {
 // List all conversations
 app.get('/api/conversations', async (req, res) => {
   try {
-    const users = await UserMemory.find().sort({ lastInteraction: -1 }).limit(50);
+    const isSuper = req.user?.role === 'superadmin';
+    const query = (!isSuper && req.user)
+      ? {
+          $or: [
+            { ownerId: req.user._id },
+            { ownerUsername: req.user.username }
+          ]
+        }
+      : {};
+    const users = await UserMemory.find(query).sort({ lastInteraction: -1 }).limit(50);
     const conversations = [];
 
     for (const u of users) {
@@ -1634,15 +1643,13 @@ app.get('/api/social-graph', async (req, res) => {
 
     // Fetch social graph nodes:
     // If superadmin: return all nodes
-    // If user: return their nodes, or unassigned legacy nodes (ownerId unset) so primary creator data is preserved
+    // If user: return only their owned nodes
     const isSuper = req.user?.role === 'superadmin';
     const query = (!isSuper && req.user)
       ? {
           $or: [
             { ownerId: req.user._id },
-            { ownerUsername: req.user.username },
-            { ownerId: { $exists: false } },
-            { ownerId: null }
+            { ownerUsername: req.user.username }
           ]
         }
       : {};
