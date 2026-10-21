@@ -128,30 +128,27 @@ class AuthService {
     }
 
     const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a;">
-        <div style="margin-bottom: 24px; text-align: center;">
-          <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 4px; color: #0f172a;">Chatter OS Security</h2>
-          <p style="font-size: 13px; color: #64748b; margin: 0;">Identity verification code</p>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px 20px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; color: #09090b;">
+        <div style="margin-bottom: 20px; text-align: center;">
+          <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 4px; color: #09090b;">Chatter OS</h2>
+          <p style="font-size: 13px; color: #71717a; margin: 0;">Verification code</p>
         </div>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
-          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px;">Your 6-Digit ${purpose} Code</div>
-          <div style="font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0f172a; font-family: monospace;">${otpCode}</div>
-          <p style="font-size: 12px; color: #94a3b8; margin: 10px 0 0;">Valid for 10 minutes. Do not share this code with anyone.</p>
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #71717a; margin-bottom: 8px;">${purpose} Code</div>
+          <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #09090b; font-family: monospace;">${otpCode}</div>
+          <p style="font-size: 12px; color: #71717a; margin: 8px 0 0;">Expires in 10 minutes</p>
         </div>
-        <p style="font-size: 13px; line-height: 1.5; color: #475569; margin: 0 0 16px;">
-          If you did not request this verification code, please ignore this email.
+        <p style="font-size: 12px; color: #71717a; margin: 0; text-align: center;">
+          If you didn't request this code, you can safely ignore this email.
         </p>
-        <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; text-align: center; font-size: 11px; color: #94a3b8;">
-          Authorized Access • ${process.env.EMAIL_USER || 'Chatter OS'}
-        </div>
       </div>
     `;
 
     return await this.transporter.sendMail({
-      from: `"Chatter OS Security" <${process.env.EMAIL_USER}>`,
+      from: `"Chatter" <${process.env.EMAIL_USER}>`,
       to: toEmail,
-      subject: `${otpCode} is your ${purpose} code`,
-      text: `Your ${purpose} verification code is: ${otpCode}\n\nThis code is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.`,
+      subject: `${otpCode} is your Chatter verification code`,
+      text: `Your verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\nIf you did not request this, you can safely ignore this email.`,
       html,
       headers: {
         'X-Priority': '1',
