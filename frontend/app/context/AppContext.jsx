@@ -255,6 +255,10 @@ export function AppProvider({ children }) {
       localStorage.removeItem('chatter_show_chooser');
       localStorage.removeItem(STORAGE_NODES_KEY);
       localStorage.removeItem(STORAGE_CONFIG_KEY);
+      if (typeof sessionStorage !== 'undefined' && userData?._id) {
+        sessionStorage.removeItem(`chatter_onboarding_dismissed_${userData._id}`);
+        sessionStorage.removeItem('chatter_onboarding_dismissed');
+      }
     } catch (e) {}
     setNodes([getRootNode(userData)]);
     setToken(jwtToken);
@@ -274,6 +278,11 @@ export function AppProvider({ children }) {
       localStorage.setItem('chatter_show_chooser', 'true');
       localStorage.removeItem(STORAGE_NODES_KEY);
       localStorage.removeItem(STORAGE_CONFIG_KEY);
+      if (typeof sessionStorage !== 'undefined') {
+        Object.keys(sessionStorage).forEach(k => {
+          if (k.startsWith('chatter_onboarding_dismissed')) sessionStorage.removeItem(k);
+        });
+      }
     } catch (e) {}
     setNodes(DEFAULT_GRAPH_DATA);
     setToken(null);
@@ -293,6 +302,11 @@ export function AppProvider({ children }) {
       localStorage.removeItem('chatter_show_chooser');
       localStorage.removeItem(STORAGE_NODES_KEY);
       localStorage.removeItem(STORAGE_CONFIG_KEY);
+      if (typeof sessionStorage !== 'undefined') {
+        Object.keys(sessionStorage).forEach(k => {
+          if (k.startsWith('chatter_onboarding_dismissed')) sessionStorage.removeItem(k);
+        });
+      }
     } catch (e) {}
     setNodes(DEFAULT_GRAPH_DATA);
     setAdminSession(null);
