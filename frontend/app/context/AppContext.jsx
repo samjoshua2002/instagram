@@ -8,15 +8,22 @@ const STORAGE_NODES_KEY = 'chatter_social_nodes_v8';
 const STORAGE_CONFIG_KEY = 'chatter_persona_config_v8';
 const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 
-export const ROOT_NODE = {
-  id: 'root',
-  name: 'Account Owner',
-  handle: '@me',
-  sub: 'Creator / Core Node',
-  isRoot: true,
-  relationship: 'Root Persona',
-  children: []
-};
+export function getRootNode(user) {
+  const name = user ? `${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || 'Account Owner')}` : 'Account Owner';
+  const handle = user?.instagramUsername ? (user.instagramUsername.startsWith('@') ? user.instagramUsername : `@${user.instagramUsername}`) : (user?.username ? `@${user.username}` : '@me');
+  return {
+    id: 'root',
+    name,
+    handle,
+    sub: user?.role === 'superadmin' ? 'Superadmin Platform Owner' : (user?.accountType === 'business' ? 'Business Account' : 'Creator / Core Node'),
+    profilePic: user?.profilePicUrl || '',
+    isRoot: true,
+    relationship: 'Root Persona',
+    children: []
+  };
+}
+
+export const ROOT_NODE = getRootNode(null);
 
 export const DEFAULT_GRAPH_DATA = [ROOT_NODE];
 
@@ -235,7 +242,10 @@ export function AppProvider({ children }) {
     try {
       sessionStorage.setItem('chatter_session_active', 'true');
       localStorage.removeItem('chatter_show_chooser');
+      localStorage.removeItem(STORAGE_NODES_KEY);
+      localStorage.removeItem(STORAGE_CONFIG_KEY);
     } catch (e) {}
+    setNodes([getRootNode(userData)]);
     setToken(jwtToken);
     setUser(userData);
     setAuthLoading(false);
@@ -251,7 +261,10 @@ export function AppProvider({ children }) {
     try {
       sessionStorage.removeItem('chatter_session_active');
       localStorage.setItem('chatter_show_chooser', 'true');
+      localStorage.removeItem(STORAGE_NODES_KEY);
+      localStorage.removeItem(STORAGE_CONFIG_KEY);
     } catch (e) {}
+    setNodes(DEFAULT_GRAPH_DATA);
     setToken(null);
     setUser(null);
     showToast?.('Switching account...', 'info');
@@ -267,7 +280,10 @@ export function AppProvider({ children }) {
       localStorage.removeItem('chatter_admin_session');
       sessionStorage.removeItem('chatter_session_active');
       localStorage.removeItem('chatter_show_chooser');
+      localStorage.removeItem(STORAGE_NODES_KEY);
+      localStorage.removeItem(STORAGE_CONFIG_KEY);
     } catch (e) {}
+    setNodes(DEFAULT_GRAPH_DATA);
     setAdminSession(null);
     setToken(null);
     setUser(null);
@@ -284,6 +300,11 @@ export function AppProvider({ children }) {
         localStorage.setItem('chatter_admin_session', JSON.stringify(sessionRecord));
         setAdminSession(sessionRecord);
       }
+      try {
+        localStorage.removeItem(STORAGE_NODES_KEY);
+        localStorage.removeItem(STORAGE_CONFIG_KEY);
+      } catch (e) {}
+      setNodes([getRootNode(creatorUser)]);
       localStorage.setItem('chatter_jwt_token', creatorToken);
       localStorage.setItem('chatter_user_profile', JSON.stringify(creatorUser));
       setToken(creatorToken);

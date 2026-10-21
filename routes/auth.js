@@ -56,6 +56,7 @@ router.post('/register/request-otp', async (req, res) => {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+    const cleanIgHandle = (instagramUsername || '').trim().replace(/^@/, '').toLowerCase();
 
     // Check if account already exists
     const existing = await User.findOne({
@@ -67,6 +68,18 @@ router.post('/register/request-otp', async (req, res) => {
         return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
       }
       return res.status(409).json({ error: 'This username is already taken. Please choose another.' });
+    }
+
+    // Check if Instagram handle is already registered by another verified user
+    if (cleanIgHandle) {
+      const existingIg = await User.findOne({
+        instagramUsername: cleanIgHandle,
+        isVerified: { $ne: false },
+        email: { $ne: cleanEmail }
+      });
+      if (existingIg) {
+        return res.status(409).json({ error: `The Instagram handle @${cleanIgHandle} is already registered to another Chatter OS account. Please choose your own handle or sign in.` });
+      }
     }
 
     // Generate 6-digit OTP
@@ -86,7 +99,7 @@ router.post('/register/request-otp', async (req, res) => {
         lastName: (lastName || '').trim(),
         mobileNumber: (mobileNumber || '').trim(),
         whatsappNumber: (whatsappNumber || '').trim(),
-        instagramUsername: (instagramUsername || '').trim() || 'catovidz',
+        instagramUsername: cleanIgHandle || '',
         instagramId: (instagramId || '').trim(),
         role: 'user',
         isVerified: false,
@@ -106,7 +119,7 @@ router.post('/register/request-otp', async (req, res) => {
       user.lastName = (lastName || '').trim();
       user.mobileNumber = (mobileNumber || '').trim();
       user.whatsappNumber = (whatsappNumber || '').trim();
-      user.instagramUsername = (instagramUsername || '').trim() || user.instagramUsername;
+      user.instagramUsername = cleanIgHandle || user.instagramUsername || '';
       if (instagramId) user.instagramId = instagramId.trim();
       user.role = existing.role || 'user';
       user.isVerified = false;
@@ -813,10 +826,22 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       greetingMessage,
       chatMode, // 'everyone' | 'everyone_except' | 'only_selected'
       enableGlobalBot, // boolean
+      instagramUsername,
+      instagramPageAccessToken,
+      instagramAccountId,
     } = req.body;
 
     if (accountType) {
       user.accountType = accountType;
+    }
+    if (instagramUsername) {
+      user.instagramUsername = instagramUsername.trim().replace(/^@/, '');
+    }
+    if (instagramPageAccessToken !== undefined) {
+      user.instagramPageAccessToken = instagramPageAccessToken.trim();
+    }
+    if (instagramAccountId !== undefined) {
+      user.instagramAccountId = instagramAccountId.trim();
     }
     if (businessProfile) {
       user.businessProfile = {
@@ -883,6 +908,9 @@ router.post('/onboarding', requireAuth, async (req, res) => {
         isOnboarded: true,
         businessProfile: user.businessProfile,
         profilePicUrl: user.profilePicUrl || '',
+        instagramUsername: user.instagramUsername || '',
+        instagramId: user.instagramId || '',
+        hasInstagramToken: Boolean(user.instagramPageAccessToken),
       }
     });
   } catch (err) {
@@ -1017,6 +1045,20 @@ router.get('/instagram/check-handle', async (req, res) => {
     const handle = (req.query.handle || '').toString().trim().replace(/^@/, '').toLowerCase();
     if (!handle || handle.length < 2) {
       return res.status(400).json({ error: 'Please enter a valid Instagram handle.' });
+    }
+
+    // Check if handle is already registered by an existing user in Chatter OS
+    const existingUser = await User.findOne({
+      instagramUsername: handle,
+      isVerified: { $ne: false }
+    });
+    if (existingUser) {
+      return res.json({
+        exists: true,
+        alreadyRegistered: true,
+        handle,
+        message: `@${handle} is already registered on Chatter OS by an existing account.`
+      });
     }
 
     const axios = require('axios');

@@ -30,6 +30,18 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   const [chatMode, setChatMode] = useState('everyone'); // 'everyone' | 'everyone_except' | 'only_selected'
   const [enableGlobalBot, setEnableGlobalBot] = useState(true);
 
+  // Instagram Connection & Token
+  const [instagramUsername, setInstagramUsername] = useState(user?.instagramUsername || '');
+  const [instagramPageAccessToken, setInstagramPageAccessToken] = useState('');
+  const [instagramAccountId, setInstagramAccountId] = useState(user?.instagramId || '');
+
+  React.useEffect(() => {
+    if (user) {
+      if (user.instagramUsername) setInstagramUsername(user.instagramUsername);
+      if (user.instagramId) setInstagramAccountId(user.instagramId);
+    }
+  }, [user]);
+
   if (!isOpen) return null;
 
   const handleCloseOrSkip = async () => {
@@ -90,7 +102,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
           personaTone,
           greetingMessage: greetingMessage.trim(),
           chatMode,
-          enableGlobalBot
+          enableGlobalBot,
+          instagramUsername: instagramUsername.trim(),
+          instagramPageAccessToken: instagramPageAccessToken.trim(),
+          instagramAccountId: instagramAccountId.trim(),
         })
       });
 
@@ -103,7 +118,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
       updateUserProfile({
         isOnboarded: true,
         accountType,
-        businessProfile: data.user?.businessProfile
+        businessProfile: data.user?.businessProfile,
+        instagramUsername: data.user?.instagramUsername || instagramUsername.trim(),
+        instagramId: data.user?.instagramId || instagramAccountId.trim(),
       });
 
       if (setRoutingConfigState) {
@@ -534,11 +551,122 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
           {step === 3 && (
             <div>
               <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
-                Chat Routing & Activation
+                Connect Instagram & Chat Activation
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '18px' }}>
-                Choose who receives automated replies and activate your Instagram bot.
+                Connect your Meta App access token and choose your AI DM automation rules.
               </p>
+
+              {/* Instagram Connection & Access Token Setup */}
+              <div style={{
+                background: '#fafafa',
+                border: '1px solid #e4e4e7',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff'
+                    }}>
+                      <Instagram size={15} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: '800', fontSize: '0.86rem', color: '#09090b' }}>
+                        Instagram Graph API Connection
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#71717a' }}>
+                        Connect your account to send and receive real Instagram DMs automatically.
+                      </div>
+                    </div>
+                  </div>
+                  {instagramPageAccessToken ? (
+                    <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
+                      Token Configured
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>
+                      Optional / Later
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#3f3f46', marginBottom: '4px' }}>
+                      Your Instagram Handle
+                    </label>
+                    <input
+                      type="text"
+                      value={instagramUsername}
+                      onChange={(e) => setInstagramUsername(e.target.value)}
+                      placeholder="e.g. catovidz"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #e4e4e7',
+                        background: '#ffffff',
+                        fontSize: '0.82rem',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#3f3f46', marginBottom: '4px' }}>
+                      Instagram Account / Page ID
+                    </label>
+                    <input
+                      type="text"
+                      value={instagramAccountId}
+                      onChange={(e) => setInstagramAccountId(e.target.value)}
+                      placeholder="e.g. 1784144..."
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #e4e4e7',
+                        background: '#ffffff',
+                        fontSize: '0.82rem',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#3f3f46', marginBottom: '4px' }}>
+                    Instagram Page Access Token (starts with IGA... or EAA...)
+                  </label>
+                  <input
+                    type="password"
+                    value={instagramPageAccessToken}
+                    onChange={(e) => setInstagramPageAccessToken(e.target.value)}
+                    placeholder="Paste your Meta Page Access Token (or configure later in Settings)"
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #e4e4e7',
+                      background: '#ffffff',
+                      fontSize: '0.8rem',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <p style={{ fontSize: '0.68rem', color: '#71717a', margin: '4px 0 0 0' }}>
+                    Generate this from your Meta for Developers App or Instagram Graph API explorer. You can also paste or update this anytime in Settings &gt; Persona &amp; Style.
+                  </p>
+                </div>
+              </div>
 
               {/* Chat Mode Radios */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
