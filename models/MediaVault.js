@@ -33,6 +33,18 @@ const mediaVaultSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   }],
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
+  ownerUsername: {
+    type: String,
+    trim: true,
+    default: '',
+    index: true,
+  },
   isDefault: {
     type: Boolean,
     default: false

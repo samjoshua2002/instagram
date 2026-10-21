@@ -269,17 +269,18 @@ class StickerService {
    * Seeds predefined GIFs into MongoDB MediaVault collection.
    * Skips any items whose URL is already in the database.
    */
-  async seedPredefinedIntoVault(selectedIds = null) {
+  async seedPredefinedIntoVault(selectedIds = null, user = null) {
     const list = this.getPredefinedList();
     const toImport = selectedIds && Array.isArray(selectedIds) && selectedIds.length > 0
       ? list.filter(item => selectedIds.includes(item.id))
       : list;
 
     const results = { added: 0, skipped: 0, items: [] };
+    const ownerQuery = user ? { ownerId: user._id } : {};
 
     for (const item of toImport) {
       try {
-        const existing = await MediaVault.findOne({ url: item.url });
+        const existing = await MediaVault.findOne({ url: item.url, ...ownerQuery });
         if (existing) {
           results.skipped++;
           continue;
@@ -292,6 +293,8 @@ class StickerService {
           mediaType: item.mediaType || 'gif',
           keywords: item.keywords || [],
           caption: `Predefined ${item.name}`,
+          ownerId: user?._id || null,
+          ownerUsername: user?.username || '',
         });
         results.added++;
         results.items.push(created);
@@ -300,7 +303,7 @@ class StickerService {
       }
     }
 
-    console.log(`📦 [Predefined Seed]: Added ${results.added} items, skipped ${results.skipped} existing items`);
+    console.log(`📦 [Predefined Seed]: Added ${results.added} items, skipped ${results.skipped} existing items for user ${user?.username || 'system'}`);
     return results;
   }
 
@@ -388,7 +391,7 @@ class StickerService {
    * Priority 3: Direct live GIPHY search (if not rate limited)
    * Never returns an irrelevant random GIF. Returns null if no relevant match is found.
    */
-  async getStickerUrl(type, contextText = '') {
+  async getStickerUrl(type, contextText = '', user = null) {
     if (!type) return null;
     const cleanType = type.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
@@ -414,12 +417,13 @@ class StickerService {
 
     // 1. FIRST PRIORITY: User's custom uploaded media in MongoDB MediaVault
     try {
-      let allVaultItems = await MediaVault.find({});
-      // Auto-seed predefined catalog if vault is empty
-      if (!allVaultItems || allVaultItems.length === 0) {
+      const ownerQuery = user ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] } : {};
+      let allVaultItems = await MediaVault.find(ownerQuery);
+      // Auto-seed predefined catalog if vault is empty for system
+      if ((!allVaultItems || allVaultItems.length === 0) && !user) {
         console.log(`📦 [MediaVault Auto-Seed]: Vault is empty. Auto-seeding curated meme collection into DB...`);
-        await this.seedPredefinedIntoVault();
-        allVaultItems = await MediaVault.find({});
+        await this.seedPredefinedIntoVault(null, user);
+        allVaultItems = await MediaVault.find(ownerQuery);
       }
 
       const stopWords = new Set(['the', 'and', 'with', 'you', 'are', 'for', 'this', 'that', 'from', 'have', 'what', 'like', 'just', 'your', 'about', 'some', 'they', 'them', 'when', 'then', 'will', 'been', 'there', 'here', 'can', 'not', 'but', 'all', 'bro', 'man']);
@@ -603,15 +607,22 @@ class StickerService {
   /**
    * Returns list of all categories (defaults + custom added by user)
    */
-  async getAllCategories() {
+  async getAllCategories(user = null) {
     const defaultIds = this.defaultCategories.map(c => c.id);
     let customList = [];
     try {
-      const config = await PersonaConfig.findOne();
+      let config = null;
+      if (user) {
+        config = await PersonaConfig.findOne({ ownerId: user._id });
+      }
+      if (!config) {
+        config = await PersonaConfig.findOne();
+      }
       if (config && config.customReactionCategories) {
         customList = config.customReactionCategories;
       }
-      const dbCategories = await MediaVault.distinct('category');
+      const ownerQuery = user ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] } : {};
+      const dbCategories = await MediaVault.distinct('category', ownerQuery);
       customList = Array.from(new Set([...customList, ...dbCategories]));
     } catch (_) {}
 

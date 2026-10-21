@@ -12,7 +12,15 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 
 export default function MediaVaultPage() {
-  const { API_BASE, showToast, user, isImpersonating } = useApp();
+  const { API_BASE, token, showToast, user, isImpersonating } = useApp();
+
+  const getAuthHeaders = (extraHeaders = {}) => {
+    const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    return {
+      ...extraHeaders,
+      ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
+    };
+  };
 
   // If pure superadmin (not inside an impersonated creator workspace), show creator selector
   if (user?.role === 'superadmin' && !isImpersonating) {
@@ -81,7 +89,7 @@ export default function MediaVaultPage() {
       const url = activeCategory && activeCategory !== 'all'
         ? `${API_BASE}/api/media-vault?category=${activeCategory}`
         : `${API_BASE}/api/media-vault`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.success) {
         setItems(data.items || []);
@@ -99,7 +107,7 @@ export default function MediaVaultPage() {
 
   const fetchPredefined = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/media-vault/predefined`);
+      const res = await fetch(`${API_BASE}/api/media-vault/predefined`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.success) {
         setPredefinedList(data.predefined || []);
@@ -112,14 +120,14 @@ export default function MediaVaultPage() {
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/import-predefined`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ ids }),
       });
       const data = await res.json();
       if (data.success) {
         const added = data.results?.added || 0;
         const skipped = data.results?.skipped || 0;
-        showToast(`Imported ${added} reaction GIFs! (${skipped} already in vault)`, 'success');
+        showToast(`Imported ${added} reaction GIFs to your vault! (${skipped} already in vault)`, 'success');
         fetchVaultData();
       } else {
         showToast(data.error || 'Failed to import predefined GIFs', 'error');
@@ -139,7 +147,7 @@ export default function MediaVaultPage() {
     setSearchingGiphy(true);
     setSelectedGiphyGifs([]);
     try {
-      const res = await fetch(`${API_BASE}/api/giphy/search?q=${encodeURIComponent(query)}&limit=24`);
+      const res = await fetch(`${API_BASE}/api/giphy/search?q=${encodeURIComponent(query)}&limit=24`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (data.success) {
         setGiphyResults(data.data || []);
@@ -200,7 +208,7 @@ export default function MediaVaultPage() {
 
       const res = await fetch(`${API_BASE}/api/media-vault/batch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ items: payloadItems }),
       });
       const data = await res.json();
@@ -264,6 +272,7 @@ export default function MediaVaultPage() {
 
         const res = await fetch(`${API_BASE}/api/media-vault/upload`, {
           method: 'POST',
+          headers: getAuthHeaders(),
           body: formData,
         });
         const data = await res.json();
@@ -288,7 +297,7 @@ export default function MediaVaultPage() {
 
         const res = await fetch(`${API_BASE}/api/media-vault`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             url: mediaUrl.trim(),
             category: selectedCategory,
@@ -322,6 +331,7 @@ export default function MediaVaultPage() {
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -353,7 +363,7 @@ export default function MediaVaultPage() {
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/${editingItem._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(editForm),
       });
       const data = await res.json();
@@ -380,7 +390,7 @@ export default function MediaVaultPage() {
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ category: newCategoryName.trim() }),
       });
       const data = await res.json();
@@ -415,7 +425,7 @@ export default function MediaVaultPage() {
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/categories/${renameModalCategory.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ newCategory: renameTargetName.trim() }),
       });
       const data = await res.json();
@@ -440,6 +450,7 @@ export default function MediaVaultPage() {
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/categories/${catName}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (data.success) {
