@@ -117,7 +117,9 @@ app.use('/api/auth', authRouter);
 
 // Aliases for Instagram handle check and Admin accounts
 app.use('/api/instagram/check-handle', (req, res, next) => {
-  req.url = '/instagram/check-handle';
+  const queryIndex = req.url.indexOf('?');
+  const query = queryIndex !== -1 ? req.url.slice(queryIndex) : '';
+  req.url = '/instagram/check-handle' + query;
   authRouter(req, res, next);
 });
 app.use('/api/admin/accounts', requireAuth, (req, res, next) => {
