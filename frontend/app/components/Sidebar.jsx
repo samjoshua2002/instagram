@@ -618,7 +618,7 @@ export default function Sidebar() {
           animate="visible"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}
         >
-          {/* Setup Automation & Account Wizard */}
+          {/* Automate Button */}
           {!isPureSuperadmin && (
             <motion.button
               variants={footerItemVariants}
@@ -628,28 +628,21 @@ export default function Sidebar() {
               onClick={openOnboardingWizard}
               style={{
                 width: '100%',
-                background: (!user?.isOnboarded || !user?.instagramPageAccessToken)
-                  ? 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%)'
-                  : '#f4f4f5',
-                color: (!user?.isOnboarded || !user?.instagramPageAccessToken) ? '#ffffff' : '#09090b',
-                border: 'none',
+                background: '#ffffff',
+                color: '#000000',
+                border: '1.5px solid #000000',
                 padding: '9px 12px',
                 borderRadius: '9px',
                 fontWeight: '700',
-                fontSize: '0.78rem',
+                fontSize: '0.8rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '7px',
-                boxShadow: (!user?.isOnboarded || !user?.instagramPageAccessToken)
-                  ? '0 3px 12px rgba(236, 72, 153, 0.25)'
-                  : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
-              <Zap size={14} />
-              <span>{(!user?.isOnboarded || !user?.instagramPageAccessToken) ? '⚡ Setup Automation & Connect' : '⚙️ Reconfigure Automation'}</span>
+              <span>Automate</span>
             </motion.button>
           )}
 
