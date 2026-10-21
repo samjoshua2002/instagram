@@ -1630,10 +1630,19 @@ app.get('/api/social-graph', async (req, res) => {
       socialGraphService.trainGraphFromDB(UserMemory, Message).catch(e => console.warn('trainGraph error:', e.message));
     }
 
-    // Fetch social graph nodes (scoped to workspace user if not superadmin)
+    // Fetch social graph nodes:
+    // If superadmin: return all nodes
+    // If user: return their nodes, or unassigned legacy nodes (ownerId unset) so primary creator data is preserved
     const isSuper = req.user?.role === 'superadmin';
     const query = (!isSuper && req.user)
-      ? { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] }
+      ? {
+          $or: [
+            { ownerId: req.user._id },
+            { ownerUsername: req.user.username },
+            { ownerId: { $exists: false } },
+            { ownerId: null }
+          ]
+        }
       : {};
     const nodes = await SocialGraph.find(query).sort({ updatedAt: -1 });
 
