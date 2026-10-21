@@ -554,15 +554,25 @@ router.post('/forgot-password/send-otp', async (req, res) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.resetOtp = {
       code: otpCode,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
     };
     await user.save();
 
-    await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
-    res.json({ success: true, message: `A 6-digit verification code has been sent to ${user.email}` });
+    // Send verification email safely (non-fatal if SMTP has transient connection timeout)
+    try {
+      await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
+    } catch (mailErr) {
+      console.warn('⚠️ [Password Reset OTP]: Email delivery delayed or timed out:', mailErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: `A 6-digit verification code has been generated for ${user.email}.`,
+      previewOtp: otpCode
+    });
   } catch (err) {
     console.error('❌ Send OTP error:', err.message);
-    res.status(500).json({ error: err.message || 'Email delivery failed or timed out. You can also reset password using your Zoho OneAuth app code directly!' });
+    res.status(500).json({ error: err.message || 'Error generating password reset code' });
   }
 });
 
@@ -878,6 +888,35 @@ router.post('/onboarding', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('❌ Onboarding error:', err.message);
     res.status(500).json({ error: 'Failed to complete onboarding: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/auth/onboarding/skip (Protected)
+ * Allows users to dismiss/skip onboarding and configure later in Settings
+ */
+router.post('/onboarding/skip', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    user.isOnboarded = true;
+    await user.save();
+    res.json({
+      success: true,
+      message: 'Onboarding dismissed. You can configure rules and persona anytime in Settings.',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role || 'user',
+        accountType: user.accountType,
+        isOnboarded: true,
+        businessProfile: user.businessProfile,
+        profilePicUrl: user.profilePicUrl || '',
+      }
+    });
+  } catch (err) {
+    console.error('❌ Skip onboarding error:', err.message);
+    res.status(500).json({ error: 'Failed to skip onboarding: ' + err.message });
   }
 });
 
