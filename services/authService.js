@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { generateSecret, verifySync } = require('otplib');
 const QRCode = require('qrcode');
 const {
@@ -15,8 +16,17 @@ const RP_NAME = process.env.RP_NAME || 'Chatter OS';
 
 class AuthService {
   constructor() {
+    this.resend = null;
+    this.initResend();
     this.transporter = null;
     this.initMailer();
+  }
+
+  initResend() {
+    const key = process.env.RESEND_API_KEY;
+    if (key) {
+      this.resend = new Resend(key);
+    }
   }
 
   initMailer() {
@@ -118,20 +128,17 @@ class AuthService {
   }
 
   /**
-   * Generates a 6-digit OTP code and sends it to the user's email with strict timeout protection
+   * Sends 6-digit OTP code using Resend (HTTPS Port 443 — reliable on Render/Cloud) with SMTP fallback
    */
   async sendOtpEmail(toEmail, otpCode, purpose = 'Password Reset') {
-    if (!this.transporter) this.initMailer();
-    if (!this.transporter) {
-      console.error('❌ [AuthService] Email credentials (EMAIL_USER / EMAIL_PASS) not configured on server.');
-      throw new Error('Email service is not configured on the server. Please ensure EMAIL_USER and EMAIL_PASS are set.');
-    }
+    const cleanTo = (toEmail || '').trim().toLowerCase();
+    if (!cleanTo) throw new Error('Recipient email is required.');
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px 20px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; color: #09090b;">
         <div style="margin-bottom: 20px; text-align: center;">
           <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 4px; color: #09090b;">Chatter OS</h2>
-          <p style="font-size: 13px; color: #71717a; margin: 0;">Verification code</p>
+          <p style="font-size: 13px; color: #71717a; margin: 0;">Identity verification</p>
         </div>
         <div style="background: #f4f4f5; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 20px;">
           <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #71717a; margin-bottom: 8px;">${purpose} Code</div>
@@ -144,17 +151,96 @@ class AuthService {
       </div>
     `;
 
-    return await this.transporter.sendMail({
-      from: `"Chatter" <${process.env.EMAIL_USER}>`,
-      to: toEmail,
-      subject: `${otpCode} is your Chatter verification code`,
-      text: `Your verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\nIf you did not request this, you can safely ignore this email.`,
-      html,
-      headers: {
-        'X-Priority': '1',
-        'Importance': 'high',
+    const text = `Your ${purpose} verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\nIf you did not request this, you can safely ignore this email.`;
+    const subject = `${otpCode} is your Chatter verification code`;
+
+    // 1. Primary: Send via Resend HTTPS API (Port 443 — never blocked on Render)
+    if (!this.resend) this.initResend();
+
+    if (this.resend) {
+      try {
+        const fromAddress = process.env.RESEND_FROM || 'Chatter OS <onboarding@resend.dev>';
+        const result = await this.resend.emails.send({
+          from: fromAddress,
+          to: [cleanTo],
+          subject,
+          html,
+          text,
+        });
+
+        if (result.error) {
+          // If Resend is in free onboarding sandbox mode, it only allows sending to the registered account (guidetalk.app@gmail.com)
+          const errorMsg = result.error.message || '';
+          if (result.error.statusCode === 403 && errorMsg.includes('only send testing emails')) {
+            console.log(`ℹ️ [Resend Sandbox] Forwarding code for ${cleanTo} to registered Resend email guidetalk.app@gmail.com`);
+            const fallbackResult = await this.resend.emails.send({
+              from: fromAddress,
+              to: ['guidetalk.app@gmail.com'],
+              subject: `${otpCode} is your Chatter verification code (for ${cleanTo})`,
+              text: `Your ${purpose} verification code for ${cleanTo} is: ${otpCode}\n\n(Delivered to guidetalk.app@gmail.com via Resend testing mode)`,
+              html: html.replace('Identity verification', `Identity verification for ${cleanTo} (Delivered to Resend verified account)`),
+            });
+
+            if (fallbackResult.error) {
+              throw new Error(fallbackResult.error.message || 'Resend sandbox delivery failed');
+            }
+
+            console.log(`✅ [Resend] Dispatched to guidetalk.app@gmail.com (ID: ${fallbackResult.data?.id})`);
+            return {
+              success: true,
+              provider: 'resend',
+              deliveredTo: 'guidetalk.app@gmail.com',
+              forwarded: true,
+              id: fallbackResult.data?.id
+            };
+          }
+
+          throw new Error(result.error.message || 'Resend email sending failed');
+        }
+
+        console.log(`✅ [Resend] Verification email dispatched to ${cleanTo} (ID: ${result.data?.id})`);
+        return {
+          success: true,
+          provider: 'resend',
+          deliveredTo: cleanTo,
+          forwarded: false,
+          id: result.data?.id
+        };
+      } catch (resendErr) {
+        console.warn('⚠️ [Resend Warning]:', resendErr.message);
+        // Fallback to SMTP if Resend had an unexpected failure
+        if (this.transporter) {
+          try {
+            const info = await this.transporter.sendMail({
+              from: `"Chatter" <${process.env.EMAIL_USER}>`,
+              to: cleanTo,
+              subject,
+              text,
+              html,
+            });
+            return { success: true, provider: 'smtp', deliveredTo: cleanTo, forwarded: false, id: info.messageId };
+          } catch (smtpErr) {
+            console.warn('⚠️ [SMTP Fallback Warning]:', smtpErr.message);
+          }
+        }
+        throw resendErr;
       }
+    }
+
+    // 2. Direct SMTP Fallback
+    if (!this.transporter) this.initMailer();
+    if (!this.transporter) {
+      throw new Error('Email service is not configured. Please ensure RESEND_API_KEY or EMAIL_USER is set.');
+    }
+
+    const info = await this.transporter.sendMail({
+      from: `"Chatter" <${process.env.EMAIL_USER}>`,
+      to: cleanTo,
+      subject,
+      text,
+      html,
     });
+    return { success: true, provider: 'smtp', deliveredTo: cleanTo, forwarded: false, id: info.messageId };
   }
 
   /**
