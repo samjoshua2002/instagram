@@ -168,42 +168,51 @@ export default function LoginPage({ onLoginSuccess }) {
   // Debounced live Instagram profile lookup
   useEffect(() => {
     const handle = (regForm.instagramUsername || '').trim().replace(/^@/, '');
-    if (!handle || handle.length < 2) {
+    if (!handle) {
       setInstaPreview(null);
       setInstaError('');
       setInstaChecking(false);
       return;
     }
 
+    const isValidSyntax = /^[a-zA-Z0-9._]{1,30}$/.test(handle);
+    if (!isValidSyntax) {
+      setInstaPreview(null);
+      setInstaError('Instagram handle can only contain letters, numbers, periods, and underscores.');
+      setInstaChecking(false);
+      return;
+    }
+
+    setInstaError('');
+    // Immediately set a valid handle preview so user is never blocked or shown an error
+    setInstaPreview({
+      username: handle,
+      fullName: handle,
+      profilePicUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(handle)}&background=09090b&color=fff`,
+      instagramId: '',
+      isVerified: false
+    });
+
     const timer = setTimeout(async () => {
       setInstaChecking(true);
-      setInstaError('');
       try {
         const res = await fetch(`${API_BASE}/api/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
         const data = await res.json();
-        if (data.exists) {
+        if (data.exists && (data.profilePicUrl || data.fullName)) {
           setInstaPreview(data);
           setInstaError('');
-          // Persist the permanent numeric instagramId in regForm!
           setRegForm(prev => ({
             ...prev,
             instagramId: data.instagramId || '',
             instagramUsername: data.username || handle
           }));
-        } else {
-          setInstaPreview(null);
-          setInstaError(`No Instagram account found for @${handle}.`);
-          setRegForm(prev => ({
-            ...prev,
-            instagramId: ''
-          }));
         }
       } catch (err) {
-        console.warn('Instagram handle check error:', err);
+        // Keep the format-verified handle preview without error
       } finally {
         setInstaChecking(false);
       }
-    }, 600);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [regForm.instagramUsername]);
@@ -534,12 +543,16 @@ export default function LoginPage({ onLoginSuccess }) {
     setRegError('');
     setRegSuccess('');
 
-    if (!regForm.email.trim() || !regForm.email.includes('@')) {
-      setRegError('Please provide a valid email address.');
+    if (!regForm.username.trim()) {
+      setRegError('Please choose a username for your account.');
       return;
     }
-    if (!regForm.username.trim() || regForm.username.trim().length < 3) {
+    if (regForm.username.trim().length < 3) {
       setRegError('Username must be at least 3 characters.');
+      return;
+    }
+    if (!regForm.email.trim() || !regForm.email.includes('@')) {
+      setRegError('Please provide a valid email address.');
       return;
     }
     if (!regForm.password || regForm.password.length < 6) {
@@ -2140,7 +2153,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d', fontSize: '0.68rem', fontWeight: '800', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, background: '#dcfce7', padding: '3px 7px', borderRadius: '4px' }}>
                         <Check size={12} strokeWidth={3} />
-                        <span>FOUND</span>
+                        <span>{instaPreview.isVerified ? 'VERIFIED' : 'READY'}</span>
                       </div>
                     </div>
                   )}
@@ -2201,7 +2214,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={regLoading || !regForm.email || !regForm.username || !regForm.password}
+                    disabled={regLoading}
                     style={{
                       width: '100%',
                       background: '#09090b',
@@ -2215,8 +2228,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      cursor: (regLoading || !regForm.email || !regForm.username || !regForm.password) ? 'not-allowed' : 'pointer',
-                      opacity: (regLoading || !regForm.email || !regForm.username || !regForm.password) ? 0.6 : 1,
+                      cursor: regLoading ? 'not-allowed' : 'pointer',
+                      opacity: regLoading ? 0.7 : 1,
                       transition: 'all 0.15s ease'
                     }}
                   >
