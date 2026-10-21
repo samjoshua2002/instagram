@@ -20,7 +20,8 @@ import {
   Shield,
   Layers,
   Settings,
-  Plus
+  Plus,
+  ArrowLeftRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -96,7 +97,7 @@ const mobileTabVariant = {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { routingConfig, toggleGlobalBot, startAiInterview, user, logout, setIsPasskeyModalOpen } = useApp();
+  const { routingConfig, toggleGlobalBot, startAiInterview, user, logout, switchAccount, setIsPasskeyModalOpen } = useApp();
 
   const isSuperadmin = user?.role === 'superadmin';
 
@@ -630,16 +631,32 @@ export default function Sidebar() {
               </div>
 
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <div style={{
-                  fontSize: '0.82rem',
-                  fontWeight: '700',
-                  color: '#09090b',
-                  lineHeight: 1.25,
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                  overflow: 'hidden'
-                }}>
-                  {displayName}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{
+                    fontSize: '0.82rem',
+                    fontWeight: '700',
+                    color: '#09090b',
+                    lineHeight: 1.25,
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden'
+                  }}>
+                    {displayName}
+                  </span>
+                  {isSuperadmin && (
+                    <span style={{
+                      fontSize: '0.58rem',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: '800',
+                      background: '#09090b',
+                      color: '#ffffff',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      flexShrink: 0
+                    }}>
+                      ADMIN
+                    </span>
+                  )}
                 </div>
                 <div style={{
                   fontSize: '0.7rem',
@@ -678,6 +695,29 @@ export default function Sidebar() {
               >
                 <Fingerprint size={13} />
                 <span>Passkeys & 2FA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={switchAccount}
+                title="Switch account"
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e4e4e7',
+                  borderRadius: '7px',
+                  padding: '6px 9px',
+                  fontSize: '0.72rem',
+                  fontWeight: '600',
+                  color: '#09090b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <ArrowLeftRight size={12} />
+                <span>Switch</span>
               </button>
 
               <button

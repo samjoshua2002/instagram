@@ -199,10 +199,32 @@ export function AppProvider({ children }) {
       try {
         localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
         localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
+
+        let saved = [];
+        try {
+          const stored = localStorage.getItem('chatter_saved_accounts');
+          if (stored) saved = JSON.parse(stored);
+          if (!Array.isArray(saved)) saved = [];
+        } catch (e) {}
+
+        const record = {
+          email: userData.email,
+          username: userData.username,
+          role: userData.role || 'user',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          profilePicUrl: userData.profilePicUrl || '',
+          hasPasskeys: userData.hasPasskeys ?? true,
+          lastUsed: Date.now(),
+        };
+        const filtered = saved.filter(a => a.email !== record.email && a.username !== record.username);
+        filtered.unshift(record);
+        localStorage.setItem('chatter_saved_accounts', JSON.stringify(filtered));
       } catch (e) {}
     }
     try {
       sessionStorage.setItem('chatter_session_active', 'true');
+      localStorage.removeItem('chatter_show_chooser');
     } catch (e) {}
     setToken(jwtToken);
     setUser(userData);
@@ -213,11 +235,27 @@ export function AppProvider({ children }) {
     }
   }, [showToast]);
 
+  const switchAccount = useCallback(() => {
+    localStorage.removeItem('chatter_jwt_token');
+    localStorage.removeItem('chatter_user_profile');
+    try {
+      sessionStorage.removeItem('chatter_session_active');
+      localStorage.setItem('chatter_show_chooser', 'true');
+    } catch (e) {}
+    setToken(null);
+    setUser(null);
+    showToast?.('Switching account...', 'info');
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.location.href = '/';
+    }
+  }, [showToast]);
+
   const logout = useCallback(() => {
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     try {
       sessionStorage.removeItem('chatter_session_active');
+      localStorage.removeItem('chatter_show_chooser');
     } catch (e) {}
     setToken(null);
     setUser(null);
@@ -1040,6 +1078,7 @@ export function AppProvider({ children }) {
         authLoading,
         login,
         logout,
+        switchAccount,
         updateUserProfile,
         isPasskeyModalOpen,
         setIsPasskeyModalOpen,
