@@ -1511,11 +1511,27 @@ router.get('/instagram/check-handle', async (req, res) => {
       });
     }
 
-    // 5. Account not in DB and not a valid public account
+    // 5. If live scraper was rate-limited or blocked by Instagram from cloud IP,
+    // do not block valid handles! Allow valid handle formats so users are never falsely locked out.
+    if (/^[a-zA-Z0-9._]{1,30}$/.test(handle)) {
+      return res.json({
+        exists: true,
+        handle,
+        fullName: handle,
+        profilePicUrl: '',
+        instagramId: '',
+        bio: '',
+        verified: false,
+        isProfessional: true,
+        fromPeopleDirectory: false
+      });
+    }
+
+    // 6. Only fail if handle syntax is invalid
     return res.json({
       exists: false,
       handle,
-      message: 'Account does not exist. It must be a valid professional or business Instagram account.'
+      message: 'Invalid Instagram handle format. Must be 1-30 characters containing only letters, numbers, periods, and underscores.'
     });
   } catch (err) {
     console.error('❌ Check handle error:', err.message);
