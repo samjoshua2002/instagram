@@ -150,8 +150,13 @@ class AuthService {
     return await this.transporter.sendMail({
       from: `"Chatter OS Security" <${process.env.EMAIL_USER}>`,
       to: toEmail,
-      subject: `[Verification] Your ${purpose} Code: ${otpCode}`,
+      subject: `${otpCode} is your ${purpose} code`,
+      text: `Your ${purpose} verification code is: ${otpCode}\n\nThis code is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.`,
       html,
+      headers: {
+        'X-Priority': '1',
+        'Importance': 'high',
+      }
     });
   }
 
