@@ -8,12 +8,14 @@ import {
   MessageSquare, Film, Bot, Shield,
   Search, RefreshCw, CheckCircle2, AlertCircle,
   ExternalLink, ChevronDown, ChevronUp, Layers,
-  Lock, Instagram, Smartphone, Calendar, UserCheck, Mail
+  Lock, Instagram, Smartphone, Calendar, UserCheck, Mail,
+  LogIn, Building2, Briefcase, User as UserIcon, Filter,
+  ChevronLeft
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 
 // Butter-Smooth Framer Motion Animated Number Counter (quintic deceleration curve)
-function AnimatedNumber({ value, duration = 1.8 }) {
+function AnimatedNumber({ value, duration = 1.6 }) {
   const numericValue = typeof value === 'number' ? value : parseInt(value, 10) || 0;
   const [displayValue, setDisplayValue] = useState(0);
   const prevValueRef = useRef(0);
@@ -22,7 +24,7 @@ function AnimatedNumber({ value, duration = 1.8 }) {
     const start = prevValueRef.current;
     const controls = animate(start, numericValue, {
       duration,
-      ease: [0.16, 1, 0.3, 1], // butter smooth quintic ease-out
+      ease: [0.16, 1, 0.3, 1],
       onUpdate: (latest) => setDisplayValue(Math.round(latest))
     });
     prevValueRef.current = numericValue;
@@ -144,7 +146,7 @@ const statCardVariants = {
 };
 
 export default function AnalyticsPage() {
-  const { nodes, routingConfig, user, token, API_BASE } = useApp();
+  const { nodes, routingConfig, user, token, login, API_BASE, showToast } = useApp();
   const isSuperadmin = user?.role === 'superadmin';
 
   // Toggle view for superadmins: 'platform' (default) vs 'personal'
@@ -155,10 +157,15 @@ export default function AnalyticsPage() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState('');
   const [adminSearch, setAdminSearch] = useState('');
-  const [adminSubTab, setAdminSubTab] = useState('accounts'); // 'accounts' | 'members'
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'business' | 'personal' | 'admin' | 'pending'
   const [expandedAccountId, setExpandedAccountId] = useState(null);
+  const [impersonatingId, setImpersonatingId] = useState(null);
 
-  // Fetch admin accounts and social graph members when superadmin
+  // Pagination for 25+ users
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Fetch admin accounts list
   const fetchAdminAccounts = async () => {
     if (!token || !isSuperadmin) return;
     setAdminLoading(true);
@@ -184,34 +191,88 @@ export default function AnalyticsPage() {
     }
   }, [isSuperadmin, token]);
 
-  // Filtered accounts list
+  // Impersonate / Enter Workspace
+  const handleEnterWorkspace = async (targetUser) => {
+    if (!token || !isSuperadmin || impersonatingId) return;
+    setImpersonatingId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/impersonate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId: targetUser.id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to enter workspace.');
+
+      showToast?.(`Entering workspace: @${targetUser.username}`, 'success');
+      login(data.token, data.user);
+    } catch (err) {
+      console.error('Workspace impersonation error:', err);
+      showToast?.(err.message || 'Failed to enter workspace.', 'error');
+    } finally {
+      setImpersonatingId(null);
+    }
+  };
+
+  // Filtered accounts list for 25+ users
   const filteredAccounts = useMemo(() => {
     if (!adminData?.accounts) return [];
-    if (!adminSearch.trim()) return adminData.accounts;
-    const q = adminSearch.toLowerCase();
-    return adminData.accounts.filter(a =>
-      (a.email && a.email.toLowerCase().includes(q)) ||
-      (a.username && a.username.toLowerCase().includes(q)) ||
-      (a.firstName && a.firstName.toLowerCase().includes(q)) ||
-      (a.lastName && a.lastName.toLowerCase().includes(q)) ||
-      (a.instagramUsername && a.instagramUsername.toLowerCase().includes(q))
-    );
-  }, [adminData?.accounts, adminSearch]);
+    let list = adminData.accounts;
 
-  // Filtered members list
-  const filteredMembers = useMemo(() => {
-    if (!adminData?.contacts) return [];
-    if (!adminSearch.trim()) return adminData.contacts;
-    const q = adminSearch.toLowerCase();
-    return adminData.contacts.filter(c =>
-      (c.name && c.name.toLowerCase().includes(q)) ||
-      (c.handle && c.handle.toLowerCase().includes(q)) ||
-      (c.category && c.category.toLowerCase().includes(q)) ||
-      (c.relationship && c.relationship.toLowerCase().includes(q))
-    );
-  }, [adminData?.contacts, adminSearch]);
+    // Filter pill condition
+    if (filterType === 'business') {
+      list = list.filter(a => a.accountType === 'business' || a.accountType === 'creator' || a.accountType === 'agency');
+    } else if (filterType === 'personal') {
+      list = list.filter(a => a.accountType === 'personal' || !a.accountType);
+    } else if (filterType === 'admin') {
+      list = list.filter(a => a.role === 'superadmin');
+    } else if (filterType === 'pending') {
+      list = list.filter(a => !a.isOnboarded);
+    }
 
-  // Personal Bot Analytics
+    // Text search
+    if (adminSearch.trim()) {
+      const q = adminSearch.toLowerCase();
+      list = list.filter(a =>
+        (a.email && a.email.toLowerCase().includes(q)) ||
+        (a.username && a.username.toLowerCase().includes(q)) ||
+        (a.firstName && a.firstName.toLowerCase().includes(q)) ||
+        (a.lastName && a.lastName.toLowerCase().includes(q)) ||
+        (a.instagramUsername && a.instagramUsername.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [adminData?.accounts, filterType, adminSearch]);
+
+  // Paginated accounts
+  const totalPages = Math.ceil(filteredAccounts.length / pageSize) || 1;
+  const paginatedAccounts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAccounts.slice(start, start + pageSize);
+  }, [filteredAccounts, currentPage, pageSize]);
+
+  // Compute KPI metrics across all users
+  const kpiMetrics = useMemo(() => {
+    if (!adminData?.accounts) {
+      return { total: 0, admins: 0, regular: 0, business: 0, personal: 0, activeInstagram: 0, passkeys: 0, pending: 0 };
+    }
+    const accounts = adminData.accounts;
+    const total = accounts.length;
+    const admins = accounts.filter(a => a.role === 'superadmin').length;
+    const regular = total - admins;
+    const business = accounts.filter(a => a.accountType === 'business' || a.accountType === 'creator' || a.accountType === 'agency').length;
+    const personal = accounts.filter(a => a.accountType === 'personal' || !a.accountType).length;
+    const activeInstagram = accounts.filter(a => a.instagramUsername && a.instagramUsername !== 'catovidz').length;
+    const passkeys = accounts.filter(a => a.hasPasskeys).length;
+    const pending = accounts.filter(a => !a.isOnboarded).length;
+    return { total, admins, regular, business, personal, activeInstagram, passkeys, pending };
+  }, [adminData]);
+
+  // Personal Bot Analytics (Fallback for regular user or when toggle is switched)
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
 
   const breakdown = useMemo(() => {
@@ -277,11 +338,11 @@ export default function AnalyticsPage() {
             {isSuperadmin ? 'SUPERADMIN OBSERVATORY' : 'COMMAND CENTER'}
           </div>
           <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-0.7px', marginTop: '4px', color: '#09090b' }}>
-            {isSuperadmin && activeTab === 'platform' ? 'Platform Accounts & Users Summary' : 'Analytics Overview'}
+            {isSuperadmin && activeTab === 'platform' ? 'Platform Users & Workspaces' : 'Analytics Overview'}
           </h1>
           <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '4px' }}>
             {isSuperadmin && activeTab === 'platform'
-              ? 'Multi-tenant directory of all connected accounts, members graph, and automation policies.'
+              ? 'Multi-tenant management for all registered accounts, connected Instagram workspaces, and automations.'
               : 'Real-time analytics on your contacts, interaction volume, and AI routing.'}
           </p>
         </div>
@@ -315,7 +376,7 @@ export default function AnalyticsPage() {
               }}
             >
               <Shield size={13} />
-              <span>Platform Summary</span>
+              <span>Platform Users ({adminData?.accounts?.length || '...'})</span>
             </button>
             <button
               type="button"
@@ -343,11 +404,11 @@ export default function AnalyticsPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          VIEW A: SUPERADMIN PLATFORM ACCOUNTS & MEMBERS DIRECTORY
+          PRACTICAL SUPERADMIN VIEW FOR 25+ USERS
          ───────────────────────────────────────────────────────────── */}
       {isSuperadmin && activeTab === 'platform' ? (
         <div>
-          {/* PLATFORM KPI SUMMARY CARDS */}
+          {/* 4 HIGH-LEVEL TENANT METRICS */}
           <motion.div
             variants={statsContainerVariants}
             initial="hidden"
@@ -373,7 +434,7 @@ export default function AnalyticsPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Registered Accounts
+                  Total Creators & Users
                 </span>
                 <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
                   <Users size={15} />
@@ -381,20 +442,16 @@ export default function AnalyticsPage() {
               </div>
               <div>
                 <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={adminData?.totalAccounts || 0} duration={1.6} />
+                  <AnimatedNumber value={kpiMetrics.total} duration={1.6} />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  {adminData?.accounts ? (
-                    <>
-                      {adminData.accounts.filter(a => a.role === 'superadmin').length} Admins • {adminData.accounts.filter(a => a.role !== 'superadmin').length} Users
-                    </>
-                  ) : 'Active creators'}
+                  {kpiMetrics.admins} Superadmin • {kpiMetrics.regular} Users
                 </div>
               </div>
               <div />
             </motion.div>
 
-            {/* 2. Total Social Graph Members */}
+            {/* 2. Active Webhook Automations */}
             <motion.div
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
@@ -412,26 +469,24 @@ export default function AnalyticsPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Platform Members
+                  Active Automations
                 </span>
                 <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
-                  <Layers size={15} />
+                  <Bot size={15} />
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={adminData?.totalContacts || friendNodes.length} duration={1.6} />
+                  <AnimatedNumber value={kpiMetrics.total - kpiMetrics.pending} duration={1.6} />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  {adminData?.contactsBreakdown?.closeFriends || 0} Close • {adminData?.contactsBreakdown?.onlineFriends || 0} Online
+                  {kpiMetrics.pending} Setup pending
                 </div>
               </div>
-              <Link href="/relationships" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
-                <span>View Directory</span><ArrowRight size={10} />
-              </Link>
+              <div />
             </motion.div>
 
-            {/* 3. Connected Instagram Creators */}
+            {/* 3. Instagram Connected Workspaces */}
             <motion.div
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
@@ -449,7 +504,7 @@ export default function AnalyticsPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Instagram Connected
+                  Instagram Workspaces
                 </span>
                 <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
                   <Instagram size={15} />
@@ -457,16 +512,16 @@ export default function AnalyticsPage() {
               </div>
               <div>
                 <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={adminData?.accounts ? adminData.accounts.filter(a => a.instagramUsername).length : 1} duration={1.6} />
+                  <AnimatedNumber value={kpiMetrics.total} duration={1.6} />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Live Webhook automations
+                  Multi-account webhooks live
                 </div>
               </div>
               <div />
             </motion.div>
 
-            {/* 4. Enterprise Passkeys & 2FA */}
+            {/* 4. Portfolio Breakdown */}
             <motion.div
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
@@ -484,25 +539,25 @@ export default function AnalyticsPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Protected by Passkeys
+                  Account Structure
                 </span>
                 <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
-                  <Lock size={15} />
+                  <Building2 size={15} />
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={adminData?.accounts ? adminData.accounts.filter(a => a.hasPasskeys).length : 1} duration={1.6} />
+                  <AnimatedNumber value={kpiMetrics.business} duration={1.6} />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  FIDO2 Biometric Auth
+                  Business accounts • {kpiMetrics.personal} Personal
                 </div>
               </div>
               <div />
             </motion.div>
           </motion.div>
 
-          {/* ACCOUNTS & MEMBERS TABLE CONTAINER */}
+          {/* MAIN USERS DIRECTORY CONTAINER */}
           <div style={{
             background: '#ffffff',
             border: '1px solid #e4e4e7',
@@ -510,54 +565,44 @@ export default function AnalyticsPage() {
             padding: '22px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
           }}>
-            {/* Top Toolbar: Sub-tabs, Search, and Refresh */}
+            {/* TOOLBAR: FILTERS + SEARCH + REFRESH */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setAdminSubTab('accounts')}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: '700',
-                    border: '1px solid',
-                    borderColor: adminSubTab === 'accounts' ? '#09090b' : '#e4e4e7',
-                    background: adminSubTab === 'accounts' ? '#09090b' : '#ffffff',
-                    color: adminSubTab === 'accounts' ? '#ffffff' : '#09090b',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Users size={14} />
-                  <span>Connected Accounts ({adminData?.accounts?.length || 0})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAdminSubTab('members')}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: '700',
-                    border: '1px solid',
-                    borderColor: adminSubTab === 'members' ? '#09090b' : '#e4e4e7',
-                    background: adminSubTab === 'members' ? '#09090b' : '#ffffff',
-                    color: adminSubTab === 'members' ? '#ffffff' : '#09090b',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Layers size={14} />
-                  <span>Platform Members Graph ({adminData?.contacts?.length || 0})</span>
-                </button>
+              {/* Quick Filter Pills */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'all', label: `All (${kpiMetrics.total})` },
+                  { id: 'business', label: `Business (${kpiMetrics.business})` },
+                  { id: 'personal', label: `Personal (${kpiMetrics.personal})` },
+                  { id: 'admin', label: `Admins (${kpiMetrics.admins})` },
+                  { id: 'pending', label: `Pending Setup (${kpiMetrics.pending})` },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      setFilterType(f.id);
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.76rem',
+                      fontWeight: '700',
+                      border: '1px solid',
+                      borderColor: filterType === f.id ? '#09090b' : '#e4e4e7',
+                      background: filterType === f.id ? '#09090b' : '#ffffff',
+                      color: filterType === f.id ? '#ffffff' : '#52525b',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '380px' }}>
+              {/* Search + Refresh */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '340px' }}>
                 <div style={{
                   position: 'relative',
                   flex: 1,
@@ -568,8 +613,11 @@ export default function AnalyticsPage() {
                   <input
                     type="text"
                     value={adminSearch}
-                    onChange={(e) => setAdminSearch(e.target.value)}
-                    placeholder={adminSubTab === 'accounts' ? 'Filter by email, username, or IG...' : 'Filter members by name or handle...'}
+                    onChange={(e) => {
+                      setAdminSearch(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Search name, email, or @handle..."
                     style={{
                       width: '100%',
                       padding: '8px 12px 8px 32px',
@@ -585,7 +633,7 @@ export default function AnalyticsPage() {
                   type="button"
                   onClick={fetchAdminAccounts}
                   disabled={adminLoading}
-                  title="Refresh directory"
+                  title="Refresh user directory"
                   style={{
                     padding: '8px 12px',
                     borderRadius: '8px',
@@ -619,167 +667,227 @@ export default function AnalyticsPage() {
               </div>
             )}
 
-            {/* SUBTAB 1: ACCOUNTS LIST TABLE */}
-            {adminSubTab === 'accounts' ? (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1.5px solid #e4e4e7', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      <th style={{ padding: '10px 12px' }}>Account & Creator</th>
-                      <th style={{ padding: '10px 12px' }}>Role & Type</th>
-                      <th style={{ padding: '10px 12px' }}>Instagram Handle</th>
-                      <th style={{ padding: '10px 12px' }}>Authentication</th>
-                      <th style={{ padding: '10px 12px' }}>Onboarding</th>
-                      <th style={{ padding: '10px 12px' }}>Registered</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAccounts.length > 0 ? (
-                      filteredAccounts.map((acc) => {
-                        const isExpanded = expandedAccountId === acc.id;
-                        const isSuper = acc.role === 'superadmin';
-                        return (
-                          <React.Fragment key={acc.id}>
-                            <tr
-                              style={{
-                                borderBottom: '1px solid #f4f4f5',
-                                background: isExpanded ? '#fafafa' : '#ffffff',
-                                transition: 'background 0.15s ease'
-                              }}
-                            >
-                              {/* Account Identity */}
-                              <td style={{ padding: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '8px',
-                                    background: '#09090b',
-                                    color: '#ffffff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontWeight: '800',
-                                    fontSize: '0.85rem',
-                                    overflow: 'hidden',
-                                    flexShrink: 0
-                                  }}>
-                                    {acc.profilePicUrl ? (
-                                      <img src={acc.profilePicUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                      (acc.firstName?.[0] || acc.username?.[0] || 'U').toUpperCase()
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontWeight: '800', color: '#09090b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span>{acc.firstName ? `${acc.firstName} ${acc.lastName || ''}`.trim() : acc.username}</span>
-                                      {acc.isVerified && <CheckCircle2 size={13} color="#16a34a" />}
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                                      {acc.email} • @{acc.username}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
+            {/* PRACTICAL ENTERPRISE USER DIRECTORY TABLE */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{
+                    borderBottom: '1.5px solid #e4e4e7',
+                    color: '#71717a',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: '0.68rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    <th style={{ padding: '10px 12px' }}>User / Creator</th>
+                    <th style={{ padding: '10px 12px' }}>Workspace / Business</th>
+                    <th style={{ padding: '10px 12px' }}>Instagram Handle</th>
+                    <th style={{ padding: '10px 12px' }}>Role</th>
+                    <th style={{ padding: '10px 12px' }}>Automation</th>
+                    <th style={{ padding: '10px 12px' }}>Security</th>
+                    <th style={{ padding: '10px 12px' }}>Registered</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedAccounts.length > 0 ? (
+                    paginatedAccounts.map((acc) => {
+                      const isExpanded = expandedAccountId === acc.id;
+                      const isSuper = acc.role === 'superadmin';
+                      const isSelf = user?.id === acc.id || user?.email === acc.email;
+                      const isBusiness = acc.accountType === 'business' || acc.accountType === 'creator' || acc.accountType === 'agency';
 
-                              {/* Role & Type */}
-                              <td style={{ padding: '12px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
-                                  <span style={{
-                                    fontSize: '0.62rem',
-                                    fontWeight: '800',
-                                    fontFamily: "'JetBrains Mono', monospace",
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    background: isSuper ? '#09090b' : '#f4f4f5',
-                                    color: isSuper ? '#ffffff' : '#09090b'
-                                  }}>
-                                    {isSuper ? '👑 SUPERADMIN' : 'USER'}
-                                  </span>
-                                  <span style={{ fontSize: '0.68rem', color: '#71717a', textTransform: 'capitalize' }}>
-                                    {acc.accountType || 'Personal'}
-                                  </span>
-                                </div>
-                              </td>
-
-                              {/* Instagram Handle */}
-                              <td style={{ padding: '12px' }}>
-                                {acc.instagramUsername ? (
-                                  <a
-                                    href={`https://instagram.com/${acc.instagramUsername}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      color: '#09090b',
-                                      textDecoration: 'none',
-                                      fontWeight: '700',
-                                      fontFamily: "'JetBrains Mono', monospace"
-                                    }}
-                                  >
-                                    <span>@{acc.instagramUsername}</span>
-                                    <ExternalLink size={11} color="#a1a1aa" />
-                                  </a>
-                                ) : (
-                                  <span style={{ color: '#a1a1aa', fontSize: '0.74rem' }}>Unlinked</span>
-                                )}
-                              </td>
-
-                              {/* Auth / Passkeys */}
-                              <td style={{ padding: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  {acc.hasPasskeys ? (
-                                    <span style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      background: '#f0fdf4',
-                                      border: '1px solid #bbf7d0',
-                                      color: '#16a34a',
-                                      fontSize: '0.68rem',
-                                      fontWeight: '700',
-                                      padding: '2px 6px',
-                                      borderRadius: '4px'
-                                    }}>
-                                      <Lock size={11} />
-                                      <span>{acc.passkeyCount || 1} Passkey</span>
-                                    </span>
+                      return (
+                        <React.Fragment key={acc.id}>
+                          <tr
+                            style={{
+                              borderBottom: '1px solid #f4f4f5',
+                              background: isExpanded ? '#fafafa' : '#ffffff',
+                              transition: 'background 0.15s ease'
+                            }}
+                          >
+                            {/* User Identity */}
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  borderRadius: '8px',
+                                  background: '#09090b',
+                                  color: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: '800',
+                                  fontSize: '0.85rem',
+                                  overflow: 'hidden',
+                                  flexShrink: 0
+                                }}>
+                                  {acc.profilePicUrl ? (
+                                    <img src={acc.profilePicUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                   ) : (
-                                    <span style={{ fontSize: '0.72rem', color: '#71717a' }}>Password / 2FA</span>
+                                    (acc.firstName?.[0] || acc.username?.[0] || 'U').toUpperCase()
                                   )}
                                 </div>
-                              </td>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontWeight: '800', color: '#09090b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {acc.firstName ? `${acc.firstName} ${acc.lastName || ''}`.trim() : acc.username}
+                                    </span>
+                                    {isSelf && (
+                                      <span style={{
+                                        fontSize: '0.58rem',
+                                        background: '#f4f4f5',
+                                        border: '1px solid #e4e4e7',
+                                        color: '#71717a',
+                                        borderRadius: '3px',
+                                        padding: '1px 4px',
+                                        fontFamily: "'JetBrains Mono', monospace"
+                                      }}>
+                                        YOU
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {acc.email} • @{acc.username}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
 
-                              {/* Onboarding */}
-                              <td style={{ padding: '12px' }}>
+                            {/* Workspace / Business */}
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: '700', color: '#09090b' }}>
+                                  {acc.businessProfile?.businessName || (isBusiness ? 'Creator Studio' : 'Personal')}
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#71717a', textTransform: 'capitalize' }}>
+                                  {acc.businessProfile?.category || acc.accountType || 'Personal'}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Instagram Handle */}
+                            <td style={{ padding: '12px' }}>
+                              {acc.instagramUsername ? (
+                                <a
+                                  href={`https://instagram.com/${acc.instagramUsername}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    color: '#09090b',
+                                    textDecoration: 'none',
+                                    fontWeight: '700',
+                                    fontFamily: "'JetBrains Mono', monospace"
+                                  }}
+                                >
+                                  <span>@{acc.instagramUsername}</span>
+                                  <ExternalLink size={11} color="#a1a1aa" />
+                                </a>
+                              ) : (
+                                <span style={{ color: '#a1a1aa', fontSize: '0.74rem' }}>Unlinked</span>
+                              )}
+                            </td>
+
+                            {/* Role */}
+                            <td style={{ padding: '12px' }}>
+                              <span style={{
+                                fontSize: '0.62rem',
+                                fontWeight: '800',
+                                fontFamily: "'JetBrains Mono', monospace",
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: isSuper ? '#09090b' : '#f4f4f5',
+                                color: isSuper ? '#ffffff' : '#09090b'
+                              }}>
+                                {isSuper ? 'SUPERADMIN' : 'USER'}
+                              </span>
+                            </td>
+
+                            {/* Automation Status */}
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{
+                                  width: '7px',
+                                  height: '7px',
+                                  borderRadius: '50%',
+                                  background: acc.isOnboarded ? '#16a34a' : '#f59e0b',
+                                  flexShrink: 0
+                                }} />
                                 <span style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: '700',
+                                  color: acc.isOnboarded ? '#15803d' : '#b45309'
+                                }}>
+                                  {acc.isOnboarded ? 'Active' : 'Setup Pending'}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Security */}
+                            <td style={{ padding: '12px' }}>
+                              {acc.hasPasskeys ? (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  color: '#16a34a',
                                   fontSize: '0.68rem',
                                   fontWeight: '700',
-                                  color: acc.isOnboarded ? '#15803d' : '#b45309',
-                                  background: acc.isOnboarded ? '#f0fdf4' : '#fffbeb',
-                                  border: `1px solid ${acc.isOnboarded ? '#bbf7d0' : '#fef3c7'}`,
                                   padding: '2px 6px',
                                   borderRadius: '4px'
                                 }}>
-                                  {acc.isOnboarded ? 'Ready' : 'Pending'}
+                                  <Lock size={10} />
+                                  <span>{acc.passkeyCount || 1} Passkey</span>
                                 </span>
-                              </td>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', color: '#71717a' }}>Password</span>
+                              )}
+                            </td>
 
-                              {/* Registered Date */}
-                              <td style={{ padding: '12px', fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                                {acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : 'N/A'}
-                              </td>
+                            {/* Registered */}
+                            <td style={{ padding: '12px', fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                              {acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : 'Recent'}
+                            </td>
 
-                              {/* Actions / Expand */}
-                              <td style={{ padding: '12px', textAlign: 'right' }}>
+                            {/* Actions: Impersonate / Details */}
+                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                {!isSelf && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEnterWorkspace(acc)}
+                                    disabled={impersonatingId === acc.id}
+                                    title={`Switch to ${acc.username}'s workspace`}
+                                    style={{
+                                      background: '#09090b',
+                                      border: '1px solid #09090b',
+                                      borderRadius: '6px',
+                                      padding: '5px 9px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: '700',
+                                      color: '#ffffff',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <LogIn size={11} />
+                                    <span>{impersonatingId === acc.id ? 'Entering...' : 'Enter'}</span>
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   onClick={() => setExpandedAccountId(isExpanded ? null : acc.id)}
                                   style={{
-                                    background: '#f4f4f5',
+                                    background: '#ffffff',
                                     border: '1px solid #e4e4e7',
                                     borderRadius: '6px',
                                     padding: '5px 8px',
@@ -792,114 +900,133 @@ export default function AnalyticsPage() {
                                     gap: '3px'
                                   }}
                                 >
-                                  <span>{isExpanded ? 'Hide' : 'Details'}</span>
-                                  {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                  <span>{isExpanded ? 'Hide' : 'Info'}</span>
+                                  {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                                 </button>
-                              </td>
-                            </tr>
+                              </div>
+                            </td>
+                          </tr>
 
-                            {/* Expanded Account Inspector Drawer */}
-                            {isExpanded && (
-                              <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
-                                <td colSpan={7} style={{ padding: '16px 20px' }}>
-                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', fontSize: '0.76rem' }}>
-                                    <div>
-                                      <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>ACCOUNT ID</div>
-                                      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>{acc.id}</div>
-                                    </div>
-                                    <div>
-                                      <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>INSTAGRAM USER ID</div>
-                                      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>{acc.instagramId || 'None registered'}</div>
-                                    </div>
-                                    <div>
-                                      <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>CONTACT NUMBERS</div>
-                                      <div style={{ color: '#09090b' }}>
-                                        Mobile: {acc.mobileNumber || 'N/A'} • WA: {acc.whatsappNumber || 'N/A'}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>LAST LOGIN</div>
-                                      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>
-                                        {acc.lastLogin ? new Date(acc.lastLogin).toLocaleString() : 'Recent'}
-                                      </div>
+                          {/* Expanded Drawer */}
+                          {isExpanded && (
+                            <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
+                              <td colSpan={8} style={{ padding: '16px 20px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', fontSize: '0.76rem' }}>
+                                  <div>
+                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>USER ID</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>{acc.id}</div>
+                                  </div>
+                                  <div>
+                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>INSTAGRAM ID</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>{acc.instagramId || 'None registered'}</div>
+                                  </div>
+                                  <div>
+                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>CONTACT NUMBERS</div>
+                                    <div style={{ color: '#09090b' }}>
+                                      Mobile: {acc.mobileNumber || 'N/A'} • WA: {acc.whatsappNumber || 'N/A'}
                                     </div>
                                   </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#71717a' }}>
-                          No accounts match the current filter.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              /* SUBTAB 2: PLATFORM MEMBERS SOCIAL GRAPH */
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1.5px solid #e4e4e7', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      <th style={{ padding: '10px 12px' }}>Member Name</th>
-                      <th style={{ padding: '10px 12px' }}>Category</th>
-                      <th style={{ padding: '10px 12px' }}>Relationship</th>
-                      <th style={{ padding: '10px 12px' }}>Instagram Handle</th>
-                      <th style={{ padding: '10px 12px' }}>Lore / Facts</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Tree Connections</th>
+                                  <div>
+                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>LAST LOGIN</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>
+                                      {acc.lastLogin ? new Date(acc.lastLogin).toLocaleString() : 'Recent'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#71717a' }}>
+                        No accounts found matching your filter criteria.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredMembers.length > 0 ? (
-                      filteredMembers.map((c) => (
-                        <tr key={c.id} style={{ borderBottom: '1px solid #f4f4f5' }}>
-                          <td style={{ padding: '12px', fontWeight: '800', color: '#09090b' }}>
-                            {c.name}
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <span style={{
-                              fontSize: '0.66rem',
-                              fontFamily: "'JetBrains Mono', monospace",
-                              fontWeight: '700',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: '#f4f4f5',
-                              color: '#09090b',
-                              textTransform: 'uppercase'
-                            }}>
-                              {(c.category || 'online_friend').replace(/_/g, ' ')}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', color: '#52525b', textTransform: 'capitalize' }}>
-                            {c.relationship || 'friend'}
-                          </td>
-                          <td style={{ padding: '12px', fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>
-                            {c.handle ? `@${c.handle}` : 'Unlinked'}
-                          </td>
-                          <td style={{ padding: '12px', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
-                            {c.factsCount || 0} facts
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontWeight: '800', color: '#09090b' }}>
-                            {c.connectionsCount || 0}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: '#71717a' }}>
-                          No platform members found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* PAGINATION CONTROLS FOR 25+ USERS */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              marginTop: '18px',
+              paddingTop: '16px',
+              borderTop: '1px solid #f4f4f5',
+              fontSize: '0.78rem',
+              color: '#71717a'
+            }}>
+              <div>
+                Showing {filteredAccounts.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredAccounts.length)} of {filteredAccounts.length} creators
               </div>
-            )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.74rem',
+                    color: '#09090b'
+                  }}
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={25}>25 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                  disabled={currentPage <= 1}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.74rem',
+                    fontWeight: '700',
+                    color: currentPage <= 1 ? '#d4d4d8' : '#09090b',
+                    cursor: currentPage <= 1 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Prev
+                </button>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b' }}>
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                  disabled={currentPage >= totalPages}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.74rem',
+                    fontWeight: '700',
+                    color: currentPage >= totalPages ? '#d4d4d8' : '#09090b',
+                    cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
