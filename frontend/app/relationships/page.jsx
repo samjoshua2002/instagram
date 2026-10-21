@@ -613,7 +613,7 @@ export default function RelationshipsPage() {
     const isFullAi = currentAiMode === 'full_ai';
 
     return (
-      <div className="page-container" style={{ maxWidth: '1200px' }}>
+      <div className="page-container" style={{ maxWidth: '1400px' }}>
         {/* Top Back Navigation Bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '20px', borderBottom: '1px solid #e4e4e7', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>

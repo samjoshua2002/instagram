@@ -351,13 +351,15 @@ export default function SettingsPage() {
     }
   };
 
+  const isSuperadmin = user?.role === 'superadmin';
+
   const tabs = [
     { id: 'about', label: 'About Me', icon: BookOpen },
     { id: 'characteristics', label: 'My Characteristics', icon: Smile },
     { id: 'texting', label: 'How To Text', icon: MessageSquare },
     { id: 'replying', label: 'How To Reply', icon: Zap },
     { id: 'examples', label: 'Chat Examples', icon: Code },
-    { id: 'integrations', label: 'API Keys & Giphy', icon: Key },
+    ...(isSuperadmin ? [{ id: 'integrations', label: 'API Keys & Giphy', icon: Key }] : []),
     { id: 'simulator', label: 'Test My Clone', icon: Send },
   ];
 
@@ -1176,8 +1178,8 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* TAB: API KEYS & INTEGRATIONS */}
-      {activeTab === 'integrations' && (
+      {/* TAB: API KEYS & INTEGRATIONS (Superadmin only) */}
+      {activeTab === 'integrations' && isSuperadmin && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* GIPHY Developer Key Card */}
           <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
