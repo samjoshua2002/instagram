@@ -139,17 +139,19 @@ router.post('/register/request-otp', async (req, res) => {
 
     // Send verification email
     try {
-      await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+      const sendResult = await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+      const targetMsg = sendResult.forwarded
+        ? `A 6-digit verification code was sent to ${sendResult.deliveredTo} (Resend sandbox for ${cleanEmail}).`
+        : `A 6-digit verification code was sent to ${cleanEmail}. Please check your inbox.`;
+      res.json({
+        success: true,
+        message: targetMsg,
+        email: cleanEmail,
+      });
     } catch (mailErr) {
       console.error('❌ [Register OTP] Email sending failed:', mailErr.message);
       return res.status(500).json({ error: 'Failed to send verification email: ' + mailErr.message });
     }
-
-    res.json({
-      success: true,
-      message: `A 6-digit verification code was sent to ${cleanEmail}. Please check your inbox.`,
-      email: cleanEmail,
-    });
   } catch (err) {
     console.error('❌ Registration Request OTP error:', err.message);
     res.status(500).json({ error: err.message });
@@ -182,7 +184,15 @@ router.post('/register/resend-otp', async (req, res) => {
     await user.save();
 
     try {
-      await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+      const sendResult = await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
+      const targetMsg = sendResult.forwarded
+        ? `A fresh 6-digit verification code was sent to ${sendResult.deliveredTo} (Resend sandbox for ${cleanEmail}).`
+        : `A fresh 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox.`;
+      res.json({
+        success: true,
+        message: targetMsg,
+        email: cleanEmail,
+      });
     } catch (mailErr) {
       console.error('❌ [Resend OTP] Email sending failed:', mailErr.message);
       return res.status(500).json({ error: 'Failed to resend verification email: ' + mailErr.message });
@@ -573,16 +583,18 @@ router.post('/forgot-password/send-otp', async (req, res) => {
 
     // Send verification email
     try {
-      await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
+      const sendResult = await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
+      const targetMsg = sendResult.forwarded
+        ? `A 6-digit verification code was sent to ${sendResult.deliveredTo} (Resend sandbox for ${user.email}).`
+        : `A 6-digit verification code has been sent to ${user.email}. Please check your inbox.`;
+      res.json({
+        success: true,
+        message: targetMsg
+      });
     } catch (mailErr) {
       console.error('❌ [Password Reset OTP] Email delivery failed:', mailErr.message);
       return res.status(500).json({ error: 'Failed to send verification email: ' + mailErr.message });
     }
-
-    res.json({
-      success: true,
-      message: `A 6-digit verification code has been sent to ${user.email}. Please check your inbox.`
-    });
   } catch (err) {
     console.error('❌ Send OTP error:', err.message);
     res.status(500).json({ error: err.message || 'Error generating password reset code' });
