@@ -5,7 +5,8 @@ import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle
+  Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle,
+  LayoutGrid, List, AlignJustify
 } from 'lucide-react';
 
 export default function ControlsPage() {
@@ -19,6 +20,25 @@ export default function ControlsPage() {
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'
+
+  // Layout switcher state: 'dense' (ultra-compact mobile default) | 'grid' | 'list'
+  const [controlsLayout, setControlsLayout] = useState(() => {
+    if (typeof window === 'undefined') return 'dense';
+    try {
+      const saved = localStorage.getItem('chatter_controls_layout');
+      if (saved) return saved;
+      return window.innerWidth <= 768 ? 'dense' : 'grid';
+    } catch {
+      return 'dense';
+    }
+  });
+
+  const handleSetControlsLayout = (mode) => {
+    setControlsLayout(mode);
+    try {
+      localStorage.setItem('chatter_controls_layout', mode);
+    } catch {}
+  };
 
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
 
@@ -237,6 +257,161 @@ export default function ControlsPage() {
     ? friendNodes.filter(n => isExcluded(n)).length
     : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
 
+  // Render an Ultra-Compact Mobile-Friendly Contact Row (~42px slim height)
+  const renderDenseContactRow = (contact) => {
+    const isEveryoneMode = routingConfig.chatMode === 'everyone';
+    const isChecked = isEveryoneMode
+      ? true
+      : (routingConfig.chatMode === 'everyone_except' ? isExcluded(contact) : isIncluded(contact));
+
+    const currentMode = getContactMode(contact);
+    const isFullAi = currentMode === 'full_ai';
+    const isReelsOnly = currentMode === 'reels_only';
+    const isPaused = currentMode === 'manual';
+
+    return (
+      <motion.div
+        layout
+        key={contact.id || contact.name}
+        className="control-contact-dense-row"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        transition={{ duration: 0.18 }}
+        style={{
+          background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
+          border: '1px solid',
+          borderColor: isChecked && !isEveryoneMode ? '#09090b' : '#e4e4e7',
+          borderRadius: '8px',
+          padding: '6px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          transition: 'border-color 0.15s ease, background-color 0.15s ease',
+          minHeight: '44px'
+        }}
+      >
+        {/* Left: Checkbox + Avatar + Name/Handle */}
+        <div
+          onClick={() => handleToggleContact(contact)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            cursor: isEveryoneMode ? 'default' : 'pointer',
+            flex: 1,
+            minWidth: 0,
+            touchAction: 'manipulation'
+          }}
+        >
+          <div
+            style={{
+              width: '16px',
+              height: '16px',
+              minWidth: '16px',
+              borderRadius: '4px',
+              background: isChecked ? '#09090b' : '#ffffff',
+              border: '1px solid',
+              borderColor: isChecked ? '#09090b' : '#d4d4d8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              flexShrink: 0
+            }}
+          >
+            {isChecked && <Check size={11} strokeWidth={3} />}
+          </div>
+          <ContactAvatar contact={contact} size={28} showStatus={true} />
+          <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+            <div style={{ fontWeight: '700', fontSize: '0.8rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              {contact.name}
+            </div>
+            <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              {contact.handle || contact.relationship || 'Friend'}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Quick Action Pill Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => handleSetMode(contact, 'full_ai')}
+            title="Full AI"
+            style={{
+              padding: '4px 8px',
+              borderRadius: '5px',
+              fontSize: '0.67rem',
+              fontWeight: isFullAi ? '700' : '500',
+              cursor: 'pointer',
+              background: isFullAi ? '#09090b' : '#f4f4f5',
+              color: isFullAi ? '#ffffff' : '#52525b',
+              border: '1px solid',
+              borderColor: isFullAi ? '#09090b' : '#e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Bot size={11} />
+            <span>AI</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetMode(contact, 'reels_only')}
+            title="Reels Only"
+            style={{
+              padding: '4px 8px',
+              borderRadius: '5px',
+              fontSize: '0.67rem',
+              fontWeight: isReelsOnly ? '700' : '500',
+              cursor: 'pointer',
+              background: isReelsOnly ? '#09090b' : '#f4f4f5',
+              color: isReelsOnly ? '#ffffff' : '#52525b',
+              border: '1px solid',
+              borderColor: isReelsOnly ? '#09090b' : '#e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Film size={11} />
+            <span>Reels</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetMode(contact, 'paused')}
+            title="Manual Chat / Off"
+            style={{
+              padding: '4px 8px',
+              borderRadius: '5px',
+              fontSize: '0.67rem',
+              fontWeight: isPaused ? '700' : '500',
+              cursor: 'pointer',
+              background: isPaused ? '#09090b' : '#f4f4f5',
+              color: isPaused ? '#ffffff' : '#52525b',
+              border: '1px solid',
+              borderColor: isPaused ? '#09090b' : '#e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Pause size={11} />
+            <span>Off</span>
+          </button>
+        </div>
+      </motion.div>
+    );
+  };
+
   // Render a Single Contact Card
   const renderContactCard = (contact) => {
     const isEveryoneMode = routingConfig.chatMode === 'everyone';
@@ -250,9 +425,14 @@ export default function ControlsPage() {
     const isPaused = currentMode === 'manual';
 
     return (
-      <div
+      <motion.div
+        layout
         key={contact.id || contact.name}
         className="control-contact-card"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        transition={{ duration: 0.18 }}
         style={{
           background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
           border: '1px solid',
@@ -415,8 +595,16 @@ export default function ControlsPage() {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Stop AI</span>
           </button>
         </div>
-      </div>
+      </motion.div>
     );
+  };
+
+  // Render by layout mode
+  const renderContactItem = (contact) => {
+    if (controlsLayout === 'dense') {
+      return renderDenseContactRow(contact);
+    }
+    return renderContactCard(contact);
   };
 
   return (
@@ -605,21 +793,67 @@ export default function ControlsPage() {
           )}
         </div>
 
-        {/* Search Bar + 4 Filter Tabs */}
+        {/* Search Bar + Layout Switcher + 4 Filter Tabs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
-            <input
-              type="text"
-              placeholder="Search contacts by name or handle..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                paddingLeft: '34px',
-                height: '38px',
-                fontSize: '0.82rem'
-              }}
-            />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+              <input
+                type="text"
+                placeholder="Search contacts by name or handle..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  paddingLeft: '34px',
+                  height: '38px',
+                  fontSize: '0.82rem',
+                  width: '100%'
+                }}
+              />
+            </div>
+
+            {/* Layout View Switcher */}
+            <div style={{
+              display: 'flex',
+              background: '#ffffff',
+              border: '1px solid #e4e4e7',
+              padding: '3px',
+              borderRadius: '8px',
+              flexShrink: 0
+            }}>
+              {[
+                { id: 'dense', label: 'Compact', icon: AlignJustify },
+                { id: 'grid', label: 'Cards', icon: LayoutGrid },
+                { id: 'list', label: 'List', icon: List }
+              ].map(({ id, label, icon: Icon }) => {
+                const isActive = controlsLayout === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => handleSetControlsLayout(id)}
+                    title={`${label} View`}
+                    style={{
+                      background: isActive ? '#09090b' : 'transparent',
+                      color: isActive ? '#ffffff' : '#71717a',
+                      border: 'none',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.74rem',
+                      fontWeight: isActive ? '700' : '500',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Icon size={13} />
+                    <span className="hidden-on-mobile">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Quick Segment Filter Tabs */}
@@ -673,9 +907,9 @@ export default function ControlsPage() {
 
         {/* 3 CORE SECTIONS FOR 'ONLY_SELECTED' & STRUCTURED VIEW */}
         {routingConfig.chatMode === 'only_selected' && activeTab === 'all' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          <motion.div layout style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
             {/* SECTION 1: FULL AI ACTIVE */}
-            <div>
+            <motion.div layout>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} />
@@ -691,18 +925,24 @@ export default function ControlsPage() {
                 AI responds automatically to all text messages and shared reels from these selected contacts.
               </p>
               {fullAiContacts.length > 0 ? (
-                <div className="responsive-contacts-grid">
-                  {fullAiContacts.map(renderContactCard)}
-                </div>
+                <motion.div
+                  layout
+                  className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
+                  style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
+                >
+                  <AnimatePresence>
+                    {fullAiContacts.map(renderContactItem)}
+                  </AnimatePresence>
+                </motion.div>
               ) : (
                 <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
                   No contacts currently selected for Full AI. Check a contact below to activate Full AI.
                 </div>
               )}
-            </div>
+            </motion.div>
 
             {/* SECTION 2: REELS ONLY */}
-            <div>
+            <motion.div layout>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0284c7' }} />
@@ -718,18 +958,24 @@ export default function ControlsPage() {
                 AI only reacts with witty quips or reactions when these contacts share an Instagram Reel or Meme. Direct text chats stay manual.
               </p>
               {reelsOnlyContacts.length > 0 ? (
-                <div className="responsive-contacts-grid">
-                  {reelsOnlyContacts.map(renderContactCard)}
-                </div>
+                <motion.div
+                  layout
+                  className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
+                  style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
+                >
+                  <AnimatePresence>
+                    {reelsOnlyContacts.map(renderContactItem)}
+                  </AnimatePresence>
+                </motion.div>
               ) : (
                 <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
                   No contacts in Reels Only mode.
                 </div>
               )}
-            </div>
+            </motion.div>
 
             {/* SECTION 3: MANUAL CHAT / PAUSED (UNSELECTED) */}
-            <div>
+            <motion.div layout>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#d4d4d8' }} />
@@ -745,23 +991,35 @@ export default function ControlsPage() {
                 AI is completely silenced for these unselected contacts. You chat with them manually on Instagram.
               </p>
               {manualContacts.length > 0 ? (
-                <div className="responsive-contacts-grid">
-                  {manualContacts.map(renderContactCard)}
-                </div>
+                <motion.div
+                  layout
+                  className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
+                  style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
+                >
+                  <AnimatePresence>
+                    {manualContacts.map(renderContactItem)}
+                  </AnimatePresence>
+                </motion.div>
               ) : (
                 <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
                   All contacts are currently selected for AI.
                 </div>
               )}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         ) : (
-          /* TAB FILTERED OR STANDARD GRID VIEW */
-          <div className="responsive-contacts-grid">
-            {activeTab === 'full_ai' && fullAiContacts.map(renderContactCard)}
-            {activeTab === 'reels_only' && reelsOnlyContacts.map(renderContactCard)}
-            {activeTab === 'manual' && manualContacts.map(renderContactCard)}
-            {activeTab === 'all' && filteredFriends.map(renderContactCard)}
+          /* TAB FILTERED OR STANDARD VIEW */
+          <motion.div
+            layout
+            className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
+            style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
+          >
+            <AnimatePresence>
+              {activeTab === 'full_ai' && fullAiContacts.map(renderContactItem)}
+              {activeTab === 'reels_only' && reelsOnlyContacts.map(renderContactItem)}
+              {activeTab === 'manual' && manualContacts.map(renderContactItem)}
+              {activeTab === 'all' && filteredFriends.map(renderContactItem)}
+            </AnimatePresence>
             {((activeTab === 'full_ai' && fullAiContacts.length === 0) ||
               (activeTab === 'reels_only' && reelsOnlyContacts.length === 0) ||
               (activeTab === 'manual' && manualContacts.length === 0) ||
@@ -770,7 +1028,7 @@ export default function ControlsPage() {
                 No contacts found matching this view.
               </div>
             )}
-          </div>
+          </motion.div>
         )}
       </div>
     </motion.div>
