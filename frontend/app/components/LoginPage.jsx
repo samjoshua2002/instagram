@@ -199,13 +199,19 @@ export default function LoginPage({ onLoginSuccess }) {
       try {
         const res = await fetch(`${API_BASE}/api/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
         const data = await res.json();
-        if (data.exists && (data.profilePicUrl || data.fullName)) {
+        if (data.alreadyRegistered) {
+          setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
+          setInstaPreview(null);
+        } else if (data.exists === false) {
+          setInstaError(data.message || `No Instagram account found for @${handle}.`);
+          setInstaPreview(null);
+        } else if (data.exists) {
           setInstaPreview(data);
           setInstaError('');
           setRegForm(prev => ({
             ...prev,
             instagramId: data.instagramId || '',
-            instagramUsername: data.username || handle
+            instagramUsername: data.handle || data.username || handle
           }));
         }
       } catch (err) {

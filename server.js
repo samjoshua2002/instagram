@@ -1075,6 +1075,24 @@ app.get('/api/persona', async (req, res) => {
     if (!config) {
       config = await PersonaConfig.create({});
     }
+
+    // If authenticated user is NOT superadmin, scope identity & tokens to their own account!
+    if (req.user && req.user.role !== 'superadmin') {
+      const userConfig = config.toObject();
+      userConfig.creatorName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
+      userConfig.instagramHandle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
+      if (req.user.businessProfile?.description) {
+        userConfig.personaBio = req.user.businessProfile.description;
+      }
+      if (req.user.instagramPageAccessToken) {
+        userConfig.instagramPageAccessToken = req.user.instagramPageAccessToken;
+      }
+      if (req.user.instagramAccountId) {
+        userConfig.instagramAccountId = req.user.instagramAccountId;
+      }
+      return res.json(userConfig);
+    }
+
     res.json(config);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1139,6 +1157,15 @@ app.put('/api/persona', async (req, res) => {
 
     await config.save();
     await redisService.invalidatePersonaConfig();
+
+    if (req.user && req.user.role !== 'superadmin') {
+      if (instagramPageAccessToken !== undefined) req.user.instagramPageAccessToken = instagramPageAccessToken.trim();
+      if (instagramAccountId !== undefined) req.user.instagramAccountId = instagramAccountId.trim();
+      if (creatorName !== undefined) req.user.firstName = creatorName.trim();
+      if (instagramHandle !== undefined) req.user.instagramUsername = instagramHandle.trim().replace(/^@/, '');
+      await req.user.save();
+    }
+
     res.json({ success: true, config });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1603,8 +1630,12 @@ app.get('/api/social-graph', async (req, res) => {
       socialGraphService.trainGraphFromDB(UserMemory, Message).catch(e => console.warn('trainGraph error:', e.message));
     }
 
-    // Fetch all social graph nodes
-    const nodes = await SocialGraph.find({}).sort({ updatedAt: -1 });
+    // Fetch social graph nodes (scoped to workspace user if not superadmin)
+    const isSuper = req.user?.role === 'superadmin';
+    const query = (!isSuper && req.user)
+      ? { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] }
+      : {};
+    const nodes = await SocialGraph.find(query).sort({ updatedAt: -1 });
 
     // Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
     const enrichedNodes = await Promise.all(nodes.map(async (n) => {
@@ -1821,6 +1852,7 @@ app.post('/api/social-graph/node', async (req, res) => {
           ...(typeof req.body.chatsCount === 'number' ? { chatsCount: req.body.chatsCount } : {}),
           ...(typeof req.body.reelsCount === 'number' ? { reelsCount: req.body.reelsCount } : {}),
           ...(finalProfilePic ? { profilePic: finalProfilePic } : {}),
+          ...(req.user ? { ownerId: req.user._id, ownerUsername: req.user.username } : {}),
           updatedAt: new Date()
         }
       },

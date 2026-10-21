@@ -21,16 +21,12 @@ class AuthService {
 
   initMailer() {
     const user = process.env.EMAIL_USER;
-    const pass = process.env.EMAIL_PASS;
+    const rawPass = process.env.EMAIL_PASS;
+    const pass = rawPass ? rawPass.replace(/\s+/g, '') : null;
     if (user && pass) {
       this.transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // SSL port 465 avoids cloud SMTP throttling
+        service: 'gmail',
         auth: { user, pass },
-        connectionTimeout: 7000,
-        greetingTimeout: 7000,
-        socketTimeout: 9000,
       });
     }
   }
