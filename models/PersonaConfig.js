@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const PersonaConfigSchema = new mongoose.Schema({
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
   creatorName: {
     type: String,
     default: 'Sam Joshua',

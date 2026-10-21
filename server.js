@@ -1082,29 +1082,52 @@ app.post('/api/conversations/:senderId/fact', async (req, res) => {
 // Get Persona Configuration
 app.get('/api/persona', async (req, res) => {
   try {
-    let config = await PersonaConfig.findOne();
-    if (!config) {
-      config = await PersonaConfig.create({});
+    let query = {};
+    if (req.user) {
+      query = { ownerId: req.user._id };
     }
 
-    // If authenticated user is NOT superadmin, scope identity & tokens to their own account!
-    if (req.user && req.user.role !== 'superadmin') {
+    let config = await PersonaConfig.findOne(query);
+    if (!config && req.user) {
+      if (req.user.role === 'superadmin') {
+        config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
+      }
+      if (!config) {
+        const displayName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
+        const handle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
+        config = await PersonaConfig.create({
+          ownerId: req.user._id,
+          creatorName: displayName,
+          instagramHandle: handle,
+          personaBio: req.user.businessProfile?.description || `I am ${displayName}, creator of ${handle}.`,
+          aboutMe: `I am ${displayName}, creator of ${handle}.`,
+          characteristics: 'Friendly, helpful, approachable, authentic.',
+          textingHabits: 'Casual lowercase, friendly, short messages.',
+          replyRules: 'Default to natural friendly replies without sounding robotic.',
+          toneGuidelines: '1. Talk naturally like a real human.\n2. Keep replies engaging and warm.\n3. Never sound like a robot.',
+          customKnowledge: `Account: ${handle}\nCreator: ${displayName}`,
+          instagramPageAccessToken: req.user.instagramPageAccessToken || '',
+          instagramAccountId: req.user.instagramAccountId || '',
+        });
+      }
+    }
+
+    if (config) {
       const userConfig = config.toObject();
-      userConfig.creatorName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
-      userConfig.instagramHandle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
-      if (req.user.businessProfile?.description) {
-        userConfig.personaBio = req.user.businessProfile.description;
-      }
-      if (req.user.instagramPageAccessToken) {
-        userConfig.instagramPageAccessToken = req.user.instagramPageAccessToken;
-      }
-      if (req.user.instagramAccountId) {
-        userConfig.instagramAccountId = req.user.instagramAccountId;
+      if (req.user) {
+        if (!userConfig.creatorName) {
+          userConfig.creatorName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
+        }
+        if (!userConfig.instagramHandle) {
+          userConfig.instagramHandle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
+        }
+        userConfig.instagramPageAccessToken = config.instagramPageAccessToken || req.user.instagramPageAccessToken || '';
+        userConfig.instagramAccountId = config.instagramAccountId || req.user.instagramAccountId || req.user.instagramId || '';
       }
       return res.json(userConfig);
     }
 
-    res.json(config);
+    res.json(config || {});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1113,9 +1136,17 @@ app.get('/api/persona', async (req, res) => {
 // Update Persona Configuration
 app.put('/api/persona', async (req, res) => {
   try {
-    let config = await PersonaConfig.findOne();
+    let query = {};
+    if (req.user) {
+      query = { ownerId: req.user._id };
+    }
+
+    let config = await PersonaConfig.findOne(query);
+    if (!config && req.user && req.user.role === 'superadmin') {
+      config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
+    }
     if (!config) {
-      config = new PersonaConfig();
+      config = new PersonaConfig({ ...query });
     }
 
     const {
@@ -1164,16 +1195,18 @@ app.put('/api/persona', async (req, res) => {
     if (autoShareReelsEnabled !== undefined) config.autoShareReelsEnabled = autoShareReelsEnabled;
     if (autoShareReelsFrequencyHours !== undefined) config.autoShareReelsFrequencyHours = autoShareReelsFrequencyHours;
     if (autoShareReelsTopics !== undefined) config.autoShareReelsTopics = autoShareReelsTopics;
-    if (giphyApiKey !== undefined) config.giphyApiKey = giphyApiKey.trim();
+    if (giphyApiKey !== undefined) config.giphyApiKey = (giphyApiKey || '').trim();
 
     await config.save();
     await redisService.invalidatePersonaConfig();
 
-    if (req.user && req.user.role !== 'superadmin') {
+    if (req.user) {
       if (instagramPageAccessToken !== undefined) req.user.instagramPageAccessToken = instagramPageAccessToken.trim();
       if (instagramAccountId !== undefined) req.user.instagramAccountId = instagramAccountId.trim();
       if (creatorName !== undefined) req.user.firstName = creatorName.trim();
       if (instagramHandle !== undefined) req.user.instagramUsername = instagramHandle.trim().replace(/^@/, '');
+      req.user.hasInstagramToken = Boolean(req.user.instagramPageAccessToken);
+      req.user.isInstagramConnected = Boolean(req.user.instagramPageAccessToken);
       await req.user.save();
     }
 
