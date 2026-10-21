@@ -49,6 +49,16 @@ const UserSchema = new mongoose.Schema({
     default: 'catovidz',
     trim: true,
   },
+  instagramId: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  role: {
+    type: String,
+    enum: ['user', 'superadmin'],
+    default: 'user',
+  },
   accountType: {
     type: String,
     enum: ['personal', 'creator', 'business', 'agency'],

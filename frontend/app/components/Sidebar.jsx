@@ -98,12 +98,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { routingConfig, toggleGlobalBot, startAiInterview, user, logout, setIsPasskeyModalOpen } = useApp();
 
+  const isSuperadmin = user?.role === 'superadmin';
+
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard, code: '01' },
     { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
     { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
     { href: '/settings', label: 'Persona & Style', icon: UserCheck, code: '04' },
     { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '05' },
+    ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '06' }] : [])
   ];
 
   const displayName = user?.firstName

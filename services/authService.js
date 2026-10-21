@@ -55,11 +55,8 @@ class AuthService {
           username: 'samjoshua',
           email: 'guidetalk.app@gmail.com',
           passwordHash: initialHash,
-          firstName: 'Sam',
-          lastName: 'Joshua',
-          mobileNumber: '8610866413',
-          whatsappNumber: '8610866413',
-          instagramUsername: 'catovidz',
+          firstName: 'Admin',
+          lastName: 'User',
           accountType: 'personal',
           twoFactor: {
             enabled: true,
@@ -77,20 +74,9 @@ class AuthService {
           user.twoFactor.enabled = true;
           changed = true;
         }
-        if (!user.mobileNumber) {
-          user.mobileNumber = '8610866413';
-          changed = true;
-        }
-        if (!user.whatsappNumber) {
-          user.whatsappNumber = '8610866413';
-          changed = true;
-        }
-        if (!user.instagramUsername) {
-          user.instagramUsername = 'catovidz';
-          changed = true;
-        }
         if (changed) await user.save();
       }
+
       return user;
     } catch (err) {
       console.error('❌ [AuthService] Failed ensuring owner user:', err.message);
@@ -102,12 +88,15 @@ class AuthService {
    * Sign a JWT session token (valid for 30 days)
    */
   generateToken(user) {
+    const isSuper = user.role === 'superadmin';
     return jwt.sign(
       {
         userId: user._id.toString(),
         username: user.username,
         email: user.email,
         accountType: user.accountType || 'personal',
+        role: isSuper ? 'superadmin' : 'user',
+        instagramId: user.instagramId || '',
         firstName: user.firstName,
         lastName: user.lastName,
       },
@@ -133,7 +122,8 @@ class AuthService {
   async sendOtpEmail(toEmail, otpCode, purpose = 'Password Reset') {
     if (!this.transporter) this.initMailer();
     if (!this.transporter) {
-      throw new Error('Email service not configured. Please ensure EMAIL_USER and EMAIL_PASS are configured on Render.');
+      console.warn('⚠️ [AuthService] Email service not configured. Falling back gracefully.');
+      return { sent: false, reason: 'unconfigured' };
     }
 
     const html = `
@@ -164,7 +154,7 @@ class AuthService {
     });
 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Email server connection timed out after 8s. You can also reset password instantly using your Zoho OneAuth app code!')), 8000)
+      setTimeout(() => reject(new Error('Email server connection timed out after 25s.')), 25000)
     );
 
     return Promise.race([sendPromise, timeoutPromise]);
