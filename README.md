@@ -5,6 +5,7 @@
 [![Express Backend](https://img.shields.io/badge/Backend-Node.js%20%2F%20Express-339933?logo=node.js&logoColor=white)](https://expressjs.com)
 [![MongoDB Atlas](https://img.shields.io/badge/Database-MongoDB%20Atlas-47A248?logo=mongodb&logoColor=white)](https://mongodb.com)
 [![Azure OpenAI](https://img.shields.io/badge/AI_Engine-Azure_OpenAI_gpt--4o-0078D4?logo=microsoftazure&logoColor=white)](https://azure.microsoft.com)
+[![Brevo](https://img.shields.io/badge/Email_Delivery-Brevo_HTTPS_API-0092FF?logo=brevo&logoColor=white)](https://brevo.com)
 [![Resend](https://img.shields.io/badge/Email_Delivery-Resend_HTTPS_API-black?logo=resend&logoColor=white)](https://resend.com)
 [![CEL Engine](https://img.shields.io/badge/Rules-Google_CEL-4285F4?logo=google&logoColor=white)](https://github.com/google/cel-spec)
 [![Tauri 2.0](https://img.shields.io/badge/Desktop-Tauri%202.0%20(macOS%20%26%20Win)-24C8D8?logo=tauri&logoColor=white)](https://tauri.app)
@@ -27,14 +28,14 @@ flowchart TD
     IGUser([Instagram Contact / Customer]) -->|Sends DM / Shares Reel| MetaPlatform[Meta Graph API Platform]
     AdminUser([Creator / Workspace Admin]) -->|Login / Signup / Password Reset| WebClient[Next.js 14 Dashboard / Tauri App]
 
-    %% Authentication & Identity Flow (Resend Mail)
+    %% Authentication & Identity Flow (Brevo & Resend Mail Engine)
     subgraph Auth_Identity["Authentication & Identity Security"]
         WebClient -->|POST /api/auth/register or reset| AuthRoutes[Auth Service Router]
         AuthRoutes --> AuthType{Auth Factor}
-        AuthType -->|OTP / Email Verification| ResendEngine["Resend Mail Engine (HTTPS Port 443)"]
+        AuthType -->|OTP / Email Verification| BrevoEngine["Brevo HTTPS REST API Engine (Port 443)"]
         AuthType -->|Biometric Passkeys| WebAuthn["WebAuthn FIDO2 / Touch ID"]
         AuthType -->|Time-based MFA| TOTP["Zoho OneAuth / Authenticator TOTP"]
-        ResendEngine -->|Encrypted 6-digit OTP / Reset Token| AdminInbox([Admin Inbox: guidetalk.app@gmail.com])
+        BrevoEngine -->|Delivers Code from guidetalk.app@gmail.com| UserInbox([User Recipient Inbox])
     end
 
     %% Webhook Ingestion & Security
@@ -147,7 +148,7 @@ instagram/
 │   ├── instagramService.js   # Meta Graph API sender, typing indicators, reactions
 │   ├── memoryService.js      # Automated background fact and lore extraction
 │   ├── socialGraphService.js # Relationship network queries
-│   ├── authService.js        # Resend HTTPS API transactional mail, OTP verification, WebAuthn Passkeys
+│   ├── authService.js        # Brevo & Resend HTTPS REST APIs, OTP verification, WebAuthn Passkeys
 │   └── redisService.js       # Distributed deduplication locks and rate limiting
 ├── routes/
 │   └── auth.js               # Auth, WebAuthn passkeys, Facebook Login for Business OAuth
@@ -178,8 +179,8 @@ instagram/
 | **Database & Cache** | MongoDB Atlas (Mongoose 8.3.1), Upstash Redis (`ioredis`) |
 | **AI Providers** | Azure OpenAI (`gpt-4o`), Custom OpenAI, Anthropic, Groq, Ollama, MCP |
 | **Rule Engine** | Google Common Expression Language (`@marcbachmann/cel-js`) |
-| **Email Delivery** | Resend REST API (HTTPS port 443 — immune to cloud SMTP port blocks) |
-| **Security & Auth** | Resend API (HTTPS Port 443 OTPs), WebAuthn / Passkeys (`@simplewebauthn`), JWT, BCrypt, AES-256-GCM, HMAC-SHA256 |
+| **Email Delivery** | Brevo & Resend REST APIs (HTTPS port 443 — delivers directly from guidetalk.app@gmail.com to requesting users) |
+| **Security & Auth** | Brevo/Resend HTTPS OTPs, WebAuthn / Passkeys (`@simplewebauthn`), JWT, BCrypt, AES-256-GCM, HMAC-SHA256 |
 | **External APIs** | Meta Instagram Graph API (v19.0 / v26.0), GIPHY API |
 
 ---
@@ -191,7 +192,7 @@ instagram/
 3. **Safe Failure:** If an incoming message cannot be mapped to a registered tenant, it drops safely without executing replies. **The platform never falls back to admin credentials for external accounts.**
 4. **Token Encryption at Rest:** Every Meta Page Access Token and custom AI API key is encrypted using AES-256-GCM before saving to MongoDB.
 5. **Prompt Injection Guardrails:** User messages are isolated inside strict `<incoming_message>` XML boundaries to prevent prompt hijacking.
-6. **Transactional Email Hardening:** Email OTPs and password resets utilize Resend's REST API over HTTPS (port 443) rather than raw SMTP (ports 25/465/587), guaranteeing 100% deliverability on cloud hosting providers like Render without connection timeouts.
+6. **Transactional Email Hardening:** Email OTPs and password resets utilize Brevo and Resend REST APIs over HTTPS (port 443) rather than raw SMTP (ports 25/465/587), guaranteeing 100% deliverability on cloud hosting providers like Render without connection timeouts or IP locks.
 
 ---
 
@@ -203,13 +204,13 @@ instagram/
 - Running Redis instance (Upstash or local)
 - Meta Developer Account with an active Instagram Professional account
 - Azure OpenAI endpoint or custom OpenAI/Ollama API credentials
-- Resend Account & API Key (for transactional OTP & password reset emails)
+- Brevo Account & API Key (or Resend API Key) for transactional OTP & verification emails
 
 ### Installation & Local Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/samjoshuav/instagram.git
+   git clone https://github.com/samjoshua/instagram.git
    cd instagram
    ```
 
@@ -229,7 +230,8 @@ instagram/
    - `META_APP_ID` & `META_APP_SECRET`: Credentials from Meta App Dashboard.
    - `WEBHOOK_VERIFY_TOKEN`: Verification secret for webhook challenge.
    - `AZURE_OPENAI_ENDPOINT` & `AZURE_OPENAI_KEY`: Default AI provider credentials.
-   - `RESEND_API_KEY`: Resend API key for instant OTP and verification email delivery.
+   - `BREVO_API_KEY`: Brevo REST API key for instant OTP emails sent directly from `guidetalk.app@gmail.com`.
+   - `RESEND_API_KEY`: Optional Resend API key fallback.
 
 4. **Start the development servers:**
    ```bash
