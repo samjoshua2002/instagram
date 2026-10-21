@@ -156,6 +156,16 @@ export function AppProvider({ children }) {
     return false;
   });
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+  const [adminSession, setAdminSession] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('chatter_admin_session');
+        return stored ? JSON.parse(stored) : null;
+      } catch { return null; }
+    }
+    return null;
+  });
+  const isImpersonating = !!adminSession;
 
   const [routingConfig, setRoutingConfigState] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -254,9 +264,11 @@ export function AppProvider({ children }) {
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     try {
+      localStorage.removeItem('chatter_admin_session');
       sessionStorage.removeItem('chatter_session_active');
       localStorage.removeItem('chatter_show_chooser');
     } catch (e) {}
+    setAdminSession(null);
     setToken(null);
     setUser(null);
     showToast?.('Signed out successfully.', 'info');
@@ -264,6 +276,44 @@ export function AppProvider({ children }) {
       window.location.href = '/';
     }
   }, [showToast]);
+
+  const enterWorkspace = useCallback((creatorToken, creatorUser) => {
+    if (typeof window !== 'undefined') {
+      if (!adminSession && user?.role === 'superadmin') {
+        const sessionRecord = { token, user };
+        localStorage.setItem('chatter_admin_session', JSON.stringify(sessionRecord));
+        setAdminSession(sessionRecord);
+      }
+      localStorage.setItem('chatter_jwt_token', creatorToken);
+      localStorage.setItem('chatter_user_profile', JSON.stringify(creatorUser));
+      setToken(creatorToken);
+      setUser(creatorUser);
+      showToast?.(`Switched to workspace: @${creatorUser.instagramUsername || creatorUser.username}`, 'success');
+      window.location.href = '/';
+    }
+  }, [adminSession, token, user, showToast]);
+
+  const exitWorkspace = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      let savedSession = adminSession;
+      if (!savedSession) {
+        try {
+          const raw = localStorage.getItem('chatter_admin_session');
+          if (raw) savedSession = JSON.parse(raw);
+        } catch {}
+      }
+      if (savedSession) {
+        localStorage.setItem('chatter_jwt_token', savedSession.token);
+        localStorage.setItem('chatter_user_profile', JSON.stringify(savedSession.user));
+        localStorage.removeItem('chatter_admin_session');
+        setToken(savedSession.token);
+        setUser(savedSession.user);
+        setAdminSession(null);
+        showToast?.('Returned to Platform Superadmin Console', 'info');
+        window.location.href = '/';
+      }
+    }
+  }, [adminSession, showToast]);
 
   const updateUserProfile = useCallback((updatedUser) => {
     setUser(prev => ({ ...prev, ...updatedUser }));
@@ -1082,6 +1132,10 @@ export function AppProvider({ children }) {
         updateUserProfile,
         isPasskeyModalOpen,
         setIsPasskeyModalOpen,
+        adminSession,
+        isImpersonating,
+        enterWorkspace,
+        exitWorkspace,
       }}
     >
       {children}
