@@ -146,11 +146,11 @@ const statCardVariants = {
 };
 
 export default function AnalyticsPage() {
-  const { nodes, routingConfig, user, token, login, API_BASE, showToast } = useApp();
+  const { nodes, routingConfig, user, token, enterWorkspace, API_BASE, showToast } = useApp();
   const isSuperadmin = user?.role === 'superadmin';
 
-  // Toggle view for superadmins: 'platform' (default) vs 'personal'
-  const [activeTab, setActiveTab] = useState(isSuperadmin ? 'platform' : 'personal');
+  // Toggle view for superadmins: 'platform' (default)
+  const [activeTab, setActiveTab] = useState('platform');
 
   // Superadmin observatory state
   const [adminData, setAdminData] = useState(null);
@@ -167,12 +167,13 @@ export default function AnalyticsPage() {
 
   // Fetch admin accounts list
   const fetchAdminAccounts = async () => {
-    if (!token || !isSuperadmin) return;
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
     setAdminLoading(true);
     setAdminError('');
     try {
       const res = await fetch(`${API_BASE}/api/admin/accounts`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${activeToken}` }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch admin accounts.');
@@ -193,26 +194,25 @@ export default function AnalyticsPage() {
 
   // Impersonate / Enter Workspace
   const handleEnterWorkspace = async (targetUser) => {
-    if (!token || !isSuperadmin || impersonatingId) return;
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken || impersonatingId) return;
     setImpersonatingId(targetUser.id);
     try {
       const res = await fetch(`${API_BASE}/api/admin/impersonate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify({ userId: targetUser.id })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to enter workspace.');
 
-      showToast?.(`Entering workspace: @${targetUser.username}`, 'success');
-      login(data.token, data.user);
+      enterWorkspace(data.token, data.user);
     } catch (err) {
       console.error('Workspace impersonation error:', err);
       showToast?.(err.message || 'Failed to enter workspace.', 'error');
-    } finally {
       setImpersonatingId(null);
     }
   };
@@ -347,57 +347,48 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        {/* Superadmin Tab Switcher */}
+        {/* Superadmin Quick Actions */}
         {isSuperadmin && (
-          <div style={{
-            display: 'inline-flex',
-            background: '#f4f4f5',
-            padding: '4px',
-            borderRadius: '10px',
-            border: '1px solid #e4e4e7',
-            gap: '4px'
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: '#f4f4f5',
+              border: '1px solid #e4e4e7',
+              fontSize: '0.74rem',
+              fontWeight: '700',
+              fontFamily: "'JetBrains Mono', monospace",
+              color: '#09090b'
+            }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+              <span>SUPERADMIN OBSERVATORY</span>
+            </div>
+
             <button
               type="button"
-              onClick={() => setActiveTab('platform')}
+              onClick={fetchAdminAccounts}
+              disabled={adminLoading}
+              title="Refresh platform accounts"
               style={{
-                padding: '7px 14px',
-                borderRadius: '7px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
-                border: 'none',
-                cursor: 'pointer',
-                background: activeTab === 'platform' ? '#09090b' : 'transparent',
-                color: activeTab === 'platform' ? '#ffffff' : '#71717a',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Shield size={13} />
-              <span>Platform Users ({adminData?.accounts?.length || '...'})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('personal')}
-              style={{
-                padding: '7px 14px',
-                borderRadius: '7px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                background: '#09090b',
+                color: '#ffffff',
                 border: 'none',
-                cursor: 'pointer',
-                background: activeTab === 'personal' ? '#09090b' : 'transparent',
-                color: activeTab === 'personal' ? '#ffffff' : '#71717a',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
+                fontSize: '0.74rem',
+                fontWeight: '700',
+                cursor: adminLoading ? 'wait' : 'pointer',
                 transition: 'all 0.15s ease'
               }}
             >
-              <Bot size={13} />
-              <span>My Bot & DMs</span>
+              <RefreshCw size={12} className={adminLoading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
             </button>
           </div>
         )}

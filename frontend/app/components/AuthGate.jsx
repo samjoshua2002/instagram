@@ -10,6 +10,7 @@ import Toast from './Toast';
 import AiInterviewModal from './AiInterviewModal';
 import LinkIdModal from './LinkIdModal';
 import OnboardingWizard from './OnboardingWizard';
+import WorkspaceImpersonationBanner from './WorkspaceImpersonationBanner';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function AuthGate({ children }) {
@@ -85,6 +86,7 @@ export default function AuthGate({ children }) {
       <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: '#ffffff' }}>
         <Sidebar />
         <main className="app-main-content">
+          <WorkspaceImpersonationBanner />
           {children}
         </main>
       </div>

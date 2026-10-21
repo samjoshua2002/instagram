@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
+import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle,
@@ -15,8 +16,21 @@ export default function ControlsPage() {
     routingConfig,
     saveRouting,
     setRoutingConfig,
-    updateContactPreferences
+    updateContactPreferences,
+    user,
+    isImpersonating
   } = useApp();
+
+  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator Chat Rules & AI Routing"
+        sectionCode="03 // CONTROLS"
+        sectionDescription="Chat rules, contact exclusion lists, and AI routing logic are configured per individual creator workspace. Choose a creator workspace below to inspect and manage their rules."
+      />
+    );
+  }
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'

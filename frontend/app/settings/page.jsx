@@ -7,10 +7,22 @@ import {
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
   Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff
 } from 'lucide-react';
+import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 
 export default function SettingsPage() {
-  const { API_BASE, showToast } = useApp();
+  const { API_BASE, showToast, user, isImpersonating } = useApp();
+
+  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator Persona & Style"
+        sectionCode="04 // SETTINGS"
+        sectionDescription="Persona, bio, texting style, tone guidelines, and forbidden words are configured per individual creator workspace. Choose a creator workspace below to inspect and manage their persona."
+      />
+    );
+  }
 
   const [activeTab, setActiveTab] = useState('about');
   const [loading, setLoading] = useState(true);
@@ -20,8 +32,8 @@ export default function SettingsPage() {
 
   // Form State
   const [formData, setFormData] = useState({
-    creatorName: 'Sam Joshua',
-    instagramHandle: '@catovidz',
+    creatorName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.username || ''),
+    instagramHandle: user?.instagramUsername ? `@${user.instagramUsername}` : '',
     personaBio: '',
     aboutMe: '',
     characteristics: '',
@@ -32,7 +44,7 @@ export default function SettingsPage() {
     forbiddenWords: [],
     sampleConversations: [],
     typingDelaySeconds: 1.5,
-    giphyApiKey: 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
+    giphyApiKey: '',
   });
 
   // State for Giphy API Key
