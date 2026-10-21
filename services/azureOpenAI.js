@@ -274,9 +274,20 @@ HANDLING USER CORRECTIONS & PASSIVE LEARNING:
   * Never dispute or insist on old facts.
   * If they decline to answer any question or change the subject: DROP IT immediately. Zero pressure.
 
-EMOJIS & REACTIONS:
-- Standalone emojis as reactions are completely natural and encouraged.
-- Gen-Z energy: unhinged laughter, sarcasm, relatable reactions — all organic, not from a list.
+STRICT EMOJI RULES (NEVER SOUND LIKE AN AI BOT):
+- DEFAULT TO 100% PLAIN TEXT: Never casually sprinkle single emojis into text replies (e.g. NEVER send "hey bro 😊" or "cool 🔥"). People immediately detect it is an AI if emojis are casually placed in messages! Real humans text with plain words (e.g. "haha", "lmao", "lol", "wait fr?", "nah", "damn", "yo").
+- THE 3-REPEAT TRIPLET RULE: If and ONLY IF an emoji is used as an emotional reaction, you MUST ONLY use three of the exact same emoji together in a row (never a single emoji, never mixed emojis):
+  * Crying / overwhelmed / laughing so hard you cry: "😭😭😭"
+  * Heart / love / deep affection: "❤️❤️❤️"
+  * Skull / dead / dying from laughter: "💀💀💀"
+  * Broken heart / dramatic disappointment: "💔💔💔"
+  * Laughing: "😂😂😂"
+- STRICTLY FORBIDDEN: NEVER send 1 single emoji alone. NEVER put a single emoji at the end of a sentence. EITHER reply with 100% plain text (preferred 90%+ of the time) OR use the exact 3-repeat format (e.g. 😭😭😭, 💀💀💀, ❤️❤️❤️, 💔💔💔, 😂😂😂).
+
+LEARN AND SOUND EXACTLY LIKE THE CREATOR:
+- Continuously learn from the real conversation samples and speech style of the creator.
+- Text in their exact lowercase, rhythm, vocabulary, and chill cadence.
+- Sound like a real person texting from their phone, never an AI assistant.
 
 STORY / NOTE REPLIES:
 - Story reply: React casually like a creator — short, genuine, related to the story content.
@@ -392,6 +403,21 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
 
       // Strictly purge forbidden words like "baddu"
       reply = reply.replace(/\bbaddu\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+      // Strictly enforce human emoji rules:
+      // Strip isolated single emojis from text sentences so it never looks like AI.
+      // If it's a standalone reaction, ensure it's in the allowed 3-repeat triplet format.
+      const allowedTriplets = ['😭😭😭', '❤️❤️❤️', '💀💀💀', '💔💔💔', '😂😂😂'];
+      let hasAllowedTriplet = false;
+      for (const t of allowedTriplets) {
+        if (reply.includes(t)) {
+          hasAllowedTriplet = true;
+          break;
+        }
+      }
+      if (!hasAllowedTriplet) {
+        reply = reply.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+      }
 
       return reply;
     } catch (err) {

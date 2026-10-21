@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause
+  Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 export default function ControlsPage() {
@@ -18,6 +18,7 @@ export default function ControlsPage() {
   } = useApp();
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'
 
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
 
@@ -27,7 +28,7 @@ export default function ControlsPage() {
     currentConfigRef.current = routingConfig;
   }, [routingConfig]);
 
-  const queueSave = (newConfig) => {
+  const queueSave = useCallback((newConfig) => {
     currentConfigRef.current = newConfig;
     setRoutingConfig(newConfig);
     const savePromise = saveQueueRef.current.then(() => saveRouting(newConfig));
@@ -35,126 +36,169 @@ export default function ControlsPage() {
       console.warn('Serialized routing save error:', err);
     });
     return saveQueueRef.current;
-  };
+  }, [saveRouting, setRoutingConfig]);
 
-  const filteredFriends = useMemo(() => {
-    if (!search.trim()) return friendNodes;
-    const q = search.toLowerCase();
-    return friendNodes.filter(n =>
-      n.name.toLowerCase().includes(q) ||
-      (n.handle || '').toLowerCase().includes(q) ||
-      (n.relationship || '').toLowerCase().includes(q)
-    );
-  }, [friendNodes, search]);
-
-  const getContactKey = (c) => {
+  const getContactKey = useCallback((c) => {
     if (c.senderId && c.senderId.trim()) return c.senderId.trim();
     if (c.handle && c.handle.trim()) return c.handle.replace(/^@/, '').toLowerCase().trim();
     if (c.id && c.id.trim()) return c.id.trim();
     return (c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '_').trim();
-  };
+  }, []);
 
-  const isExcluded = (contact) => {
-    const key = getContactKey(contact);
+  const getTargetKeys = useCallback((c) => {
+    return [
+      c.id,
+      c.senderId,
+      c.handle ? c.handle.replace(/^@/, '').toLowerCase() : '',
+      c.name ? c.name.toLowerCase().replace(/[^a-z0-9]/g, '_') : ''
+    ].filter(Boolean);
+  }, []);
+
+  const isExcluded = useCallback((contact) => {
     const configToUse = currentConfigRef.current || routingConfig;
     const excluded = (configToUse.excludedContactIds || []).filter(Boolean);
-    return (
-      excluded.includes(key) ||
-      (contact.senderId && excluded.includes(contact.senderId)) ||
-      (contact.handle && excluded.includes(contact.handle.replace(/^@/, '').toLowerCase())) ||
-      (contact.id && excluded.includes(contact.id)) ||
-      contact.aiEnabled === false
-    );
-  };
+    const targetKeys = getTargetKeys(contact);
+    return targetKeys.some(k => excluded.includes(k)) || contact.aiEnabled === false;
+  }, [routingConfig, getTargetKeys]);
 
-  const isIncluded = (contact) => {
-    const key = getContactKey(contact);
+  const isIncluded = useCallback((contact) => {
     const configToUse = currentConfigRef.current || routingConfig;
     const included = (configToUse.includedContactIds || []).filter(Boolean);
-    return (
-      included.includes(key) ||
-      (contact.senderId && included.includes(contact.senderId)) ||
-      (contact.handle && included.includes(contact.handle.replace(/^@/, '').toLowerCase())) ||
-      (contact.id && included.includes(contact.id))
-    );
-  };
+    const targetKeys = getTargetKeys(contact);
+    return targetKeys.some(k => included.includes(k)) && contact.aiEnabled !== false;
+  }, [routingConfig, getTargetKeys]);
 
-  const handleToggleExclude = (contact) => {
+  // Determine current AI state of contact
+  const getContactMode = useCallback((contact) => {
+    const chatMode = routingConfig.chatMode;
+    if (chatMode === 'only_selected') {
+      const included = isIncluded(contact);
+      if (!included || contact.aiEnabled === false) return 'manual';
+      if (contact.replyToMessages === false && contact.replyToReelsAndPosts !== false) return 'reels_only';
+      return 'full_ai';
+    } else if (chatMode === 'everyone_except') {
+      const excluded = isExcluded(contact);
+      if (excluded || contact.aiEnabled === false) return 'manual';
+      if (contact.replyToMessages === false && contact.replyToReelsAndPosts !== false) return 'reels_only';
+      return 'full_ai';
+    } else {
+      // everyone
+      if (contact.aiEnabled === false) return 'manual';
+      if (contact.replyToMessages === false && contact.replyToReelsAndPosts !== false) return 'reels_only';
+      return 'full_ai';
+    }
+  }, [routingConfig.chatMode, isIncluded, isExcluded]);
+
+  // Synchronized Checkbox Toggle
+  const handleToggleContact = useCallback((contact) => {
     const key = getContactKey(contact);
+    const targetKeys = getTargetKeys(contact);
     const baseConfig = currentConfigRef.current || routingConfig;
-    const current = (baseConfig.excludedContactIds || []).filter(Boolean);
-    const alreadyExcluded = isExcluded(contact);
+    const chatMode = baseConfig.chatMode;
 
-    let next;
-    if (alreadyExcluded) {
-      next = current.filter(id =>
-        id !== key &&
-        id !== contact.senderId &&
-        id !== (contact.handle ? contact.handle.replace(/^@/, '').toLowerCase() : '') &&
-        id !== contact.id
-      );
-      // If contact was excluded because aiEnabled was false, enable AI in 1 click
-      if (contact.aiEnabled === false) {
+    if (chatMode === 'only_selected') {
+      const currentlyIncluded = isIncluded(contact);
+      const currentList = (baseConfig.includedContactIds || []).filter(Boolean);
+
+      if (currentlyIncluded) {
+        // UNCHECKING: Immediately remove from whitelist AND set AI mode to 'paused'
+        const next = currentList.filter(id => !targetKeys.includes(id));
+        const updated = { ...baseConfig, includedContactIds: next };
+        queueSave(updated);
+        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' });
+      } else {
+        // CHECKING: Immediately add to whitelist AND set AI mode to 'full_ai'
+        const next = [...currentList.filter(id => !targetKeys.includes(id)), key];
+        const updated = { ...baseConfig, includedContactIds: next };
+        queueSave(updated);
         updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
       }
-    } else {
-      next = [...current, key];
-    }
-    const updated = { ...baseConfig, excludedContactIds: next };
-    queueSave(updated);
-  };
+    } else if (chatMode === 'everyone_except') {
+      const currentlyExcluded = isExcluded(contact);
+      const currentList = (baseConfig.excludedContactIds || []).filter(Boolean);
 
-  const handleToggleInclude = (contact) => {
-    const key = getContactKey(contact);
-    const baseConfig = currentConfigRef.current || routingConfig;
-    const current = (baseConfig.includedContactIds || []).filter(Boolean);
-    const alreadyIncluded = isIncluded(contact);
-
-    let next;
-    if (alreadyIncluded) {
-      next = current.filter(id =>
-        id !== key &&
-        id !== contact.senderId &&
-        id !== (contact.handle ? contact.handle.replace(/^@/, '').toLowerCase() : '') &&
-        id !== contact.id
-      );
-    } else {
-      next = [...current, key];
-      // Ensure AI is active for the included contact
-      if (contact.aiEnabled === false) {
+      if (currentlyExcluded) {
+        // UNCHECKING: Remove from blacklist AND set AI mode to 'full_ai'
+        const next = currentList.filter(id => !targetKeys.includes(id));
+        const updated = { ...baseConfig, excludedContactIds: next };
+        queueSave(updated);
         updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
+      } else {
+        // CHECKING: Add to blacklist AND set AI mode to 'paused'
+        const next = [...currentList.filter(id => !targetKeys.includes(id)), key];
+        const updated = { ...baseConfig, excludedContactIds: next };
+        queueSave(updated);
+        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' });
       }
     }
-    const updated = { ...baseConfig, includedContactIds: next };
-    queueSave(updated);
-  };
+  }, [routingConfig, getContactKey, getTargetKeys, isIncluded, isExcluded, queueSave, updateContactPreferences]);
 
-  const handleSelectAll = () => {
+  // Direct Button Switcher: Full AI, Reels Only, Stop AI (Instant Two-Way Sync)
+  const handleSetMode = useCallback((contact, mode) => {
+    const key = getContactKey(contact);
+    const targetKeys = getTargetKeys(contact);
+    const baseConfig = currentConfigRef.current || routingConfig;
+    const chatMode = baseConfig.chatMode;
+
+    // 1. Update contact preferences (nodes)
+    updateContactPreferences(contact.senderId || contact.id, { aiMode: mode });
+
+    // 2. Synchronize routingConfig based on active chatMode
+    let updated = { ...baseConfig };
+    if (chatMode === 'only_selected') {
+      const current = (baseConfig.includedContactIds || []).filter(Boolean);
+      if (mode === 'full_ai' || mode === 'reels_only') {
+        // Must be in whitelist
+        if (!current.some(id => targetKeys.includes(id))) {
+          updated.includedContactIds = [...current, key];
+        }
+      } else {
+        // Stop AI -> remove from whitelist
+        updated.includedContactIds = current.filter(id => !targetKeys.includes(id));
+      }
+    } else if (chatMode === 'everyone_except') {
+      const current = (baseConfig.excludedContactIds || []).filter(Boolean);
+      if (mode === 'paused') {
+        // Stop AI -> must be in excluded blacklist
+        if (!current.some(id => targetKeys.includes(id))) {
+          updated.excludedContactIds = [...current, key];
+        }
+      } else {
+        // Full AI or Reels Only -> remove from excluded blacklist
+        updated.excludedContactIds = current.filter(id => !targetKeys.includes(id));
+      }
+    }
+
+    queueSave(updated);
+  }, [routingConfig, getContactKey, getTargetKeys, queueSave, updateContactPreferences]);
+
+  // Bulk Actions
+  const handleSelectAll = useCallback(() => {
     const allKeys = friendNodes.map(n => getContactKey(n)).filter(Boolean);
     const baseConfig = currentConfigRef.current || routingConfig;
     let updated;
     if (baseConfig.chatMode === 'everyone_except') {
       updated = { ...baseConfig, excludedContactIds: allKeys };
+      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'paused' }));
     } else if (baseConfig.chatMode === 'only_selected') {
       updated = { ...baseConfig, includedContactIds: allKeys };
+      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'full_ai' }));
     }
-    if (updated) {
-      queueSave(updated);
-    }
-  };
+    if (updated) queueSave(updated);
+  }, [friendNodes, routingConfig, getContactKey, queueSave, updateContactPreferences]);
 
-  const handleClearAll = () => {
+  const handleClearAll = useCallback(() => {
     const baseConfig = currentConfigRef.current || routingConfig;
     let updated;
     if (baseConfig.chatMode === 'everyone_except') {
       updated = { ...baseConfig, excludedContactIds: [] };
+      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'full_ai' }));
     } else if (baseConfig.chatMode === 'only_selected') {
       updated = { ...baseConfig, includedContactIds: [] };
+      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'paused' }));
     }
-    if (updated) {
-      queueSave(updated);
-    }
-  };
+    if (updated) queueSave(updated);
+  }, [friendNodes, routingConfig, queueSave, updateContactPreferences]);
 
   const onSave = async () => {
     setIsSaving(true);
@@ -165,9 +209,215 @@ export default function ControlsPage() {
     }
   };
 
+  // Filtered Friends
+  const filteredFriends = useMemo(() => {
+    if (!search.trim()) return friendNodes;
+    const q = search.toLowerCase();
+    return friendNodes.filter(n =>
+      n.name.toLowerCase().includes(q) ||
+      (n.handle || '').toLowerCase().includes(q) ||
+      (n.relationship || '').toLowerCase().includes(q)
+    );
+  }, [friendNodes, search]);
+
+  // Categorize Contacts into the 3 Core Sections
+  const fullAiContacts = useMemo(() => {
+    return filteredFriends.filter(c => getContactMode(c) === 'full_ai');
+  }, [filteredFriends, getContactMode]);
+
+  const reelsOnlyContacts = useMemo(() => {
+    return filteredFriends.filter(c => getContactMode(c) === 'reels_only');
+  }, [filteredFriends, getContactMode]);
+
+  const manualContacts = useMemo(() => {
+    return filteredFriends.filter(c => getContactMode(c) === 'manual');
+  }, [filteredFriends, getContactMode]);
+
   const activeCount = routingConfig.chatMode === 'everyone_except'
     ? friendNodes.filter(n => isExcluded(n)).length
     : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
+
+  // Render a Single Contact Card
+  const renderContactCard = (contact) => {
+    const isEveryoneMode = routingConfig.chatMode === 'everyone';
+    const isChecked = isEveryoneMode
+      ? true
+      : (routingConfig.chatMode === 'everyone_except' ? isExcluded(contact) : isIncluded(contact));
+
+    const currentMode = getContactMode(contact);
+    const isFullAi = currentMode === 'full_ai';
+    const isReelsOnly = currentMode === 'reels_only';
+    const isPaused = currentMode === 'manual';
+
+    return (
+      <div
+        key={contact.id || contact.name}
+        className="control-contact-card"
+        style={{
+          background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
+          border: '1px solid',
+          borderColor: isChecked && !isEveryoneMode ? '#09090b' : '#e4e4e7',
+          borderRadius: '10px',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          transition: 'border-color 0.15s ease, background-color 0.15s ease',
+          touchAction: 'manipulation'
+        }}
+      >
+        {/* Top Row: Checkbox + Avatar + Info + Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0, width: '100%' }}>
+          <div
+            onClick={() => handleToggleContact(contact)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              cursor: isEveryoneMode ? 'default' : 'pointer',
+              flex: 1,
+              minWidth: 0,
+              opacity: isEveryoneMode ? 0.75 : 1,
+              touchAction: 'manipulation'
+            }}
+          >
+            {/* Checkbox */}
+            <div
+              style={{
+                width: '18px',
+                height: '18px',
+                minWidth: '18px',
+                borderRadius: '4px',
+                background: isChecked ? '#09090b' : '#ffffff',
+                border: '1px solid',
+                borderColor: isChecked ? '#09090b' : '#d4d4d8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                flexShrink: 0
+              }}
+            >
+              {isChecked && <Check size={12} strokeWidth={3} />}
+            </div>
+
+            <ContactAvatar contact={contact} size={36} showStatus={true} />
+
+            <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+              <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {contact.name}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {contact.handle || contact.relationship || 'Friend'}
+              </div>
+            </div>
+          </div>
+
+          {/* Mode Pill */}
+          <span
+            style={{
+              fontSize: '0.64rem',
+              padding: '2px 7px',
+              borderRadius: '4px',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: '700',
+              background: isFullAi ? '#09090b' : (isReelsOnly ? '#27272a' : '#f4f4f5'),
+              color: (isFullAi || isReelsOnly) ? '#ffffff' : '#71717a',
+              border: '1px solid #e4e4e7',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
+          >
+            {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
+          </span>
+        </div>
+
+        {/* Bottom Row: AI Mode Selector Buttons (Touch-optimized) */}
+        <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid #f4f4f5', width: '100%' }}>
+          <button
+            type="button"
+            onClick={() => handleSetMode(contact, 'full_ai')}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '7px 4px',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: isFullAi ? '700' : '500',
+              cursor: 'pointer',
+              background: isFullAi ? '#09090b' : '#ffffff',
+              color: isFullAi ? '#ffffff' : '#71717a',
+              border: '1px solid',
+              borderColor: isFullAi ? '#09090b' : '#e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              overflow: 'hidden',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Bot size={11} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Full AI</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetMode(contact, 'reels_only')}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '7px 4px',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: isReelsOnly ? '700' : '500',
+              cursor: 'pointer',
+              background: isReelsOnly ? '#09090b' : '#ffffff',
+              color: isReelsOnly ? '#ffffff' : '#71717a',
+              border: '1px solid',
+              borderColor: isReelsOnly ? '#09090b' : '#e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              overflow: 'hidden',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Film size={11} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Reels Only</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSetMode(contact, 'paused')}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '7px 4px',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: isPaused ? '700' : '500',
+              cursor: 'pointer',
+              background: isPaused ? '#09090b' : '#ffffff',
+              color: isPaused ? '#ffffff' : '#71717a',
+              border: '1px solid',
+              borderColor: isPaused ? '#09090b' : '#e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              overflow: 'hidden',
+              touchAction: 'manipulation'
+            }}
+          >
+            <Pause size={11} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Stop AI</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <motion.div
@@ -232,7 +482,8 @@ export default function ControlsPage() {
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 transition: 'all 0.15s ease',
-                boxShadow: isSelected ? '0 4px 14px rgba(0, 0, 0, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)'
+                boxShadow: isSelected ? '0 4px 14px rgba(0, 0, 0, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
+                touchAction: 'manipulation'
               }}
             >
               <div>
@@ -311,7 +562,8 @@ export default function ControlsPage() {
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '6px',
+            touchAction: 'manipulation'
           }}
         >
           {isSaving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={14} />}
@@ -327,9 +579,11 @@ export default function ControlsPage() {
               {routingConfig.chatMode === 'everyone_except' ? 'Checkbox Contacts to Exclude' : (routingConfig.chatMode === 'only_selected' ? 'Checkbox Contacts to Include' : 'All Contacts (Active)')}
             </h3>
             <p style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '2px' }}>
-              {routingConfig.chatMode === 'everyone'
-                ? 'All contacts receive automated AI replies. Checkboxes are muted. Switch mode above to exclude anyone.'
-                : 'Select who to exclude or whitelist, or adjust per-person reply modes (Full AI, Reels Only, Manual).'}
+              {routingConfig.chatMode === 'only_selected'
+                ? 'Only checked contacts will receive AI replies. Contacts in the Manual Chat section are silenced.'
+                : (routingConfig.chatMode === 'everyone_except'
+                  ? 'Checked contacts are excluded from AI (manual chat). Unchecked contacts receive automated AI replies.'
+                  : 'All contacts receive automated AI replies. Switch mode above to exclude anyone.')}
             </p>
           </div>
 
@@ -337,13 +591,13 @@ export default function ControlsPage() {
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 onClick={handleSelectAll}
-                style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+                style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
               >
                 Select All
               </button>
               <button
                 onClick={handleClearAll}
-                style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#71717a', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+                style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#71717a', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
               >
                 Clear
               </button>
@@ -351,203 +605,173 @@ export default function ControlsPage() {
           )}
         </div>
 
-        {/* Search Bar */}
-        <div style={{ marginBottom: '16px', position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
-          <input
-            type="text"
-            placeholder="Search contacts by name or handle..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              paddingLeft: '34px',
-              height: '38px',
-              fontSize: '0.82rem'
-            }}
-          />
+        {/* Search Bar + 4 Filter Tabs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+            <input
+              type="text"
+              placeholder="Search contacts by name or handle..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                paddingLeft: '34px',
+                height: '38px',
+                fontSize: '0.82rem'
+              }}
+            />
+          </div>
+
+          {/* Quick Segment Filter Tabs */}
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {[
+              { id: 'all', label: 'All Contacts', count: filteredFriends.length },
+              { id: 'full_ai', label: '⚡ Full AI', count: fullAiContacts.length },
+              { id: 'reels_only', label: '🎬 Reels Only', count: reelsOnlyContacts.length },
+              { id: 'manual', label: '⏸️ Manual Chat', count: manualContacts.length }
+            ].map(tab => {
+              const isTabActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    background: isTabActive ? '#09090b' : '#ffffff',
+                    color: isTabActive ? '#ffffff' : '#52525b',
+                    border: '1px solid',
+                    borderColor: isTabActive ? '#09090b' : '#e4e4e7',
+                    borderRadius: '7px',
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: isTabActive ? '700' : '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    touchAction: 'manipulation'
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    background: isTabActive ? '#27272a' : '#f4f4f5',
+                    color: isTabActive ? '#ffffff' : '#71717a',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: '700'
+                  }}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Contact Cards Grid */}
-        <div className="responsive-contacts-grid">
-          {filteredFriends.map(contact => {
-            const isEveryoneMode = routingConfig.chatMode === 'everyone';
-            const isChecked = isEveryoneMode
-              ? true
-              : (routingConfig.chatMode === 'everyone_except' ? isExcluded(contact) : isIncluded(contact));
-
-            const isPaused = contact.aiEnabled === false;
-            const isReelsOnly = !isPaused && contact.replyToMessages === false && contact.replyToReelsAndPosts !== false;
-            const isFullAi = !isPaused && !isReelsOnly;
-
-            return (
-              <div
-                key={contact.id || contact.name}
-                className="control-contact-card"
-                style={{
-                  background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
-                  border: '1px solid',
-                  borderColor: isChecked && !isEveryoneMode ? '#09090b' : '#e4e4e7',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* Top Row: Checkbox + DP + Info */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0, width: '100%' }}>
-                  <div
-                    onClick={() => {
-                      if (isEveryoneMode) return;
-                      if (routingConfig.chatMode === 'everyone_except') {
-                        handleToggleExclude(contact);
-                      } else {
-                        handleToggleInclude(contact);
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      cursor: isEveryoneMode ? 'default' : 'pointer',
-                      flex: 1,
-                      minWidth: 0,
-                      opacity: isEveryoneMode ? 0.75 : 1
-                    }}
-                  >
-                    {/* Checkbox */}
-                    <div
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        minWidth: '18px',
-                        borderRadius: '4px',
-                        background: isChecked ? '#09090b' : '#ffffff',
-                        border: '1px solid',
-                        borderColor: isChecked ? '#09090b' : '#d4d4d8',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        flexShrink: 0
-                      }}
-                    >
-                      {isChecked && <Check size={12} strokeWidth={3} />}
-                    </div>
-
-                    <ContactAvatar contact={contact} size={36} showStatus={true} />
-
-                    <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-                      <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {contact.name}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {contact.handle || contact.relationship || 'Friend'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mode Badge */}
-                  <span
-                    style={{
-                      fontSize: '0.64rem',
-                      padding: '2px 7px',
-                      borderRadius: '4px',
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontWeight: '700',
-                      background: '#f4f4f5',
-                      color: '#09090b',
-                      border: '1px solid #e4e4e7',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0
-                    }}
-                  >
-                    {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
+        {/* 3 CORE SECTIONS FOR 'ONLY_SELECTED' & STRUCTURED VIEW */}
+        {routingConfig.chatMode === 'only_selected' && activeTab === 'all' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            {/* SECTION 1: FULL AI ACTIVE */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} />
+                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                    1. Full AI Active (Auto-Replies to Messages & Reels)
+                  </h4>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: '#f4f4f5', padding: '2px 6px', borderRadius: '4px' }}>
+                    {fullAiContacts.length}
                   </span>
                 </div>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#71717a', margin: '0 0 12px 16px' }}>
+                AI responds automatically to all text messages and shared reels from these selected contacts.
+              </p>
+              {fullAiContacts.length > 0 ? (
+                <div className="responsive-contacts-grid">
+                  {fullAiContacts.map(renderContactCard)}
+                </div>
+              ) : (
+                <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
+                  No contacts currently selected for Full AI. Check a contact below to activate Full AI.
+                </div>
+              )}
+            </div>
 
-                {/* Bottom Row: AI Mode Selector Buttons */}
-                <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid #f4f4f5', width: '100%' }}>
-                  <button
-                    onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' })}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: '6px 4px',
-                      borderRadius: '6px',
-                      fontSize: '0.7rem',
-                      fontWeight: isFullAi ? '700' : '500',
-                      cursor: 'pointer',
-                      background: isFullAi ? '#09090b' : '#ffffff',
-                      color: isFullAi ? '#ffffff' : '#71717a',
-                      border: '1px solid',
-                      borderColor: isFullAi ? '#09090b' : '#e4e4e7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <Bot size={11} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Full AI</span>
-                  </button>
-
-                  <button
-                    onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'reels_only' })}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: '6px 4px',
-                      borderRadius: '6px',
-                      fontSize: '0.7rem',
-                      fontWeight: isReelsOnly ? '700' : '500',
-                      cursor: 'pointer',
-                      background: isReelsOnly ? '#09090b' : '#ffffff',
-                      color: isReelsOnly ? '#ffffff' : '#71717a',
-                      border: '1px solid',
-                      borderColor: isReelsOnly ? '#09090b' : '#e4e4e7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <Film size={11} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Reels Only</span>
-                  </button>
-
-                  <button
-                    onClick={() => updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' })}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: '6px 4px',
-                      borderRadius: '6px',
-                      fontSize: '0.7rem',
-                      fontWeight: isPaused ? '700' : '500',
-                      cursor: 'pointer',
-                      background: isPaused ? '#09090b' : '#ffffff',
-                      color: isPaused ? '#ffffff' : '#71717a',
-                      border: '1px solid',
-                      borderColor: isPaused ? '#09090b' : '#e4e4e7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <Pause size={11} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Stop AI</span>
-                  </button>
+            {/* SECTION 2: REELS ONLY */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0284c7' }} />
+                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                    2. Reels Only (Reacts Exclusively to Shared Reels)
+                  </h4>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: '#f4f4f5', padding: '2px 6px', borderRadius: '4px' }}>
+                    {reelsOnlyContacts.length}
+                  </span>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              <p style={{ fontSize: '0.75rem', color: '#71717a', margin: '0 0 12px 16px' }}>
+                AI only reacts with witty quips or reactions when these contacts share an Instagram Reel or Meme. Direct text chats stay manual.
+              </p>
+              {reelsOnlyContacts.length > 0 ? (
+                <div className="responsive-contacts-grid">
+                  {reelsOnlyContacts.map(renderContactCard)}
+                </div>
+              ) : (
+                <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
+                  No contacts in Reels Only mode.
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 3: MANUAL CHAT / PAUSED (UNSELECTED) */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#d4d4d8' }} />
+                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                    3. Manual Chat / Paused (Not Selected)
+                  </h4>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: '#f4f4f5', padding: '2px 6px', borderRadius: '4px' }}>
+                    {manualContacts.length}
+                  </span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#71717a', margin: '0 0 12px 16px' }}>
+                AI is completely silenced for these unselected contacts. You chat with them manually on Instagram.
+              </p>
+              {manualContacts.length > 0 ? (
+                <div className="responsive-contacts-grid">
+                  {manualContacts.map(renderContactCard)}
+                </div>
+              ) : (
+                <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
+                  All contacts are currently selected for AI.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* TAB FILTERED OR STANDARD GRID VIEW */
+          <div className="responsive-contacts-grid">
+            {activeTab === 'full_ai' && fullAiContacts.map(renderContactCard)}
+            {activeTab === 'reels_only' && reelsOnlyContacts.map(renderContactCard)}
+            {activeTab === 'manual' && manualContacts.map(renderContactCard)}
+            {activeTab === 'all' && filteredFriends.map(renderContactCard)}
+            {((activeTab === 'full_ai' && fullAiContacts.length === 0) ||
+              (activeTab === 'reels_only' && reelsOnlyContacts.length === 0) ||
+              (activeTab === 'manual' && manualContacts.length === 0) ||
+              (activeTab === 'all' && filteredFriends.length === 0)) && (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: '#a1a1aa', fontSize: '0.85rem' }}>
+                No contacts found matching this view.
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
