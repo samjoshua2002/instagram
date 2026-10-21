@@ -1132,6 +1132,26 @@ router.get('/instagram/callback', async (req, res) => {
             user.hasInstagramToken = Boolean(linkedPageToken);
             user.isInstagramConnected = Boolean(linkedPageToken);
             await user.save();
+
+            // Sync PersonaConfig as well
+            try {
+              const PersonaConfig = require('../models/PersonaConfig');
+              await PersonaConfig.findOneAndUpdate(
+                { ownerId: user._id },
+                {
+                  $set: {
+                    ownerId: user._id,
+                    instagramPageAccessToken: linkedPageToken,
+                    instagramAccountId: instagramAccountId,
+                    ...(instagramUsername ? { instagramHandle: `@${instagramUsername.replace(/^@/, '')}` } : {}),
+                    globalBotActive: true
+                  }
+                },
+                { upsert: true, new: true }
+              );
+            } catch (personaErr) {
+              console.warn('Could not sync PersonaConfig in OAuth callback:', personaErr.message);
+            }
           }
         }
       } catch (e) {
