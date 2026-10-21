@@ -209,7 +209,7 @@ export function AppProvider({ children }) {
     setAuthLoading(false);
     showToast?.(`Welcome back, ${userData?.firstName || userData?.username || 'User'}!`, 'success');
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.replace('/');
+      window.location.href = '/';
     }
   }, [showToast]);
 
@@ -222,6 +222,9 @@ export function AppProvider({ children }) {
     setToken(null);
     setUser(null);
     showToast?.('Signed out successfully.', 'info');
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.location.href = '/';
+    }
   }, [showToast]);
 
   const updateUserProfile = useCallback((updatedUser) => {
@@ -674,6 +677,7 @@ export function AppProvider({ children }) {
     }
 
     let contactName = '';
+    let matchedNode = null;
     setNodes(prev => {
       const next = prev.map(n => {
         const matches = (
@@ -685,6 +689,7 @@ export function AppProvider({ children }) {
 
         if (matches) {
           contactName = n.name;
+          matchedNode = n;
           return {
             ...n,
             ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
@@ -700,6 +705,58 @@ export function AppProvider({ children }) {
       } catch (e) {}
       return next;
     });
+
+    // Also sync routingConfig (excludedContactIds and includedContactIds) immediately
+    if (typeof finalAiEnabled === 'boolean') {
+      setRoutingConfigState(prev => {
+        const excluded = prev.excludedContactIds || [];
+        const included = prev.includedContactIds || [];
+        const targetKeys = [
+          contactIdOrSenderId,
+          matchedNode?.senderId,
+          matchedNode?.id,
+          matchedNode?.handle ? matchedNode.handle.replace(/^@/, '').toLowerCase() : '',
+          matchedNode?.name ? matchedNode.name.toLowerCase().replace(/[^a-z0-9]/g, '_') : ''
+        ].filter(Boolean);
+
+        const primaryKey = matchedNode
+          ? (matchedNode.senderId || (matchedNode.handle ? matchedNode.handle.replace(/^@/, '').toLowerCase() : '') || matchedNode.id || contactIdOrSenderId)
+          : contactIdOrSenderId;
+
+        let nextExcluded = [...excluded];
+        let nextIncluded = [...included];
+
+        if (finalAiEnabled) {
+          nextExcluded = nextExcluded.filter(id => !targetKeys.includes(id));
+          if (!nextIncluded.some(id => targetKeys.includes(id))) {
+            nextIncluded.push(primaryKey);
+          }
+        } else {
+          nextIncluded = nextIncluded.filter(id => !targetKeys.includes(id));
+          if (!nextExcluded.some(id => targetKeys.includes(id))) {
+            nextExcluded.push(primaryKey);
+          }
+        }
+
+        const nextRouting = {
+          ...prev,
+          excludedContactIds: nextExcluded,
+          includedContactIds: nextIncluded
+        };
+
+        try {
+          localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(nextRouting));
+        } catch (e) {}
+
+        fetch(`${API_BASE}/api/persona`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nextRouting)
+        }).catch(() => {});
+
+        return nextRouting;
+      });
+    }
 
     if (selectedNode) {
       setSelectedNode(prev => ({

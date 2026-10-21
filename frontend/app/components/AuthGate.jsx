@@ -44,8 +44,8 @@ export default function AuthGate({ children }) {
     try {
       sessionStorage.setItem('chatter_session_active', 'true');
     } catch (e) {}
-    if (pathname && pathname !== '/') {
-      router.replace('/');
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.location.href = '/';
     }
   };
 
