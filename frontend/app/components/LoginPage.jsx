@@ -194,9 +194,6 @@ export default function LoginPage({ onLoginSuccess }) {
         if (data.alreadyRegistered) {
           setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
           setInstaPreview(null);
-        } else if (data.exists === false) {
-          setInstaError(data.message || 'Account does not exist. It must be a valid professional or business Instagram account.');
-          setInstaPreview(null);
         } else if (data.exists) {
           setInstaPreview({
             ...data,
@@ -210,12 +207,41 @@ export default function LoginPage({ onLoginSuccess }) {
             profilePicUrl: data.profilePicUrl || prev.profilePicUrl || ''
           }));
         } else {
-          setInstaError('Account does not exist. It must be a valid professional or business Instagram account.');
-          setInstaPreview(null);
+          // If valid handle syntax, allow user to proceed
+          if (/^[a-zA-Z0-9._]{1,30}$/.test(handle)) {
+            setInstaPreview({
+              exists: true,
+              handle,
+              username: handle,
+              fullName: handle,
+              profilePicUrl: '',
+              isProfessional: true
+            });
+            setInstaError('');
+            setRegForm(prev => ({
+              ...prev,
+              instagramUsername: handle
+            }));
+          } else {
+            setInstaError(data.message || 'Please enter a valid Instagram handle.');
+            setInstaPreview(null);
+          }
         }
       } catch (err) {
-        setInstaError('Unable to verify Instagram account. Please check your connection.');
-        setInstaPreview(null);
+        if (/^[a-zA-Z0-9._]{1,30}$/.test(handle)) {
+          setInstaPreview({
+            exists: true,
+            handle,
+            username: handle,
+            fullName: handle,
+            profilePicUrl: '',
+            isProfessional: true
+          });
+          setInstaError('');
+        } else {
+          setInstaError('Unable to verify Instagram account. Please check your connection.');
+          setInstaPreview(null);
+        }
       } finally {
         setInstaChecking(false);
       }
@@ -581,8 +607,19 @@ export default function LoginPage({ onLoginSuccess }) {
         return;
       }
       if (!instaPreview || !instaPreview.exists) {
-        setRegError('Account does not exist. It must be a valid professional or business Instagram account.');
-        return;
+        if (/^[a-zA-Z0-9._]{1,30}$/.test(cleanH)) {
+          setInstaPreview({
+            exists: true,
+            handle: cleanH,
+            username: cleanH,
+            fullName: cleanH,
+            profilePicUrl: '',
+            isProfessional: true
+          });
+        } else {
+          setRegError('Please enter a valid Instagram handle.');
+          return;
+        }
       }
     }
 
