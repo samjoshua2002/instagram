@@ -46,10 +46,20 @@ const UserSchema = new mongoose.Schema({
   },
   instagramUsername: {
     type: String,
-    default: 'catovidz',
+    default: '',
     trim: true,
   },
   instagramId: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  instagramPageAccessToken: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  instagramAccountId: {
     type: String,
     default: '',
     trim: true,

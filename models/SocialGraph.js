@@ -7,10 +7,20 @@ const ConnectionSchema = new mongoose.Schema({
 }, { _id: false });
 
 const SocialGraphSchema = new mongoose.Schema({
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true,
+  },
+  ownerUsername: {
+    type: String,
+    default: '',
+    trim: true,
+    index: true,
+  },
   name: {
     type: String,
     required: true,
-    unique: true,
     trim: true,
   },
   aliases: [{
