@@ -179,7 +179,7 @@ export default function ProfilePage() {
       boxSizing: 'border-box',
       overflowY: 'auto'
     }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
         {/* Page Header */}
         <div style={{ marginBottom: '28px' }}>
           <div style={{

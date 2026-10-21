@@ -730,7 +730,7 @@ async function dispatchDebouncedReply(queueEntry) {
     let mediaWasSent = false;
     if (stickerType && stickerService.hasSticker(stickerType)) {
       // GIFs react to the HUMAN'S chat message, never our AI reply text
-      const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText);
+      const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText, config?.ownerId ? { _id: config.ownerId } : null);
       if (stickerUrl) {
         if (hasText) {
           await new Promise(resolve => setTimeout(resolve, 600));
@@ -1361,12 +1361,21 @@ app.post('/api/test-token', async (req, res) => {
 // ==========================================
 
 // Get all uploaded media and active categories
+// Get all uploaded media and active categories
 app.get('/api/media-vault', async (req, res) => {
   try {
     const { category } = req.query;
-    const filter = category && category !== 'all' ? { category: category.toLowerCase().trim() } : {};
+    const isSuper = req.user?.role === 'superadmin';
+    const ownerFilter = req.user
+      ? (isSuper
+          ? { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }, { ownerId: null }] }
+          : { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] })
+      : {};
+    const filter = category && category !== 'all'
+      ? { ...ownerFilter, category: category.toLowerCase().trim() }
+      : ownerFilter;
     const items = await MediaVault.find(filter).sort({ createdAt: -1 });
-    const categories = await stickerService.getAllCategories();
+    const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, items, categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1402,9 +1411,11 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
       mediaType,
       caption: caption || '',
       keywords: parsedKeywords,
+      ownerId: req.user?._id || null,
+      ownerUsername: req.user?.username || '',
     });
 
-    console.log(`📸 [Media Vault Upload]: Saved ${mediaType} under category "${cleanCat}": ${fileUrl} (keywords: ${parsedKeywords.join(', ')})`);
+    console.log(`📸 [Media Vault Upload]: Saved ${mediaType} under category "${cleanCat}": ${fileUrl} for @${req.user?.username || 'user'}`);
     res.json({ success: true, item: newMedia });
   } catch (err) {
     console.error('❌ Media Vault upload error:', err);
@@ -1432,6 +1443,8 @@ app.post('/api/media-vault', async (req, res) => {
       mediaType: mediaType || 'gif',
       caption: caption || '',
       keywords: parsedKeywords,
+      ownerId: req.user?._id || null,
+      ownerUsername: req.user?.username || '',
     });
 
     res.json({ success: true, item: newMedia });
@@ -1449,6 +1462,7 @@ app.post('/api/media-vault/batch', async (req, res) => {
     }
 
     const created = [];
+    const ownerFilter = req.user ? { ownerId: req.user._id } : {};
     for (const item of itemsToInsert) {
       if (!item.url) continue;
       const cleanCat = (item.category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
@@ -1456,8 +1470,8 @@ app.post('/api/media-vault/batch', async (req, res) => {
         ? item.keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
         : (item.keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
-      // Check if duplicate URL already in vault
-      const existing = await MediaVault.findOne({ url: item.url.trim() });
+      // Check if duplicate URL already in user's vault
+      const existing = await MediaVault.findOne({ url: item.url.trim(), ...ownerFilter });
       if (existing) continue;
 
       const newMedia = await MediaVault.create({
@@ -1467,6 +1481,8 @@ app.post('/api/media-vault/batch', async (req, res) => {
         mediaType: item.mediaType || 'gif',
         caption: item.caption || '',
         keywords: parsedKeywords,
+        ownerId: req.user?._id || null,
+        ownerUsername: req.user?.username || '',
       });
       created.push(newMedia);
     }
@@ -1481,6 +1497,11 @@ app.post('/api/media-vault/batch', async (req, res) => {
 app.put('/api/media-vault/:id', async (req, res) => {
   try {
     const { name, category, keywords, caption } = req.body;
+    const isSuper = req.user?.role === 'superadmin';
+    const query = { _id: req.params.id };
+    if (!isSuper && req.user) {
+      query.$or = [{ ownerId: req.user._id }, { ownerUsername: req.user.username }];
+    }
     const update = {};
     if (name !== undefined) update.name = name.trim();
     if (category !== undefined) update.category = category.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
@@ -1491,8 +1512,8 @@ app.put('/api/media-vault/:id', async (req, res) => {
         : (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
     }
 
-    const updated = await MediaVault.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Media not found' });
+    const updated = await MediaVault.findOneAndUpdate(query, update, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Media not found or unauthorized' });
     res.json({ success: true, item: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1502,8 +1523,13 @@ app.put('/api/media-vault/:id', async (req, res) => {
 // Delete media item
 app.delete('/api/media-vault/:id', async (req, res) => {
   try {
-    const item = await MediaVault.findById(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Media not found' });
+    const isSuper = req.user?.role === 'superadmin';
+    const query = { _id: req.params.id };
+    if (!isSuper && req.user) {
+      query.$or = [{ ownerId: req.user._id }, { ownerUsername: req.user.username }];
+    }
+    const item = await MediaVault.findOne(query);
+    if (!item) return res.status(404).json({ error: 'Media not found or unauthorized' });
 
     // If locally uploaded file, delete from disk
     if (item.url && item.url.includes('/uploads/')) {
@@ -1534,7 +1560,7 @@ app.get('/api/media-vault/predefined', (req, res) => {
 app.post('/api/media-vault/import-predefined', async (req, res) => {
   try {
     const { ids } = req.body || {};
-    const results = await stickerService.seedPredefinedIntoVault(ids);
+    const results = await stickerService.seedPredefinedIntoVault(ids, req.user);
     res.json({ success: true, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1544,7 +1570,7 @@ app.post('/api/media-vault/import-predefined', async (req, res) => {
 // Get all categories
 app.get('/api/media-vault/categories', async (req, res) => {
   try {
-    const categories = await stickerService.getAllCategories();
+    const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1560,8 +1586,9 @@ app.post('/api/media-vault/categories', async (req, res) => {
     }
     const cleanCat = category.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
-    let config = await PersonaConfig.findOne();
-    if (!config) config = await PersonaConfig.create({});
+    const personaQuery = req.user ? { ownerId: req.user._id } : {};
+    let config = await PersonaConfig.findOne(personaQuery);
+    if (!config) config = await PersonaConfig.create({ ownerId: req.user?._id || null });
 
     config.customReactionCategories = config.customReactionCategories || [];
     if (!config.customReactionCategories.includes(cleanCat)) {
@@ -1569,7 +1596,7 @@ app.post('/api/media-vault/categories', async (req, res) => {
       await config.save();
     }
 
-    const categories = await stickerService.getAllCategories();
+    const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1587,16 +1614,18 @@ app.put('/api/media-vault/categories/:name', async (req, res) => {
     const cleanNew = newCategory.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
     // 1. Update in PersonaConfig
-    let config = await PersonaConfig.findOne();
+    const personaQuery = req.user ? { ownerId: req.user._id } : {};
+    let config = await PersonaConfig.findOne(personaQuery);
     if (config && config.customReactionCategories) {
       config.customReactionCategories = config.customReactionCategories.map(c => c === oldCat ? cleanNew : c);
       await config.save();
     }
 
-    // 2. Cascade update all MediaVault items from old category to new category
-    await MediaVault.updateMany({ category: oldCat }, { category: cleanNew });
+    // 2. Cascade update all MediaVault items belonging to this creator
+    const ownerFilter = req.user ? { ownerId: req.user._id } : {};
+    await MediaVault.updateMany({ category: oldCat, ...ownerFilter }, { category: cleanNew });
 
-    const categories = await stickerService.getAllCategories();
+    const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1607,7 +1636,8 @@ app.put('/api/media-vault/categories/:name', async (req, res) => {
 app.delete('/api/media-vault/categories/:name', async (req, res) => {
   try {
     const catName = req.params.name.toLowerCase().trim();
-    let config = await PersonaConfig.findOne();
+    const personaQuery = req.user ? { ownerId: req.user._id } : {};
+    let config = await PersonaConfig.findOne(personaQuery);
     if (config && config.customReactionCategories) {
       config.customReactionCategories = config.customReactionCategories.filter(c => c !== catName);
       await config.save();
