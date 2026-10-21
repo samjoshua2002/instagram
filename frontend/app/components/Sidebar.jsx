@@ -496,33 +496,35 @@ export default function Sidebar() {
           animate="visible"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}
         >
-          {/* Quick Add Person Action */}
-          <motion.button
-            variants={footerItemVariants}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            type="button"
-            onClick={() => startAiInterview(null)}
-            style={{
-              width: '100%',
-              background: '#09090b',
-              color: '#ffffff',
-              border: 'none',
-              padding: '10px 14px',
-              borderRadius: '9px',
-              fontWeight: '700',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '7px',
-              cursor: 'pointer',
-              boxShadow: '0 3px 10px rgba(9, 9, 11, 0.1)'
-            }}
-          >
-            <Sparkles size={14} color="#ffffff" />
-            <span>+ Add Person</span>
-          </motion.button>
+          {/* Quick Add Person Action (For regular user relationships) */}
+          {!isSuperadmin && (
+            <motion.button
+              variants={footerItemVariants}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={() => startAiInterview(null)}
+              style={{
+                width: '100%',
+                background: '#09090b',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 14px',
+                borderRadius: '9px',
+                fontWeight: '700',
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '7px',
+                cursor: 'pointer',
+                boxShadow: '0 3px 10px rgba(9, 9, 11, 0.1)'
+              }}
+            >
+              <Sparkles size={14} color="#ffffff" />
+              <span>+ Add Person</span>
+            </motion.button>
+          )}
 
           {/* Bot State Switcher Button */}
           <motion.button
