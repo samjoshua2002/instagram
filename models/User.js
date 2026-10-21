@@ -64,6 +64,15 @@ const UserSchema = new mongoose.Schema({
     enum: ['personal', 'creator', 'business', 'agency'],
     default: 'personal',
   },
+  isOnboarded: {
+    type: Boolean,
+    default: false,
+  },
+  businessProfile: {
+    businessName: { type: String, default: '' },
+    category: { type: String, default: '' },
+    description: { type: String, default: '' },
+  },
   address: {
     street: { type: String, default: '' },
     city: { type: String, default: '' },

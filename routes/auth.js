@@ -192,6 +192,8 @@ router.post('/register/verify-otp', async (req, res) => {
         instagramId: user.instagramId || '',
         role: isSuper ? 'superadmin' : 'user',
         accountType: user.accountType,
+        isOnboarded: user.isOnboarded ?? false,
+        businessProfile: user.businessProfile || null,
         profilePicUrl: user.profilePicUrl,
         hasPasskeys: (user.passkeys || []).length > 0,
       },
@@ -258,6 +260,8 @@ router.post('/login', async (req, res) => {
         instagramId: user.instagramId || '',
         role: isSuper ? 'superadmin' : 'user',
         accountType: user.accountType,
+        isOnboarded: user.isOnboarded ?? false,
+        businessProfile: user.businessProfile || null,
         profilePicUrl: user.profilePicUrl || '',
         hasPasskeys: (user.passkeys || []).length > 0,
       },
@@ -628,6 +632,8 @@ router.post('/passkey/login-verify', async (req, res) => {
         instagramId: user.instagramId || '',
         role: isSuper ? 'superadmin' : 'user',
         accountType: user.accountType,
+        isOnboarded: user.isOnboarded ?? false,
+        businessProfile: user.businessProfile || null,
         hasPasskeys: (user.passkeys || []).length > 0,
       },
     });
@@ -726,6 +732,8 @@ router.get('/me', requireAuth, async (req, res) => {
     instagramId: user.instagramId || '',
     role: isSuper ? 'superadmin' : 'user',
     accountType: user.accountType,
+    isOnboarded: user.isOnboarded ?? false,
+    businessProfile: user.businessProfile || null,
     address: user.address,
     twoFactorEnabled: user.twoFactor?.enabled || false,
     passkeys: (user.passkeys || []).map(p => ({
@@ -735,6 +743,98 @@ router.get('/me', requireAuth, async (req, res) => {
       deviceType: p.deviceType,
     })),
   });
+});
+
+/**
+ * POST /api/auth/onboarding (Protected)
+ * Configures new user account: Business vs Personal, AI Persona Tone, Chat Rules & Automation
+ */
+router.post('/onboarding', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const {
+      accountType, // 'business' | 'personal' | 'creator'
+      businessProfile, // { businessName, category, description }
+      personaTone, // 'professional' | 'witty' | 'friendly' | 'roast'
+      greetingMessage,
+      chatMode, // 'everyone' | 'everyone_except' | 'only_selected'
+      enableGlobalBot, // boolean
+    } = req.body;
+
+    if (accountType) {
+      user.accountType = accountType;
+    }
+    if (businessProfile) {
+      user.businessProfile = {
+        businessName: businessProfile.businessName || '',
+        category: businessProfile.category || '',
+        description: businessProfile.description || '',
+      };
+    }
+    user.isOnboarded = true;
+    await user.save();
+
+    // Sync with PersonaConfig
+    try {
+      const PersonaConfig = require('../models/PersonaConfig');
+      let persona = await PersonaConfig.findOne();
+      if (!persona) {
+        persona = new PersonaConfig();
+      }
+      if (personaTone) {
+        persona.tone = personaTone;
+      }
+      if (greetingMessage) {
+        persona.greeting = greetingMessage;
+      }
+      if (accountType === 'business') {
+        persona.persona = 'helpful_assistant';
+      } else if (accountType === 'personal') {
+        persona.persona = 'friendly_peer';
+      }
+      await persona.save();
+    } catch (e) {
+      console.warn('Could not update persona during onboarding:', e.message);
+    }
+
+    // Sync with RoutingConfig
+    try {
+      const RoutingConfig = require('../models/RoutingConfig');
+      let routing = await RoutingConfig.findOne();
+      if (!routing) {
+        routing = new RoutingConfig();
+      }
+      if (chatMode) {
+        routing.chatMode = chatMode;
+      }
+      if (typeof enableGlobalBot === 'boolean') {
+        routing.globalBotActive = enableGlobalBot;
+      }
+      await routing.save();
+    } catch (e) {
+      console.warn('Could not update routing during onboarding:', e.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Onboarding configured successfully!',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role || 'user',
+        accountType: user.accountType,
+        isOnboarded: true,
+        businessProfile: user.businessProfile,
+        profilePicUrl: user.profilePicUrl || '',
+      }
+    });
+  } catch (err) {
+    console.error('❌ Onboarding error:', err.message);
+    res.status(500).json({ error: 'Failed to complete onboarding: ' + err.message });
+  }
 });
 
 /**
