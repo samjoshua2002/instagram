@@ -1080,6 +1080,50 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/auth/admin/impersonate
+ * Superadmin can switch directly into any user's workspace with 1 click
+ */
+router.post('/admin/impersonate', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'Target userId is required.' });
+    }
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    const token = authService.generateToken(targetUser);
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: targetUser._id,
+        email: targetUser.email,
+        username: targetUser.username,
+        role: targetUser.role || 'user',
+        firstName: targetUser.firstName,
+        lastName: targetUser.lastName,
+        profilePicUrl: targetUser.profilePicUrl || '',
+        instagramUsername: targetUser.instagramUsername || '',
+        instagramId: targetUser.instagramId || '',
+        accountType: targetUser.accountType || 'personal',
+        isOnboarded: targetUser.isOnboarded ?? false,
+        businessProfile: targetUser.businessProfile || null,
+        hasPasskeys: (targetUser.passkeys || []).length > 0,
+      }
+    });
+  } catch (err) {
+    console.error('Impersonation error:', err);
+    res.status(500).json({ error: 'Failed to switch workspace: ' + err.message });
+  }
+});
+
 module.exports = {
   router,
   requireAuth,

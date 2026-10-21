@@ -124,6 +124,10 @@ app.use('/api/admin/accounts', requireAuth, (req, res, next) => {
   req.url = '/admin/accounts';
   authRouter(req, res, next);
 });
+app.use('/api/admin/impersonate', requireAuth, (req, res, next) => {
+  req.url = '/admin/impersonate';
+  authRouter(req, res, next);
+});
 app.use('/api/onboarding', requireAuth, (req, res, next) => {
   req.url = '/onboarding';
   authRouter(req, res, next);
