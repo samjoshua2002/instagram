@@ -1042,14 +1042,19 @@ router.delete('/passkeys/:credentialId', requireAuth, async (req, res) => {
  */
 router.get('/instagram/check-handle', async (req, res) => {
   try {
-    const handle = (req.query.handle || '').toString().trim().replace(/^@/, '').toLowerCase();
+    const rawHandle = (req.query.handle || '').toString().trim();
+    const handle = rawHandle.replace(/^@/, '').toLowerCase();
     if (!handle || handle.length < 2) {
       return res.status(400).json({ error: 'Please enter a valid Instagram handle.' });
     }
 
-    // Check if handle is already registered by an existing user in Chatter OS
+    // 1. Check if handle is already registered by an existing verified user in Chatter OS
+    const escapeRegex = (s) => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const safeRegex = new RegExp(`^${escapeRegex(handle)}$`, 'i');
+    const safeHandleRegex = new RegExp(`^@?${escapeRegex(handle)}$`, 'i');
+
     const existingUser = await User.findOne({
-      instagramUsername: handle,
+      instagramUsername: safeRegex,
       isVerified: { $ne: false }
     });
     if (existingUser) {
@@ -1061,73 +1066,134 @@ router.get('/instagram/check-handle', async (req, res) => {
       });
     }
 
+    // 2. Query People Directory (UserMemory, SocialGraph, PersonaConfig)
+    const UserMemory = require('../models/UserMemory');
+    const SocialGraph = require('../models/SocialGraph');
+    const PersonaConfig = require('../models/PersonaConfig');
+
+    const [matchedMemory, matchedContact, persona] = await Promise.all([
+      UserMemory.findOne({ username: safeRegex }),
+      SocialGraph.findOne({
+        $or: [
+          { instagramHandle: safeHandleRegex },
+          { name: safeRegex }
+        ]
+      }),
+      PersonaConfig.findOne({ instagramUsername: safeHandleRegex })
+    ]);
+
+    let dbProfile = null;
+    if (matchedMemory || matchedContact || persona) {
+      dbProfile = {
+        fullName: matchedContact?.name || matchedMemory?.name || persona?.name || handle,
+        profilePicUrl: matchedContact?.profilePic || matchedMemory?.profilePic || persona?.profilePicUrl || '',
+        instagramId: matchedContact?.senderId || matchedMemory?.senderId || persona?.instagramId || '',
+        isProfessional: true,
+      };
+    }
+
+    // 3. Fetch profile from account name using Instagram live scraper logic
     const axios = require('axios');
-    const targetUrl = `https://www.instagram.com/${encodeURIComponent(handle)}/`;
-    const response = await axios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      },
-      timeout: 9000,
-      validateStatus: () => true
-    });
+    let liveProfile = null;
 
-    const html = response.data || '';
-    const title = html.match(/<title>([^<]+)<\/title>/)?.[1] || '';
-    const desc = html.match(/meta content=\"([^\"]+)\" name=\"description\"/)?.[1] ||
-                 html.match(/meta property=\"og:description\" content=\"([^\"]+)\"/)?.[1] || '';
-    let ogImg = html.match(/meta property=\"og:image\" content=\"([^\"]+)\"/)?.[1] || '';
-    if (ogImg) {
-      ogImg = ogImg.replace(/&amp;/g, '&');
-    }
-
-    const isExplicitlyNotFound = title.startsWith('Page Not Found') || response.status === 404;
-    const hasRichMeta = Boolean(desc) || Boolean(ogImg);
-
-    if (isExplicitlyNotFound) {
-      return res.json({
-        exists: false,
-        handle,
-        message: `No public Instagram account found for @${handle}`
+    try {
+      const targetUrl = `https://www.instagram.com/${encodeURIComponent(handle)}/`;
+      const response = await axios.get(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        timeout: 9000,
+        validateStatus: () => true
       });
+
+      const html = response.data || '';
+      const title = html.match(/<title>([^<]+)<\/title>/)?.[1] || '';
+      const desc = html.match(/meta content=\"([^\"]+)\" name=\"description\"/)?.[1] ||
+                   html.match(/meta property=\"og:description\" content=\"([^\"]+)\"/)?.[1] || '';
+      let ogImg = html.match(/meta property=\"og:image\" content=\"([^\"]+)\"/)?.[1] || '';
+      if (ogImg) {
+        ogImg = ogImg.replace(/&amp;/g, '&');
+      }
+
+      const isNotFound = title.startsWith('Page Not Found') || title === 'Instagram' || response.status === 404;
+      const hasRichMeta = !isNotFound && (Boolean(desc) || Boolean(ogImg));
+
+      if (hasRichMeta) {
+        const decodeHtmlEntities = (str) => {
+          if (!str) return '';
+          return str
+            .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+              try { return String.fromCodePoint(parseInt(hex, 16)); } catch { return ''; }
+            })
+            .replace(/&#([0-9]+);/g, (_, dec) => {
+              try { return String.fromCodePoint(parseInt(dec, 10)); } catch { return ''; }
+            })
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&apos;/g, "'");
+        };
+
+        let fullName = handle;
+        if (title.includes('(&#064;')) {
+          fullName = decodeHtmlEntities(title.split('(&#064;')[0].trim());
+        } else if (title.includes('(@')) {
+          fullName = decodeHtmlEntities(title.split('(@')[0].trim());
+        }
+
+        const idMatch = html.match(/\"props\":\{\"id\":\"([0-9]+)\"/i) ||
+                        html.match(/\"id\":\"([0-9]{5,25})\"/i) ||
+                        html.match(/profilePage_([0-9]+)/i) ||
+                        html.match(/\/([0-9]+)_[0-9]+_[0-9]+_n\.jpg/);
+        const instagramId = idMatch ? idMatch[1] : '';
+
+        liveProfile = {
+          fullName: fullName || handle,
+          profilePicUrl: ogImg || '',
+          instagramId,
+          bio: desc,
+          verified: html.includes('"is_verified":true') || html.includes('Verified')
+        };
+      }
+    } catch (scrapeErr) {
+      console.warn(`Instagram live check note for @${handle}:`, scrapeErr.message);
     }
 
-    if (!hasRichMeta) {
-      // Instagram rate limits server scrapers or displays login shell. Accept valid handle format!
+    // 4. Combine DB and live scraped profile
+    if (dbProfile || liveProfile) {
+      const finalFullName = (dbProfile?.fullName && dbProfile.fullName !== handle)
+        ? dbProfile.fullName
+        : (liveProfile?.fullName || handle);
+      const finalPic = liveProfile?.profilePicUrl || dbProfile?.profilePicUrl || '';
+      const finalId = dbProfile?.instagramId || liveProfile?.instagramId || '';
+
+      // Persist discovered profile picture back to UserMemory if missing
+      if (matchedMemory && !matchedMemory.profilePic && finalPic) {
+        matchedMemory.profilePic = finalPic;
+        matchedMemory.save().catch(() => {});
+      }
+
       return res.json({
         exists: true,
-        unverified: true,
         handle,
-        fullName: handle,
-        profilePicUrl: '',
-        instagramId: '',
-        message: `@${handle} accepted.`
+        fullName: finalFullName,
+        profilePicUrl: finalPic,
+        instagramId: finalId,
+        bio: liveProfile?.bio || '',
+        verified: Boolean(liveProfile?.verified),
+        isProfessional: true,
+        fromPeopleDirectory: Boolean(dbProfile)
       });
     }
 
-    // Extract permanent numeric user ID if available
-    const idMatch = html.match(/\"props\":\{\"id\":\"([0-9]+)\"/i) ||
-                    html.match(/\"id\":\"([0-9]{5,25})\"/i) ||
-                    html.match(/profilePage_([0-9]+)/i) ||
-                    html.match(/\/([0-9]+)_[0-9]+_[0-9]+_n\.jpg/);
-    const instagramId = idMatch ? idMatch[1] : '';
-
-    // Extract full name
-    let fullName = handle;
-    if (title.includes('(&#064;')) {
-      fullName = title.split('(&#064;')[0].trim();
-    } else if (title.includes('(@')) {
-      fullName = title.split('(@')[0].trim();
-    }
-
+    // 5. Account not in DB and not a valid public account
     return res.json({
-      exists: true,
+      exists: false,
       handle,
-      fullName,
-      profilePicUrl: ogImg,
-      instagramId,
-      bio: desc,
-      verified: html.includes('"is_verified":true') || html.includes('Verified')
+      message: 'Account does not exist. It must be a valid professional or business Instagram account.'
     });
   } catch (err) {
     console.error('❌ Check handle error:', err.message);

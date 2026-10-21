@@ -185,17 +185,10 @@ export default function LoginPage({ onLoginSuccess }) {
     }
 
     setInstaError('');
-    // Immediately set a valid handle preview so user is never blocked or shown an error
-    setInstaPreview({
-      username: handle,
-      fullName: handle,
-      profilePicUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(handle)}&background=09090b&color=fff`,
-      instagramId: '',
-      isVerified: false
-    });
+    setInstaChecking(true);
+    setInstaPreview(null);
 
     const timer = setTimeout(async () => {
-      setInstaChecking(true);
       try {
         const res = await fetch(`${API_BASE}/api/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
         const data = await res.json();
@@ -203,19 +196,27 @@ export default function LoginPage({ onLoginSuccess }) {
           setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
           setInstaPreview(null);
         } else if (data.exists === false) {
-          setInstaError(data.message || `No Instagram account found for @${handle}.`);
+          setInstaError(data.message || 'Account does not exist. It must be a valid professional or business Instagram account.');
           setInstaPreview(null);
         } else if (data.exists) {
-          setInstaPreview(data);
+          setInstaPreview({
+            ...data,
+            username: data.handle || data.username || handle
+          });
           setInstaError('');
           setRegForm(prev => ({
             ...prev,
             instagramId: data.instagramId || '',
-            instagramUsername: data.handle || data.username || handle
+            instagramUsername: data.handle || data.username || handle,
+            profilePicUrl: data.profilePicUrl || prev.profilePicUrl || ''
           }));
+        } else {
+          setInstaError('Account does not exist. It must be a valid professional or business Instagram account.');
+          setInstaPreview(null);
         }
       } catch (err) {
-        // Keep the format-verified handle preview without error
+        setInstaError('Unable to verify Instagram account. Please check your connection.');
+        setInstaPreview(null);
       } finally {
         setInstaChecking(false);
       }
@@ -567,9 +568,24 @@ export default function LoginPage({ onLoginSuccess }) {
       setRegError('Password must be at least 6 characters.');
       return;
     }
-    if (regForm.instagramUsername && !/^[a-zA-Z0-9._]{1,30}$/.test(regForm.instagramUsername.replace(/^@/, ''))) {
-      setRegError('Instagram handle can only contain letters, numbers, periods, and underscores.');
-      return;
+    if (regForm.instagramUsername && regForm.instagramUsername.trim()) {
+      const cleanH = regForm.instagramUsername.trim().replace(/^@/, '');
+      if (!/^[a-zA-Z0-9._]{1,30}$/.test(cleanH)) {
+        setRegError('Instagram handle can only contain letters, numbers, periods, and underscores.');
+        return;
+      }
+      if (instaChecking) {
+        setRegError('Please wait for Instagram handle verification to complete.');
+        return;
+      }
+      if (instaError) {
+        setRegError(instaError);
+        return;
+      }
+      if (!instaPreview || !instaPreview.exists) {
+        setRegError('Account does not exist. It must be a valid professional or business Instagram account.');
+        return;
+      }
     }
 
     setRegLoading(true);
@@ -2147,8 +2163,27 @@ export default function LoginPage({ onLoginSuccess }) {
                     </div>
                   </div>
 
+                  {/* Instagram Verification Checking State */}
+                  {instaChecking && (
+                    <div style={{
+                      marginBottom: '14px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.74rem',
+                      color: '#64748b'
+                    }}>
+                      <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                      <span>Verifying professional/business account on Instagram...</span>
+                    </div>
+                  )}
+
                   {/* Instagram Live Account Recommendation Card */}
-                  {instaPreview && (
+                  {instaPreview && !instaChecking && (
                     <div style={{
                       marginBottom: '14px',
                       background: '#f0fdf4',
@@ -2196,7 +2231,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     </div>
                   )}
 
-                  {instaError && (
+                  {instaError && !instaChecking && (
                     <div style={{
                       marginBottom: '14px',
                       background: '#fef2f2',
