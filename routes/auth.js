@@ -263,6 +263,8 @@ router.post('/register/verify-otp', async (req, res) => {
         businessProfile: user.businessProfile || null,
         profilePicUrl: user.profilePicUrl,
         hasPasskeys: (user.passkeys || []).length > 0,
+        hasInstagramToken: Boolean(user.instagramPageAccessToken),
+        isInstagramConnected: Boolean(user.instagramPageAccessToken),
       },
     });
   } catch (err) {
@@ -331,6 +333,8 @@ router.post('/login', async (req, res) => {
         businessProfile: user.businessProfile || null,
         profilePicUrl: user.profilePicUrl || '',
         hasPasskeys: (user.passkeys || []).length > 0,
+        hasInstagramToken: Boolean(user.instagramPageAccessToken),
+        isInstagramConnected: Boolean(user.instagramPageAccessToken),
       },
     });
   } catch (err) {
@@ -714,6 +718,8 @@ router.post('/passkey/login-verify', async (req, res) => {
         isOnboarded: user.isOnboarded ?? false,
         businessProfile: user.businessProfile || null,
         hasPasskeys: (user.passkeys || []).length > 0,
+        hasInstagramToken: Boolean(user.instagramPageAccessToken),
+        isInstagramConnected: Boolean(user.instagramPageAccessToken),
       },
     });
   } catch (err) {
@@ -813,6 +819,8 @@ router.get('/me', requireAuth, async (req, res) => {
     accountType: user.accountType,
     isOnboarded: user.isOnboarded ?? false,
     businessProfile: user.businessProfile || null,
+    hasInstagramToken: Boolean(user.instagramPageAccessToken),
+    isInstagramConnected: Boolean(user.instagramPageAccessToken),
     address: user.address,
     twoFactorEnabled: user.twoFactor?.enabled || false,
     passkeys: (user.passkeys || []).map(p => ({

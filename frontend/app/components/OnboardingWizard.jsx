@@ -122,6 +122,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         businessProfile: data.user?.businessProfile,
         instagramUsername: data.user?.instagramUsername || instagramUsername.trim(),
         instagramId: data.user?.instagramId || instagramAccountId.trim(),
+        hasInstagramToken: Boolean(data.user?.hasInstagramToken || instagramPageAccessToken.trim()),
+        isInstagramConnected: Boolean(data.user?.isInstagramConnected || instagramPageAccessToken.trim()),
+        instagramPageAccessToken: instagramPageAccessToken.trim(),
       });
 
       if (setRoutingConfigState) {

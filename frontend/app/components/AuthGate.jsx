@@ -10,6 +10,7 @@ import Toast from './Toast';
 import AiInterviewModal from './AiInterviewModal';
 import LinkIdModal from './LinkIdModal';
 import OnboardingWizard from './OnboardingWizard';
+import InstagramConnectFallback from './InstagramConnectFallback';
 import WorkspaceImpersonationBanner from './WorkspaceImpersonationBanner';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 
@@ -26,6 +27,9 @@ export default function AuthGate({ children }) {
     isOnboardingModalOpen,
     setIsOnboardingModalOpen,
   } = useApp();
+
+  const isSuperadmin = user?.role === 'superadmin';
+  const isInstagramLinked = isSuperadmin || Boolean(user?.hasInstagramToken || user?.isInstagramConnected || user?.instagramPageAccessToken);
 
   const [wizardDismissed, setWizardDismissed] = useState(false);
 
@@ -104,7 +108,14 @@ export default function AuthGate({ children }) {
         <Sidebar />
         <main className="app-main-content">
           <WorkspaceImpersonationBanner />
-          {children}
+          {!isInstagramLinked && pathname !== '/settings' ? (
+            <InstagramConnectFallback
+              onConnect={() => setIsOnboardingModalOpen(true)}
+              user={user}
+            />
+          ) : (
+            children
+          )}
         </main>
       </div>
       <Toast />
@@ -115,7 +126,7 @@ export default function AuthGate({ children }) {
         onClose={() => setIsPasskeyModalOpen(false)}
       />
       <OnboardingWizard
-        isOpen={isOnboardingModalOpen || (!!user && user.isOnboarded === false && user.role !== 'superadmin' && !wizardDismissed)}
+        isOpen={isOnboardingModalOpen || (!isSuperadmin && !isInstagramLinked && !wizardDismissed)}
         onClose={() => {
           setWizardDismissed(true);
           setIsOnboardingModalOpen(false);
