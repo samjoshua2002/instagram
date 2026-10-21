@@ -159,7 +159,6 @@ export default function LoginPage({ onLoginSuccess }) {
   const [regAuthUser, setRegAuthUser] = useState(null);
   const [regPasskeyLoading, setRegPasskeyLoading] = useState(false);
   const [regPasskeySuccess, setRegPasskeySuccess] = useState(false);
-  const [previewOtp, setPreviewOtp] = useState('');
 
   // Live Instagram Handle Recommendation & Validation State
   const [instaChecking, setInstaChecking] = useState(false);
@@ -236,7 +235,6 @@ export default function LoginPage({ onLoginSuccess }) {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
-  const [forgotPreviewOtp, setForgotPreviewOtp] = useState('');
 
   // 1. Initialize Cached Account from LocalStorage on mount
   useEffect(() => {
@@ -612,9 +610,6 @@ export default function LoginPage({ onLoginSuccess }) {
         throw new Error(data.error || 'Failed to initiate account creation.');
       }
 
-      if (data.previewOtp) {
-        setPreviewOtp(data.previewOtp);
-      }
       setRegSuccess(data.message || `Verification code sent to ${regForm.email}. Check your inbox!`);
       setRegStage('otp');
     } catch (err) {
@@ -640,9 +635,6 @@ export default function LoginPage({ onLoginSuccess }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to resend code.');
-      if (data.previewOtp) {
-        setPreviewOtp(data.previewOtp);
-      }
       setRegSuccess(data.message || 'New verification code sent. Check your inbox!');
     } catch (err) {
       setRegError(err.message || 'Failed to resend verification code.');
@@ -818,10 +810,6 @@ export default function LoginPage({ onLoginSuccess }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send verification code.');
 
-      if (data.previewOtp) {
-        setForgotPreviewOtp(data.previewOtp);
-        setForgotOtpCode(data.previewOtp);
-      }
       setOtpSent(true);
       setForgotSuccess(data.message || 'Verification code sent to your email.');
     } catch (err) {
@@ -2357,31 +2345,6 @@ export default function LoginPage({ onLoginSuccess }) {
                       />
                     </div>
 
-                    {previewOtp && (
-                      <div style={{ marginBottom: '14px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => setRegOtpCode(previewOtp)}
-                          style={{
-                            background: '#f4f4f5',
-                            border: '1px solid #e4e4e7',
-                            borderRadius: '6px',
-                            padding: '4px 10px',
-                            fontSize: '0.74rem',
-                            fontWeight: '700',
-                            fontFamily: "'JetBrains Mono', monospace",
-                            color: '#09090b',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
-                        >
-                          <span>Auto-fill Code: <strong>{previewOtp}</strong></span>
-                        </button>
-                      </div>
-                    )}
-
                     <button
                       type="submit"
                       disabled={regLoading || regOtpCode.trim().length !== 6}
@@ -2807,35 +2770,6 @@ export default function LoginPage({ onLoginSuccess }) {
                   </form>
                 ) : (
                   <form onSubmit={handleVerifyEmailOtp}>
-                    {forgotPreviewOtp && (
-                      <div style={{
-                        background: '#f4f4f5',
-                        border: '1px solid #e4e4e7',
-                        borderRadius: '8px',
-                        padding: '10px 12px',
-                        marginBottom: '14px',
-                        fontSize: '0.76rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                      }}>
-                        <span style={{ color: '#71717a' }}>Instant Verification Code:</span>
-                        <span style={{
-                          fontFamily: "'JetBrains Mono', monospace",
-                          fontWeight: '800',
-                          fontSize: '0.92rem',
-                          letterSpacing: '2px',
-                          color: '#09090b',
-                          background: '#ffffff',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid #d4d4d8'
-                        }}>
-                          {forgotPreviewOtp}
-                        </span>
-                      </div>
-                    )}
-
                     <div style={{ marginBottom: '12px' }}>
                       <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
                         6-Digit Verification Code
@@ -2912,7 +2846,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                     <button
                       type="button"
-                      onClick={() => { setOtpSent(false); setForgotError(''); setForgotSuccess(''); setForgotPreviewOtp(''); }}
+                      onClick={() => { setOtpSent(false); setForgotError(''); setForgotSuccess(''); }}
                       style={{
                         background: 'none',
                         border: 'none',

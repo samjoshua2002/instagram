@@ -25,8 +25,13 @@ class AuthService {
     const pass = rawPass ? rawPass.replace(/\s+/g, '') : null;
     if (user && pass) {
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: { user, pass },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
       });
     }
   }
@@ -118,42 +123,36 @@ class AuthService {
   async sendOtpEmail(toEmail, otpCode, purpose = 'Password Reset') {
     if (!this.transporter) this.initMailer();
     if (!this.transporter) {
-      console.warn('⚠️ [AuthService] Email service not configured. Falling back gracefully.');
-      return { sent: false, reason: 'unconfigured' };
+      console.error('❌ [AuthService] Email credentials (EMAIL_USER / EMAIL_PASS) not configured on server.');
+      throw new Error('Email service is not configured on the server. Please ensure EMAIL_USER and EMAIL_PASS are set.');
     }
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a;">
         <div style="margin-bottom: 24px; text-align: center;">
-          <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 4px; color: #0f172a;">Sam Joshua Dashboard</h2>
+          <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 4px; color: #0f172a;">Chatter OS Security</h2>
           <p style="font-size: 13px; color: #64748b; margin: 0;">Identity verification code</p>
         </div>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
           <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px;">Your 6-Digit ${purpose} Code</div>
           <div style="font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0f172a; font-family: monospace;">${otpCode}</div>
-          <p style="font-size: 12px; color: #94a3b8; margin: 10px 0 0;">Valid for 10 minutes. Do not share this code.</p>
+          <p style="font-size: 12px; color: #94a3b8; margin: 10px 0 0;">Valid for 10 minutes. Do not share this code with anyone.</p>
         </div>
         <p style="font-size: 13px; line-height: 1.5; color: #475569; margin: 0 0 16px;">
           If you did not request this verification code, please ignore this email.
         </p>
         <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; text-align: center; font-size: 11px; color: #94a3b8;">
-          Authorized Access • guidetalk.app@gmail.com
+          Authorized Access • ${process.env.EMAIL_USER || 'Chatter OS'}
         </div>
       </div>
     `;
 
-    const sendPromise = this.transporter.sendMail({
-      from: `"Sam Joshua Security" <${process.env.EMAIL_USER}>`,
+    return await this.transporter.sendMail({
+      from: `"Chatter OS Security" <${process.env.EMAIL_USER}>`,
       to: toEmail,
       subject: `[Verification] Your ${purpose} Code: ${otpCode}`,
       html,
     });
-
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Email server connection timed out after 25s.')), 25000)
-    );
-
-    return Promise.race([sendPromise, timeoutPromise]);
   }
 
   /**
