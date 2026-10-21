@@ -8,10 +8,22 @@ import {
   Smile, Flame, Eye, Heart, HelpCircle, Frown, X, ExternalLink,
   Pencil, Tag, Search, Download, Key, Check, Layers
 } from 'lucide-react';
+import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 
 export default function MediaVaultPage() {
-  const { API_BASE, showToast } = useApp();
+  const { API_BASE, showToast, user, isImpersonating } = useApp();
+
+  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator Media Vault"
+        sectionCode="05 // VAULT"
+        sectionDescription="Reaction images, GIFs, and media vault assets are stored per individual creator workspace. Choose a creator workspace below to inspect and manage their media vault."
+      />
+    );
+  }
 
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);

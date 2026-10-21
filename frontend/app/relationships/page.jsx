@@ -8,6 +8,7 @@ import {
   Plus, RefreshCw, MessageSquare, Shield, X, Users,
   LayoutGrid, List, AlignJustify, Table as TableIcon
 } from 'lucide-react';
+import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import ContactAvatar from '../components/ContactAvatar';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -63,8 +64,21 @@ export default function RelationshipsPage() {
     extractFromRawChat,
     API_BASE,
     showToast,
-    isSyncingInitial
+    isSyncingInitial,
+    user,
+    isImpersonating
   } = useApp();
+
+  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator People Directory"
+        sectionCode="02 // RELATIONSHIPS"
+        sectionDescription="People directories, relationship tags, and contact memory belong to individual creator workspaces. Choose a creator workspace below to inspect and manage their contact directory."
+      />
+    );
+  }
 
   // Navigation State: null = Directory Table view; Object = Full Inner Person Page
   const [selectedPerson, setSelectedPerson] = useState(null);

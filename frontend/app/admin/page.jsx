@@ -11,7 +11,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SuperadminPage() {
-  const { user, API_BASE, token, showToast } = useApp();
+  const { user, API_BASE, token, enterWorkspace, showToast } = useApp();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,17 +19,19 @@ export default function SuperadminPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('accounts'); // 'accounts' | 'members'
   const [expandedAccountId, setExpandedAccountId] = useState(null);
+  const [enteringId, setEnteringId] = useState(null);
 
   const isSuperadmin = user?.role === 'superadmin';
 
   const fetchAdminData = async () => {
-    if (!token) return;
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
     setLoading(true);
     setError('');
     try {
       const res = await fetch(`${API_BASE}/api/admin/accounts`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         }
       });
       const resData = await res.json();
@@ -42,6 +44,31 @@ export default function SuperadminPage() {
       setError(err.message || 'Error loading superadmin directory.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEnterWorkspace = async (targetUser) => {
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken || enteringId) return;
+    setEnteringId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/impersonate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({ userId: targetUser.id })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to enter workspace.');
+
+      enterWorkspace(resData.token, resData.user);
+    } catch (err) {
+      console.error('Enter workspace error:', err);
+      showToast?.(err.message || 'Failed to enter workspace.', 'error');
+    } finally {
+      setEnteringId(null);
     }
   };
 
@@ -471,6 +498,32 @@ export default function SuperadminPage() {
                           Joined {account.createdAt ? new Date(account.createdAt).toLocaleDateString() : 'N/A'}
                         </span>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEnterWorkspace(account);
+                        }}
+                        disabled={enteringId === account.id}
+                        title="Enter and manage this workspace"
+                        style={{
+                          background: '#09090b',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '7px',
+                          padding: '6px 12px',
+                          fontSize: '0.74rem',
+                          fontWeight: '700',
+                          cursor: enteringId === account.id ? 'wait' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}
+                      >
+                        <Shield size={12} color="#22c55e" />
+                        <span>{enteringId === account.id ? 'Opening...' : 'Manage'}</span>
+                      </button>
 
                       <div style={{
                         width: '32px',
