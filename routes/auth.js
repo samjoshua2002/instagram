@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const User = require('../models/User');
 const authService = require('../services/authService');
 
@@ -965,6 +966,239 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('❌ Skip onboarding error:', err.message);
     res.status(500).json({ error: 'Failed to skip onboarding: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/auth/instagram/connect
+ * Redirects to Meta OAuth login dialog for in-app Instagram connection
+ */
+router.get('/instagram/connect', (req, res) => {
+  try {
+    const metaAppId = process.env.META_APP_ID;
+    if (!metaAppId) {
+      return res.status(500).send('META_APP_ID is not configured in environment.');
+    }
+
+    const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
+    const userJwt = req.query.token || '';
+
+    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+    const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
+
+    const stateObj = {
+      token: userJwt,
+      origin: clientOrigin,
+    };
+    const state = Buffer.from(JSON.stringify(stateObj)).toString('base64');
+
+    const scopes = [
+      'instagram_basic',
+      'instagram_manage_messages',
+      'pages_manage_metadata',
+      'pages_read_engagement',
+      'pages_show_list'
+    ].join(',');
+
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
+
+    res.redirect(authUrl);
+  } catch (err) {
+    console.error('❌ /instagram/connect error:', err.message);
+    res.status(500).send('Failed to initiate Instagram OAuth: ' + err.message);
+  }
+});
+
+/**
+ * GET /api/auth/instagram/callback
+ * Exchanges Meta OAuth code for Page Access Token & Instagram Business ID
+ */
+router.get('/instagram/callback', async (req, res) => {
+  try {
+    const { code, state, error, error_description } = req.query;
+
+    let origin = 'https://instagram-ebon-zeta.vercel.app';
+    let userJwt = '';
+    if (state) {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+        if (decoded.origin) origin = decoded.origin;
+        if (decoded.token) userJwt = decoded.token;
+      } catch (e) {}
+    }
+
+    if (error) {
+      console.error('❌ Meta OAuth error:', error, error_description);
+      const safeErr = (error_description || error || 'Authorization was cancelled').replace(/['"]/g, '');
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Authorization Failed</title></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa; color: #09090b;">
+          <div style="background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px; padding: 36px 30px; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
+            <div style="display: inline-block; background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;">AUTHORIZATION FAILED</div>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px;">Could Not Connect</h2>
+            <p style="color: #71717a; font-size: 14px; line-height: 1.5; margin: 0 0 16px 0;">${safeErr}</p>
+            <p style="font-size: 12px; color: #a1a1aa;">Closing window and returning to Chatter OS...</p>
+          </div>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', error: "${safeErr}" }, "*");
+              setTimeout(() => { window.close(); }, 3000);
+            }
+          </script>
+        </body>
+        </html>
+      `);
+    }
+
+    if (!code) {
+      return res.status(400).send('No authorization code provided by Meta.');
+    }
+
+    const metaAppId = process.env.META_APP_ID;
+    const metaAppSecret = process.env.META_APP_SECRET;
+    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+    const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
+
+    // 1. Exchange code for short-lived token
+    const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
+      params: {
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        redirect_uri: redirectUri,
+        code
+      }
+    });
+
+    const shortLivedToken = tokenRes.data.access_token;
+
+    // 2. Exchange for 60-day long-lived token
+    let longLivedToken = shortLivedToken;
+    try {
+      const longLivedRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
+        params: {
+          grant_type: 'fb_exchange_token',
+          client_id: metaAppId,
+          client_secret: metaAppSecret,
+          fb_exchange_token: shortLivedToken
+        }
+      });
+      if (longLivedRes.data.access_token) {
+        longLivedToken = longLivedRes.data.access_token;
+      }
+    } catch (e) {
+      console.warn('Long-lived token exchange warning:', e.message);
+    }
+
+    // 3. Query Facebook Pages and linked Instagram Business Accounts
+    const accountsRes = await axios.get('https://graph.facebook.com/v19.0/me/accounts', {
+      params: {
+        fields: 'id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}',
+        access_token: longLivedToken
+      }
+    });
+
+    const pages = accountsRes.data.data || [];
+    let linkedPageToken = '';
+    let instagramAccountId = '';
+    let instagramUsername = '';
+
+    for (const page of pages) {
+      if (page.instagram_business_account) {
+        linkedPageToken = page.access_token;
+        instagramAccountId = page.instagram_business_account.id;
+        instagramUsername = page.instagram_business_account.username;
+        break;
+      }
+    }
+
+    if (!linkedPageToken && pages.length > 0) {
+      linkedPageToken = pages[0].access_token;
+      instagramAccountId = pages[0].id;
+      instagramUsername = pages[0].name;
+    }
+
+    // 4. Save to User document if JWT was passed in state
+    if (userJwt) {
+      try {
+        const decodedToken = authService.verifyToken(userJwt);
+        if (decodedToken && decodedToken.userId) {
+          const user = await User.findById(decodedToken.userId);
+          if (user) {
+            if (linkedPageToken) user.instagramPageAccessToken = linkedPageToken;
+            if (instagramAccountId) user.instagramAccountId = instagramAccountId;
+            if (instagramUsername) user.instagramUsername = instagramUsername;
+            user.hasInstagramToken = Boolean(linkedPageToken);
+            user.isInstagramConnected = Boolean(linkedPageToken);
+            await user.save();
+          }
+        }
+      } catch (e) {
+        console.warn('Could not auto-save token from JWT state:', e.message);
+      }
+    }
+
+    // 5. Return auto-closing HTML that posts message to opener
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Instagram Connected</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa; color: #09090b; }
+          .card { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; padding: 36px 30px; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+          .badge { display: inline-block; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px; }
+          h2 { margin: 0 0 8px 0; font-size: 20px; }
+          p { color: #71717a; font-size: 14px; line-height: 1.5; margin: 0 0 16px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">SUCCESSFULLY CONNECTED</div>
+          <h2>Instagram Account Linked!</h2>
+          <p>Connected as <strong>@${instagramUsername || 'Instagram'}</strong>.<br/>Returning to Chatter OS...</p>
+        </div>
+        <script>
+          const payload = {
+            success: true,
+            instagramUsername: "${instagramUsername || ''}",
+            instagramAccountId: "${instagramAccountId || ''}",
+            instagramPageAccessToken: "${linkedPageToken || ''}"
+          };
+          if (window.opener) {
+            window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_SUCCESS', payload }, "*");
+            setTimeout(() => { window.close(); }, 1200);
+          } else {
+            setTimeout(() => { window.location.href = "${origin}"; }, 1500);
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('❌ Meta OAuth callback error:', err.response?.data || err.message);
+    const errText = (err.response?.data?.error?.message || err.message || 'Unknown error').replace(/['"]/g, '');
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Connection Failed</title></head>
+      <body style="font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa;">
+        <div style="background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px; padding: 36px 30px; max-width: 440px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
+          <div style="display: inline-block; background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;">CONNECTION FAILED</div>
+          <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #dc2626;">Could Not Retrieve Token</h2>
+          <p style="color: #4b5563; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0;">${errText}</p>
+          <p style="font-size: 12px; color: #9ca3af;">You can also enter your Page Access Token manually in the setup wizard.</p>
+        </div>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', error: "${errText}" }, "*");
+            setTimeout(() => { window.close(); }, 3500);
+          }
+        </script>
+      </body>
+      </html>
+    `);
   }
 });
 
