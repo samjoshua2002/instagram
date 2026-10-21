@@ -1643,10 +1643,15 @@ app.get('/privacy', (req, res) => {
   `);
 });
 
+// Deauthorize Callback for Meta
+app.all('/deauthorize', (req, res) => {
+  res.json({ success: true, message: 'Account deauthorized successfully' });
+});
+
 // User Data Deletion Callback for Meta
 app.all('/data-deletion', (req, res) => {
   res.json({
-    url: 'https://page-pool-recorded-father.trycloudflare.com/privacy',
+    url: 'https://instagram-ai-bot-64tf.onrender.com/privacy',
     confirmation_code: 'chatter_deletion_success'
   });
 });
