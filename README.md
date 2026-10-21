@@ -12,6 +12,12 @@ Chatter AI is an autonomous, context-aware Instagram Direct Message platform eng
 
 ---
 
+## 📸 Live Dashboard Preview
+
+![Chatter OS Analytics Overview Dashboard](./image.png)
+
+---
+
 ## 🏛️ System Architecture Overview
 
 ```mermaid
@@ -19,7 +25,7 @@ flowchart TD
     IGUser([Instagram Contact / Customer]) -->|Sends DM / Shares Reel| MetaPlatform[Meta Graph API Platform]
     MetaPlatform -->|POST /webhook with HMAC-SHA256| ExpressBE[Express Backend Router]
     
-    subgraph Ingestion & Security
+    subgraph Ingestion_Security["Ingestion & Security"]
         ExpressBE --> HMAC{Validate X-Hub-Signature-256}
         HMAC -->|Invalid| Reject[401 Unauthorized]
         HMAC -->|Valid| Ack[200 OK EVENT_RECEIVED]
@@ -28,27 +34,27 @@ flowchart TD
         Dedupe -->|New Message| TenantResolver[Resolve Tenant via recipient.id]
     end
     
-    subgraph Multi-Tenant Core Dispatcher
+    subgraph MultiTenant_Core["Multi-Tenant Core Dispatcher"]
         TenantResolver --> TenantCheck{Account Resolved?}
         TenantCheck -->|No| SafeDrop[Safe Failure: Log & Terminate]
         TenantCheck -->|Yes| DecryptCredentials[Decrypt Meta Token via AES-256-GCM]
         DecryptCredentials --> AccountMode{Account Type}
     end
     
-    subgraph Personal Creator Pipeline
+    subgraph Personal_Pipeline["Personal Creator Pipeline"]
         AccountMode -->|Personal| PersonalCEL[Personal CEL Rules: Dialects, Length, Lore Gating]
         PersonalCEL --> HumanMimicryPrompt[Human Mimicry: Lowercase, Slang, Anti-AI Filter]
         HumanMimicryPrompt --> StickerEngine[Media Vault & GIPHY Sticker Dispatch]
     end
     
-    subgraph Business Enterprise Pipeline
+    subgraph Business_Pipeline["Business Enterprise Pipeline"]
         AccountMode -->|Business| BusinessCEL[Business CEL Rules: Hours, Escalations, Refunds]
         BusinessCEL --> RAGDocEngine[RAG Engine: Runbooks, FAQs, Service URLs]
         RAGDocEngine --> GroundedBrandPrompt[Brand Compliance & Document Link Delivery]
         GroundedBrandPrompt --> LeadBookingTracker[Analytics Hook: Capture Leads & Bookings]
     end
     
-    subgraph Modular AI Factory (Default or BYO-LLM)
+    subgraph Modular_AI["Modular AI Factory"]
         HumanMimicryPrompt --> LLMFactory{Select AI Model}
         GroundedBrandPrompt --> LLMFactory
         LLMFactory -->|Managed Cloud| AzureOpenAI[Azure OpenAI gpt-4o]
@@ -218,17 +224,6 @@ instagram/
 5. **Access the dashboard:**
    Navigate to `http://localhost:3000` to register your account, connect Instagram, and configure your AI assistant.
 
----
-
-## 📖 Documentation Index
-
-For detailed specifications and implementation tracking:
-- [`start.md`](file:///Users/samjoshua/Developer/instagram/instagram/start.md) — Developer Kickoff Guide
-- [`checklist.md`](file:///Users/samjoshua/Developer/instagram/instagram/checklist.md) — Master Phased Implementation Checklist (Phases 0–10)
-- [`PLAN.md`](file:///Users/samjoshua/Developer/instagram/instagram/PLAN.md) — Complete Technical Architecture Specification
-- [`project.md`](file:///Users/samjoshua/Developer/instagram/instagram/project.md) — Comprehensive System Audit & Baseline Findings
-
----
 
 ## 📄 License
 Private & Proprietary — All rights reserved.
