@@ -88,7 +88,7 @@ router.post('/register/request-otp', async (req, res) => {
         whatsappNumber: (whatsappNumber || '').trim(),
         instagramUsername: (instagramUsername || '').trim() || 'catovidz',
         instagramId: (instagramId || '').trim(),
-        role: isSuperadmin ? 'superadmin' : 'user',
+        role: 'user',
         isVerified: false,
         verificationOtp: {
           code: otpCode,
@@ -108,7 +108,7 @@ router.post('/register/request-otp', async (req, res) => {
       user.whatsappNumber = (whatsappNumber || '').trim();
       user.instagramUsername = (instagramUsername || '').trim() || user.instagramUsername;
       if (instagramId) user.instagramId = instagramId.trim();
-      user.role = isSuperadmin ? 'superadmin' : 'user';
+      user.role = existing.role || 'user';
       user.isVerified = false;
       user.verificationOtp = {
         code: otpCode,
@@ -956,14 +956,27 @@ router.get('/instagram/check-handle', async (req, res) => {
       ogImg = ogImg.replace(/&amp;/g, '&');
     }
 
-    const isNotFound = title.startsWith('Page Not Found') || title === 'Instagram' || response.status === 404;
-    const exists = !isNotFound && (Boolean(desc) || Boolean(ogImg));
+    const isExplicitlyNotFound = title.startsWith('Page Not Found') || response.status === 404;
+    const hasRichMeta = Boolean(desc) || Boolean(ogImg);
 
-    if (!exists) {
+    if (isExplicitlyNotFound) {
       return res.json({
         exists: false,
         handle,
         message: `No public Instagram account found for @${handle}`
+      });
+    }
+
+    if (!hasRichMeta) {
+      // Instagram rate limits server scrapers or displays login shell. Accept valid handle format!
+      return res.json({
+        exists: true,
+        unverified: true,
+        handle,
+        fullName: handle,
+        profilePicUrl: '',
+        instagramId: '',
+        message: `@${handle} accepted.`
       });
     }
 
@@ -1022,6 +1035,8 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
         lastName: u.lastName,
         role: u.role || 'user',
         accountType: u.accountType || 'personal',
+        isOnboarded: u.isOnboarded ?? false,
+        businessProfile: u.businessProfile || null,
         mobileNumber: u.mobileNumber || '',
         whatsappNumber: u.whatsappNumber || '',
         instagramUsername: u.instagramUsername || '',
