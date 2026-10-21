@@ -52,6 +52,7 @@ export default function SettingsPage() {
 
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
+  const [oauthConnecting, setOauthConnecting] = useState(false);
 
   // Helper to obtain authorization headers
   const getAuthHeaders = () => {
@@ -60,6 +61,54 @@ export default function SettingsPage() {
       'Content-Type': 'application/json',
       ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
     };
+  };
+
+  // Listen for OAuth postMessage from login popup window
+  useEffect(() => {
+    const handleOAuthMessage = (event) => {
+      if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
+        const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
+        setFormData(prev => ({
+          ...prev,
+          ...(igUser ? { instagramHandle: `@${igUser.replace(/^@/, '')}` } : {}),
+          ...(igId ? { instagramAccountId: igId } : {}),
+          ...(igToken ? { instagramPageAccessToken: igToken } : {}),
+        }));
+        setOauthConnecting(false);
+        if (updateUserProfile) {
+          updateUserProfile({
+            hasInstagramToken: true,
+            isInstagramConnected: true,
+            instagramPageAccessToken: igToken,
+            instagramAccountId: igId,
+            instagramUsername: igUser,
+          });
+        }
+        showToast?.(`Instagram connected: @${igUser || 'account'}! Credentials updated.`, 'success');
+      } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
+        setOauthConnecting(false);
+        setErrorMsg(event.data.error || 'Instagram connection cancelled or failed.');
+      }
+    };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [showToast, updateUserProfile]);
+
+  const handleLaunchInstagramOAuth = () => {
+    setErrorMsg('');
+    setOauthConnecting(true);
+    try {
+      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
+      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+      if (!popup) {
+        setOauthConnecting(false);
+        setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
+      }
+    } catch (e) {
+      setOauthConnecting(false);
+      setErrorMsg('Failed to open login dialog: ' + e.message);
+    }
   };
 
   // State for Giphy API Key
@@ -564,6 +613,63 @@ export default function SettingsPage() {
             <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px' }}>
               Your Instagram Page Access Token and Instagram Account ID enable Chatter AI to send and receive messages on your behalf. You can view, copy, or update your credentials directly below.
             </p>
+
+            {/* Meta OAuth Auto-Connect Action */}
+            <div style={{
+              background: '#fafafa',
+              border: '1px solid #e4e4e7',
+              borderRadius: '10px',
+              padding: '14px 18px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.84rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Instagram size={15} />
+                  <span>Automatic Token Generation</span>
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '2px' }}>
+                  Log in with Meta to auto-fetch and renew your Page Access Token &amp; Account ID without manual copy-pasting.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleLaunchInstagramOAuth}
+                disabled={oauthConnecting}
+                style={{
+                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '9px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  cursor: oauthConnecting ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 3px 10px rgba(124, 58, 237, 0.2)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+              >
+                {oauthConnecting ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={13} />
+                    <span>Connect with Instagram</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
               <div>
