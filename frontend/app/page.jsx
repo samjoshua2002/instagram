@@ -10,7 +10,7 @@ import {
   ExternalLink, ChevronDown, ChevronUp, Layers,
   Lock, Instagram, Smartphone, Calendar, UserCheck, Mail,
   LogIn, Building2, Briefcase, User as UserIcon, Filter,
-  ChevronLeft
+  ChevronLeft, Trash2
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 
@@ -212,8 +212,37 @@ export default function AnalyticsPage() {
       enterWorkspace(data.token, data.user);
     } catch (err) {
       console.error('Workspace impersonation error:', err);
-      showToast?.(err.message || 'Failed to enter workspace.', 'error');
       setImpersonatingId(null);
+    }
+  };
+
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDeleteAccount = async (targetUser) => {
+    const handle = targetUser.instagramUsername || targetUser.username;
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete @${handle} (${targetUser.email}) and all their workspace data? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
+
+    setDeletingId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/accounts/${targetUser.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${activeToken}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete account.');
+      showToast?.(data.message || `Account @${handle} deleted successfully.`, 'success');
+      await fetchAdminAccounts();
+    } catch (err) {
+      console.error('Delete account error:', err);
+      showToast?.(err.message || 'Failed to delete account.', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -894,6 +923,31 @@ export default function AnalyticsPage() {
                                   <span>{isExpanded ? 'Hide' : 'Info'}</span>
                                   {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                                 </button>
+
+                                {!isSelf && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteAccount(acc)}
+                                    disabled={deletingId === acc.id}
+                                    title={`Permanently delete @${acc.username}`}
+                                    style={{
+                                      background: '#ffffff',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '6px',
+                                      padding: '5px 8px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: '700',
+                                      color: '#dc2626',
+                                      cursor: deletingId === acc.id ? 'wait' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}
+                                  >
+                                    <Trash2 size={11} />
+                                    <span>{deletingId === acc.id ? '...' : 'Delete'}</span>
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

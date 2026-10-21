@@ -121,7 +121,8 @@ app.use('/api/instagram/check-handle', (req, res, next) => {
   authRouter(req, res, next);
 });
 app.use('/api/admin/accounts', requireAuth, (req, res, next) => {
-  req.url = '/admin/accounts';
+  const subPath = req.url === '/' ? '' : req.url;
+  req.url = '/admin/accounts' + subPath;
   authRouter(req, res, next);
 });
 app.use('/api/admin/impersonate', requireAuth, (req, res, next) => {

@@ -159,6 +159,7 @@ export default function LoginPage({ onLoginSuccess }) {
   const [regAuthUser, setRegAuthUser] = useState(null);
   const [regPasskeyLoading, setRegPasskeyLoading] = useState(false);
   const [regPasskeySuccess, setRegPasskeySuccess] = useState(false);
+  const [previewOtp, setPreviewOtp] = useState('');
 
   // Live Instagram Handle Recommendation & Validation State
   const [instaChecking, setInstaChecking] = useState(false);
@@ -588,6 +589,9 @@ export default function LoginPage({ onLoginSuccess }) {
         throw new Error(data.error || 'Failed to initiate account creation.');
       }
 
+      if (data.previewOtp) {
+        setPreviewOtp(data.previewOtp);
+      }
       setRegSuccess(data.message || `Verification code sent to ${regForm.email}. Check your inbox!`);
       setRegStage('otp');
     } catch (err) {
@@ -596,6 +600,29 @@ export default function LoginPage({ onLoginSuccess }) {
       } else {
         setRegError(err.message || 'Failed to initiate account creation.');
       }
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setRegError('');
+    setRegSuccess('');
+    setRegLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: regForm.email.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to resend code.');
+      if (data.previewOtp) {
+        setPreviewOtp(data.previewOtp);
+      }
+      setRegSuccess(data.message || 'New verification code sent. Check your inbox!');
+    } catch (err) {
+      setRegError(err.message || 'Failed to resend verification code.');
     } finally {
       setRegLoading(false);
     }
@@ -2284,6 +2311,31 @@ export default function LoginPage({ onLoginSuccess }) {
                       />
                     </div>
 
+                    {previewOtp && (
+                      <div style={{ marginBottom: '14px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => setRegOtpCode(previewOtp)}
+                          style={{
+                            background: '#f4f4f5',
+                            border: '1px solid #e4e4e7',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: '700',
+                            fontFamily: "'JetBrains Mono', monospace",
+                            color: '#09090b',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <span>Auto-fill Code: <strong>{previewOtp}</strong></span>
+                        </button>
+                      </div>
+                    )}
+
                     <button
                       type="submit"
                       disabled={regLoading || regOtpCode.trim().length !== 6}
@@ -2319,10 +2371,11 @@ export default function LoginPage({ onLoginSuccess }) {
                       </button>
                       <button
                         type="button"
-                        onClick={handleRegisterSubmit}
-                        style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.76rem', fontWeight: '600', cursor: 'pointer', padding: 0 }}
+                        onClick={handleResendOtp}
+                        disabled={regLoading}
+                        style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.76rem', fontWeight: '600', cursor: regLoading ? 'wait' : 'pointer', padding: 0 }}
                       >
-                        Resend Code
+                        {regLoading ? 'Sending...' : 'Resend Code'}
                       </button>
                     </div>
                   </form>
