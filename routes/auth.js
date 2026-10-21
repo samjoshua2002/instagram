@@ -975,15 +975,11 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
  */
 router.get('/instagram/connect', (req, res) => {
   try {
-    const metaAppId = process.env.META_APP_ID;
-    if (!metaAppId) {
-      return res.status(500).send('META_APP_ID is not configured in environment.');
-    }
-
+    const instagramAppId = process.env.INSTAGRAM_APP_ID || '1082976137966604';
     const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
     const userJwt = req.query.token || '';
 
-    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+    const backendUrl = process.env.BACKEND_URL || 'https://instagram-ai-bot-64tf.onrender.com';
     const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
     const stateObj = {
@@ -993,14 +989,15 @@ router.get('/instagram/connect', (req, res) => {
     const state = Buffer.from(JSON.stringify(stateObj)).toString('base64');
 
     const scopes = [
-      'instagram_basic',
-      'instagram_manage_messages',
-      'pages_manage_metadata',
-      'pages_read_engagement',
-      'pages_show_list'
+      'instagram_business_basic',
+      'instagram_business_manage_messages',
+      'instagram_business_manage_comments',
+      'instagram_business_content_publish',
+      'instagram_business_manage_insights'
     ].join(',');
 
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${encodeURIComponent(state)}`;
+    // Direct Instagram Business Login Authorization URL
+    const authUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${instagramAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
 
     res.redirect(authUrl);
   } catch (err) {
@@ -1011,7 +1008,7 @@ router.get('/instagram/connect', (req, res) => {
 
 /**
  * GET /api/auth/instagram/callback
- * Exchanges Meta OAuth code for Page Access Token & Instagram Business ID
+ * Exchanges Meta / Instagram OAuth code for Page Access Token & Instagram Business ID
  */
 router.get('/instagram/callback', async (req, res) => {
   try {
@@ -1056,67 +1053,118 @@ router.get('/instagram/callback', async (req, res) => {
       return res.status(400).send('No authorization code provided by Meta.');
     }
 
-    const metaAppId = process.env.META_APP_ID;
-    const metaAppSecret = process.env.META_APP_SECRET;
-    const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+    const cleanCode = code.replace(/#_$/, '');
+    const instagramAppId = process.env.INSTAGRAM_APP_ID || '1082976137966604';
+    const metaAppId = process.env.META_APP_ID || '28946827981672606';
+    const metaAppSecret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || '4494347ba6f01696552b99a2e90ccd75';
+    const backendUrl = process.env.BACKEND_URL || 'https://instagram-ai-bot-64tf.onrender.com';
     const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
-    // 1. Exchange code for short-lived token
-    const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
-      params: {
-        client_id: metaAppId,
-        client_secret: metaAppSecret,
-        redirect_uri: redirectUri,
-        code
-      }
-    });
-
-    const shortLivedToken = tokenRes.data.access_token;
-
-    // 2. Exchange for 60-day long-lived token
-    let longLivedToken = shortLivedToken;
-    try {
-      const longLivedRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
-        params: {
-          grant_type: 'fb_exchange_token',
-          client_id: metaAppId,
-          client_secret: metaAppSecret,
-          fb_exchange_token: shortLivedToken
-        }
-      });
-      if (longLivedRes.data.access_token) {
-        longLivedToken = longLivedRes.data.access_token;
-      }
-    } catch (e) {
-      console.warn('Long-lived token exchange warning:', e.message);
-    }
-
-    // 3. Query Facebook Pages and linked Instagram Business Accounts
-    const accountsRes = await axios.get('https://graph.facebook.com/v19.0/me/accounts', {
-      params: {
-        fields: 'id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}',
-        access_token: longLivedToken
-      }
-    });
-
-    const pages = accountsRes.data.data || [];
-    let linkedPageToken = '';
+    let shortLivedToken = '';
     let instagramAccountId = '';
     let instagramUsername = '';
 
-    for (const page of pages) {
-      if (page.instagram_business_account) {
-        linkedPageToken = page.access_token;
-        instagramAccountId = page.instagram_business_account.id;
-        instagramUsername = page.instagram_business_account.username;
-        break;
+    // Step 1: Exchange code via Instagram API OAuth endpoint
+    try {
+      const igFormData = new URLSearchParams();
+      igFormData.append('client_id', instagramAppId);
+      igFormData.append('client_secret', metaAppSecret);
+      igFormData.append('grant_type', 'authorization_code');
+      igFormData.append('redirect_uri', redirectUri);
+      igFormData.append('code', cleanCode);
+
+      const igRes = await axios.post('https://api.instagram.com/oauth/access_token', igFormData.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+
+      if (igRes.data?.access_token) {
+        shortLivedToken = igRes.data.access_token;
+        instagramAccountId = igRes.data.user_id ? String(igRes.data.user_id) : '';
+      }
+    } catch (igErr) {
+      console.warn('⚠️ Instagram API token exchange fallback:', igErr.response?.data || igErr.message);
+    }
+
+    // Step 1 Fallback: Exchange via Facebook Graph API if needed
+    if (!shortLivedToken) {
+      try {
+        const fbRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+          params: {
+            client_id: metaAppId,
+            client_secret: metaAppSecret,
+            redirect_uri: redirectUri,
+            code: cleanCode
+          }
+        });
+        shortLivedToken = fbRes.data.access_token;
+      } catch (fbErr) {
+        console.error('❌ Both Instagram and Facebook token exchanges failed:', fbErr.response?.data || fbErr.message);
+        throw new Error('Token exchange failed: ' + (fbErr.response?.data?.error?.message || fbErr.message));
       }
     }
 
-    if (!linkedPageToken && pages.length > 0) {
-      linkedPageToken = pages[0].access_token;
-      instagramAccountId = pages[0].id;
-      instagramUsername = pages[0].name;
+    // Step 2: Exchange for 60-day long-lived token
+    let longLivedToken = shortLivedToken;
+    try {
+      const longLivedRes = await axios.get('https://graph.instagram.com/access_token', {
+        params: {
+          grant_type: 'ig_exchange_token',
+          client_secret: metaAppSecret,
+          access_token: shortLivedToken
+        }
+      });
+      if (longLivedRes.data?.access_token) {
+        longLivedToken = longLivedRes.data.access_token;
+      }
+    } catch (llErr) {
+      try {
+        const fbLongLived = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+          params: {
+            grant_type: 'fb_exchange_token',
+            client_id: metaAppId,
+            client_secret: metaAppSecret,
+            fb_exchange_token: shortLivedToken
+          }
+        });
+        if (fbLongLived.data?.access_token) {
+          longLivedToken = fbLongLived.data.access_token;
+        }
+      } catch (e) {
+        console.warn('Long-lived token exchange warning:', e.message);
+      }
+    }
+
+    // Step 3: Fetch profile identity (username and ID)
+    try {
+      const profileRes = await axios.get('https://graph.instagram.com/v21.0/me', {
+        params: {
+          fields: 'id,username,name,account_type',
+          access_token: longLivedToken
+        }
+      });
+      if (profileRes.data?.username) {
+        instagramUsername = profileRes.data.username;
+        instagramAccountId = profileRes.data.id || instagramAccountId;
+      }
+    } catch (profileErr) {
+      // Fallback via Facebook Pages
+      try {
+        const accountsRes = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+          params: {
+            fields: 'id,name,access_token,instagram_business_account{id,username,name}',
+            access_token: longLivedToken
+          }
+        });
+        const pages = accountsRes.data?.data || [];
+        for (const page of pages) {
+          if (page.instagram_business_account) {
+            longLivedToken = page.access_token || longLivedToken;
+            instagramAccountId = page.instagram_business_account.id;
+            instagramUsername = page.instagram_business_account.username;
+            break;
+          }
+        }
+      } catch (e) {}
     }
 
     // 4. Save to User document if JWT was passed in state
