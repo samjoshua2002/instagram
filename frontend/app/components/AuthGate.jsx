@@ -108,7 +108,7 @@ export default function AuthGate({ children }) {
         <Sidebar />
         <main className="app-main-content">
           <WorkspaceImpersonationBanner />
-          {!isInstagramLinked && pathname !== '/settings' ? (
+          {!isInstagramLinked && pathname !== '/settings' && pathname !== '/profile' ? (
             <InstagramConnectFallback
               onConnect={() => setIsOnboardingModalOpen(true)}
               user={user}
@@ -126,7 +126,7 @@ export default function AuthGate({ children }) {
         onClose={() => setIsPasskeyModalOpen(false)}
       />
       <OnboardingWizard
-        isOpen={isOnboardingModalOpen || (!isSuperadmin && !isInstagramLinked && !wizardDismissed)}
+        isOpen={isOnboardingModalOpen}
         onClose={() => {
           setWizardDismissed(true);
           setIsOnboardingModalOpen(false);
