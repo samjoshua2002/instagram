@@ -30,7 +30,8 @@ import {
   Phone,
   Instagram,
   ShieldCheck,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
@@ -58,17 +59,43 @@ export default function LoginPage({ onLoginSuccess }) {
   // Top primary navigation tabs: 'signin' | 'register'
   const [authMode, setAuthMode] = useState('signin');
 
-  // Cached / Remembered Account State
+  // Cached / Remembered Accounts State (Multi-Account Support)
+  const [savedAccounts, setSavedAccounts] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('chatter_saved_accounts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const single = localStorage.getItem('chatter_remembered_account');
+      if (single) {
+        const parsed = JSON.parse(single);
+        if (parsed && (parsed.email || parsed.username)) return [parsed];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
   const [rememberedAccount, setRememberedAccount] = useState(() => {
     if (typeof window === 'undefined') return null;
     try {
+      const stored = localStorage.getItem('chatter_saved_accounts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+      }
       const cached = localStorage.getItem('chatter_remembered_account');
       return cached ? JSON.parse(cached) : null;
     } catch {
       return null;
     }
   });
+
   const [useAnotherAccount, setUseAnotherAccount] = useState(false);
+  const [showAccountChooser, setShowAccountChooser] = useState(false);
 
   // Sign In Sub-State
   // activeSignInMethod: 'passkey' | 'password' | 'oneauth'
@@ -221,29 +248,79 @@ export default function LoginPage({ onLoginSuccess }) {
       const record = {
         email: userData.email,
         username: userData.username,
+        role: userData.role || 'user',
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
         profilePicUrl: userData.profilePicUrl || '',
         hasPasskeys: userData.hasPasskeys ?? true,
+        lastUsed: Date.now(),
       };
       localStorage.setItem('chatter_remembered_account', JSON.stringify(record));
       setRememberedAccount(record);
+
+      let saved = [];
+      try {
+        const stored = localStorage.getItem('chatter_saved_accounts');
+        if (stored) saved = JSON.parse(stored);
+        if (!Array.isArray(saved)) saved = [];
+      } catch (e) {}
+
+      const filtered = saved.filter(a => a.email !== record.email && a.username !== record.username);
+      filtered.unshift(record);
+      localStorage.setItem('chatter_saved_accounts', JSON.stringify(filtered));
+      setSavedAccounts(filtered);
     } catch (e) {}
   };
 
-  // Switch / Forget Cached Account
-  const handleSwitchAccount = () => {
-    setUseAnotherAccount(true);
-    setIdentifier('');
+  // Switch / Choose Saved Account
+  const handleSelectAccount = (acc) => {
+    setRememberedAccount(acc);
+    setIdentifier(acc.email || acc.username || '');
     setPassword('');
     setTotpCode('');
     setError('');
     setInfoMessage('');
-    setActiveSignInMethod('password');
+    setUseAnotherAccount(false);
+    setShowAccountChooser(false);
+    try {
+      localStorage.setItem('chatter_remembered_account', JSON.stringify(acc));
+    } catch (e) {}
+    if (acc.hasPasskeys) {
+      setActiveSignInMethod('passkey');
+    } else {
+      setActiveSignInMethod('password');
+    }
+  };
+
+  const handleRemoveSavedAccount = (emailToRemove, e) => {
+    e?.stopPropagation();
+    try {
+      const updated = savedAccounts.filter(a => a.email !== emailToRemove);
+      localStorage.setItem('chatter_saved_accounts', JSON.stringify(updated));
+      setSavedAccounts(updated);
+      if (rememberedAccount?.email === emailToRemove) {
+        if (updated.length > 0) {
+          handleSelectAccount(updated[0]);
+        } else {
+          setRememberedAccount(null);
+          localStorage.removeItem('chatter_remembered_account');
+          setUseAnotherAccount(true);
+          setShowAccountChooser(false);
+        }
+      }
+    } catch (e) {}
+  };
+
+  const handleSwitchAccount = () => {
+    setShowAccountChooser(true);
+    setUseAnotherAccount(false);
+    setError('');
+    setInfoMessage('');
   };
 
   const handleReturnToSavedAccount = () => {
     setUseAnotherAccount(false);
+    setShowAccountChooser(false);
     if (rememberedAccount?.email) {
       setIdentifier(rememberedAccount.email);
     }
@@ -469,8 +546,8 @@ export default function LoginPage({ onLoginSuccess }) {
       setRegError('Password must be at least 6 characters.');
       return;
     }
-    if (instaError) {
-      setRegError('The specified Instagram handle does not exist. Please enter a valid account or clear the handle.');
+    if (regForm.instagramUsername && !/^[a-zA-Z0-9._]{1,30}$/.test(regForm.instagramUsername.replace(/^@/, ''))) {
+      setRegError('Instagram handle can only contain letters, numbers, periods, and underscores.');
       return;
     }
 
@@ -928,8 +1005,141 @@ export default function LoginPage({ onLoginSuccess }) {
                 </div>
               )}
 
-              {/* SCENARIO 1: REMEMBERED ACCOUNT CARD (NO NEED TO TYPE EMAIL AGAIN) */}
-              {rememberedAccount && !useAnotherAccount ? (
+              {/* SCENARIO 0: MULTI-ACCOUNT CHOOSER LIST */}
+              {showAccountChooser ? (
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                      Choose an account
+                    </h3>
+                    <p style={{ fontSize: '0.78rem', color: '#71717a', margin: '4px 0 0 0' }}>
+                      Select a saved account to continue to Chatter OS:
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                    {(savedAccounts.length > 0 ? savedAccounts : (rememberedAccount ? [rememberedAccount] : [])).map((acc) => {
+                      const isCurrent = rememberedAccount?.email === acc.email;
+                      const isSuper = acc.role === 'superadmin';
+                      return (
+                        <div
+                          key={acc.email || acc.username}
+                          onClick={() => handleSelectAccount(acc)}
+                          style={{
+                            border: '1.5px solid',
+                            borderColor: isCurrent ? '#09090b' : '#e4e4e7',
+                            background: isCurrent ? '#fafafa' : '#ffffff',
+                            borderRadius: '11px',
+                            padding: '12px 14px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '10px',
+                              background: '#09090b',
+                              color: '#ffffff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: '800',
+                              fontSize: '0.92rem',
+                              flexShrink: 0,
+                              overflow: 'hidden'
+                            }}>
+                              {acc.profilePicUrl ? (
+                                <img src={acc.profilePicUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                (acc.firstName?.[0] || acc.username?.[0] || 'U').toUpperCase()
+                              )}
+                            </div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {acc.firstName ? `${acc.firstName} ${acc.lastName || ''}`.trim() : acc.username}
+                                </span>
+                                {isSuper && (
+                                  <span style={{
+                                    fontSize: '0.62rem',
+                                    fontFamily: "'JetBrains Mono', monospace",
+                                    fontWeight: '800',
+                                    background: '#09090b',
+                                    color: '#ffffff',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    flexShrink: 0
+                                  }}>
+                                    SUPERADMIN
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {acc.email} • @{acc.username}
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveSavedAccount(acc.email, e)}
+                            title="Remove account from device"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#a1a1aa',
+                              cursor: 'pointer',
+                              padding: '6px',
+                              borderRadius: '4px'
+                            }}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sign in with another account */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAccountChooser(false);
+                      setUseAnotherAccount(true);
+                      setIdentifier('');
+                      setPassword('');
+                      setTotpCode('');
+                      setError('');
+                      setActiveSignInMethod('password');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '10px',
+                      border: '1.5px dashed #d4d4d8',
+                      background: '#ffffff',
+                      color: '#09090b',
+                      fontSize: '0.84rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <UserPlus size={15} />
+                    <span>Sign in with another account</span>
+                  </button>
+                </div>
+              ) : rememberedAccount && !useAnotherAccount ? (
+                /* SCENARIO 1: REMEMBERED ACCOUNT CARD */
                 <div>
                   <div style={{
                     background: '#fafafa',
@@ -963,8 +1173,23 @@ export default function LoginPage({ onLoginSuccess }) {
                         )}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {rememberedAccount.firstName ? `${rememberedAccount.firstName} ${rememberedAccount.lastName || ''}`.trim() : rememberedAccount.username}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {rememberedAccount.firstName ? `${rememberedAccount.firstName} ${rememberedAccount.lastName || ''}`.trim() : rememberedAccount.username}
+                          </span>
+                          {rememberedAccount.role === 'superadmin' && (
+                            <span style={{
+                              fontSize: '0.6rem',
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontWeight: '800',
+                              background: '#09090b',
+                              color: '#ffffff',
+                              padding: '1px 5px',
+                              borderRadius: '3px'
+                            }}>
+                              SUPERADMIN
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#71717a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {rememberedAccount.email}
@@ -976,18 +1201,18 @@ export default function LoginPage({ onLoginSuccess }) {
                       type="button"
                       onClick={handleSwitchAccount}
                       style={{
-                        background: 'none',
-                        border: 'none',
+                        background: '#ffffff',
+                        border: '1px solid #e4e4e7',
                         color: '#09090b',
                         fontSize: '0.76rem',
-                        fontWeight: '600',
-                        textDecoration: 'underline',
+                        fontWeight: '700',
+                        borderRadius: '6px',
                         cursor: 'pointer',
-                        padding: '4px 6px',
+                        padding: '5px 10px',
                         flexShrink: 0
                       }}
                     >
-                      Switch
+                      {savedAccounts.length > 1 ? `Switch (${savedAccounts.length})` : 'Switch'}
                     </button>
                   </div>
 
