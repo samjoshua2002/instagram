@@ -5,11 +5,11 @@ import { useApp } from '../context/AppContext';
 import {
   Briefcase, User, Sparkles, Bot, ShieldCheck, Check,
   ArrowRight, ArrowLeft, RefreshCw, Sliders, CheckCircle2,
-  Building2, MessageSquare, Zap, Film, Instagram
+  Building2, MessageSquare, Zap, Film, Instagram, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function OnboardingWizard({ isOpen, onComplete }) {
+export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   const { user, token, API_BASE, updateUserProfile, showToast, setRoutingConfigState } = useApp();
 
   const [step, setStep] = useState(1);
@@ -31,6 +31,30 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
   const [enableGlobalBot, setEnableGlobalBot] = useState(true);
 
   if (!isOpen) return null;
+
+  const handleCloseOrSkip = async () => {
+    try {
+      sessionStorage.setItem('chatter_onboarding_dismissed', 'true');
+    } catch (e) {}
+
+    try {
+      if (token) {
+        fetch(`${API_BASE}/api/auth/onboarding/skip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }).then(res => res.json()).then(data => {
+          if (data.user) {
+            updateUserProfile({ isOnboarded: true });
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    if (onClose) onClose();
+  };
 
   const handleNext = () => {
     setError('');
@@ -104,8 +128,9 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(9, 9, 11, 0.75)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(9, 9, 11, 0.90)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -124,14 +149,14 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.35)',
           border: '1px solid #e4e4e7',
           overflow: 'hidden'
         }}
       >
         {/* Wizard Header & Progress */}
         <div style={{
-          padding: '24px 28px 16px',
+          padding: '20px 24px 16px',
           borderBottom: '1px solid #f4f4f5',
           background: '#fafafa'
         }}>
@@ -155,18 +180,41 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
                 CHATTER OS // SETUP WIZARD
               </span>
             </div>
-            <span style={{
-              fontSize: '0.72rem',
-              fontWeight: '700',
-              fontFamily: "'JetBrains Mono', monospace",
-              background: '#f4f4f5',
-              border: '1px solid #e4e4e7',
-              padding: '3px 8px',
-              borderRadius: '999px',
-              color: '#71717a'
-            }}>
-              STEP {step} OF 3
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: '700',
+                fontFamily: "'JetBrains Mono', monospace",
+                background: '#f4f4f5',
+                border: '1px solid #e4e4e7',
+                padding: '3px 8px',
+                borderRadius: '999px',
+                color: '#71717a'
+              }}>
+                STEP {step} OF 3
+              </span>
+              <button
+                type="button"
+                onClick={handleCloseOrSkip}
+                aria-label="Close setup wizard"
+                title="Close / Cancel Setup"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  padding: 0
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
@@ -607,9 +655,9 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
           )}
         </div>
 
-        {/* Wizard Footer Controls */}
+        {/* Footer Actions */}
         <div style={{
-          padding: '16px 28px',
+          padding: '16px 24px',
           borderTop: '1px solid #f4f4f5',
           background: '#fafafa',
           display: 'flex',
@@ -617,14 +665,54 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
           alignItems: 'center'
         }}>
           {step > 1 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleBack}
+                disabled={loading}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e4e4e7',
+                  color: '#09090b',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <ArrowLeft size={14} />
+                <span>Back</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseOrSkip}
+                disabled={loading}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  padding: '8px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={handleBack}
+              onClick={handleCloseOrSkip}
               disabled={loading}
               style={{
                 background: '#ffffff',
                 border: '1px solid #e4e4e7',
-                color: '#52525b',
+                color: '#71717a',
                 padding: '8px 16px',
                 borderRadius: '8px',
                 fontSize: '0.8rem',
@@ -635,11 +723,9 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
                 gap: '6px'
               }}
             >
-              <ArrowLeft size={14} />
-              <span>Back</span>
+              <X size={13} />
+              <span>Cancel / Skip for now</span>
             </button>
-          ) : (
-            <div />
           )}
 
           {step < 3 ? (

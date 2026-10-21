@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import LoginPage from './LoginPage';
@@ -24,6 +24,18 @@ export default function AuthGate({ children }) {
     isPasskeyModalOpen,
     setIsPasskeyModalOpen
   } = useApp();
+
+  const [wizardDismissed, setWizardDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (sessionStorage.getItem('chatter_onboarding_dismissed') === 'true') {
+          setWizardDismissed(true);
+        }
+      } catch (e) {}
+    }
+  }, []);
 
   // Fresh launch detector: when user closes tab/window and opens fresh,
   // sessionStorage is cleared. We automatically redirect them to start on Dashboard (/)!
@@ -98,7 +110,8 @@ export default function AuthGate({ children }) {
         onClose={() => setIsPasskeyModalOpen(false)}
       />
       <OnboardingWizard
-        isOpen={!!user && user.isOnboarded === false}
+        isOpen={!!user && user.isOnboarded === false && user.role !== 'superadmin' && !wizardDismissed}
+        onClose={() => setWizardDismissed(true)}
       />
     </>
   );
