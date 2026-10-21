@@ -38,8 +38,54 @@ export default function InstagramConnectFallback({ onConnect, user }) {
   const [accessToken, setAccessToken] = useState(initialToken);
   const [showToken, setShowToken] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [oauthConnecting, setOauthConnecting] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Listen for OAuth postMessage from login popup window
+  React.useEffect(() => {
+    const handleOAuthMessage = (event) => {
+      if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
+        const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
+        if (igUser) setHandle(igUser);
+        if (igId) setAccountId(igId);
+        if (igToken) setAccessToken(igToken);
+        setOauthConnecting(false);
+        if (updateUserProfile) {
+          updateUserProfile({
+            hasInstagramToken: true,
+            isInstagramConnected: true,
+            instagramPageAccessToken: igToken,
+            instagramAccountId: igId,
+            instagramUsername: igUser,
+          });
+        }
+        showToast?.(`Instagram connected: @${igUser || 'account'}! Automation active.`, 'success');
+      } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
+        setOauthConnecting(false);
+        setErrorMsg(event.data.error || 'Instagram connection cancelled or failed.');
+      }
+    };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [showToast, updateUserProfile]);
+
+  const handleLaunchInstagramOAuth = () => {
+    setErrorMsg('');
+    setOauthConnecting(true);
+    try {
+      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
+      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+      if (!popup) {
+        setOauthConnecting(false);
+        setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
+      }
+    } catch (e) {
+      setOauthConnecting(false);
+      setErrorMsg('Failed to open login dialog: ' + e.message);
+    }
+  };
 
   const handleConnectDirectly = async (e) => {
     e?.preventDefault();
@@ -265,8 +311,58 @@ export default function InstagramConnectFallback({ onConnect, user }) {
               </span>
             </div>
             <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px', lineHeight: 1.45 }}>
-              Enter your Meta Graph API credentials below. Once entered, chat automation is activated instantly for your account.
+              Connect directly via Meta to automatically generate and save your Page Access Token, or enter your credentials manually below.
             </p>
+
+            {/* One-Click Meta OAuth Connect Button */}
+            <div style={{ marginBottom: '22px' }}>
+              <button
+                type="button"
+                onClick={handleLaunchInstagramOAuth}
+                disabled={oauthConnecting}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '11px',
+                  padding: '13px 20px',
+                  fontSize: '0.88rem',
+                  fontWeight: '700',
+                  cursor: oauthConnecting ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '9px',
+                  boxShadow: '0 6px 20px rgba(124, 58, 237, 0.25)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {oauthConnecting ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Connecting via Meta OAuth...</span>
+                  </>
+                ) : (
+                  <>
+                    <Instagram size={17} />
+                    <span>Log in with Instagram &amp; Auto-Generate Token</span>
+                    <Zap size={15} />
+                  </>
+                )}
+              </button>
+              <span style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '6px', display: 'block', textAlign: 'center' }}>
+                Opens official Meta dialog to automatically link your Page Access Token &amp; Account ID.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+              <div style={{ flex: 1, height: '1px', background: '#e4e4e7' }} />
+              <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                Or Enter / Update Token Manually
+              </span>
+              <div style={{ flex: 1, height: '1px', background: '#e4e4e7' }} />
+            </div>
 
             <form onSubmit={handleConnectDirectly} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
