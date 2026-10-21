@@ -189,7 +189,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
+        const res = await fetch(`${API_BASE}/api/auth/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
         const data = await res.json();
         if (data.alreadyRegistered) {
           setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
