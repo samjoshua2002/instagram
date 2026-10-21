@@ -154,7 +154,48 @@ class AuthService {
     const text = `Your ${purpose} verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\nIf you did not request this, you can safely ignore this email.`;
     const subject = `${otpCode} is your Chatter verification code`;
 
-    // 1. Primary: Send via Resend HTTPS API (Port 443 — never blocked on Render)
+    // 1. Primary: Send via Brevo HTTPS REST API (Port 443 — sends from guidetalk.app@gmail.com directly to any requester)
+    const brevoKey = process.env.BREVO_API_KEY;
+    if (brevoKey) {
+      try {
+        const senderEmail = process.env.EMAIL_USER || 'guidetalk.app@gmail.com';
+        const senderName = process.env.EMAIL_FROM_NAME || 'Chatter OS';
+
+        const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'api-key': brevoKey,
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: senderName, email: senderEmail },
+            to: [{ email: cleanTo }],
+            subject,
+            htmlContent: html,
+            textContent: text
+          })
+        });
+
+        const brevoData = await brevoRes.json();
+        if (brevoRes.ok && brevoData.messageId) {
+          console.log(`✅ [Brevo] Verification email dispatched from ${senderEmail} to ${cleanTo} (ID: ${brevoData.messageId})`);
+          return {
+            success: true,
+            provider: 'brevo',
+            deliveredTo: cleanTo,
+            forwarded: false,
+            id: brevoData.messageId
+          };
+        } else {
+          console.warn('⚠️ [Brevo API Error]:', brevoData.message || JSON.stringify(brevoData));
+        }
+      } catch (brevoErr) {
+        console.warn('⚠️ [Brevo Network Warning]:', brevoErr.message);
+      }
+    }
+
+    // 2. Secondary: Send via Resend HTTPS API (Port 443 — reliable on Render/Cloud)
     if (!this.resend) this.initResend();
 
     if (this.resend) {
