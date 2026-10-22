@@ -371,16 +371,42 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const mid = event.message.mid;
   const isReelOrShare = event.isReelOrShare;
 
-  const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+  const targetAccountId = accountId || recipientId;
 
-  // Only your account should respond with AI: ignore events for other accounts (e.g. moi)
-  if (accountId && accountId !== botAccountId && recipientId !== botAccountId) {
-    console.log(`⏸️ Skipping: event is for account ${accountId || recipientId}, not primary bot ${botAccountId}`);
+  // 1. Locate the creator account in MongoDB
+  let ownerUser = await User.findOne({
+    $or: [
+      { instagramAccountId: targetAccountId },
+      { 'businessProfile.instagramId': targetAccountId },
+      { username: 'qereydoun' },
+      { instagramUsername: 'qereydoun' }
+    ]
+  });
+
+  // 2. Fetch the creator's specific PersonaConfig
+  let config = null;
+  if (ownerUser) {
+    config = await PersonaConfig.findOne({ ownerId: ownerUser._id });
+  }
+  if (!config) {
+    config = await PersonaConfig.findOne({ instagramAccountId: targetAccountId });
+  }
+  if (!config) {
+    config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
+  }
+
+  // 3. Resolve active token for this creator
+  const creatorAccessToken = (config && config.instagramPageAccessToken) ||
+                             (ownerUser && ownerUser.instagramPageAccessToken) ||
+                             process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
+
+  // Prevent bot from replying to itself
+  if (senderId === targetAccountId) {
     return;
   }
 
-  // Prevent bot from replying to itself
-  if (senderId === botAccountId) {
+  if (!creatorAccessToken) {
+    console.warn(`⚠️ [Webhook] No access token found for account ${targetAccountId}. Event received but cannot send reply.`);
     return;
   }
 
@@ -397,7 +423,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     }
   }
 
-  console.log(`\n💬 [Incoming DM] From: ${senderId} | Text: "${messageText}"`);
+  console.log(`\n💬 [Incoming DM] Creator: ${config?.creatorName || 'Bot'} (${targetAccountId}) | From: ${senderId} | Text: "${messageText}"`);
 
   // Safe timestamp parser
   let msgTime = new Date();
@@ -408,16 +434,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     }
   }
 
-  // 1. Fetch persona & global settings
-  let config = await PersonaConfig.findOne();
-  if (!config) {
-    config = await PersonaConfig.create({});
-  }
-
   // 2. Fetch or create user memory
   let userProfile = null;
   try {
-    userProfile = await instagramService.getUserProfile(senderId);
+    userProfile = await instagramService.getUserProfile(senderId, creatorAccessToken);
   } catch (e) {
     // ignore
   }
@@ -521,7 +541,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   // 5. If user shared a Reel/Post or media, react with an emoji first!
   if (isReelOrShare && mid && mid !== 'random_mid') {
-    instagramService.sendMessageReaction(senderId, mid, '😂').catch(() => {});
+    instagramService.sendMessageReaction(senderId, mid, '😂', creatorAccessToken).catch(() => {});
   }
 
   // 6. Anti-Spam / Debounce Logic:
@@ -549,6 +569,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const queueEntry = {
     senderId,
     recipientId,
+    targetAccountId,
+    creatorAccessToken,
+    ownerUser,
     userMemory,
     config,
     messages: [{ text: messageText, mid }],
@@ -570,7 +593,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
  * Dispatches a single, smart AI reply after user finishes typing their message(s)
  */
 async function dispatchDebouncedReply(queueEntry) {
-  const { senderId, recipientId, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
+  const { senderId, recipientId, targetAccountId, creatorAccessToken, ownerUser, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
 
   // Combine multiple messages if user sent a cluster
   const combinedText = messages.map(m => m.text).join('\n');
@@ -579,7 +602,7 @@ async function dispatchDebouncedReply(queueEntry) {
   }
 
   // Send read receipt immediately
-  await instagramService.sendSenderAction(senderId, 'mark_seen');
+  await instagramService.sendSenderAction(senderId, 'mark_seen', creatorAccessToken);
 
   // Fetch recent conversation history
   let history = await Message.find({
@@ -608,15 +631,16 @@ async function dispatchDebouncedReply(queueEntry) {
 
   try {
     // Turn on typing indicator while generating
-    await instagramService.sendSenderAction(senderId, 'typing_on');
+    await instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken);
 
-    // Generate response mimicking Sam Joshua
-    console.log(`🤖 Generating Sam's response via Azure OpenAI...`);
+    // Generate response mimicking creator persona
+    console.log(`🤖 Generating ${config?.creatorName || 'Creator'}'s response via Azure OpenAI...`);
     try {
       replyText = await azureOpenAI.generateReply({
         userMemory,
         messageHistory: history,
         incomingText: combinedText,
+        config,
       });
     } catch (aiErr) {
       console.error(`❌ [AI Generation Error]:`, aiErr.message);
@@ -708,9 +732,9 @@ async function dispatchDebouncedReply(queueEntry) {
     console.log(`⏳ [Realistic Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
 
     // Keep typing indicator actively pulsing on Instagram every 3.5 seconds so it NEVER drops while typing
-    await instagramService.sendSenderAction(senderId, 'typing_on');
+    await instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken);
     const typingPulseInterval = setInterval(() => {
-      instagramService.sendSenderAction(senderId, 'typing_on').catch(() => {});
+      instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
     }, 3500);
 
     try {
@@ -719,11 +743,11 @@ async function dispatchDebouncedReply(queueEntry) {
       clearInterval(typingPulseInterval);
     }
 
-    console.log(`✨ [Sam's AI Reply]: "${replyText}" ${stickerType ? `[Media/Sticker: ${stickerType}]` : ''}`);
+    console.log(`✨ [${config?.creatorName || 'AI'}'s Reply]: "${replyText}" ${stickerType ? `[Media/Sticker: ${stickerType}]` : ''}`);
 
     const hasText = !!(replyText && replyText.trim().length > 0);
     if (hasText) {
-      sendResult = await instagramService.sendTextMessage(senderId, replyText, null, lastMid);
+      sendResult = await instagramService.sendTextMessage(senderId, replyText, creatorAccessToken, lastMid);
     }
 
     // If a sticker or media attachment was chosen, send the image/GIF directly to Instagram DM!
@@ -737,7 +761,7 @@ async function dispatchDebouncedReply(queueEntry) {
           await new Promise(resolve => setTimeout(resolve, 600));
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending accessory ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
-            const accRes = await instagramService.sendImageMessage(senderId, stickerUrl);
+            const accRes = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
             if (accRes?.success) {
               mediaWasSent = true;
               recordMediaSent(senderId);
@@ -750,7 +774,7 @@ async function dispatchDebouncedReply(queueEntry) {
         } else {
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending sticker-only ${stickerType} (${stickerUrl}) to ${senderId}...`);
-            stickerSendResult = await instagramService.sendImageMessage(senderId, stickerUrl);
+            stickerSendResult = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
             if (stickerSendResult?.success) {
               mediaWasSent = true;
               recordMediaSent(senderId);
