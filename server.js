@@ -8,6 +8,7 @@ const multer = require('multer');
 const connectDB = require('./config/db');
 
 // Models
+const User = require('./models/User');
 const UserMemory = require('./models/UserMemory');
 const Message = require('./models/Message');
 const PersonaConfig = require('./models/PersonaConfig');
