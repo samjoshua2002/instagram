@@ -982,12 +982,15 @@ router.get('/instagram/connect', (req, res) => {
     const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
     const userJwt = req.query.token || '';
 
-    const backendUrl = process.env.BACKEND_URL || 'https://instagram-ai-bot-64tf.onrender.com';
+    let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
+    backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
     const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
     const stateObj = {
       token: userJwt,
       origin: clientOrigin,
+      redirectUri,
+      appId: instagramAppId,
     };
     const state = Buffer.from(JSON.stringify(stateObj)).toString('base64');
 
@@ -1019,11 +1022,16 @@ router.get('/instagram/callback', async (req, res) => {
 
     let origin = 'https://instagram-ebon-zeta.vercel.app';
     let userJwt = '';
+    let savedRedirectUri = '';
+    let savedAppId = '';
+
     if (state) {
       try {
         const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
         if (decoded.origin) origin = decoded.origin;
         if (decoded.token) userJwt = decoded.token;
+        if (decoded.redirectUri) savedRedirectUri = decoded.redirectUri;
+        if (decoded.appId) savedAppId = decoded.appId;
       } catch (e) {}
     }
 
@@ -1056,54 +1064,101 @@ router.get('/instagram/callback', async (req, res) => {
       return res.status(400).send('No authorization code provided by Meta.');
     }
 
-    const cleanCode = code.replace(/#_$/, '');
-    const instagramAppId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '1082976137966604';
+    // Strip URL fragment #_ from code
+    const cleanCode = (code || '').split('#')[0].trim();
+    const instagramAppId = savedAppId || process.env.INSTAGRAM_APP_ID || '1082976137966604';
     const metaAppId = process.env.META_APP_ID || '28946827981672606';
     const metaAppSecret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || '4494347ba6f01696552b99a2e90ccd75';
-    const backendUrl = process.env.BACKEND_URL || 'https://instagram-ai-bot-64tf.onrender.com';
-    const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
+
+    let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
+    backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
+    const defaultUri = `${backendUrl}/api/auth/instagram/callback`;
+
+    // Candidate redirect URIs: exactly match saved state or try normalized variations
+    const baseUri = (savedRedirectUri || defaultUri).trim();
+    const normalizedNoSlash = baseUri.replace(/\/+$/, '');
+    const redirectUriCandidates = Array.from(new Set([
+      baseUri,
+      normalizedNoSlash,
+      `${normalizedNoSlash}/`,
+      normalizedNoSlash.replace(/^https:/i, 'http:'),
+      `${normalizedNoSlash.replace(/^https:/i, 'http:')}/`,
+    ]));
+
+    // Candidate App IDs
+    const appIdCandidates = Array.from(new Set([
+      instagramAppId,
+      metaAppId,
+      '1082976137966604',
+      '28946827981672606'
+    ])).filter(Boolean);
 
     let shortLivedToken = '';
     let instagramAccountId = '';
     let instagramUsername = '';
+    let lastExchangeError = '';
 
-    // Step 1: Exchange code via Instagram API OAuth endpoint
-    try {
-      const igFormData = new URLSearchParams();
-      igFormData.append('client_id', instagramAppId);
-      igFormData.append('client_secret', metaAppSecret);
-      igFormData.append('grant_type', 'authorization_code');
-      igFormData.append('redirect_uri', redirectUri);
-      igFormData.append('code', cleanCode);
+    // Step 1: Direct Instagram API token exchange (https://api.instagram.com/oauth/access_token)
+    for (const testAppId of appIdCandidates) {
+      if (shortLivedToken) break;
+      for (const uri of redirectUriCandidates) {
+        if (shortLivedToken) break;
+        try {
+          const igFormData = new URLSearchParams();
+          igFormData.append('client_id', testAppId);
+          igFormData.append('client_secret', metaAppSecret);
+          igFormData.append('grant_type', 'authorization_code');
+          igFormData.append('redirect_uri', uri);
+          igFormData.append('code', cleanCode);
 
-      const igRes = await axios.post('https://api.instagram.com/oauth/access_token', igFormData.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
+          const igRes = await axios.post('https://api.instagram.com/oauth/access_token', igFormData.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
 
-      if (igRes.data?.access_token) {
-        shortLivedToken = igRes.data.access_token;
-        instagramAccountId = igRes.data.user_id ? String(igRes.data.user_id) : '';
+          if (igRes.data?.access_token) {
+            shortLivedToken = igRes.data.access_token;
+            instagramAccountId = igRes.data.user_id ? String(igRes.data.user_id) : '';
+            console.log(`✅ [Instagram API] Token exchange succeeded with App ID ${testAppId} and URI ${uri}`);
+            break;
+          }
+        } catch (igErr) {
+          lastExchangeError = igErr.response?.data?.error_message || igErr.response?.data?.error?.message || igErr.message;
+          console.warn(`⚠️ [Instagram API] Attempt failed (AppId=${testAppId}, URI=${uri}):`, igErr.response?.data || igErr.message);
+        }
       }
-    } catch (igErr) {
-      console.warn('⚠️ Instagram API token exchange fallback:', igErr.response?.data || igErr.message);
     }
 
-    // Step 1 Fallback: Exchange via Facebook Graph API if needed
+    // Step 1 Fallback: Facebook Graph API token exchange (https://graph.facebook.com/v21.0/oauth/access_token)
     if (!shortLivedToken) {
-      try {
-        const fbRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-          params: {
-            client_id: metaAppId,
-            client_secret: metaAppSecret,
-            redirect_uri: redirectUri,
-            code: cleanCode
+      for (const testAppId of appIdCandidates) {
+        if (shortLivedToken) break;
+        for (const uri of redirectUriCandidates) {
+          if (shortLivedToken) break;
+          try {
+            const fbRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+              params: {
+                client_id: testAppId,
+                client_secret: metaAppSecret,
+                redirect_uri: uri,
+                code: cleanCode
+              }
+            });
+            if (fbRes.data?.access_token) {
+              shortLivedToken = fbRes.data.access_token;
+              console.log(`✅ [Facebook Graph API] Token exchange succeeded with App ID ${testAppId} and URI ${uri}`);
+              break;
+            }
+          } catch (fbErr) {
+            lastExchangeError = fbErr.response?.data?.error?.message || fbErr.message;
+            console.warn(`⚠️ [Facebook Graph API] Attempt failed (AppId=${testAppId}, URI=${uri}):`, fbErr.response?.data?.error || fbErr.message);
           }
-        });
-        shortLivedToken = fbRes.data.access_token;
-      } catch (fbErr) {
-        console.error('❌ Both Instagram and Facebook token exchanges failed:', fbErr.response?.data || fbErr.message);
-        throw new Error('Token exchange failed: ' + (fbErr.response?.data?.error?.message || fbErr.message));
+        }
       }
+    }
+
+    if (!shortLivedToken) {
+      console.error('❌ All token exchange attempts failed:', lastExchangeError);
+      throw new Error('Token exchange failed: ' + (lastExchangeError || 'Error validating verification code.'));
     }
 
     // Step 2: Exchange for 60-day long-lived token
