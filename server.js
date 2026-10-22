@@ -283,9 +283,11 @@ function handleCreatorEcho(event, accountId) {
     console.log(`🛑 [Creator Intervened]: Cancelled pending AI auto-reply for ${contactId}`);
   }
 
+  const senderAccountId = accountId || event.sender?.id || process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+
   // Record outgoing message in DB
   Message.create({
-    senderId: botAccountId,
+    senderId: senderAccountId,
     recipientId: contactId,
     role: 'assistant',
     text: text || '[Media]',
@@ -300,6 +302,22 @@ function handleCreatorEcho(event, accountId) {
     lastReminderSentAt: null,
     $inc: { messageCount: 1 }
   }).catch(() => {});
+
+  // Atomically update creator-scoped SocialGraph contact node
+  (async () => {
+    try {
+      const ownerUser = await User.findOne({
+        $or: [
+          { instagramAccountId: senderAccountId },
+          { 'businessProfile.instagramId': senderAccountId }
+        ]
+      });
+      const creatorFilter = ownerUser 
+        ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] } 
+        : { $or: [{ ownerUsername: 'samjoshua' }, { ownerUsername: null }, { ownerUsername: { $exists: false } }] };
+      await SocialGraph.updateOne({ senderId: contactId, ...creatorFilter }, { $inc: { chatsCount: 1 } });
+    } catch (_) {}
+  })();
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
@@ -477,13 +495,18 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
         chatsCount: 1,
         ...(isReelOrShare ? { reelsCount: 1 } : {})
       };
-      const res = await SocialGraph.updateOne({ senderId }, { $inc: incPayload });
+      const creatorFilter = ownerUser 
+        ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] } 
+        : { $or: [{ ownerUsername: 'samjoshua' }, { ownerUsername: null }, { ownerUsername: { $exists: false } }] };
+
+      const res = await SocialGraph.updateOne({ senderId, ...creatorFilter }, { $inc: incPayload });
       if (res.matchedCount === 0) {
         const cleanU = (userMemory.username || '').replace(/^@/, '').trim();
         let matched = false;
         if (cleanU) {
           const res2 = await SocialGraph.updateOne(
             {
+              ...creatorFilter,
               $or: [
                 { instagramHandle: `@${cleanU}` },
                 { instagramHandle: cleanU },
@@ -1833,14 +1856,9 @@ app.get('/api/social-graph', async (req, res) => {
 
       const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
 
-      // Authoritative persistent cumulative lifetime chats & reels count (immune to message pruning)
-      const chatsCount = Math.max(n.chatsCount || 0, memory?.messageCount || 0);
-      const reelsCount = Math.max(n.reelsCount || 0, memory?.reelsCount || 0);
-
-      // Keep database in sync in the background if either counter was higher
-      if (chatsCount > (n.chatsCount || 0) || reelsCount > (n.reelsCount || 0)) {
-        SocialGraph.updateOne({ _id: n._id }, { chatsCount, reelsCount }).catch(() => {});
-      }
+      // Authoritative creator-scoped persistent chats & reels count (immune to cross-account pollution)
+      const chatsCount = typeof n.chatsCount === 'number' ? n.chatsCount : 0;
+      const reelsCount = typeof n.reelsCount === 'number' ? n.reelsCount : 0;
 
       return {
         ...n.toObject(),
