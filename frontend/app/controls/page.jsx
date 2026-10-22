@@ -54,22 +54,47 @@ export default function ControlsPage() {
     } catch {}
   };
 
-  const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
+  const friendNodes = useMemo(() => {
+    const list = nodes.filter(n => !n.isRoot);
+    const seen = new Set();
+    const result = [];
+    for (const n of list) {
+      const cleanSenderId = (n.senderId || '').trim();
+      const cleanHandle = (n.handle || '').replace(/^@/, '').toLowerCase().trim();
+      const cleanName = (n.name || '').toLowerCase().trim();
+      const key = cleanSenderId || cleanHandle || cleanName;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      if (cleanHandle) seen.add(cleanHandle);
+      if (cleanSenderId) seen.add(cleanSenderId);
+      result.push(n);
+    }
+    return result;
+  }, [nodes]);
 
-  const saveQueueRef = useRef(Promise.resolve());
+  const debounceTimerRef = useRef(null);
   const currentConfigRef = useRef(routingConfig);
   useEffect(() => {
     currentConfigRef.current = routingConfig;
   }, [routingConfig]);
 
-  const queueSave = useCallback((newConfig) => {
+  const queueSave = useCallback((newConfig, immediate = false) => {
     currentConfigRef.current = newConfig;
+    // 1. INSTANT 0ms optimistic UI update
     setRoutingConfig(newConfig);
-    const savePromise = saveQueueRef.current.then(() => saveRouting(newConfig));
-    saveQueueRef.current = savePromise.catch(err => {
-      console.warn('Serialized routing save error:', err);
-    });
-    return saveQueueRef.current;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (immediate) {
+      return saveRouting(newConfig);
+    }
+
+    // 2. Debounce network sync by 350ms so rapid clicking responds instantly without network lag
+    debounceTimerRef.current = setTimeout(() => {
+      saveRouting(newConfig);
+    }, 350);
   }, [saveRouting, setRoutingConfig]);
 
   const getContactKey = useCallback((c) => {
@@ -237,7 +262,10 @@ export default function ControlsPage() {
   const onSave = async () => {
     setIsSaving(true);
     try {
-      await queueSave(currentConfigRef.current || routingConfig);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      await queueSave(currentConfigRef.current || routingConfig, true);
     } finally {
       setIsSaving(false);
     }
@@ -286,7 +314,7 @@ export default function ControlsPage() {
     return (
       <motion.div
         layout
-        key={contact.id || contact.name}
+        key={contact._id || contact.senderId || contact.id || contact.name}
         className="control-contact-dense-row"
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -297,13 +325,12 @@ export default function ControlsPage() {
           border: '1px solid',
           borderColor: isChecked && !isEveryoneMode ? '#09090b' : '#e4e4e7',
           borderRadius: '8px',
-          padding: '6px 10px',
+          padding: controlsLayout === 'list' ? '10px 14px' : '6px 10px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '8px',
           transition: 'border-color 0.15s ease, background-color 0.15s ease',
-          minHeight: '44px'
         }}
       >
         {/* Left: Checkbox + Avatar + Name/Handle */}
@@ -615,7 +642,7 @@ export default function ControlsPage() {
 
   // Render by layout mode
   const renderContactItem = (contact) => {
-    if (controlsLayout === 'dense') {
+    if (controlsLayout === 'dense' || controlsLayout === 'list') {
       return renderDenseContactRow(contact);
     }
     return renderContactCard(contact);
