@@ -51,23 +51,23 @@ class AuthService {
    */
   async ensureOwnerUser() {
     try {
-      const email = 'guidetalk.app@gmail.com';
-      let user = await User.findOne({ email });
-      if (!user) {
-        user = await User.findOne({ username: 'samjoshua' });
-      }
+      const superadminEmail = 'samjoshuacs2002@gmail.com';
+      let user = await User.findOne({
+        $or: [{ email: superadminEmail }, { username: 'samjoshua2002' }]
+      });
 
       const totpSecret = generateSecret();
 
       if (!user) {
-        // Initial default temporary password: SamJoshua@2026!
+        // Initial default password: SamJoshua@2026!
         const initialHash = await User.hashPassword('SamJoshua@2026!');
         user = new User({
-          username: 'samjoshua',
-          email: 'guidetalk.app@gmail.com',
+          username: 'samjoshua2002',
+          email: superadminEmail,
           passwordHash: initialHash,
-          firstName: 'Admin',
-          lastName: 'User',
+          firstName: 'Sam',
+          lastName: 'Joshua',
+          role: 'superadmin',
           accountType: 'personal',
           twoFactor: {
             enabled: true,
@@ -75,9 +75,9 @@ class AuthService {
           },
         });
         await user.save();
-        console.log(`🔐 [AuthService]: Created primary owner account for Sam Joshua (guidetalk.app@gmail.com)`);
+        console.log(`🔐 [AuthService]: Created primary superadmin account for Sam Joshua (${superadminEmail})`);
       } else {
-        // Ensure core fields are populated
+        // Ensure superadmin role is strictly applied to samjoshuacs2002@gmail.com
         let changed = false;
         if (user.role !== 'superadmin') {
           user.role = 'superadmin';
@@ -98,6 +98,14 @@ class AuthService {
           changed = true;
         }
         if (changed) await user.save();
+      }
+
+      // Demote guidetalk.app@gmail.com to standard user if it was previously superadmin
+      const guidetalkUser = await User.findOne({ email: 'guidetalk.app@gmail.com' });
+      if (guidetalkUser && guidetalkUser.role === 'superadmin') {
+        guidetalkUser.role = 'user';
+        await guidetalkUser.save();
+        console.log('ℹ️ [AuthService]: guidetalk.app@gmail.com role set to "user". Only samjoshuacs2002@gmail.com is superadmin.');
       }
 
       return user;
