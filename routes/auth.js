@@ -822,6 +822,9 @@ router.get('/me', requireAuth, async (req, res) => {
     businessProfile: user.businessProfile || null,
     hasInstagramToken: Boolean(user.instagramPageAccessToken),
     isInstagramConnected: Boolean(user.instagramPageAccessToken),
+    igApprovalStatus: user.igApprovalStatus || (user.instagramPageAccessToken ? 'approved' : 'none'),
+    igApprovalRequestedAt: user.igApprovalRequestedAt,
+    igApprovedAt: user.igApprovedAt,
     address: user.address,
     twoFactorEnabled: user.twoFactor?.enabled || false,
     passkeys: (user.passkeys || []).map(p => ({
@@ -975,7 +978,7 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
  */
 router.get('/instagram/connect', (req, res) => {
   try {
-    const instagramAppId = process.env.INSTAGRAM_APP_ID || '1082976137966604';
+    const instagramAppId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '1082976137966604';
     const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
     const userJwt = req.query.token || '';
 
@@ -1054,7 +1057,7 @@ router.get('/instagram/callback', async (req, res) => {
     }
 
     const cleanCode = code.replace(/#_$/, '');
-    const instagramAppId = process.env.INSTAGRAM_APP_ID || '1082976137966604';
+    const instagramAppId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '1082976137966604';
     const metaAppId = process.env.META_APP_ID || '28946827981672606';
     const metaAppSecret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || '4494347ba6f01696552b99a2e90ccd75';
     const backendUrl = process.env.BACKEND_URL || 'https://instagram-ai-bot-64tf.onrender.com';
@@ -1168,6 +1171,7 @@ router.get('/instagram/callback', async (req, res) => {
     }
 
     // 4. Save to User document if JWT was passed in state
+    const linkedPageToken = longLivedToken;
     if (userJwt) {
       try {
         const decodedToken = authService.verifyToken(userJwt);
@@ -1556,6 +1560,7 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
     const allContacts = await SocialGraph.find({}).sort({ createdAt: -1 });
 
     const accounts = allUsers.map(u => {
+      const hasToken = Boolean(u.instagramPageAccessToken);
       return {
         id: u._id,
         username: u.username,
@@ -1569,7 +1574,12 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
         mobileNumber: u.mobileNumber || '',
         whatsappNumber: u.whatsappNumber || '',
         instagramUsername: u.instagramUsername || '',
-        instagramId: u.instagramId || '',
+        instagramId: u.instagramId || u.instagramAccountId || '',
+        hasInstagramToken: hasToken,
+        isInstagramConnected: hasToken,
+        igApprovalStatus: u.igApprovalStatus || (hasToken ? 'approved' : 'none'),
+        igApprovalRequestedAt: u.igApprovalRequestedAt || null,
+        igApprovedAt: u.igApprovedAt || null,
         profilePicUrl: u.profilePicUrl || '',
         isVerified: u.isVerified,
         hasPasskeys: (u.passkeys || []).length > 0,
@@ -1606,6 +1616,99 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('❌ Superadmin accounts error:', err.message);
     res.status(500).json({ error: 'Failed to fetch admin accounts: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/auth/ig-request-access
+ * User requests permission to connect Instagram in Meta Test Mode
+ */
+router.get('/ig-request-access', requireAuth, async (req, res) => {
+  return res.json({
+    igApprovalStatus: req.user.igApprovalStatus || (req.user.instagramPageAccessToken ? 'approved' : 'none'),
+    instagramUsername: req.user.instagramUsername || '',
+  });
+});
+
+router.post('/ig-request-access', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const { instagramUsername } = req.body;
+
+    if (instagramUsername) {
+      user.instagramUsername = instagramUsername.trim().replace(/^@/, '');
+    }
+
+    user.igApprovalStatus = 'pending';
+    user.igApprovalRequestedAt = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Request submitted! Please wait for admin approval in Meta App Roles.',
+      igApprovalStatus: 'pending',
+      instagramUsername: user.instagramUsername,
+    });
+  } catch (err) {
+    console.error('❌ Request IG Access error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/admin/approve-ig-access
+ * Superadmin marks user as approved after adding their handle to Meta Roles and dispatches email
+ */
+router.post('/admin/approve-ig-access', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+
+    const { userId, instagramUsername } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'Target userId is required.' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (instagramUsername) {
+      targetUser.instagramUsername = instagramUsername.trim().replace(/^@/, '');
+    }
+
+    targetUser.igApprovalStatus = 'approved';
+    targetUser.igApprovedAt = new Date();
+    await targetUser.save();
+
+    // Dispatch approval email
+    const frontendUrl = process.env.FRONTEND_URL || 'https://instagram-ebon-zeta.vercel.app/settings';
+    let emailResult = null;
+    try {
+      emailResult = await authService.sendApprovalEmail(
+        targetUser.email,
+        targetUser.firstName || targetUser.username,
+        targetUser.instagramUsername,
+        frontendUrl
+      );
+    } catch (e) {
+      console.warn('⚠️ Could not send approval email:', e.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Approved @${targetUser.instagramUsername || targetUser.username}! ${emailResult?.success ? 'Notification email sent.' : 'Saved in database.'}`,
+      user: {
+        id: targetUser._id,
+        igApprovalStatus: 'approved',
+        instagramUsername: targetUser.instagramUsername,
+      }
+    });
+  } catch (err) {
+    console.error('❌ Admin approve IG access error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -171,17 +171,10 @@ export default function ProfilePage() {
   };
 
   return (
-    <div style={{
-      width: '100%',
-      minHeight: '100%',
-      padding: '32px 36px',
-      background: '#ffffff',
-      boxSizing: 'border-box',
-      overflowY: 'auto'
-    }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+    <div className="profile-page-container">
+      <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
         {/* Page Header */}
-        <div style={{ marginBottom: '28px' }}>
+        <div style={{ marginBottom: '24px' }}>
           <div style={{
             fontSize: '0.68rem',
             fontWeight: '800',
@@ -244,8 +237,8 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* 2-Column Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
+        {/* 2-Column Responsive Grid */}
+        <div className="profile-main-grid">
           {/* Column 1: Personal Details */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{
@@ -268,7 +261,7 @@ export default function ProfilePage() {
               </h2>
 
               <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="profile-row-grid">
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
                       First Name
@@ -331,7 +324,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="profile-row-grid">
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
                       Mobile Number

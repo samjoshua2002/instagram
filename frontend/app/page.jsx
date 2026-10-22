@@ -10,7 +10,7 @@ import {
   ExternalLink, ChevronDown, ChevronUp, Layers,
   Lock, Instagram, Smartphone, Calendar, UserCheck, Mail,
   LogIn, Building2, Briefcase, User as UserIcon, Filter,
-  ChevronLeft, Trash2
+  ChevronLeft, Trash2, Send, Clock
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 
@@ -217,6 +217,37 @@ export default function AnalyticsPage() {
   };
 
   const [deletingId, setDeletingId] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
+
+  const handleApproveUser = async (targetUser) => {
+    const handle = targetUser.instagramUsername || targetUser.username;
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
+
+    setApprovingId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/admin/approve-ig-access`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({
+          userId: targetUser.id,
+          instagramUsername: targetUser.instagramUsername || targetUser.username
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to approve user access.');
+      showToast?.(data.message || `Approved @${handle}! Invite instructions emailed.`, 'success');
+      await fetchAdminAccounts();
+    } catch (err) {
+      console.error('Approve access error:', err);
+      showToast?.(err.message || 'Failed to approve user.', 'error');
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   const handleDeleteAccount = async (targetUser) => {
     const handle = targetUser.instagramUsername || targetUser.username;
@@ -252,7 +283,13 @@ export default function AnalyticsPage() {
     let list = adminData.accounts;
 
     // Filter pill condition
-    if (filterType === 'business') {
+    if (filterType === 'active') {
+      list = list.filter(a => a.hasInstagramToken || a.isInstagramConnected);
+    } else if (filterType === 'pendingApproval') {
+      list = list.filter(a => a.igApprovalStatus === 'pending');
+    } else if (filterType === 'notConnected') {
+      list = list.filter(a => !a.hasInstagramToken && !a.isInstagramConnected);
+    } else if (filterType === 'business') {
       list = list.filter(a => a.accountType === 'business' || a.accountType === 'creator' || a.accountType === 'agency');
     } else if (filterType === 'personal') {
       list = list.filter(a => a.accountType === 'personal' || !a.accountType);
@@ -287,7 +324,7 @@ export default function AnalyticsPage() {
   // Compute KPI metrics across all users
   const kpiMetrics = useMemo(() => {
     if (!adminData?.accounts) {
-      return { total: 0, admins: 0, regular: 0, business: 0, personal: 0, activeInstagram: 0, passkeys: 0, pending: 0 };
+      return { total: 0, admins: 0, regular: 0, business: 0, personal: 0, activeInstagram: 0, pendingApproval: 0, notConnected: 0, passkeys: 0, pending: 0 };
     }
     const accounts = adminData.accounts;
     const total = accounts.length;
@@ -295,10 +332,12 @@ export default function AnalyticsPage() {
     const regular = total - admins;
     const business = accounts.filter(a => a.accountType === 'business' || a.accountType === 'creator' || a.accountType === 'agency').length;
     const personal = accounts.filter(a => a.accountType === 'personal' || !a.accountType).length;
-    const activeInstagram = accounts.filter(a => a.instagramUsername && a.instagramUsername !== 'catovidz').length;
+    const activeInstagram = accounts.filter(a => a.hasInstagramToken || a.isInstagramConnected).length;
+    const pendingApproval = accounts.filter(a => a.igApprovalStatus === 'pending').length;
+    const notConnected = accounts.filter(a => !a.hasInstagramToken && !a.isInstagramConnected).length;
     const passkeys = accounts.filter(a => a.hasPasskeys).length;
     const pending = accounts.filter(a => !a.isOnboarded).length;
-    return { total, admins, regular, business, personal, activeInstagram, passkeys, pending };
+    return { total, admins, regular, business, personal, activeInstagram, pendingApproval, notConnected, passkeys, pending };
   }, [adminData]);
 
   // Personal Bot Analytics (Fallback for regular user or when toggle is switched)
@@ -497,10 +536,10 @@ export default function AnalyticsPage() {
               </div>
               <div>
                 <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={kpiMetrics.total - kpiMetrics.pending} duration={1.6} />
+                  <AnimatedNumber value={kpiMetrics.activeInstagram} duration={1.6} />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  {kpiMetrics.pending} Setup pending
+                  {kpiMetrics.notConnected} Not connected
                 </div>
               </div>
               <div />
@@ -532,10 +571,10 @@ export default function AnalyticsPage() {
               </div>
               <div>
                 <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={kpiMetrics.total} duration={1.6} />
+                  <AnimatedNumber value={kpiMetrics.activeInstagram} duration={1.6} />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Multi-account webhooks live
+                  {kpiMetrics.pendingApproval > 0 ? `${kpiMetrics.pendingApproval} Pending whitelist` : 'Multi-account webhooks live'}
                 </div>
               </div>
               <div />
@@ -585,16 +624,62 @@ export default function AnalyticsPage() {
             padding: '22px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
           }}>
+            {/* Meta Sandbox Pending Whitelist Alert Banner */}
+            {kpiMetrics.pendingApproval > 0 && (
+              <div style={{
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px',
+                fontSize: '0.78rem',
+                color: '#92400e'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>{kpiMetrics.pendingApproval} Creator(s) waiting for Meta Sandbox Whitelist:</strong> Add their Instagram username in <em>Meta App Roles &rarr; Roles (Instagram Testers)</em>, then click <strong>Approve &amp; Email</strong> to dispatch invite instructions.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterType('pendingApproval');
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '6px',
+                    padding: '4px 9px',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    color: '#b45309',
+                    cursor: 'pointer'
+                  }}
+                >
+                  View Pending ({kpiMetrics.pendingApproval})
+                </button>
+              </div>
+            )}
+
             {/* TOOLBAR: FILTERS + SEARCH + REFRESH */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
               {/* Quick Filter Pills */}
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[
                   { id: 'all', label: `All (${kpiMetrics.total})` },
+                  { id: 'active', label: `Active (${kpiMetrics.activeInstagram})` },
+                  { id: 'pendingApproval', label: `Pending Approval (${kpiMetrics.pendingApproval})` },
+                  { id: 'notConnected', label: `Not Connected (${kpiMetrics.notConnected})` },
                   { id: 'business', label: `Business (${kpiMetrics.business})` },
                   { id: 'personal', label: `Personal (${kpiMetrics.personal})` },
                   { id: 'admin', label: `Admins (${kpiMetrics.admins})` },
-                  { id: 'pending', label: `Pending Setup (${kpiMetrics.pending})` },
                 ].map((f) => (
                   <button
                     key={f.id}
@@ -829,22 +914,48 @@ export default function AnalyticsPage() {
 
                             {/* Automation Status */}
                             <td style={{ padding: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{
-                                  width: '7px',
-                                  height: '7px',
-                                  borderRadius: '50%',
-                                  background: acc.isOnboarded ? '#16a34a' : '#f59e0b',
-                                  flexShrink: 0
-                                }} />
-                                <span style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: '700',
-                                  color: acc.isOnboarded ? '#15803d' : '#b45309'
-                                }}>
-                                  {acc.isOnboarded ? 'Active' : 'Setup Pending'}
-                                </span>
-                              </div>
+                              {(() => {
+                                const isConnected = Boolean(acc.hasInstagramToken || acc.isInstagramConnected);
+                                const isPending = acc.igApprovalStatus === 'pending';
+                                const isApproved = acc.igApprovalStatus === 'approved';
+
+                                let dotColor = '#a1a1aa';
+                                let textColor = '#71717a';
+                                let label = 'Not Connected';
+
+                                if (isConnected) {
+                                  dotColor = '#16a34a';
+                                  textColor = '#15803d';
+                                  label = 'Active';
+                                } else if (isPending) {
+                                  dotColor = '#f59e0b';
+                                  textColor = '#b45309';
+                                  label = 'Pending Approval';
+                                } else if (isApproved) {
+                                  dotColor = '#0284c7';
+                                  textColor = '#0369a1';
+                                  label = 'Approved';
+                                }
+
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                                    <div style={{
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: dotColor,
+                                      flexShrink: 0
+                                    }} />
+                                    <span style={{
+                                      fontSize: '0.72rem',
+                                      fontWeight: '700',
+                                      color: textColor
+                                    }}>
+                                      {label}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Security */}
@@ -875,9 +986,40 @@ export default function AnalyticsPage() {
                               {acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : 'Recent'}
                             </td>
 
-                            {/* Actions: Impersonate / Details */}
+                            {/* Actions: Impersonate / Approve / Details */}
                             <td style={{ padding: '12px', textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                {!isSelf && !acc.hasInstagramToken && !acc.isInstagramConnected && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveUser(acc)}
+                                    disabled={approvingId === acc.id}
+                                    title={acc.igApprovalStatus === 'pending'
+                                      ? `Whitelisted in Meta Roles? Click to mark approved & dispatch invite email to ${acc.email}`
+                                      : `Send Meta tester invite email to ${acc.email}`}
+                                    style={{
+                                      background: acc.igApprovalStatus === 'pending' ? '#09090b' : '#ffffff',
+                                      border: acc.igApprovalStatus === 'pending' ? '1px solid #09090b' : '1px solid #e4e4e7',
+                                      borderRadius: '6px',
+                                      padding: '5px 8px',
+                                      fontSize: '0.7rem',
+                                      fontWeight: '700',
+                                      color: acc.igApprovalStatus === 'pending' ? '#ffffff' : '#09090b',
+                                      cursor: approvingId === acc.id ? 'wait' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <Send size={11} />
+                                    <span>
+                                      {approvingId === acc.id
+                                        ? 'Sending...'
+                                        : (acc.igApprovalStatus === 'pending' ? 'Approve & Email' : 'Invite')}
+                                    </span>
+                                  </button>
+                                )}
+
                                 {!isSelf && (
                                   <button
                                     type="button"
@@ -1050,7 +1192,16 @@ export default function AnalyticsPage() {
                 >
                   Prev
                 </button>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: '#09090b' }}>
+                <span style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: '700',
+                  color: '#09090b',
+                  whiteSpace: 'nowrap',
+                  minWidth: '54px',
+                  textAlign: 'center',
+                  display: 'inline-block',
+                  userSelect: 'none'
+                }}>
                   {currentPage} / {totalPages}
                 </span>
                 <button

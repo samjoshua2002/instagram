@@ -287,7 +287,9 @@ export default function LoginPage({ onLoginSuccess }) {
   const cacheAccount = (userData) => {
     if (!userData) return;
     try {
+      const isConnected = Boolean(userData.hasInstagramToken || userData.isInstagramConnected || userData.instagramPageAccessToken);
       const record = {
+        ...userData,
         email: userData.email,
         username: userData.username,
         role: userData.role || 'user',
@@ -295,9 +297,15 @@ export default function LoginPage({ onLoginSuccess }) {
         lastName: userData.lastName || '',
         profilePicUrl: userData.profilePicUrl || '',
         hasPasskeys: userData.hasPasskeys ?? true,
+        hasInstagramToken: isConnected,
+        isInstagramConnected: isConnected,
+        instagramUsername: userData.instagramUsername || '',
+        instagramAccountId: userData.instagramAccountId || userData.instagramId || '',
+        instagramPageAccessToken: userData.instagramPageAccessToken || '',
         lastUsed: Date.now(),
       };
       localStorage.setItem('chatter_remembered_account', JSON.stringify(record));
+      localStorage.setItem('chatter_user_profile', JSON.stringify(record));
       setRememberedAccount(record);
 
       let saved = [];
