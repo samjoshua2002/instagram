@@ -470,7 +470,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   await userMemory.save();
   await redisService.pushMessage(senderId, { role: 'user', text: messageText, timestamp: msgTime });
 
-  // Atomically persist cumulative counts to SocialGraph node
+  // Atomically persist cumulative counts to SocialGraph node or auto-create for creator
   (async () => {
     try {
       const incPayload = {
@@ -480,8 +480,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
       const res = await SocialGraph.updateOne({ senderId }, { $inc: incPayload });
       if (res.matchedCount === 0) {
         const cleanU = (userMemory.username || '').replace(/^@/, '').trim();
+        let matched = false;
         if (cleanU) {
-          await SocialGraph.updateOne(
+          const res2 = await SocialGraph.updateOne(
             {
               $or: [
                 { instagramHandle: `@${cleanU}` },
@@ -491,6 +492,20 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
             },
             { $inc: incPayload }
           );
+          matched = res2.matchedCount > 0;
+        }
+        if (!matched && ownerUser) {
+          await SocialGraph.create({
+            ownerId: ownerUser._id,
+            ownerUsername: ownerUser.username,
+            senderId,
+            name: userMemory.name || userMemory.username || `User_${senderId.slice(-4)}`,
+            instagramHandle: cleanU ? `@${cleanU}` : '',
+            profilePic: userMemory.profilePic || '',
+            category: 'online_friend',
+            chatsCount: 1,
+            reelsCount: isReelOrShare ? 1 : 0
+          });
         }
       }
     } catch (_) {}
