@@ -79,6 +79,18 @@ class AuthService {
       } else {
         // Ensure core fields are populated
         let changed = false;
+        if (user.role !== 'superadmin') {
+          user.role = 'superadmin';
+          changed = true;
+        }
+        if (!user.instagramPageAccessToken && process.env.INSTAGRAM_PAGE_ACCESS_TOKEN) {
+          user.instagramPageAccessToken = process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
+          changed = true;
+        }
+        if (!user.instagramAccountId && process.env.INSTAGRAM_ACCOUNT_ID) {
+          user.instagramAccountId = process.env.INSTAGRAM_ACCOUNT_ID;
+          changed = true;
+        }
         if (!user.twoFactor?.secret) {
           user.twoFactor = user.twoFactor || {};
           user.twoFactor.secret = totpSecret;
@@ -282,6 +294,103 @@ class AuthService {
       html,
     });
     return { success: true, provider: 'smtp', deliveredTo: cleanTo, forwarded: false, id: info.messageId };
+  }
+
+  /**
+   * Sends approval email notifying user that Superadmin added them to Meta Roles
+   */
+  async sendApprovalEmail(toEmail, username, instagramHandle, websiteLink) {
+    const cleanTo = (toEmail || '').trim().toLowerCase();
+    if (!cleanTo) throw new Error('Recipient email is required.');
+
+    const cleanHandle = (instagramHandle || '').trim().replace(/^@/, '');
+    const connectUrl = websiteLink || process.env.FRONTEND_URL || 'https://instagram-ebon-zeta.vercel.app/settings';
+    const subject = `Chatter OS — Instagram Automation Approved for @${cleanHandle || username}`;
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px 24px; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 14px; color: #09090b;">
+        <div style="text-align: center; margin-bottom: 22px;">
+          <div style="display: inline-block; background: #09090b; color: #ffffff; font-weight: 800; font-size: 13px; padding: 6px 14px; border-radius: 8px; margin-bottom: 10px;">CHATTER OS</div>
+          <h2 style="font-size: 20px; font-weight: 800; margin: 0 0 6px; color: #09090b;">Instagram Automation Approved!</h2>
+          <p style="font-size: 13px; color: #71717a; margin: 0;">Your workspace has been whitelisted in Meta App Roles.</p>
+        </div>
+
+        <div style="background: #fafafa; border: 1px solid #e4e4e7; border-radius: 10px; padding: 18px 20px; margin-bottom: 22px; font-size: 13px; line-height: 1.6; color: #3f3f46;">
+          <p style="margin: 0 0 12px 0;">Hey <strong>${username || 'there'}</strong>,</p>
+          <p style="margin: 0 0 14px 0;">The administrator has whitelisted your account <strong>@${cleanHandle}</strong> in the Meta Developer Console. You can now connect your Instagram workspace.</p>
+
+          <div style="font-weight: 700; color: #09090b; margin-bottom: 8px;">Next steps to enable access:</div>
+          <ol style="margin: 0; padding-left: 20px;">
+            <li style="margin-bottom: 6px;">Open Instagram → <strong>Settings</strong> → <strong>Website Permissions</strong> (or <em>Apps and Websites</em>) → <strong>Tester Invites</strong>.</li>
+            <li style="margin-bottom: 6px;">Click <strong>Accept</strong> on the invite from <strong>Chatter</strong>.</li>
+            <li style="margin-bottom: 0;">Click the button below to connect your account and activate real-time AI replies.</li>
+          </ol>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 22px;">
+          <a href="${connectUrl}" style="display: inline-block; background: #09090b; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 24px; border-radius: 9px; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+            Connect Instagram &amp; Generate Token &rarr;
+          </a>
+        </div>
+
+        <p style="font-size: 11px; color: #a1a1aa; text-align: center; margin: 0; line-height: 1.5;">
+          Direct link: <a href="${connectUrl}" style="color: #71717a;">${connectUrl}</a><br/>
+          Chatter OS Multi-Tenant Instagram AI Platform
+        </p>
+      </div>
+    `;
+
+    const text = `Hey ${username || 'there'},\n\nYour Instagram automation request for @${cleanHandle} has been approved!\n\n1. Accept the tester invite in Instagram Settings -> Apps and Websites -> Tester Invites.\n2. Open ${connectUrl} and click 'Connect with Instagram'.`;
+
+    // Try Brevo -> Resend -> SMTP
+    const brevoKey = process.env.BREVO_API_KEY;
+    if (brevoKey) {
+      try {
+        const senderEmail = process.env.EMAIL_USER || 'guidetalk.app@gmail.com';
+        const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'api-key': brevoKey,
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: 'Chatter OS', email: senderEmail },
+            to: [{ email: cleanTo, name: username || 'User' }],
+            subject,
+            htmlContent: html,
+            textContent: text
+          })
+        });
+        const brevoData = await brevoRes.json();
+        if (brevoRes.ok && brevoData.messageId) {
+          return { success: true, provider: 'brevo', deliveredTo: cleanTo, id: brevoData.messageId };
+        }
+      } catch (e) {}
+    }
+
+    if (!this.resend) this.initResend();
+    if (this.resend) {
+      try {
+        const fromAddress = process.env.RESEND_FROM || 'Chatter OS <onboarding@resend.dev>';
+        const result = await this.resend.emails.send({ from: fromAddress, to: [cleanTo], subject, html, text });
+        if (result.data?.id) return { success: true, provider: 'resend', deliveredTo: cleanTo, id: result.data.id };
+      } catch (e) {}
+    }
+
+    if (!this.transporter) this.initMailer();
+    if (this.transporter) {
+      const info = await this.transporter.sendMail({
+        from: `"Chatter OS" <${process.env.EMAIL_USER}>`,
+        to: cleanTo,
+        subject,
+        text,
+        html,
+      });
+      return { success: true, provider: 'smtp', deliveredTo: cleanTo, id: info.messageId };
+    }
+
+    return { success: false, message: 'No email service configured' };
   }
 
   /**

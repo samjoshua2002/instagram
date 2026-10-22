@@ -69,6 +69,19 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'superadmin'],
     default: 'user',
   },
+  igApprovalStatus: {
+    type: String,
+    enum: ['none', 'pending', 'approved', 'rejected'],
+    default: 'none',
+  },
+  igApprovalRequestedAt: {
+    type: Date,
+    default: null,
+  },
+  igApprovedAt: {
+    type: Date,
+    default: null,
+  },
   accountType: {
     type: String,
     enum: ['personal', 'creator', 'business', 'agency'],
