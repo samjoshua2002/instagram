@@ -186,8 +186,8 @@ class InstagramService {
   /**
    * Send typing indicator to create a realistic chatting effect
    */
-  async sendSenderAction(recipientId, action = 'typing_on') {
-    const token = await this.getAccessToken();
+  async sendSenderAction(recipientId, action = 'typing_on', customToken = null) {
+    const token = customToken || await this.getAccessToken();
     if (!token) return;
 
     const isInstagramToken = token.startsWith('IG');
@@ -217,8 +217,8 @@ class InstagramService {
   /**
    * React to a message with an emoji (e.g. '😂', '❤️', '🔥')
    */
-  async sendMessageReaction(recipientId, messageId, emoji = '😂') {
-    const token = await this.getAccessToken();
+  async sendMessageReaction(recipientId, messageId, emoji = '😂', customToken = null) {
+    const token = customToken || await this.getAccessToken();
     if (!token || !messageId) return;
 
     const isInstagramToken = token.startsWith('IG');
@@ -253,8 +253,8 @@ class InstagramService {
   /**
    * Fetch user profile (username, name, profile pic) from Graph API
    */
-  async getUserProfile(senderId) {
-    const token = await this.getAccessToken();
+  async getUserProfile(senderId, customToken = null) {
+    const token = customToken || await this.getAccessToken();
     if (!token) return null;
 
     try {

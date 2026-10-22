@@ -34,15 +34,18 @@ class AzureOpenAIService {
    * Generates a reply mimicking Sam Joshua's exact tone, adapting to the user's conversation style,
    * referencing remembered facts, and drawing upon the social graph network of friends.
    */
-  async generateReply({ userMemory, messageHistory, incomingText }) {
-    // 1. Fetch persona config (with Redis 10m cache)
-    let config = await redisService.getCachedPersonaConfig();
+  async generateReply({ userMemory, messageHistory, incomingText, config: passedConfig }) {
+    // 1. Fetch persona config (use passed creator config or fallback)
+    let config = passedConfig;
     if (!config) {
-      config = await PersonaConfig.findOne();
+      config = await redisService.getCachedPersonaConfig();
       if (!config) {
-        config = await PersonaConfig.create({});
+        config = await PersonaConfig.findOne();
+        if (!config) {
+          config = await PersonaConfig.create({});
+        }
+        await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
       }
-      await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
     }
 
     // 1b. Fetch active reaction categories from user's Media Vault
