@@ -22,6 +22,17 @@ import {
   Check
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { startRegistration } from '@simplewebauthn/browser';
+
+const formatAddress = (addr) => {
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  if (typeof addr === 'object') {
+    const parts = [addr.street, addr.city, addr.state, addr.country, addr.postalCode].filter(Boolean);
+    return parts.join(', ');
+  }
+  return '';
+};
 
 export default function ProfilePage() {
   const { user, token, API_BASE, updateUserProfile, showToast } = useApp();
@@ -39,7 +50,7 @@ export default function ProfilePage() {
     mobileNumber: user?.mobileNumber || '',
     whatsappNumber: user?.whatsappNumber || '',
     instagramUsername: user?.instagramUsername || '',
-    address: user?.address || '',
+    address: formatAddress(user?.address),
   });
 
   // Passkeys state
@@ -56,7 +67,7 @@ export default function ProfilePage() {
         mobileNumber: user.mobileNumber || '',
         whatsappNumber: user.whatsappNumber || '',
         instagramUsername: user.instagramUsername || '',
-        address: user.address || '',
+        address: formatAddress(user.address),
       });
       fetchPasskeys();
     }
@@ -118,11 +129,7 @@ export default function ProfilePage() {
       const options = await res.json();
       if (!res.ok) throw new Error(options.error || 'Failed to initialize WebAuthn');
 
-      // Convert options for navigator.credentials.create
-      options.challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-      options.user.id = Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-
-      const credential = await navigator.credentials.create({ publicKey: options });
+      const registration = await startRegistration({ optionsJSON: options });
 
       const verifyRes = await fetch(`${API_BASE}/api/auth/passkey/register-verify`, {
         method: 'POST',
@@ -131,13 +138,8 @@ export default function ProfilePage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          credentialId: credential.id,
-          rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-          response: {
-            clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-            attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject)))
-          },
-          deviceType: navigator.userAgent.includes('Mac') ? 'macOS / Touch ID' : navigator.userAgent.includes('iPhone') ? 'iOS Face ID' : 'Security Key'
+          response: registration,
+          name: navigator.userAgent.includes('Mac') ? 'Mac (Touch ID)' : navigator.userAgent.includes('iPhone') ? 'iPhone (Face ID)' : navigator.userAgent.includes('Windows') ? 'Windows PC (Hello)' : 'Security Key'
         })
       });
 
