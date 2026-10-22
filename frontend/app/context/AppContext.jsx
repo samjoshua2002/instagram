@@ -13,6 +13,11 @@ export function getStorageNodesKey(u) {
   return uid ? `chatter_social_nodes_${uid}` : STORAGE_NODES_KEY;
 }
 
+export function getStorageConfigKey(u) {
+  const uid = u?._id || u?.id || u?.username;
+  return uid ? `chatter_persona_config_${uid}` : STORAGE_CONFIG_KEY;
+}
+
 export function getRootNode(user) {
   const name = user ? `${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || 'Account Owner')}` : 'Account Owner';
   const handle = user?.instagramUsername ? (user.instagramUsername.startsWith('@') ? user.instagramUsername : `@${user.instagramUsername}`) : (user?.username ? `@${user.username}` : '@me');
@@ -188,7 +193,9 @@ export function AppProvider({ children }) {
   const [routingConfig, setRoutingConfigState] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem(STORAGE_CONFIG_KEY);
+        const currentUser = JSON.parse(localStorage.getItem('chatter_user_profile') || localStorage.getItem('chatter_remembered_account') || 'null');
+        const configKey = getStorageConfigKey(currentUser);
+        const cached = localStorage.getItem(configKey);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && parsed.chatMode) return parsed;
@@ -450,9 +457,22 @@ export function AppProvider({ children }) {
       } else if (user) {
         setNodes([getRootNode(user)]);
       }
-      const cachedConfig = localStorage.getItem(STORAGE_CONFIG_KEY);
+      const userConfigKey = getStorageConfigKey(user);
+      const cachedConfig = localStorage.getItem(userConfigKey);
       if (cachedConfig) {
-        setRoutingConfigState(prev => ({ ...prev, ...JSON.parse(cachedConfig) }));
+        try {
+          const parsed = JSON.parse(cachedConfig);
+          if (parsed && parsed.chatMode) {
+            setRoutingConfigState(parsed);
+          }
+        } catch (e) {}
+      } else {
+        setRoutingConfigState({
+          chatMode: 'everyone',
+          excludedContactIds: [],
+          includedContactIds: [],
+          globalBotActive: true
+        });
       }
     } catch (e) {
       console.warn('LocalStorage hydration note:', e);
@@ -573,14 +593,17 @@ export function AppProvider({ children }) {
       const pData = await personaRes.json();
       if (pData && (pData.chatMode || pData.globalBotActive !== undefined)) {
         if (activeRoutingSavesRef.current === 0 && lastRoutingEditTimeRef.current === editTimestampBefore && Date.now() - editTimestampBefore > 6000) {
+          const mode = pData.chatMode || 'everyone';
           setRoutingConfigState({
-            chatMode: pData.chatMode || 'everyone_except',
+            chatMode: mode,
             excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
             includedContactIds: (pData.includedContactIds || []).filter(Boolean),
             globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
           });
-          localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify({
-            chatMode: pData.chatMode || 'everyone_except',
+          const currentUser = userRef.current;
+          const userConfigKey = getStorageConfigKey(currentUser);
+          localStorage.setItem(userConfigKey, JSON.stringify({
+            chatMode: mode,
             excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
             includedContactIds: (pData.includedContactIds || []).filter(Boolean),
             globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
@@ -996,7 +1019,9 @@ export function AppProvider({ children }) {
     activeRoutingSavesRef.current += 1;
     setRoutingConfig(newConfig);
     try {
-      localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(newConfig));
+      const activeUser = userRef.current || user;
+      const userConfigKey = getStorageConfigKey(activeUser);
+      localStorage.setItem(userConfigKey, JSON.stringify(newConfig));
       const putOperation = routingSaveQueueRef.current.then(async () => {
         const res = await fetch(`${API_BASE}/api/persona`, {
           method: 'PUT',
@@ -1022,7 +1047,9 @@ export function AppProvider({ children }) {
     const nextConfig = { ...routingConfig, globalBotActive: nextState };
     setRoutingConfig(nextConfig);
     try {
-      localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(nextConfig));
+      const activeUser = userRef.current || user;
+      const userConfigKey = getStorageConfigKey(activeUser);
+      localStorage.setItem(userConfigKey, JSON.stringify(nextConfig));
       const putOperation = routingSaveQueueRef.current.then(async () => {
         const res = await fetch(`${API_BASE}/api/persona`, {
           method: 'PUT',
