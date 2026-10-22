@@ -156,27 +156,25 @@ export default function InstagramConnectFallback({ onConnect, user }) {
       const backendUrl = (API_BASE || 'https://instagram-ai-bot-64tf.onrender.com').replace(/\/+$/, '');
       const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
-      const metaAppId = '28946827981672606';
+      const instagramAppId = '28946827981672606';
       const scopes = [
-        'instagram_basic',
-        'instagram_manage_messages',
-        'instagram_manage_comments',
-        'pages_show_list',
-        'pages_read_engagement',
-        'pages_manage_metadata'
+        'instagram_business_basic',
+        'instagram_business_manage_messages',
+        'instagram_business_manage_comments',
+        'instagram_business_content_publish',
+        'instagram_business_manage_insights'
       ].join(',');
 
       const stateObj = {
         token: currentToken,
         origin: clientOrigin,
         redirectUri: redirectUri,
-        appId: metaAppId
+        appId: instagramAppId
       };
       const state = btoa(JSON.stringify(stateObj));
 
-      // Navigate DIRECTLY to official Meta / Facebook OAuth dialog
-      // Uses the user's active configured App ID 28946827981672606 where onrender.com is approved!
-      const directOAuthUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
+      // Direct Instagram OAuth dialog for Business accounts on instagram.com
+      const directOAuthUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${instagramAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
 
       const popup = window.open(directOAuthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
       if (!popup) {
