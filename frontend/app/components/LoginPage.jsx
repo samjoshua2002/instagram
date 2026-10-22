@@ -59,6 +59,15 @@ export default function LoginPage({ onLoginSuccess }) {
   // Top primary navigation tabs: 'signin' | 'register'
   const [authMode, setAuthMode] = useState('signin');
 
+  const sanitizeAccountRole = (acc) => {
+    if (!acc) return acc;
+    const isSuper = acc.email === 'samjoshuacs2002@gmail.com' || acc.username === 'samjoshua2002';
+    return {
+      ...acc,
+      role: isSuper ? 'superadmin' : 'user'
+    };
+  };
+
   // Cached / Remembered Accounts State (Multi-Account Support)
   const [savedAccounts, setSavedAccounts] = useState(() => {
     if (typeof window === 'undefined') return [];
@@ -66,12 +75,20 @@ export default function LoginPage({ onLoginSuccess }) {
       const stored = localStorage.getItem('chatter_saved_accounts');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const sanitized = parsed.map(sanitizeAccountRole);
+          try { localStorage.setItem('chatter_saved_accounts', JSON.stringify(sanitized)); } catch (e) {}
+          return sanitized;
+        }
       }
       const single = localStorage.getItem('chatter_remembered_account');
       if (single) {
         const parsed = JSON.parse(single);
-        if (parsed && (parsed.email || parsed.username)) return [parsed];
+        if (parsed && (parsed.email || parsed.username)) {
+          const sanitized = [sanitizeAccountRole(parsed)];
+          try { localStorage.setItem('chatter_saved_accounts', JSON.stringify(sanitized)); } catch (e) {}
+          return sanitized;
+        }
       }
       return [];
     } catch {
@@ -85,14 +102,48 @@ export default function LoginPage({ onLoginSuccess }) {
       const stored = localStorage.getItem('chatter_saved_accounts');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const sanitized = sanitizeAccountRole(parsed[0]);
+          try { localStorage.setItem('chatter_remembered_account', JSON.stringify(sanitized)); } catch (e) {}
+          return sanitized;
+        }
       }
       const cached = localStorage.getItem('chatter_remembered_account');
-      return cached ? JSON.parse(cached) : null;
+      if (cached) {
+        const sanitized = sanitizeAccountRole(JSON.parse(cached));
+        try { localStorage.setItem('chatter_remembered_account', JSON.stringify(sanitized)); } catch (e) {}
+        return sanitized;
+      }
+      return null;
     } catch {
       return null;
     }
   });
+
+  // Re-sync local storage cache on mount to immediately remove superadmin from guidetalk
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem('chatter_saved_accounts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const sanitized = parsed.map(sanitizeAccountRole);
+          localStorage.setItem('chatter_saved_accounts', JSON.stringify(sanitized));
+          setSavedAccounts(sanitized);
+        }
+      }
+      const single = localStorage.getItem('chatter_remembered_account');
+      if (single) {
+        const parsed = JSON.parse(single);
+        if (parsed) {
+          const sanitized = sanitizeAccountRole(parsed);
+          localStorage.setItem('chatter_remembered_account', JSON.stringify(sanitized));
+          setRememberedAccount(sanitized);
+        }
+      }
+    } catch (e) {}
+  }, []);
 
   const [useAnotherAccount, setUseAnotherAccount] = useState(false);
   const [showAccountChooser, setShowAccountChooser] = useState(false);
@@ -291,8 +342,7 @@ export default function LoginPage({ onLoginSuccess }) {
       const record = {
         ...userData,
         email: userData.email,
-        username: userData.username,
-        role: userData.role || 'user',
+        role: (userData.email === 'samjoshuacs2002@gmail.com' || userData.username === 'samjoshua2002') ? 'superadmin' : 'user',
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
         profilePicUrl: userData.profilePicUrl || '',

@@ -497,7 +497,7 @@ router.get('/oneauth/qr', async (req, res) => {
     // If no email specified, fallback to owner account
     if (!user && !rawEmail) {
       user = await User.findOne({
-        $or: [{ email: 'guidetalk.app@gmail.com' }, { username: 'samjoshua' }]
+        $or: [{ email: 'samjoshuacs2002@gmail.com' }, { username: 'samjoshua2002' }]
       });
     }
     if (!user) {
@@ -686,7 +686,7 @@ router.post('/passkey/login-verify', async (req, res) => {
       user = await User.findOne({ 'passkeys.credentialId': response.id });
     }
     if (!user) {
-      user = await User.findOne({ email: 'guidetalk.app@gmail.com' });
+      user = await User.findOne({ email: 'samjoshuacs2002@gmail.com' });
     }
     if (!user) {
       return res.status(404).json({ error: 'No user registered with this passkey' });
