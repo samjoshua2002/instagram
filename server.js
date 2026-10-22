@@ -1762,6 +1762,55 @@ app.get('/api/social-graph', async (req, res) => {
           ]
         }
       : {};
+
+    // Auto-discover contacts for this creator from message history if missing
+    if (req.user && !isSuper && req.user.instagramAccountId) {
+      try {
+        const creatorIgId = req.user.instagramAccountId;
+        const messages = await Message.find({
+          $or: [{ recipientId: creatorIgId }, { senderId: creatorIgId }]
+        }).sort({ createdAt: -1 });
+
+        const contactIds = new Set();
+        for (const m of messages) {
+          if (m.senderId && m.senderId !== creatorIgId) contactIds.add(m.senderId);
+          if (m.recipientId && m.recipientId !== creatorIgId) contactIds.add(m.recipientId);
+        }
+
+        for (const cid of contactIds) {
+          const exists = await SocialGraph.findOne({
+            ownerId: req.user._id,
+            senderId: cid
+          });
+          if (!exists) {
+            const mem = await UserMemory.findOne({ senderId: cid });
+            const chatsCount = await Message.countDocuments({
+              $or: [
+                { senderId: cid, recipientId: creatorIgId },
+                { senderId: creatorIgId, recipientId: cid }
+              ]
+            });
+            const cleanU = (mem?.username || '').replace(/^@/, '').trim();
+            await SocialGraph.create({
+              ownerId: req.user._id,
+              ownerUsername: req.user.username,
+              senderId: cid,
+              name: mem?.name && !mem.name.startsWith('User_') ? mem.name : (cleanU || `User_${cid.slice(-4)}`),
+              instagramHandle: cleanU ? `@${cleanU}` : '',
+              profilePic: mem?.profilePic || '',
+              category: 'online_friend',
+              chatsCount,
+              reelsCount: 0,
+              relationshipToSam: 'Friend',
+              lore: mem?.personalNotes ? [mem.personalNotes] : []
+            }).catch(() => {});
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Auto contact sync error:', syncErr.message);
+      }
+    }
+
     const nodes = await SocialGraph.find(query).sort({ updatedAt: -1 });
 
     // Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
