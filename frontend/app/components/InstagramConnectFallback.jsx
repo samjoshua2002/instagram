@@ -150,9 +150,34 @@ export default function InstagramConnectFallback({ onConnect, user }) {
     setErrorMsg('');
     setOauthConnecting(true);
     try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
-      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://instagram-ebon-zeta.vercel.app';
+      const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : '') || '';
+
+      const backendUrl = (API_BASE || 'https://instagram-ai-bot-64tf.onrender.com').replace(/\/+$/, '');
+      const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
+
+      const instagramAppId = '1082976137966604';
+      const scopes = [
+        'instagram_business_basic',
+        'instagram_business_manage_messages',
+        'instagram_business_manage_comments',
+        'instagram_business_content_publish',
+        'instagram_business_manage_insights'
+      ].join(',');
+
+      const stateObj = {
+        token: currentToken,
+        origin: clientOrigin,
+        redirectUri: redirectUri,
+        appId: instagramAppId
+      };
+      const state = btoa(JSON.stringify(stateObj));
+
+      // Navigate DIRECTLY to official Instagram OAuth dialog on instagram.com
+      // This bypasses Chrome's Safe Browsing heuristic warning on Render's shared subdomain!
+      const directInstagramUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${instagramAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
+
+      const popup = window.open(directInstagramUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
       if (!popup) {
         setOauthConnecting(false);
         setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
