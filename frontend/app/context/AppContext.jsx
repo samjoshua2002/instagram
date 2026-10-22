@@ -235,7 +235,9 @@ export function AppProvider({ children }) {
           if (!Array.isArray(saved)) saved = [];
         } catch (e) {}
 
+        const isConnected = Boolean(userData.hasInstagramToken || userData.isInstagramConnected || userData.instagramPageAccessToken);
         const record = {
+          ...userData,
           email: userData.email,
           username: userData.username,
           role: userData.role || 'user',
@@ -243,6 +245,11 @@ export function AppProvider({ children }) {
           lastName: userData.lastName || '',
           profilePicUrl: userData.profilePicUrl || '',
           hasPasskeys: userData.hasPasskeys ?? true,
+          hasInstagramToken: isConnected,
+          isInstagramConnected: isConnected,
+          instagramUsername: userData.instagramUsername || '',
+          instagramAccountId: userData.instagramAccountId || userData.instagramId || '',
+          instagramPageAccessToken: userData.instagramPageAccessToken || '',
           lastUsed: Date.now(),
         };
         const filtered = saved.filter(a => a.email !== record.email && a.username !== record.username);

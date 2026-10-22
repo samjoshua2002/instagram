@@ -588,4 +588,85 @@ input:focus, textarea:focus, select:focus {
   }
 }
 
+/* ═══════════════════════════════════════════
+   Instagram Connect Fallback Responsive UI
+   ═══════════════════════════════════════════ */
+.connect-fallback-container {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.connect-grid-layout {
+  display: grid;
+  grid-template-columns: 1.25fr 0.95fr;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.connect-features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 960px) {
+  .connect-fallback-container {
+    padding: 20px 16px;
+  }
+  .connect-grid-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .connect-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
+  .connect-features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Profile Page Responsive UI
+   ═══════════════════════════════════════════ */
+.profile-page-container {
+  padding: 32px 36px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.profile-main-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+.profile-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .profile-page-container {
+    padding: 20px 16px;
+  }
+  .profile-main-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 580px) {
+  .profile-row-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 
