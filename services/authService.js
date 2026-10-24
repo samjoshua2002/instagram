@@ -12,7 +12,9 @@ const {
 const User = require('../models/User');
 const { setUserInstagram } = require('./instagramTokenService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'chatter_jwt_secret_samjoshua_auth_2026_super_secure_key_99';
+// Never fall back to a secret written in the code: anyone who reads it could sign sessions
+const JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(48).toString('hex');
+if (!process.env.JWT_SECRET) console.warn('⚠️ JWT_SECRET is not set: using a random secret, so sessions end when the server restarts.');
 const RP_NAME = process.env.RP_NAME || 'Chatter OS';
 
 class AuthService {
