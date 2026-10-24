@@ -30,6 +30,23 @@ const KnowledgeDocSchema = new mongoose.Schema({
   keywords: [{
     type: String,
   }],
+  // All chunks of one uploaded document / link share a sourceId
+  sourceId: {
+    type: String,
+    default: '',
+    index: true,
+  },
+  sourceType: {
+    type: String,
+    enum: ['file', 'link', 'text'],
+    default: 'text',
+  },
+  chunkIndex: {
+    type: Number,
+    default: 0,
+  },
 }, { timestamps: true });
+
+KnowledgeDocSchema.index({ ownerId: 1, keywords: 1 });
 
 module.exports = mongoose.model('KnowledgeDoc', KnowledgeDocSchema);
