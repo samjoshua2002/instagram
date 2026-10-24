@@ -87,12 +87,12 @@ export default function InspectorDrawer() {
     };
 
     await saveNode(updatedNode);
-    showToast(`💾 Saved details for ${formData.name}!`);
+    showToast(`Saved details for ${formData.name}!`);
   };
 
   const handleTriggerAutofill = async () => {
     setIsAutofilling(true);
-    showToast(`🤖 AI scanning chat logs for ${selectedNode.name}...`);
+    showToast(`AI scanning chat logs for ${selectedNode.name}...`);
     try {
       const autofill = await aiAutofillPerson(selectedNode.name);
       if (autofill) {
@@ -109,9 +109,9 @@ export default function InspectorDrawer() {
           autofill.facts.forEach(f => addFact(selectedNode.id, f));
         }
 
-        showToast(`✨ AI autofilled profile fields from conversation!`);
+        showToast(`AI autofilled profile fields from conversation!`);
       } else {
-        showToast(`⚠️ No new chat data found to synthesize.`);
+        showToast(`No new chat data found to synthesize.`);
       }
     } catch (e) {
       showToast(`Autofill error: ${e.message}`);
@@ -139,7 +139,7 @@ export default function InspectorDrawer() {
       });
       const data = await res.json();
       if (data.success && data.memory) {
-        showToast(`✨ Memory synthesized from recent DMs!`);
+        showToast(`Memory synthesized from recent DMs!`);
       } else {
         showToast(`DMs reviewed. Memory is up-to-date!`);
       }
@@ -168,7 +168,7 @@ export default function InspectorDrawer() {
     await saveNode(updatedNode);
     setNewConnTarget('');
     setNewConnRel('');
-    showToast(`🔗 Connected ${selectedNode.name} to ${newConn.targetName}!`);
+    showToast(`Connected ${selectedNode.name} to ${newConn.targetName}!`);
   };
 
   return (
@@ -254,7 +254,7 @@ export default function InspectorDrawer() {
           }}
         >
           <div>
-            <div style={{ color: '#f59e0b', fontWeight: '800', fontSize: '0.8rem' }}>⚠️ Missing Instagram ID</div>
+            <div style={{ color: '#f59e0b', fontWeight: '800', fontSize: '0.8rem' }}>Missing Instagram ID</div>
             <div style={{ color: 'var(--color-border-strong)', fontSize: '0.74rem', marginTop: '2px' }}>
               Add Instagram @handle so AI merges past conversation and replies in live DMs.
             </div>
@@ -282,7 +282,7 @@ export default function InspectorDrawer() {
       <div style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '10px', padding: '14px', marginBottom: '18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
-            🤖 CHAT CONTROL FOR {selectedNode.name.toUpperCase()}
+            CHAT CONTROL FOR {selectedNode.name.toUpperCase()}
           </span>
           <span
             style={{
@@ -386,7 +386,7 @@ export default function InspectorDrawer() {
             cursor: 'pointer'
           }}
         >
-          ✏️ Profile & Lore
+          Profile & Lore
         </button>
         <button
           onClick={() => setDrawerTab('memories')}
@@ -402,7 +402,7 @@ export default function InspectorDrawer() {
             cursor: 'pointer'
           }}
         >
-          🧠 Memories & Intel
+          Memories & Intel
         </button>
         <button
           onClick={() => setDrawerTab('connections')}
@@ -418,7 +418,7 @@ export default function InspectorDrawer() {
             cursor: 'pointer'
           }}
         >
-          🔗 Connections
+          Connections
         </button>
       </div>
 
@@ -429,7 +429,7 @@ export default function InspectorDrawer() {
           <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
             <div>
               <div style={{ color: '#10b981', fontSize: '0.82rem', fontWeight: '800' }}>
-                ✨ AI Chat Intelligence
+                AI Chat Intelligence
               </div>
               <div style={{ color: 'var(--color-text-muted)', fontSize: '0.74rem', marginTop: '2px' }}>
                 Auto-fill relationship, DOB, notes & banter from past DMs.
@@ -475,7 +475,7 @@ export default function InspectorDrawer() {
 
             <div>
               <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-                🎂 Date of Birth (DOB)
+                Date of Birth (DOB)
               </label>
               <input
                 type="text"
@@ -553,7 +553,7 @@ export default function InspectorDrawer() {
           {/* Banter & Cussing Style */}
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#f43f5e', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
-              ⚡ Banter & Cussing Style
+              Banter & Cussing Style
             </label>
             <input
               type="text"
@@ -633,7 +633,7 @@ export default function InspectorDrawer() {
             }}
           >
             <Sparkles size={16} className={isLearning ? 'animate-spin' : ''} />
-            <span>{isLearning ? 'Synthesizing...' : '✨ Force AI to Learn from Chat'}</span>
+            <span>{isLearning ? 'Synthesizing...' : 'Force AI to Learn from Chat'}</span>
           </button>
 
           <div>
@@ -701,7 +701,7 @@ export default function InspectorDrawer() {
                 selectedNode.connections.map((c, i) => (
                   <div key={i} style={{ background: 'var(--color-text-primary)', border: '1px solid var(--ambient-dominant)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.82rem', color: 'var(--ambient-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <b>🔗 {c.targetName}</b>
+                      <b>{c.targetName}</b>
                       <div style={{ fontSize: '0.72rem', color: 'var(--ambient-secondary)', marginTop: '2px' }}>{c.rel || c.relationship}</div>
                     </div>
                   </div>

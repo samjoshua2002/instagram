@@ -1162,7 +1162,7 @@ export default function RelationshipsPage() {
               {birthday ? (
                 <div className="person-card-title">
                   {birthday.days === 0
-                    ? `It's ${formData.name || selectedPerson.name}'s birthday today 🎉`
+                    ? `It's ${formData.name || selectedPerson.name}'s birthday today`
                     : `${birthday.days} day${birthday.days === 1 ? '' : 's'} to go`}
                 </div>
               ) : (
@@ -2567,8 +2567,8 @@ export default function RelationshipsPage() {
                       <span>{dobDisplay || 'Birthday not set'}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>💬 {chatsCount}</span>
-                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>🎬 {reelsCount}</span>
+                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{chatsCount} chats</span>
+                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{reelsCount} reels</span>
                     </div>
                   </div>
 
@@ -2689,7 +2689,7 @@ export default function RelationshipsPage() {
                       {relDisplay}
                     </span>
                     <span style={{ fontSize: '0.72rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: 'var(--color-text-secondary)' }}>
-                      💬 {chatsCount}
+                      {chatsCount} chats
                     </span>
                     <button
                       onClick={(e) => {

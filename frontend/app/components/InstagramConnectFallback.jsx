@@ -122,7 +122,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
           updateUserProfile(data);
         }
         if (data.igApprovalStatus === 'approved') {
-          showToast?.('🎉 Your Instagram automation has been approved by admin!', 'success');
+          showToast?.('Your Instagram automation has been approved by admin!', 'success');
         } else if (data.igApprovalStatus === 'pending') {
           showToast?.('Request is still pending Admin whitelist in Meta Roles.', 'info');
         }
@@ -442,7 +442,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   <Clock size={18} color="#fbbf24" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#fbbf24', marginBottom: '3px' }}>
-                      ⏳ Request Submitted — Waiting for Admin Whitelist
+                      Request Submitted — Waiting for Admin Whitelist
                     </div>
                     <div style={{ lineHeight: 1.5, color: '#fbbf24' }}>
                       Your handle <strong>@{user?.instagramUsername || handle}</strong> is awaiting addition into Meta App Roles by the Superadmin. Once added, you will receive an automated email with direct steps to accept the invite.
@@ -477,7 +477,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   <CheckCircle2 size={18} color="#4ade80" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#4ade80', marginBottom: '3px' }}>
-                      🎉 Whitelisted in Meta Roles! Complete Next 2 Steps:
+                      Whitelisted in Meta Roles! Complete Next 2 Steps:
                     </div>
                     <div style={{ lineHeight: 1.5, color: '#4ade80' }}>
                       <strong>Step 1:</strong> Accept the invite in Instagram: <em>Settings &rarr; Website Permissions (or Apps and Websites) &rarr; Tester Invites</em>.<br />
