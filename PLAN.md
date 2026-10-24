@@ -459,6 +459,9 @@ graph TD
 - **Phase 7 Settings:** standalone AI model page with provider test ping.
 - **Phase 8 Desktop:** Tauri 2 app with tray, native alerts and CI installers for macOS and Windows (macOS signing still needs an Apple certificate).
 - **§17.3 Command Center:** dashboard KPI cards show 14-day sparklines (`trends` in `GET /api/analytics/overview`), a live leads strip refreshes every 30s for business workspaces, and the Personal / Business / Hybrid mode switch sits in the dashboard header.
+- **Workspace summary bar:** the command center shows mode, features on, chat rule and waiting chats at a glance.
+- **§17.1 #4 Live checks:** `scripts/live_check.js` runs read-only checks against the live backend (sign-in, passkeys, webhook, search, reply delays, account isolation); 34/34 pass.
+- **§17.1 #3 Mobile check (2026-10-25):** at 375px and 430px, `/`, `/relationships`, `/settings`, `/storyboard` and `/documents` have no sideways scroll; the top header and bottom tabs stay fixed while scrolling; the feature sheet opens from the avatar and the More tab, locks the page behind it, closes on Escape and after a tile opens a page.
 
 ---
 
