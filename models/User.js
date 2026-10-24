@@ -91,6 +91,30 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Connected Instagram account; the token is stored only encrypted (cryptoService, AES-256-GCM)
+  instagram: {
+    connected: { type: Boolean, default: false },
+    accountId: { type: String, default: '', index: true },
+    pageId: { type: String, default: '' },
+    username: { type: String, default: '' },
+    accessTokenEncrypted: { type: String, default: '' },
+    iv: { type: String, default: '' },
+    authTag: { type: String, default: '' },
+    tokenExpiresAt: { type: Date, default: null },
+  },
+  // BYO-LLM / local Ollama / A2A MCP settings; the API key is stored only encrypted
+  aiProviderConfig: {
+    provider: {
+      type: String,
+      enum: ['azure', 'openai', 'anthropic', 'groq', 'openrouter', 'ollama', 'mcp'],
+      default: 'azure',
+    },
+    model: { type: String, default: '' },
+    endpoint: { type: String, default: '' },
+    apiKeyEncrypted: { type: String, default: '' },
+    iv: { type: String, default: '' },
+    authTag: { type: String, default: '' },
+  },
   businessProfile: {
     businessName: { type: String, default: '' },
     category: { type: String, default: '' },

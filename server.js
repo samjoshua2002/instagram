@@ -515,9 +515,11 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     // ignore
   }
   const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile);
+  if (ownerUser && !userMemory.ownerId) userMemory.ownerId = ownerUser._id;
 
   // 3. Save incoming user message in DB
   await Message.create({
+    ownerId: ownerUser?._id || null,
     senderId,
     recipientId,
     role: 'user',
@@ -895,6 +897,7 @@ async function dispatchDebouncedReply(queueEntry) {
 
       // Save outgoing message in DB
       await Message.create({
+        ownerId: ownerUser?._id || null,
         senderId: recipientId,
         recipientId: senderId,
         role: 'assistant',
@@ -1834,9 +1837,10 @@ app.post('/data-deletion', async (req, res) => {
     const accountIds = [metaUserId, creator?.instagramAccountId, creator?.instagramId].filter(Boolean);
 
     // Conversations to/from the account, plus the user's own contact data if they were a DM contact
+    const ownedBy = creator ? [{ ownerId: creator._id }] : [];
     const [messages, memories, nodes] = await Promise.all([
-      Message.deleteMany({ $or: [{ senderId: { $in: accountIds } }, { recipientId: { $in: accountIds } }] }),
-      UserMemory.deleteMany({ senderId: { $in: accountIds } }),
+      Message.deleteMany({ $or: [...ownedBy, { senderId: { $in: accountIds } }, { recipientId: { $in: accountIds } }] }),
+      UserMemory.deleteMany({ $or: [...ownedBy, { senderId: { $in: accountIds } }] }),
       SocialGraph.deleteMany(creator ? { $or: [{ ownerId: creator._id }, { senderId: { $in: accountIds } }] } : { senderId: { $in: accountIds } })
     ]);
     if (creator) {
