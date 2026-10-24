@@ -8,16 +8,16 @@
 
 ## Non-Negotiable Operating Rules for Claude
 Before checking off any task, you must observe these strict constraints:
-- [ ] **Rule 1:** Read [`PLAN.md`](file:///Users/samjoshua/Developer/instagram/instagram/PLAN.md) completely before modifying any file.
-- [ ] **Rule 2:** Execute strictly one phase at a time. Do not jump ahead until acceptance criteria pass.
-- [ ] **Rule 3:** **Never break the existing single-tenant Instagram bot.** Your account (`process.env.INSTAGRAM_ACCOUNT_ID`) must continue working without interruption.
-- [ ] **Rule 4:** **Never fall back to global admin tokens** if an external user's account fails resolution. Unresolved accounts must fail safely (HTTP 200 to Meta, 0 outgoing messages).
-- [ ] **Rule 5:** **Zero Plaintext Tokens:** All Meta access tokens and BYO-LLM API keys must be encrypted using AES-256-GCM via `cryptoService` before saving to MongoDB.
-- [ ] **Rule 6:** **Strict CEL Separation:** Personal slang/banter rules must never execute for business accounts; business compliance rules must never execute for personal accounts.
-- [ ] **Rule 7:** **No Stickers for Business:** Media Vault stickers, GIPHY GIFs, and meme drops are strictly disabled for business accounts.
-- [ ] **Rule 8:** **Human Mimicry for Personal:** Personal accounts must text like real humans (all lowercase, no stiff periods, natural abbreviations `rn`, `tbh`, `fr`, zero robotic phrases like "How can I help you today?").
-- [ ] **Rule 9:** Never log access tokens, auth tags, passwords, or customer phone/email data to console.
-- [ ] **Rule 10:** Test every phase using unit tests or scratch scripts before marking a phase complete.
+- [x] **Rule 1:** Read [`PLAN.md`](file:///Users/samjoshua/Developer/instagram/instagram/PLAN.md) completely before modifying any file.
+- [x] **Rule 2:** Execute strictly one phase at a time. Do not jump ahead until acceptance criteria pass.
+- [x] **Rule 3:** **Never break the existing single-tenant Instagram bot.** Your account (`process.env.INSTAGRAM_ACCOUNT_ID`) must continue working without interruption.
+- [x] **Rule 4:** **Never fall back to global admin tokens** if an external user's account fails resolution. Unresolved accounts must fail safely (HTTP 200 to Meta, 0 outgoing messages).
+- [x] **Rule 5:** **Zero Plaintext Tokens:** All Meta access tokens and BYO-LLM API keys must be encrypted using AES-256-GCM via `cryptoService` before saving to MongoDB.
+- [x] **Rule 6:** **Strict CEL Separation:** Personal slang/banter rules must never execute for business accounts; business compliance rules must never execute for personal accounts.
+- [x] **Rule 7:** **No Stickers for Business:** Media Vault stickers, GIPHY GIFs, and meme drops are strictly disabled for business accounts.
+- [x] **Rule 8:** **Human Mimicry for Personal:** Personal accounts must text like real humans (all lowercase, no stiff periods, natural abbreviations `rn`, `tbh`, `fr`, zero robotic phrases like "How can I help you today?").
+- [x] **Rule 9:** Never log access tokens, auth tags, passwords, or customer phone/email data to console.
+- [x] **Rule 10:** Test every phase using unit tests or scratch scripts before marking a phase complete.
 
 ---
 
