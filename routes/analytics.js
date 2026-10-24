@@ -8,6 +8,24 @@ const Booking = require('../models/Booking');
 // Mounted behind requireAuth; every query is scoped to the signed-in tenant
 const ownerOf = (req) => req.user._id;
 
+const TREND_DAYS = 14;
+
+// Daily counts for the last TREND_DAYS days (oldest first) for the dashboard sparklines
+async function dailyTrend(Model, match, distinctField) {
+  const since = new Date(Date.now() - (TREND_DAYS - 1) * 864e5);
+  since.setUTCHours(0, 0, 0, 0);
+  const day = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+  const pipeline = [{ $match: { ...match, createdAt: { $gte: since } } }];
+  if (distinctField) {
+    pipeline.push({ $group: { _id: { day, key: `$${distinctField}` } } }, { $group: { _id: '$_id.day', n: { $sum: 1 } } });
+  } else {
+    pipeline.push({ $group: { _id: day, n: { $sum: 1 } } });
+  }
+  const rows = await Model.aggregate(pipeline);
+  const byDay = Object.fromEntries(rows.map(r => [r._id, r.n]));
+  return Array.from({ length: TREND_DAYS }, (_, i) => byDay[new Date(since.getTime() + i * 864e5).toISOString().slice(0, 10)] || 0);
+}
+
 /**
  * GET /api/analytics/overview
  * Total conversations, active leads, confirmed bookings, resolution and automation rates
@@ -28,6 +46,13 @@ router.get('/overview', async (req, res) => {
       Message.countDocuments({ ownerId, role: 'assistant', sentByAI: { $ne: true } }),
     ]);
 
+    const [conversationTrend, leadTrend, bookingTrend, aiReplyTrend] = await Promise.all([
+      dailyTrend(Message, { ownerId, role: 'user' }, 'senderId'),
+      dailyTrend(Lead, { ownerId }),
+      dailyTrend(Booking, { ownerId, status: 'confirmed' }),
+      dailyTrend(Message, { ownerId, role: 'assistant', sentByAI: true }),
+    ]);
+
     const totalConversations = conversationIds.length;
     const totalReplies = aiReplies + humanReplies;
     res.json({
@@ -41,6 +66,8 @@ router.get('/overview', async (req, res) => {
       resolutionRate: totalConversations ? Math.round(((totalConversations - handoffsOpen) / totalConversations) * 100) : 0,
       // Share of outgoing replies sent by the AI
       automationRate: totalReplies ? Math.round((aiReplies / totalReplies) * 100) : 0,
+      // Daily counts, oldest first, for the dashboard sparklines
+      trends: { conversations: conversationTrend, leads: leadTrend, bookings: bookingTrend, aiReplies: aiReplyTrend },
     });
   } catch (err) {
     console.error('Analytics overview error:', err.message);
