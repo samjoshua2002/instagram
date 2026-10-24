@@ -1557,12 +1557,58 @@ app.get('/privacy', (req, res) => {
   `);
 });
 
-// User Data Deletion Callback for Meta
-app.all('/data-deletion', (req, res) => {
-  res.json({
-    url: 'https://page-pool-recorded-father.trycloudflare.com/privacy',
-    confirmation_code: 'chatter_deletion_success'
-  });
+// Decode and verify Meta's signed_request (base64url signature + payload, HMAC-SHA256 with the App Secret)
+function parseSignedRequest(signedRequest) {
+  if (!signedRequest || !INSTAGRAM_APP_SECRET) return null;
+  const [encodedSig, payload] = String(signedRequest).split('.', 2);
+  if (!encodedSig || !payload) return null;
+  const expected = crypto.createHmac('sha256', INSTAGRAM_APP_SECRET).update(payload).digest('base64url');
+  if (!safeEqual(encodedSig, expected)) return null;
+  try {
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// User Data Deletion Callback for Meta: deletes everything stored for the requesting user
+app.post('/data-deletion', async (req, res) => {
+  const data = parseSignedRequest(req.body.signed_request);
+  if (!data || !data.user_id) {
+    return res.status(400).json({ error: 'Invalid or missing signed_request' });
+  }
+
+  const userId = String(data.user_id);
+  try {
+    const [messages, memories, nodes] = await Promise.all([
+      Message.deleteMany({ $or: [{ senderId: userId }, { recipientId: userId }] }),
+      UserMemory.deleteMany({ senderId: userId }),
+      SocialGraph.deleteMany({ senderId: userId })
+    ]);
+    socialGraphService.clearCache();
+
+    const confirmationCode = crypto.randomBytes(8).toString('hex');
+    console.log(`🗑️ Data deletion for ${userId} (code ${confirmationCode}): ${messages.deletedCount} messages, ${memories.deletedCount} memories, ${nodes.deletedCount} graph nodes`);
+    res.json({
+      url: `https://${req.get('host')}/data-deletion/status?code=${confirmationCode}`,
+      confirmation_code: confirmationCode
+    });
+  } catch (err) {
+    console.error('Data deletion error:', err.message);
+    res.status(500).json({ error: 'Deletion failed, please retry' });
+  }
+});
+
+// Status page Meta links users to after a deletion request
+app.get('/data-deletion/status', (req, res) => {
+  const code = String(req.query.code || '').replace(/[^a-f0-9]/gi, '');
+  res.send(`
+    <html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 16px;">
+      <h1>Data Deletion Status</h1>
+      <p>Confirmation code: <strong>${code || 'unknown'}</strong></p>
+      <p>All messages, memories and profile data Chatter AI stored for your Instagram account have been permanently deleted.</p>
+    </body></html>
+  `);
 });
 
 
