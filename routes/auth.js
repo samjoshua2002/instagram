@@ -1124,6 +1124,7 @@ router.get('/instagram/callback', async (req, res) => {
     let instagramAccountId = '';
     let instagramUsername = '';
     let facebookPageId = '';
+    let needsProfessional = false;
     let lastExchangeError = '';
 
     // Step 1: Facebook Graph API token exchange (Primary for Facebook Login for Business)
@@ -1228,7 +1229,9 @@ router.get('/instagram/callback', async (req, res) => {
           access_token: longLivedToken
         }
       });
-      if (profileRes.data?.username) {
+      if (String(profileRes.data?.account_type || '').toUpperCase() === 'PERSONAL') {
+        needsProfessional = true;
+      } else if (profileRes.data?.username) {
         instagramUsername = profileRes.data.username;
         instagramAccountId = profileRes.data.id || instagramAccountId;
       }
@@ -1252,17 +1255,37 @@ router.get('/instagram/callback', async (req, res) => {
             break;
           }
         }
-        if (!instagramAccountId && pages.length > 0) {
-          const firstPage = pages[0];
-          longLivedToken = firstPage.access_token || longLivedToken;
-          facebookPageId = firstPage.id;
-          instagramAccountId = firstPage.id;
-          instagramUsername = firstPage.name;
-          console.log(`ℹ️ [Meta OAuth] Linked via Facebook Page: ${firstPage.name} (${firstPage.id})`);
-        }
+        // A Facebook Page without a linked Professional Instagram account cannot receive IG DMs
+        if (!instagramAccountId) needsProfessional = true;
       } catch (e) {
         console.warn('⚠️ [Meta OAuth] Pages lookup error:', e.message);
       }
+    }
+
+    // No Professional Instagram account linked: send the creator to the guided fix modal (§2.3)
+    if (needsProfessional || !instagramAccountId) {
+      console.log('ℹ️ [Meta OAuth] No Professional Instagram account linked; showing setup guide');
+      const setupError = 'No Instagram Professional account is linked to your Facebook Page yet.';
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Finish Instagram Setup</title></head>
+        <body style="font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa;">
+          <div style="background: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; padding: 36px 30px; max-width: 420px; text-align: center;">
+            <h2 style="margin: 0 0 8px 0; font-size: 18px;">One quick step left</h2>
+            <p style="color: #71717a; font-size: 14px; line-height: 1.5; margin: 0;">${setupError}<br/>Returning to Chatter OS with a 30-second fix...</p>
+          </div>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', code: 'no_instagram_linked', error: ${jsValue(setupError)} }, ${jsValue(origin)});
+              setTimeout(() => { window.close(); }, 1200);
+            } else {
+              setTimeout(() => { window.location.href = ${jsValue(`${origin.replace(/\/+$/, '')}/settings?error=no_instagram_linked`)}; }, 1500);
+            }
+          </script>
+        </body>
+        </html>
+      `);
     }
 
     if (!instagramUsername) {
