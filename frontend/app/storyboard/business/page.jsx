@@ -1,26 +1,32 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { MessageCircle, HelpCircle, Tag, CalendarCheck, UserCog, Trophy } from 'lucide-react';
+import { Zap, GitBranch, BookOpen, Tag, CalendarCheck, UserCog, Trophy, Lock } from 'lucide-react';
 import StoryboardCanvas from '../../components/StoryboardCanvas';
 import SandboxChat from '../../components/SandboxChat';
 import StoryboardHeader from '../StoryboardHeader';
 
+// Card types from PLAN.md §13; boards saved with the old entry/question/booking keys still show
 const NODE_TYPES = [
-  { key: 'entry', label: 'Entry', color: '#38bdf8', icon: MessageCircle, placeholder: 'Where customers come from: ad, story reply, comment' },
-  { key: 'question', label: 'Question', color: '#a78bfa', icon: HelpCircle, placeholder: 'What the bot asks or what customers often ask' },
+  { key: 'trigger', label: 'Trigger', color: '#38bdf8', icon: Zap, placeholder: 'Where customers come from: ad, story reply, comment, keyword' },
+  { key: 'condition', label: 'Condition', color: '#a78bfa', icon: GitBranch, placeholder: 'What the bot checks or asks before moving on (budget, size, date)' },
+  { key: 'knowledge', label: 'Knowledge', color: '#22d3ee', icon: BookOpen, placeholder: 'Facts the bot can use: hours, location, policies, FAQs' },
   { key: 'offer', label: 'Offer', color: '#f59e0b', icon: Tag, placeholder: 'Product, price or catalog link to share' },
-  { key: 'booking', label: 'Booking', color: '#34d399', icon: CalendarCheck, placeholder: 'How appointments are offered and confirmed' },
+  { key: 'action', label: 'Action', color: '#34d399', icon: CalendarCheck, placeholder: 'What the bot does: book a slot, take an order, send a link' },
   { key: 'handoff', label: 'Handoff', color: '#f87171', icon: UserCog, placeholder: 'When a person on your team takes over' },
-  { key: 'won', label: 'Won', color: '#facc15', icon: Trophy, placeholder: 'What counts as a sale or booked customer' },
+  { key: 'won', label: 'Goal', color: '#facc15', icon: Trophy, placeholder: 'What counts as a sale or booked customer' },
+  { key: 'secret', label: 'Off-limits', color: '#94a3b8', icon: Lock, placeholder: 'Topics the bot must never discuss (margins, suppliers, internal plans)' },
+  { key: 'entry', label: 'Trigger', color: '#38bdf8', icon: Zap, hideAdd: true },
+  { key: 'question', label: 'Condition', color: '#a78bfa', icon: GitBranch, hideAdd: true },
+  { key: 'booking', label: 'Action', color: '#34d399', icon: CalendarCheck, hideAdd: true },
 ];
 
 // Starter customer journey, left to right
 const STEPS = [
-  ['entry', 'New DM', 'Someone messages from an ad, story or post.'],
-  ['question', 'Understand the need', 'Ask what they are looking for and their budget.'],
+  ['trigger', 'New DM', 'Someone messages from an ad, story or post.'],
+  ['condition', 'Understand the need', 'Ask what they are looking for and their budget.'],
   ['offer', 'Share the offer', 'Send the matching product or service with price.'],
-  ['booking', 'Book a slot', 'Offer open times and confirm the booking.'],
+  ['action', 'Book a slot', 'Offer open times and confirm the booking.'],
   ['won', 'Customer won', 'Booking confirmed or order placed.'],
 ];
 

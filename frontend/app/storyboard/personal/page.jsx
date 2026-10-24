@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { User, Heart, BookOpen, MapPin, CalendarDays } from 'lucide-react';
+import { User, Heart, BookOpen, MapPin, CalendarDays, Lock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import StoryboardCanvas from '../../components/StoryboardCanvas';
 import SandboxChat from '../../components/SandboxChat';
@@ -9,10 +9,11 @@ import StoryboardHeader from '../StoryboardHeader';
 
 const NODE_TYPES = [
   { key: 'you', label: 'You', color: '#a78bfa', icon: User, hideAdd: true, placeholder: 'How you talk, what you are into' },
-  { key: 'person', label: 'Person', color: '#38bdf8', icon: Heart, placeholder: 'Inside jokes, how you know them, how you talk to them' },
+  { key: 'person', label: 'Person', color: '#38bdf8', icon: Heart, circles: true, placeholder: 'Inside jokes, how you know them, how you talk to them' },
   { key: 'lore', label: 'Lore', color: '#f59e0b', icon: BookOpen, placeholder: 'A fact or story about you the AI can bring up' },
   { key: 'place', label: 'Place', color: '#34d399', icon: MapPin, placeholder: 'Where it is and why it matters' },
   { key: 'event', label: 'Event', color: '#f472b6', icon: CalendarDays, placeholder: 'What happened and when' },
+  { key: 'secret', label: 'Secret', color: '#94a3b8', icon: Lock, placeholder: 'Something the bot must never share; it will dodge the topic naturally' },
 ];
 
 /** Personal Storyboard: relationship map + character lore (PLAN.md §13 Phase 4). */
@@ -28,7 +29,7 @@ export default function PersonalStoryboardPage() {
     const you = { id: 'you', type: 'you', label: user?.firstName || 'You', notes: '', contactId: '', x: cx, y: cy };
     const ring = picked.map((p, i) => {
       const a = (i / Math.max(picked.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      return { id: `c-${p.id}`, type: 'person', label: p.name, notes: p.relationship || '', contactId: String(p.id), x: Math.round(cx + r * Math.cos(a)), y: Math.round(cy + r * 0.75 * Math.sin(a)) };
+      return { id: `c-${p.id}`, type: 'person', label: p.name, notes: p.relationship || '', contactId: String(p.id), senderId: p.senderId || '', circle: '', x: Math.round(cx + r * Math.cos(a)), y: Math.round(cy + r * 0.75 * Math.sin(a)) };
     });
     const byName = Object.fromEntries(picked.map(p => [(p.name || '').toLowerCase(), `c-${p.id}`]));
     const edges = ring.map(n => ({ id: `e-you-${n.id}`, from: 'you', to: n.id, label: picked.find(p => `c-${p.id}` === n.id)?.relationship || '' }));
@@ -54,7 +55,7 @@ export default function PersonalStoryboardPage() {
         aria-label="Add a contact"
         onChange={e => {
           const p = free.find(x => String(x.id) === e.target.value);
-          if (p) addNode('person', { label: p.name, notes: p.relationship || '', contactId: String(p.id) });
+          if (p) addNode('person', { label: p.name, notes: p.relationship || '', contactId: String(p.id), senderId: p.senderId || '' });
         }}
       >
         <option value="">+ From contacts…</option>
@@ -71,7 +72,7 @@ export default function PersonalStoryboardPage() {
         active="personal"
         code="// PERSONAL STORYBOARD"
         title="Your world, mapped"
-        description="Drag people, lore, places and events around, link them, and add notes. Click a person to test how the bot talks to them."
+        description="Drag people, lore, places, events and secrets around, link them, and add notes. Put people in circles and click one to test how the bot talks to them."
       />
       <div className="story-layout">
         <StoryboardCanvas kind="personal" nodeTypes={NODE_TYPES} seed={seed} onSelect={setChatWith} extraAdd={addContact} />
