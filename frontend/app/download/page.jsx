@@ -91,7 +91,13 @@ export default function DownloadPage() {
 
       {!loadError && !release && <div className="skeleton" style={{ height: '180px', borderRadius: '16px' }} />}
 
-      {release && (
+      {release && builds.length === 0 && (
+        <div className="download-card" style={{ color: 'var(--text-muted)' }}>
+          No desktop builds are published yet. Check back soon.
+        </div>
+      )}
+
+      {release && builds.length > 0 && (
         <>
           {/* Recommended build */}
           <div className="download-card download-hero">
