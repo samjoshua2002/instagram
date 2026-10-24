@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
@@ -26,9 +26,14 @@ import {
   Activity,
   Download,
   FileText,
-  Inbox
+  Inbox,
+  Sun,
+  Moon,
+  LayoutGrid
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import MobileFeatureSheet from './MobileFeatureSheet';
+import { useTheme } from '../lib/theme';
 
 // Framer Motion Variants for Staggered Fade-in Animation
 const navContainerVariants = {
@@ -167,10 +172,38 @@ export default function Sidebar() {
     ? (user?.email || 'admin@platform')
     : (user?.instagramUsername || user?.username || 'user');
 
+  // Mobile: bottom tabs cover the top routes; the sheet exposes every route
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  const { theme, toggleTheme } = useTheme();
+
+  const mobileTabs = isPureSuperadmin
+    ? [
+      { href: '/', label: 'Platform', icon: LayoutDashboard },
+      { href: '/admin', label: 'Workspaces', icon: Users },
+      { href: '/admin/tokens', label: 'Tokens', icon: Activity },
+      { label: 'More', icon: LayoutGrid },
+    ]
+    : [
+      { href: '/', label: 'Home', icon: LayoutDashboard },
+      { href: '/relationships', label: isBusiness ? 'Inbox' : 'People', icon: isBusiness ? Inbox : Users },
+      { action: 'add' },
+      { href: '/controls', label: isBusiness ? 'Policy' : 'Rules', icon: Sliders },
+      { label: 'More', icon: LayoutGrid },
+    ];
+
+  const sheetItems = [
+    ...navItems,
+    { href: '/profile', label: 'Profile & Passkeys', icon: Fingerprint },
+    ...(isSuperadmin && !navItems.some(i => i.href === '/admin/tokens')
+      ? [{ href: '/admin/tokens', label: 'Token Health Radar', icon: Activity }]
+      : []),
+  ];
+
   return (
     <>
       {/* ═══════════════════════════════════════════════════════════
-          MOBILE TOP HEADER (screens <= 768px)
+          MOBILE STICKY TOP HEADER (screens <= 768px, PLAN.md §15.5.2)
           ═══════════════════════════════════════════════════════════ */}
       <motion.header
         initial={{ opacity: 0, y: -10 }}
@@ -178,104 +211,45 @@ export default function Sidebar() {
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="mobile-header"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '30px',
-            height: '30px',
-            borderRadius: '8px',
-            background: 'var(--color-text-primary)',
-            color: 'var(--color-surface)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: '800',
-            fontSize: '0.85rem'
-          }}>
-            C
-          </div>
-          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--color-text-primary)', letterSpacing: '-0.3px' }}>
-            CHATTER OS
-          </span>
-        </div>
+        <Link href="/" className="mobile-brand" aria-label="Dashboard">
+          <span className="mobile-brand-mark">C</span>
+          <span className="mobile-brand-text">CHATTER OS</span>
+        </Link>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Bot status chip */}
-          {!isPureSuperadmin ? (
+        <div className="mobile-header-actions">
+          {isPureSuperadmin ? (
+            <span className="mobile-workspace-chip">
+              <span className="sheet-dot on" />
+              ADMIN
+            </span>
+          ) : (
             <button
               type="button"
               onClick={toggleGlobalBot}
-              style={{
-                background: 'var(--color-surface-hover)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '999px',
-                padding: '4px 10px',
-                fontSize: '0.7rem',
-                fontWeight: '700',
-                fontFamily: "'JetBrains Mono', monospace",
-                color: routingConfig.globalBotActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                cursor: 'pointer'
-              }}
+              className="mobile-workspace-chip"
+              aria-label={routingConfig.globalBotActive ? 'Pause automation' : 'Resume automation'}
             >
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: routingConfig.globalBotActive ? '#16a34a' : 'var(--color-text-muted)'
-              }} />
-              <span>{routingConfig.globalBotActive ? 'BOT ACTIVE' : 'PAUSED'}</span>
+              <span className={`sheet-dot${routingConfig.globalBotActive ? ' on' : ''}`} />
+              {isBusiness ? 'BUSINESS' : 'PERSONAL'}
             </button>
-          ) : (
-            <div
-              style={{
-                background: 'var(--color-surface-hover)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '999px',
-                padding: '4px 10px',
-                fontSize: '0.7rem',
-                fontWeight: '700',
-                fontFamily: "'JetBrains Mono', monospace",
-                color: 'var(--color-text-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: '#16a34a'
-              }} />
-              <span>SUPERADMIN LIVE</span>
-            </div>
           )}
 
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={logout}
-            title="Sign out"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-text-secondary)',
-              padding: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <LogOut size={16} />
+          <button type="button" onClick={toggleTheme} className="mobile-icon-btn" aria-label="Toggle light or dark theme">
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+
+          <button type="button" onClick={() => setSheetOpen(true)} className="mobile-icon-btn" aria-label="Open all features">
+            <span className="mobile-avatar">
+              {user?.profilePicUrl
+                ? <img src={user.profilePicUrl} alt="" />
+                : displayName.charAt(0).toUpperCase()}
+            </span>
           </button>
         </div>
       </motion.header>
 
       {/* ═══════════════════════════════════════════════════════════
-          MOBILE BOTTOM NAVIGATION TABS (screens <= 768px)
+          MOBILE STICKY BOTTOM TAB BAR (screens <= 768px)
           ═══════════════════════════════════════════════════════════ */}
       <motion.nav
         variants={mobileTabsContainer}
@@ -283,233 +257,37 @@ export default function Sidebar() {
         animate="visible"
         className="mobile-bottom-tabs"
       >
-        {isPureSuperadmin ? (
-          <>
-            {/* Tab 1: Platform Console */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  transition: 'all 0.15s ease',
-                  padding: '6px 0'
-                }}
-              >
-                <LayoutDashboard size={19} strokeWidth={pathname === '/' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/' ? '700' : '500' }}>Platform</span>
-              </Link>
+        {mobileTabs.map(tab => {
+          if (tab.action === 'add') {
+            return (
+              <motion.div key="add" variants={mobileTabVariant} className="mobile-tab-slot">
+                <button type="button" onClick={() => startAiInterview(null)} className="mobile-add-btn" aria-label="Add Person">
+                  <Plus size={22} strokeWidth={2.5} />
+                </button>
+              </motion.div>
+            );
+          }
+          const Icon = tab.icon;
+          const isActive = tab.href ? pathname === tab.href : sheetOpen;
+          const content = (
+            <>
+              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+              <span>{tab.label}</span>
+            </>
+          );
+          return (
+            <motion.div key={tab.label} variants={mobileTabVariant} className="mobile-tab-slot">
+              {tab.href ? (
+                <Link href={tab.href} className={`mobile-tab${isActive ? ' active' : ''}`}>{content}</Link>
+              ) : (
+                <button type="button" onClick={() => setSheetOpen(true)} className={`mobile-tab${isActive ? ' active' : ''}`}>{content}</button>
+              )}
             </motion.div>
-
-            {/* Tab 2: Workspaces Directory */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/admin"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/admin' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  transition: 'all 0.15s ease',
-                  padding: '6px 0'
-                }}
-              >
-                <Users size={19} strokeWidth={pathname === '/admin' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/admin' ? '700' : '500' }}>Workspaces</span>
-              </Link>
-            </motion.div>
-
-            {/* Tab 3: Token Health Radar */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/admin/tokens"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/admin/tokens' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  transition: 'all 0.15s ease',
-                  padding: '6px 0'
-                }}
-              >
-                <Activity size={19} strokeWidth={pathname === '/admin/tokens' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/admin/tokens' ? '700' : '500' }}>Tokens</span>
-              </Link>
-            </motion.div>
-
-            {/* Tab 4: Security & Passkeys */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <button
-                type="button"
-                onClick={() => setIsPasskeyModalOpen(true)}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--color-text-primary)',
-                  padding: '6px 0'
-                }}
-              >
-                <Shield size={19} strokeWidth={2.2} color="#22c55e" />
-                <span style={{ fontSize: '0.66rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>Security</span>
-              </button>
-            </motion.div>
-          </>
-        ) : (
-          <>
-            {/* Tab 1: Dashboard (Default view) */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  transition: 'all 0.15s ease',
-                  padding: '6px 0'
-                }}
-              >
-                <LayoutDashboard size={19} strokeWidth={pathname === '/' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/' ? '700' : '500' }}>Dashboard</span>
-              </Link>
-            </motion.div>
-
-            {/* Tab 2: People Directory */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/relationships"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/relationships' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  transition: 'all 0.15s ease',
-                  padding: '6px 0'
-                }}
-              >
-                {isBusiness
-                  ? <Inbox size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />
-                  : <Users size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />}
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/relationships' ? '700' : '500' }}>{isBusiness ? 'Inbox' : 'People'}</span>
-              </Link>
-            </motion.div>
-
-            {/* Center Quick Action (+ Add Person) */}
-            <motion.div variants={mobileTabVariant} style={{ display: 'flex', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => startAiInterview(null)}
-                title="Add Person"
-                style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '50%',
-                  background: 'var(--color-text-primary)',
-                  color: 'var(--color-surface)',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 14px rgba(9, 9, 11, 0.25)',
-                  cursor: 'pointer',
-                  margin: '0 4px',
-                  flexShrink: 0,
-                  transform: 'translateY(-4px)',
-                  transition: 'transform 0.15s ease'
-                }}
-              >
-                <Plus size={22} strokeWidth={2.5} />
-              </button>
-            </motion.div>
-
-            {/* Tab 4: Rules */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/controls"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/controls' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  transition: 'all 0.15s ease',
-                  padding: '6px 0'
-                }}
-              >
-                <Sliders size={19} strokeWidth={pathname === '/controls' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/controls' ? '700' : '500' }}>{isBusiness ? 'Policy' : 'Rules'}</span>
-              </Link>
-            </motion.div>
-
-            {/* Tab 5: Profile & Security */}
-            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
-              <Link
-                href="/profile"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  textDecoration: 'none',
-                  color: pathname === '/profile' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  padding: '6px 0'
-                }}
-              >
-                {user?.profilePicUrl ? (
-                  <img
-                    src={user.profilePicUrl}
-                    alt=""
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '1.5px solid var(--color-text-primary)'
-                    }}
-                  />
-                ) : (
-                  <UserCheck size={19} strokeWidth={pathname === '/profile' ? 2.5 : 1.8} color={pathname === '/profile' ? 'var(--color-text-primary)' : 'var(--color-text-muted)'} />
-                )}
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/profile' ? '700' : '600', color: pathname === '/profile' ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>Profile</span>
-              </Link>
-            </motion.div>
-          </>
-        )}
+          );
+        })}
       </motion.nav>
+
+      <MobileFeatureSheet open={sheetOpen} onClose={closeSheet} items={sheetItems} />
 
       {/* ═══════════════════════════════════════════════════════════
           DESKTOP FLOATING SIDEBAR (screens > 768px)
