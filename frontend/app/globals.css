@@ -670,3 +670,129 @@ input:focus, textarea:focus, select:focus {
 
 
 
+
+/* ── 375px phones: /controls and /settings cards ── */
+@media (max-width: 400px) {
+  .settings-fullwidth,
+  .page-container {
+    padding: 12px 12px 84px 12px !important;
+    overflow-x: hidden;
+  }
+
+  .controls-card-container,
+  .control-contact-card {
+    border-radius: 10px !important;
+    overflow-wrap: anywhere;
+  }
+
+  .controls-card-container *,
+  .settings-fullwidth * {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* 16px stops iOS Safari from zooming into focused fields */
+  .settings-fullwidth input,
+  .settings-fullwidth select,
+  .settings-fullwidth textarea,
+  .controls-card-container input,
+  .controls-card-container select,
+  .controls-card-container textarea {
+    font-size: 16px !important;
+  }
+
+  .settings-fullwidth .btn,
+  .controls-card-container .btn {
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .responsive-contacts-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* ── Desktop download portal ── */
+.download-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.download-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.download-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.download-select {
+  width: 100%;
+  appearance: none;
+  padding: 11px 36px 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.download-build-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.download-checksum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  font-size: 0.72rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  word-break: break-all;
+}
+
+@media (max-width: 640px) {
+  .download-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .download-build-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
