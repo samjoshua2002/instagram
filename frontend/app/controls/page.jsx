@@ -673,7 +673,7 @@ export default function ControlsPage() {
       {['business', 'agency'].includes(user?.accountType) && <BusinessPolicyCard />}
 
       {/* 3 Main Mode Selector Cards */}
-      <div className="responsive-grid-3" style={{ marginBottom: '24px' }}>
+      <div className="responsive-grid-3" role="radiogroup" aria-label="AI reply mode" style={{ marginBottom: '24px' }}>
         {[
           {
             id: 'everyone',
@@ -698,24 +698,19 @@ export default function ControlsPage() {
           return (
             <div
               key={mode.id}
+              role="radio"
+              aria-checked={isSelected}
+              tabIndex={0}
+              className={`mode-card${isSelected ? ' is-selected' : ''}`}
               onClick={() => {
                 const updated = { ...(currentConfigRef.current || routingConfig), chatMode: mode.id };
                 queueSave(updated);
               }}
-              style={{
-                background: isSelected ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                color: isSelected ? 'var(--color-surface)' : 'var(--color-text-primary)',
-                border: '1px solid',
-                borderColor: isSelected ? 'var(--color-text-primary)' : 'var(--color-border)',
-                borderRadius: '12px',
-                padding: '20px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                transition: 'all 0.15s ease',
-                boxShadow: isSelected ? '0 4px 14px rgba(0, 0, 0, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
-                touchAction: 'manipulation'
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  queueSave({ ...(currentConfigRef.current || routingConfig), chatMode: mode.id });
+                }
               }}
             >
               <div>
@@ -723,8 +718,8 @@ export default function ControlsPage() {
                   <span
                     style={{
                       fontSize: '0.66rem',
-                      background: isSelected ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)',
-                      color: isSelected ? 'var(--color-surface)' : 'var(--color-text-secondary)',
+                      background: isSelected ? 'color-mix(in srgb, var(--ambient-dominant) 25%, transparent)' : 'var(--color-surface-hover)',
+                      color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                       padding: '2px 7px',
                       borderRadius: '4px',
                       fontFamily: "'JetBrains Mono', monospace",
@@ -738,14 +733,14 @@ export default function ControlsPage() {
                       width: '16px',
                       height: '16px',
                       borderRadius: '50%',
-                      border: isSelected ? '5px solid var(--color-surface)' : '1.5px solid var(--color-text-muted)'
+                      border: isSelected ? '5px solid var(--ambient-dominant)' : '1.5px solid var(--color-text-muted)'
                     }}
                   />
                 </div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: 0 }}>
                   {mode.title}
                 </h3>
-                <p style={{ fontSize: '0.8rem', opacity: isSelected ? 0.8 : 0.6, marginTop: '6px', lineHeight: '1.4' }}>
+                <p style={{ fontSize: '0.8rem', opacity: isSelected ? 0.85 : 0.6, marginTop: '6px', lineHeight: '1.4' }}>
                   {mode.desc}
                 </p>
               </div>

@@ -655,26 +655,26 @@ To guarantee personal AI responses are completely indistinguishable from real hu
 - [x] Ensure `frontend/app/layout.jsx` mounts `<AmbientBackground />` behind the application content.
 
 ### Phase B: Site-Wide UI & Route Verification Checklist
-- [ ] **`/` (Dashboard / Overview):**
+- [x] **`/` (Dashboard / Overview):**
   - Verify KPI metrics cards render as translucent glass surfaces with smooth counter animations.
   - Verify `BusinessConversionPanel.jsx` displays leads and bookings with responsive column stacking on mobile.
-- [ ] **`/relationships` (People Directory & Inner Profile):**
+- [x] **`/relationships` (People Directory & Inner Profile):**
   - Verify Directory Table / Cards toggle between dense, list, and grid layouts.
   - Redesign the Inner Person Profile view into the true Spotify artist/album layout: oversized avatar with dynamic ambient glow halo, background theme dynamically adapting to the person's photo, and frosted glass cards.
-- [ ] **`/controls` (Chat Rules & Business Policy):**
+- [x] **`/controls` (Chat Rules & Business Policy):**
   - Verify mode selection cards (Everyone, Everyone Except, Only Selected) feature reactive glowing borders and clear touch selectors.
   - Verify `BusinessPolicyCard.jsx` allows toggling working hours and days with touch-friendly pills.
-- [ ] **`/settings` (Persona & AI Studio):**
+- [x] **`/settings` (Persona & AI Studio):**
   - Verify segmented pill tabs scroll horizontally without breaking on mobile.
   - Verify `AiProviderCard.jsx` displays status badges, latency indicators, and test ping buttons.
-- [ ] **`/documents` (RAG Knowledge Vault):**
+- [x] **`/documents` (RAG Knowledge Vault):**
   - Verify file upload dropzone, link submitter, and text paste tabs render with dark glass styling.
   - Test indexing preview chips and delete actions.
-- [ ] **`/profile` (User Profile & Security):**
+- [x] **`/profile` (User Profile & Security):**
   - Verify full-width responsive 2-column layout collapses cleanly on mobile.
   - Verify avatar hover / mobile long-press allows uploading new photos.
   - Verify 1-click Workspace Switcher toggles between Personal Creator and Business & Brand.
-- [ ] **`/download` (Desktop Releases):**
+- [x] **`/download` (Desktop Releases):**
   - Verify OS auto-detection card and manual installer links render with dark glass styling.
 - [x] **Mobile Experience & Bottom Drawer:**
   - Verify viewport <= 768px displays the 54px sticky top header and 64px bottom tabs.
