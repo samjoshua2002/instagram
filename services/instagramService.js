@@ -33,13 +33,22 @@ async function withRetry(fn, maxRetries = 2, label = 'API call') {
   throw lastErr;
 }
 
+/**
+ * The legacy admin bot's persona (ownerId null). Tenant personas are never used here,
+ * so the admin fallback can't pick up another tenant's token or account.
+ */
+function findAdminConfig() {
+  return PersonaConfig.findOne({ ownerId: null });
+}
+
 class InstagramService {
   /**
-   * Retrieves the current Page Access Token either from DB or .env
+   * Admin fallback token (admin persona, then .env). Used only when a caller passes no customToken;
+   * tenant callers must always pass their own token.
    */
   async getAccessToken() {
     try {
-      const config = await PersonaConfig.findOne();
+      const config = await findAdminConfig();
       if (config && config.instagramPageAccessToken && config.instagramPageAccessToken.trim() !== '') {
         return config.instagramPageAccessToken.trim();
       }
@@ -54,7 +63,7 @@ class InstagramService {
    */
   async getAccountId() {
     try {
-      const config = await PersonaConfig.findOne();
+      const config = await findAdminConfig();
       if (config && config.instagramAccountId && config.instagramAccountId.trim() !== '') {
         return config.instagramAccountId.trim();
       }
@@ -76,7 +85,7 @@ class InstagramService {
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
     const requestBody = {
@@ -135,7 +144,7 @@ class InstagramService {
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
     const requestBody = {
@@ -192,7 +201,7 @@ class InstagramService {
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
     try {
@@ -223,7 +232,7 @@ class InstagramService {
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
     try {

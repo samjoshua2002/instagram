@@ -27,7 +27,7 @@ const socialGraphService = require('./services/socialGraphService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
 const cryptoService = require('./services/cryptoService');
-const { getUserInstagramToken, setUserInstagram } = require('./services/instagramTokenService');
+const { getUserInstagramToken, getOwnerSendToken, setUserInstagram } = require('./services/instagramTokenService');
 const { router: authRouter, requireAuth } = require('./routes/auth');
 const authService = require('./services/authService');
 
@@ -1112,8 +1112,13 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
 
-    // Send via Instagram
-    const sendResult = await instagramService.sendTextMessage(senderId, text);
+    // Send with the contact owner's token; only legacy admin contacts use the admin token
+    const memory = await UserMemory.findOne({ senderId });
+    const ownerToken = await getOwnerSendToken(memory && memory.ownerId);
+    if (ownerToken === '') {
+      return res.status(409).json({ error: 'Instagram is not connected for this account.' });
+    }
+    const sendResult = await instagramService.sendTextMessage(senderId, text, ownerToken);
 
     // Save in DB
     const newMsg = await Message.create({

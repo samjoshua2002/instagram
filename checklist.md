@@ -38,32 +38,32 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 1: Multi-Tenant Data Models & AES-256-GCM Encryption
-- [ ] **1.1 Encryption Service:**
-  - [ ] Create `services/cryptoService.js`.
-  - [ ] Implement `encrypt(text)` returning `{ encryptedData, iv, authTag }` using AES-256-GCM and `ENCRYPTION_KEY`.
-  - [ ] Implement `decrypt({ encryptedData, iv, authTag })` returning decrypted string.
-  - [ ] Write unit test in scratch script to verify encryption/decryption roundtrip.
-- [ ] **1.2 User Model Updates (`models/User.js`):**
-  - [ ] Add `accountType: { type: String, enum: ['personal', 'business'], default: 'personal' }`.
-  - [ ] Add structured `instagram` object:
-    - [ ] `connected: Boolean`
-    - [ ] `accountId: String` (indexed)
-    - [ ] `pageId: String`
-    - [ ] `username: String`
-    - [ ] `accessTokenEncrypted: String`
-    - [ ] `iv: String`
-    - [ ] `authTag: String`
-    - [ ] `tokenExpiresAt: Date`
-  - [ ] Add `aiProviderConfig` subdocument for BYO-LLM / Local Ollama / MCP settings.
-- [ ] **1.3 Scoped Models & Indexing:**
-  - [ ] Update `models/PersonaConfig.js`: add `userId` (required, unique index) and `accountType`.
-  - [ ] Update `models/UserMemory.js`: add `ownerId: { type: ObjectId, ref: 'User', required: true, index: true }`.
-  - [ ] Add compound index `{ ownerId: 1, senderId: 1 }` (unique: true) in `models/UserMemory.js`.
-  - [ ] Update `models/Message.js`: add `ownerId: { type: ObjectId, ref: 'User', required: true, index: true }`.
-  - [ ] Create `models/KnowledgeDoc.js`: fields `ownerId`, `title`, `category`, `textContent`, `fileUrl`, `keywords`.
-  - [ ] Create `models/Lead.js`: fields `ownerId`, `senderId`, `handle`, `phone`, `email`, `intentSummary`, `capturedAt`.
-  - [ ] Create `models/Booking.js`: fields `ownerId`, `senderId`, `handle`, `serviceName`, `bookingTime`, `status`.
-  - [ ] Create `models/DesktopDevice.js`: fields `userId`, `platform`, `deviceName`, `pushToken`, `lastActiveAt`.
+- [x] **1.1 Encryption Service:**
+  - [x] Create `services/cryptoService.js`.
+  - [x] Implement `encrypt(text)` returning `{ encryptedData, iv, authTag }` using AES-256-GCM and `ENCRYPTION_KEY`.
+  - [x] Implement `decrypt({ encryptedData, iv, authTag })` returning decrypted string.
+  - [x] Write unit test in scratch script to verify encryption/decryption roundtrip.
+- [x] **1.2 User Model Updates (`models/User.js`):**
+  - [x] Add `accountType: { type: String, enum: ['personal', 'business'], default: 'personal' }`.
+  - [x] Add structured `instagram` object:
+    - [x] `connected: Boolean`
+    - [x] `accountId: String` (indexed)
+    - [x] `pageId: String`
+    - [x] `username: String`
+    - [x] `accessTokenEncrypted: String`
+    - [x] `iv: String`
+    - [x] `authTag: String`
+    - [x] `tokenExpiresAt: Date`
+  - [x] Add `aiProviderConfig` subdocument for BYO-LLM / Local Ollama / MCP settings.
+- [x] **1.3 Scoped Models & Indexing:**
+  - [x] Update `models/PersonaConfig.js`: add `userId` (required, unique index) and `accountType`. _(built as `ownerId`; null for the legacy admin persona so Rule 3 holds)_
+  - [x] Update `models/UserMemory.js`: add `ownerId: { type: ObjectId, ref: 'User', required: true, index: true }`. _(nullable for legacy admin records)_
+  - [x] Add compound index `{ ownerId: 1, senderId: 1 }` (unique: true) in `models/UserMemory.js`.
+  - [x] Update `models/Message.js`: add `ownerId: { type: ObjectId, ref: 'User', required: true, index: true }`. _(nullable for legacy admin records)_
+  - [x] Create `models/KnowledgeDoc.js`: fields `ownerId`, `title`, `category`, `textContent`, `fileUrl`, `keywords`.
+  - [x] Create `models/Lead.js`: fields `ownerId`, `senderId`, `handle`, `phone`, `email`, `intentSummary`, `capturedAt`.
+  - [x] Create `models/Booking.js`: fields `ownerId`, `senderId`, `handle`, `serviceName`, `bookingTime`, `status`.
+  - [x] Create `models/DesktopDevice.js`: fields `userId`, `platform`, `deviceName`, `pushToken`, `lastActiveAt`.
 - [ ] **Phase 1 Sign-Off:** Verify MongoDB schemas compile and indexes build cleanly without errors.
 
 ---
@@ -94,33 +94,33 @@ Before checking off any task, you must observe these strict constraints:
   - [x] Update `sendSenderAction(recipientId, action, customToken)`.
   - [x] Update `sendMessageReaction(recipientId, messageId, emoji, customToken)`.
   - [x] Update `getUserProfile(senderId, customToken)`.
-  - [ ] Ensure all functions fall back to `process.env.INSTAGRAM_PAGE_ACCESS_TOKEN` only if `customToken` is null AND account matches admin ID.
+  - [x] Ensure all functions fall back to `process.env.INSTAGRAM_PAGE_ACCESS_TOKEN` only if `customToken` is null AND account matches admin ID.
 - [ ] **Phase 2 Sign-Off:** Test OAuth connection with test account; verify encrypted credentials persist in MongoDB.
 
 ---
 
 ## Phase 3: Webhook HMAC Validation & Dynamic Tenant Dispatch
-- [ ] **3.1 HMAC-SHA256 Signature Middleware (`server.js`):**
-  - [ ] Capture raw request buffer on `POST /webhook` via `express.json({ verify: (req, res, buf) => { req.rawBody = buf; } })`.
-  - [ ] Calculate expected signature using `crypto.createHmac('sha256', process.env.META_APP_SECRET).update(req.rawBody).digest('hex')`.
-  - [ ] Validate against `req.headers['x-hub-signature-256']` using `crypto.timingSafeEqual()`.
-  - [ ] Reject forged payloads with HTTP 401 Unauthorized.
-- [ ] **3.2 Dynamic Tenant Dispatcher (`server.js`):**
-  - [ ] Parse `recipientId` from `event.recipient.id` (or `entry[0].id`).
-  - [ ] Query database: `const tenant = await User.findOne({ "instagram.accountId": recipientId });`.
-  - [ ] **Legacy Admin Fallback Check:**
-    - [ ] If `tenant` is null AND `recipientId === process.env.INSTAGRAM_ACCOUNT_ID`:
-      - [ ] Load admin configuration and process message using legacy credentials.
-  - [ ] **Safe Drop Check:**
-    - [ ] If `tenant` is null AND `recipientId !== process.env.INSTAGRAM_ACCOUNT_ID`:
-      - [ ] Log warning: `Unrecognized recipient account ${recipientId}. Dropping event safely.`
-      - [ ] Exit execution. **Do NOT reply using admin token.**
-  - [ ] Decrypt tenant access token: `const token = cryptoService.decrypt(tenant.instagram);`.
-  - [ ] Load tenant-scoped data:
-    - [ ] `PersonaConfig.findOne({ userId: tenant._id })`
-    - [ ] `UserMemory.find({ ownerId: tenant._id, senderId })`
-    - [ ] `SocialGraph.findOne({ ownerId: tenant._id })`
-  - [ ] Pass tenant's decrypted token and scoped context to `azureOpenAI.generateReply()` and `instagramService.sendTextMessage()`.
+- [x] **3.1 HMAC-SHA256 Signature Middleware (`server.js`):**
+  - [x] Capture raw request buffer on `POST /webhook` via `express.json({ verify: (req, res, buf) => { req.rawBody = buf; } })`.
+  - [x] Calculate expected signature using `crypto.createHmac('sha256', process.env.META_APP_SECRET).update(req.rawBody).digest('hex')`.
+  - [x] Validate against `req.headers['x-hub-signature-256']` using `crypto.timingSafeEqual()`.
+  - [x] Reject forged payloads with HTTP 401 Unauthorized.
+- [x] **3.2 Dynamic Tenant Dispatcher (`server.js`):**
+  - [x] Parse `recipientId` from `event.recipient.id` (or `entry[0].id`).
+  - [x] Query database: `const tenant = await User.findOne({ "instagram.accountId": recipientId });`.
+  - [x] **Legacy Admin Fallback Check:**
+    - [x] If `tenant` is null AND `recipientId === process.env.INSTAGRAM_ACCOUNT_ID`:
+      - [x] Load admin configuration and process message using legacy credentials.
+  - [x] **Safe Drop Check:**
+    - [x] If `tenant` is null AND `recipientId !== process.env.INSTAGRAM_ACCOUNT_ID`:
+      - [x] Log warning: `Unrecognized recipient account ${recipientId}. Dropping event safely.`
+      - [x] Exit execution. **Do NOT reply using admin token.**
+  - [x] Decrypt tenant access token: `const token = cryptoService.decrypt(tenant.instagram);`.
+  - [x] Load tenant-scoped data:
+    - [x] `PersonaConfig.findOne({ userId: tenant._id })`
+    - [x] `UserMemory.find({ ownerId: tenant._id, senderId })`
+    - [x] `SocialGraph.findOne({ ownerId: tenant._id })`
+  - [x] Pass tenant's decrypted token and scoped context to `azureOpenAI.generateReply()` and `instagramService.sendTextMessage()`.
 - [ ] **Phase 3 Sign-Off:** Simulate webhooks for Tenant A and Admin account concurrently; verify complete isolation and zero token leakage.
 
 ---

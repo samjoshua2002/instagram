@@ -53,6 +53,24 @@ function getUserInstagramToken(user) {
 }
 
 /**
+ * Token to send with for a contact owned by `ownerId`.
+ * Returns null for legacy admin contacts (ownerId empty) so instagramService uses the admin token;
+ * for a tenant returns their own token, or '' when it cannot be resolved (caller must not send).
+ * A tenant never falls back to the admin token.
+ */
+async function getOwnerSendToken(ownerId) {
+  if (!ownerId) return null;
+  const User = require('../models/User');
+  const PersonaConfig = require('../models/PersonaConfig');
+  const owner = await User.findById(ownerId);
+  if (!owner || owner.isBanned) return '';
+  const token = getUserInstagramToken(owner);
+  if (token) return token;
+  const config = await PersonaConfig.findOne({ ownerId: owner._id });
+  return ((config && config.instagramPageAccessToken) || '').trim();
+}
+
+/**
  * Removes every stored Instagram credential from the user.
  */
 function clearUserInstagram(user) {
@@ -66,4 +84,4 @@ function clearUserInstagram(user) {
   user.isInstagramConnected = false;
 }
 
-module.exports = { setUserInstagram, getUserInstagramToken, clearUserInstagram };
+module.exports = { setUserInstagram, getUserInstagramToken, getOwnerSendToken, clearUserInstagram };
