@@ -2314,6 +2314,12 @@ body {
   color: var(--color-text-secondary);
 }
 
+.feature-setup {
+  color: var(--color-text-primary);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .feature-switch {
   appearance: none;
   -webkit-appearance: none;

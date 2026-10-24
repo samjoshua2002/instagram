@@ -70,11 +70,14 @@ export default function FeatureStorePage() {
         <section key={group.title} className="download-card">
           <div className="sheet-label">{group.title}</div>
           <div className="feature-list">
-            {group.features.map(({ key, label, hint }) => (
+            {group.features.map(({ key, label, hint, setupHref }) => (
               <label key={key} className="feature-row">
                 <span style={{ minWidth: 0 }}>
                   <span className="feature-name">{label}</span>
-                  <span className="feature-hint">{hint}</span>
+                  <span className="feature-hint">
+                    {hint}
+                    {setupHref && <> <Link href={setupHref} className="feature-setup">Set up</Link></>}
+                  </span>
                 </span>
                 <input
                   type="checkbox"
