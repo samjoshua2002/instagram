@@ -126,6 +126,23 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     type: String,
     default: '',
   },
+  // Business accounts only: inputs for celRuleEngine.evaluateBusiness
+  businessPolicy: {
+    timezone: { type: String, default: 'Asia/Kolkata' },
+    workingDays: { type: [Number], default: [1, 2, 3, 4, 5, 6] }, // 0 = Sunday
+    openTime: { type: String, default: '09:00' },
+    closeTime: { type: String, default: '18:00' },
+    outOfHoursMessage: { type: String, default: '' },
+    escalationKeywords: { type: [String], default: [] },
+    refundPolicy: { type: String, default: '' },
+    allowDiscounts: { type: Boolean, default: false },
+    discountPolicy: { type: String, default: '' },
+    // Optional extra rules: { when: '<CEL expression>', directive: '<instruction>' }
+    customRules: [{
+      when: { type: String, default: '' },
+      directive: { type: String, default: '' },
+    }],
+  },
 }, { timestamps: true });
 
 // One persona per creator (the legacy admin config has ownerId null and is excluded)

@@ -4,6 +4,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
+import BusinessPolicyCard from '../components/BusinessPolicyCard';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle,
@@ -668,6 +669,8 @@ export default function ControlsPage() {
           Configure automated Instagram AI routing: handle everyone, exclude selected contacts for manual chatting, or whitelist specific friends.
         </p>
       </div>
+
+      {['business', 'agency'].includes(user?.accountType) && <BusinessPolicyCard />}
 
       {/* 3 Main Mode Selector Cards */}
       <div className="responsive-grid-3" style={{ marginBottom: '24px' }}>

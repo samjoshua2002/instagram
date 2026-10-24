@@ -18,6 +18,7 @@ const MediaVault = require('./models/MediaVault');
 // Services
 const instagramService = require('./services/instagramService');
 const azureOpenAI = require('./services/azureOpenAI');
+const celRuleEngine = require('./services/celRuleEngine');
 const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
@@ -657,8 +658,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     return;
   }
 
-  // 5. If user shared a Reel/Post or media, react with an emoji first!
-  if (isReelOrShare && mid && mid !== 'random_mid') {
+  // 5. If user shared a Reel/Post or media, react with an emoji first (personal accounts only)
+  const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
+  if (!isBusinessTenant && isReelOrShare && mid && mid !== 'random_mid') {
     instagramService.sendMessageReaction(senderId, mid, '😂', creatorAccessToken).catch(() => {});
   }
 
@@ -747,6 +749,21 @@ async function dispatchDebouncedReply(queueEntry) {
   let stickerType = null;
   let sendResult = null;
 
+  // Business tenants: no stickers or GIFs, professional fallbacks, escalations hand off to a human
+  const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
+  const businessDecision = isBusinessTenant
+    ? celRuleEngine.evaluateForTenant({
+        accountType: 'business',
+        userMemory,
+        incomingText: combinedText,
+        businessConfig: config,
+        customRules: config?.businessPolicy?.customRules || [],
+      })
+    : null;
+  const fallbackReply = isBusinessTenant
+    ? 'Thanks for your message! Our team will get back to you shortly.'
+    : (isReelOrShare ? '😂😂' : 'yoo wassup!');
+
   try {
     // Turn on typing indicator while generating
     await instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken);
@@ -759,15 +776,16 @@ async function dispatchDebouncedReply(queueEntry) {
         messageHistory: history,
         incomingText: combinedText,
         config,
+        tenant: ownerUser,
       });
     } catch (aiErr) {
       console.error(`❌ [AI Generation Error]:`, aiErr.message);
-      // Fallback to natural short reply so recipient is never left on read
-      replyText = isReelOrShare ? '😂😂' : 'yoo wassup!';
+      // Fallback reply so recipient is never left on read
+      replyText = fallbackReply;
     }
 
     if (!replyText || replyText.trim().length === 0) {
-      replyText = isReelOrShare ? '😂😂' : 'yoo wassup!';
+      replyText = fallbackReply;
     }
 
     // Extract optional sticker or attachment tag (e.g. [ATTACHMENT: joy], [STICKER: lol])
@@ -801,7 +819,7 @@ async function dispatchDebouncedReply(queueEntry) {
 
     // 3. SPORADIC MEDIA DISPATCH (Only when Governor permits):
     // Cadence: Reply 2 or 3 text messages in a row, then ~1 in 6 random chance ("bullet in trigger out of 6") or high-confidence reaction
-    if (!stickerType && canSendMedia(senderId, isExplicitMediaRequest)) {
+    if (!isBusinessTenant && !stickerType && canSendMedia(senderId, isExplicitMediaRequest)) {
       let detectedCat = null;
       if (isExplicitMediaRequest) {
         detectedCat = 'joy';
@@ -822,6 +840,9 @@ async function dispatchDebouncedReply(queueEntry) {
         console.log(`🎯 [Media Governor Triggered]: Auto-attached [${detectedCat}] (cadence satisfied & 1/6 bullet chance hit)`);
       }
     }
+
+    // Stickers, GIFs and meme drops are never sent for business accounts
+    if (isBusinessTenant) stickerType = null;
 
     // Calculate dynamic human-realistic typing latency:
     // - Emojis / reactions (<= 4 chars or pure emoji): quick tap (1800ms - 3000ms)
@@ -946,9 +967,20 @@ async function dispatchDebouncedReply(queueEntry) {
         }
       } catch (bufErr) {}
     }
+
+    // Business escalation: pause the bot for this customer and queue them for a human
+    if (businessDecision?.shouldEscalate) {
+      const reason = businessDecision.context.message.matchedEscalation || businessDecision.chatType;
+      await UserMemory.updateOne(
+        { senderId },
+        { $set: { aiEnabled: false, handoffRequestedAt: new Date(), handoffReason: reason } }
+      ).catch(err => console.warn('⚠️ [Handoff] Could not flag customer:', err.message));
+      await redisService.invalidateUserMemory(senderId);
+      console.log(`🙋 [Handoff]: Customer ${senderId} escalated (${reason}); bot paused for this chat.`);
+    }
   } finally {
     // Ensure typing indicator is always turned off
-    await instagramService.sendSenderAction(senderId, 'typing_off').catch(() => {});
+    await instagramService.sendSenderAction(senderId, 'typing_off', creatorAccessToken).catch(() => {});
   }
 
   // Memory update already triggered earlier (ALWAYS-LEARN block) — no duplicate needed here.
@@ -1343,6 +1375,25 @@ app.put('/api/persona', async (req, res) => {
     if (autoShareReelsFrequencyHours !== undefined) config.autoShareReelsFrequencyHours = autoShareReelsFrequencyHours;
     if (autoShareReelsTopics !== undefined) config.autoShareReelsTopics = autoShareReelsTopics;
     if (giphyApiKey !== undefined) config.giphyApiKey = (giphyApiKey || '').trim();
+    if (req.body.businessPolicy && typeof req.body.businessPolicy === 'object') {
+      const bp = req.body.businessPolicy;
+      const hhmm = (v, fallback) => (/^\d{1,2}:\d{2}$/.test(v || '') ? v : fallback);
+      const current = config.businessPolicy || {};
+      config.businessPolicy = {
+        timezone: (bp.timezone || current.timezone || 'Asia/Kolkata').trim(),
+        workingDays: Array.isArray(bp.workingDays) ? bp.workingDays.map(Number).filter(d => d >= 0 && d <= 6) : current.workingDays,
+        openTime: hhmm(bp.openTime, current.openTime || '09:00'),
+        closeTime: hhmm(bp.closeTime, current.closeTime || '18:00'),
+        outOfHoursMessage: String(bp.outOfHoursMessage ?? current.outOfHoursMessage ?? '').slice(0, 500),
+        escalationKeywords: Array.isArray(bp.escalationKeywords) ? bp.escalationKeywords.map(s => String(s).trim()).filter(Boolean).slice(0, 50) : current.escalationKeywords,
+        refundPolicy: String(bp.refundPolicy ?? current.refundPolicy ?? '').slice(0, 2000),
+        allowDiscounts: bp.allowDiscounts !== undefined ? Boolean(bp.allowDiscounts) : Boolean(current.allowDiscounts),
+        discountPolicy: String(bp.discountPolicy ?? current.discountPolicy ?? '').slice(0, 2000),
+        customRules: Array.isArray(bp.customRules)
+          ? bp.customRules.filter(r => r && r.when && r.directive).slice(0, 20).map(r => ({ when: String(r.when).slice(0, 300), directive: String(r.directive).slice(0, 500) }))
+          : current.customRules,
+      };
+    }
 
     await config.save();
     await redisService.invalidatePersonaConfig();
@@ -1439,11 +1490,14 @@ app.post('/api/simulator/chat', async (req, res) => {
     }).sort({ createdAt: -1 }).limit(10);
     history.reverse();
 
-    // 4. Generate AI response
+    // 4. Generate AI response with the signed-in creator's persona (personal or business rules)
+    const simConfig = req.user ? await PersonaConfig.findOne({ ownerId: req.user._id }) : null;
     const replyText = await azureOpenAI.generateReply({
       userMemory,
       messageHistory: history,
       incomingText: messageText,
+      ...(simConfig ? { config: simConfig } : {}),
+      tenant: req.user || null,
     });
 
     // 5. Save assistant reply
