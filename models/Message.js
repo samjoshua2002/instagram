@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const MessageSchema = new mongoose.Schema({
+  // Creator (tenant) this conversation belongs to; null for legacy admin-bot records
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
   senderId: {
     type: String,
     required: true,

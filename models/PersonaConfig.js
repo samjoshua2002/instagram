@@ -7,6 +7,12 @@ const PersonaConfigSchema = new mongoose.Schema({
     default: null,
     index: true,
   },
+  // Mirrors User.accountType so the reply pipeline can pick personal vs business rules
+  accountType: {
+    type: String,
+    enum: ['personal', 'creator', 'business', 'agency'],
+    default: 'personal',
+  },
   creatorName: {
     type: String,
     default: 'Sam Joshua',
@@ -121,5 +127,11 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     default: '',
   },
 }, { timestamps: true });
+
+// One persona per creator (the legacy admin config has ownerId null and is excluded)
+PersonaConfigSchema.index(
+  { ownerId: 1 },
+  { unique: true, partialFilterExpression: { ownerId: { $type: 'objectId' } } }
+);
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);

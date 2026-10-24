@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const UserMemorySchema = new mongoose.Schema({
+  // Creator (tenant) this contact belongs to; null for legacy admin-bot records
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
   senderId: {
     type: String,
     required: true,
@@ -124,5 +131,11 @@ const UserMemorySchema = new mongoose.Schema({
     default: null,
   },
 }, { timestamps: true });
+
+// One memory per contact per creator (legacy records without ownerId are excluded)
+UserMemorySchema.index(
+  { ownerId: 1, senderId: 1 },
+  { unique: true, partialFilterExpression: { ownerId: { $type: 'objectId' } } }
+);
 
 module.exports = mongoose.model('UserMemory', UserMemorySchema);
