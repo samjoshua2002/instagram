@@ -15,6 +15,7 @@ const BANNED_PATTERNS = [
   /\bfeel free to (?:ask|reach out|let me know)[^.!?\n]*[.!?]?/gi,
   /\b(?:is there )?anything else i can help (?:you )?with\??/gi,
   /\blet me know if you (?:have any|need any)[^.!?\n]*[.!?]?/gi,
+  /^\s*here(?:'s| is| are) (?:some|a few|my|the|a list of)\b[^:\n]*:\s*$/gim,
 ];
 
 const BULLET_LINE = /^\s*(?:[-*•]|\d+[.)])\s+/;
@@ -74,8 +75,8 @@ function humanizeReply(text, { isBusiness = false } = {}) {
     .join('\n')
     .trim();
 
-  // Never return an empty reply if the cleanup ate everything
-  return out || String(text).trim();
+  // Empty means the reply was pure filler; the caller swaps in its casual fallback
+  return out;
 }
 
 /**
@@ -105,4 +106,9 @@ function bubbleGapMs() {
   return 1000 + Math.floor(Math.random() * 1000);
 }
 
-module.exports = { humanizeReply, splitIntoBubbles, bubbleGapMs };
+// Reel reaction that fits the contact's tone: kind contacts (roastiness < 20) get a heart, everyone else a laugh
+function reelReactionEmoji(roastiness) {
+  return Number.isFinite(roastiness) && roastiness < 20 ? '❤️' : '😂';
+}
+
+module.exports = { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji };
