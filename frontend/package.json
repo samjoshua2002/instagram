@@ -8,8 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
+    "@radix-ui/react-switch": "^1.4.1",
+    "@radix-ui/react-toggle-group": "^1.2.1",
     "@simplewebauthn/browser": "^14.0.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^14.4.0",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.428.0",
     "next": "^14.2.5",
     "react": "^18.3.1",

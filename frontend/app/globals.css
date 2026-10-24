@@ -2327,7 +2327,9 @@ body {
   position: relative;
   width: 44px;
   height: 26px;
+  min-height: 0;
   margin: 0;
+  padding: 0;
   border-radius: var(--radius-pill);
   background: var(--glass-fill-standard);
   border: 1px solid var(--glass-border);
@@ -2335,8 +2337,8 @@ body {
   transition: background var(--duration-fast) ease;
 }
 
-.feature-switch::after {
-  content: '';
+.feature-switch-thumb {
+  display: block;
   position: absolute;
   top: 2px;
   left: 2px;
@@ -2347,12 +2349,12 @@ body {
   transition: transform var(--duration-fast) ease, background var(--duration-fast) ease;
 }
 
-.feature-switch:checked {
+.feature-switch[data-state='checked'] {
   background: #16a34a;
   border-color: #16a34a;
 }
 
-.feature-switch:checked::after {
+.feature-switch[data-state='checked'] .feature-switch-thumb {
   transform: translateX(18px);
   background: #fff;
 }

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { User, Briefcase, Layers } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { WORKSPACE_MODES, currentMode } from '../lib/workspaceFeatures';
 
 const MODE_ICONS = { personal: User, business: Briefcase, hybrid: Layers };
@@ -26,24 +27,22 @@ export default function WorkspaceModeSwitch({ compact = false }) {
   };
 
   return (
-    <div className={`sheet-segment mode-segment${compact ? ' compact' : ''}`} role="radiogroup" aria-label="Workspace mode">
+    <ToggleGroup
+      type="single"
+      value={mode}
+      onValueChange={next => next && switchMode(next)}
+      disabled={switching}
+      className={`mode-segment${compact ? ' compact' : ''}`}
+      aria-label="Workspace mode"
+    >
       {WORKSPACE_MODES.map(({ key, label, hint }) => {
         const Icon = MODE_ICONS[key];
         return (
-          <button
-            key={key}
-            type="button"
-            role="radio"
-            aria-checked={mode === key}
-            title={hint}
-            className={mode === key ? 'active' : ''}
-            onClick={() => switchMode(key)}
-            disabled={switching}
-          >
+          <ToggleGroupItem key={key} value={key} title={hint} className={mode === key ? 'active' : ''}>
             <Icon size={compact ? 13 : 16} /> {label}
-          </button>
+          </ToggleGroupItem>
         );
       })}
-    </div>
+    </ToggleGroup>
   );
 }
