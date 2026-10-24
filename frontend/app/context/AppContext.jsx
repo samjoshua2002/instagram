@@ -403,6 +403,42 @@ export function AppProvider({ children }) {
     setUser(prev => ({ ...prev, ...updatedUser }));
   }, []);
 
+  // Feature Store (PLAN.md §4): mode + toggles that drive the nav and the reply pipeline
+  const [workspaceFeatures, setWorkspaceFeatures] = useState(null);
+  const isPureSuperadminUser = user?.role === 'superadmin' && !adminSession;
+
+  useEffect(() => {
+    if (!token || !(user?._id || user?.id) || isPureSuperadminUser) {
+      setWorkspaceFeatures(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${API_BASE}/api/workspace/features`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled && data) setWorkspaceFeatures(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [API_BASE, token, user?._id, user?.id, isPureSuperadminUser]);
+
+  /** PUT a partial change ({ activeMode } or { enabledFeatures: { key: bool } }); returns true on success. */
+  const updateWorkspaceFeatures = useCallback(async (changes) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/workspace/features`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(changes),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save workspace features');
+      setWorkspaceFeatures(prev => ({ ...prev, ...data }));
+      if (data.accountType) setUser(prev => (prev ? { ...prev, accountType: data.accountType } : prev));
+      return true;
+    } catch (err) {
+      showToast?.(err.message || 'Could not save workspace features', 'error');
+      return false;
+    }
+  }, [API_BASE, token, showToast]);
+
   // Intercept window.fetch to automatically attach Bearer token and check on load
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1203,6 +1239,8 @@ export function AppProvider({ children }) {
         logout,
         switchAccount,
         updateUserProfile,
+        workspaceFeatures,
+        updateWorkspaceFeatures,
         isPasskeyModalOpen,
         setIsPasskeyModalOpen,
         isOnboardingModalOpen,
