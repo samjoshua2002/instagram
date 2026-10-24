@@ -4,6 +4,7 @@ const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
 const celRuleEngine = require('./celRuleEngine');
 const redisService = require('./redisService');
+const ragService = require('./ragService');
 
 class AzureOpenAIService {
   constructor() {
@@ -453,12 +454,30 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
     const { directives, selectedModel, chatType } = decision;
     console.log(`🏢 [Business Routing]: "${selectedModel}" for chatType "${chatType}"`);
 
+    // Grounding: the tenant's uploaded documents that match this question
+    let knowledge = { chunks: [], wantsDocument: false, context: '' };
+    try {
+      knowledge = await ragService.retrieve({ ownerId: tenant?._id || config.ownerId, incomingText });
+    } catch (err) {
+      console.warn('⚠️ [RAG] Retrieval failed:', err.message);
+    }
+    const knowledgeSection = knowledge.context
+      ? `VERIFIED KNOWLEDGE FROM THE BUSINESS'S DOCUMENTS:
+${knowledge.context}
+
+KNOWLEDGE RULES:
+- Answer grounded strictly in the provided knowledge. Quote prices, policies and details exactly as written.
+- If the customer asks for documentation, a brochure, price list or link, provide the exact "Verified link" shown above. Never invent or shorten links.
+${knowledge.wantsDocument ? '- The customer is asking for a document or link right now: include the most relevant verified link in your reply.\n' : ''}`
+      : '';
+
     const systemPrompt = `You are the customer messaging assistant for ${businessName}${business.category ? ` (${business.category})` : ''}, replying to customers in Instagram Direct Messages on behalf of the team.
 
 ABOUT THE BUSINESS:
 ${business.description || config.aboutMe || config.personaBio || '(no description provided)'}
 
 ${config.customKnowledge ? `PRODUCTS, SERVICES & FAQ (THE ONLY SOURCE OF FACTS):\n${config.customKnowledge}\n` : ''}
+${knowledgeSection}
 ${config.toneGuidelines ? `BRAND VOICE:\n${config.toneGuidelines}\n` : ''}
 BUSINESS HOURS: ${policy.openTime || '09:00'}-${policy.closeTime || '18:00'} (${policy.timezone || 'Asia/Kolkata'}).
 
