@@ -25,7 +25,13 @@ class MemoryService {
         name: profileData?.name || '',
         profilePic: profileData?.profile_pic || '',
       });
-      await memory.save();
+      try {
+        await memory.save();
+      } catch (err) {
+        // Two first messages at once: the other request created the record first
+        if (err.code !== 11000) throw err;
+        memory = await UserMemory.findOne({ senderId });
+      }
     } else if (profileData) {
       if (profileData.username && memory.username.startsWith('User_')) {
         memory.username = profileData.username;

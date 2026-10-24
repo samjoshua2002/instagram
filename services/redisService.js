@@ -60,6 +60,24 @@ class RedisService {
     return val !== undefined ? val : null;
   }
 
+  // While Redis is down, expired keys were only dropped when read, so the in-memory store grew forever
+  _pruneFallback(maxKeys = 5000) {
+    if (this.fallbackStore.size < maxKeys) return;
+    const now = Date.now();
+    for (const [key, expiresAt] of this.fallbackExpiry) {
+      if (expiresAt < now) {
+        this.fallbackStore.delete(key);
+        this.fallbackExpiry.delete(key);
+      }
+    }
+    // Still full: drop the oldest keys (a Map keeps insertion order)
+    for (const key of this.fallbackStore.keys()) {
+      if (this.fallbackStore.size < maxKeys) break;
+      this.fallbackStore.delete(key);
+      this.fallbackExpiry.delete(key);
+    }
+  }
+
   async set(key, value, ttlSeconds = 3600) {
     if (this.isConnected && this.client) {
       try {
@@ -75,6 +93,7 @@ class RedisService {
       }
     }
     // In-memory fallback
+    this._pruneFallback();
     this.fallbackStore.set(key, value);
     if (ttlSeconds) {
       this.fallbackExpiry.set(key, Date.now() + ttlSeconds * 1000);
@@ -112,6 +131,7 @@ class RedisService {
     }
 
     // In-memory fallback
+    this._pruneFallback();
     let list = this.fallbackStore.get(key) || [];
     list.push(JSON.parse(payload));
     if (list.length > 20) {

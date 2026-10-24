@@ -581,8 +581,8 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
   /**
    * Generates a natural, friendly follow-up check-in when a conversation has been inactive for 5-6 hours
    */
-  async generateFollowUpReminder({ userMemory, messageHistory }) {
-    let config = await redisService.getCachedPersonaConfig();
+  async generateFollowUpReminder({ userMemory, messageHistory, config: passedConfig = null }) {
+    let config = passedConfig || await redisService.getCachedPersonaConfig();
     if (!config) {
       config = await PersonaConfig.findOne();
       if (!config) {
