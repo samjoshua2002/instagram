@@ -15,6 +15,7 @@ import {
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import BusinessConversionPanel from './components/BusinessConversionPanel';
 import WorkspaceModeSwitch from './components/WorkspaceModeSwitch';
+import { WORKSPACE_MODES, FEATURE_GROUPS, currentMode, isFeatureOn } from './lib/workspaceFeatures';
 
 // Tiny 14-day trend line for the KPI cards (PLAN.md §17.3); flat when there is no data yet
 function Sparkline({ points, width = 96, height = 28 }) {
@@ -183,7 +184,7 @@ const statCardVariants = {
 };
 
 export default function AnalyticsPage() {
-  const { nodes, routingConfig, user, token, enterWorkspace, API_BASE, showToast } = useApp();
+  const { nodes, routingConfig, user, token, enterWorkspace, API_BASE, showToast, workspaceFeatures } = useApp();
   const isSuperadmin = user?.role === 'superadmin';
 
   // Toggle view for superadmins: 'platform' (default)
@@ -446,6 +447,20 @@ export default function AnalyticsPage() {
   const activeModeCount = routingConfig.chatMode === 'everyone_except'
     ? (routingConfig.excludedContactIds || []).length
     : (routingConfig.chatMode === 'only_selected' ? (routingConfig.includedContactIds || []).length : 0);
+
+  // One-line workspace summary for the command center (PLAN.md §17.1)
+  const mode = WORKSPACE_MODES.find(m => m.key === currentMode(workspaceFeatures, user));
+  const allFeatures = FEATURE_GROUPS.flatMap(g => g.features);
+  const featuresOn = allFeatures.filter(f => isFeatureOn(workspaceFeatures, f.key)).length;
+  const chatRule = routingConfig.chatMode === 'everyone_except'
+    ? `Everyone except ${activeModeCount}`
+    : routingConfig.chatMode === 'only_selected' ? `Only ${activeModeCount} selected` : 'Everyone';
+  const summaryItems = [
+    { label: 'Mode', value: mode?.label, hint: mode?.hint, href: '/settings/features' },
+    { label: 'Features', value: `${featuresOn} of ${allFeatures.length} on`, href: '/settings/features' },
+    { label: 'Chat rule', value: chatRule, href: '/controls' },
+    { label: 'Waiting for you', value: `${bizStats?.openHandoffs || 0} chats`, href: '/relationships' },
+  ];
 
   const personalStatCards = [
     { label: 'Total People', value: friendNodes.length, sub: 'Active profiles', icon: <Users size={15} />, href: '/relationships' },
@@ -1302,6 +1317,22 @@ export default function AnalyticsPage() {
             VIEW B: PERSONAL BOT & DM ANALYTICS
            ───────────────────────────────────────────────────────────── */
         <div>
+          {/* WORKSPACE SUMMARY */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '16px' }}>
+            {summaryItems.map(item => (
+              <Link
+                key={item.label}
+                href={item.href}
+                title={item.hint || ''}
+                className="stat-glass"
+                style={{ padding: '10px 14px', borderRadius: '12px', textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}
+              >
+                <span style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{item.label}</span>
+                <span style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</span>
+              </Link>
+            ))}
+          </div>
+
           {/* STAT CARDS WITH BUTTER-SMOOTH FRAMER MOTION STAGGER & ANIMATED COUNTERS */}
           <motion.div
             variants={statsContainerVariants}
