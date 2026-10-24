@@ -13,5 +13,7 @@ An autonomous, 24/7 AI-powered Instagram DM auto-reply engine that mimics Sam Jo
 1. Create a **New Web Service** connected to this repository.
 2. Build Command: `npm install`
 3. Start Command: `node server.js`
-4. Add Environment Variables from `.env.example`.
+4. Add Environment Variables from `.env.example`, plus these two security settings:
+   - `INSTAGRAM_APP_SECRET`: your Meta App Secret. When set, `POST /webhook` rejects requests without a valid `X-Hub-Signature-256`.
+   - `DASHBOARD_API_KEY`: any long random string. When set, every `/api/*` call must send it as the `x-api-key` header. The dashboard asks for it once and remembers it in the browser.
 5. Update Callback URL in Meta Developer Portal to your Render URL: `https://<your-app>.onrender.com/webhook`

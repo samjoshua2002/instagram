@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const connectDB = require('./config/db');
 
@@ -102,8 +103,45 @@ const upload = multer({
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Keep the raw body so the Meta webhook signature can be checked byte-for-byte
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
+
+const safeEqual = (a, b) => {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+};
+
+// Dashboard API key: every /api/* call must send x-api-key when DASHBOARD_API_KEY is set
+const DASHBOARD_API_KEY = process.env.DASHBOARD_API_KEY || '';
+if (!DASHBOARD_API_KEY) {
+  console.warn('⚠️ DASHBOARD_API_KEY is not set: /api/* routes are open to anyone. Set it in .env to lock the dashboard.');
+}
+app.use('/api', (req, res, next) => {
+  if (!DASHBOARD_API_KEY || req.method === 'OPTIONS') return next();
+  const key = req.get('x-api-key') || '';
+  if (!safeEqual(key, DASHBOARD_API_KEY)) {
+    return res.status(401).json({ error: 'Unauthorized: missing or wrong dashboard API key' });
+  }
+  next();
+});
+
+// Meta webhook signature (X-Hub-Signature-256) check, enforced when INSTAGRAM_APP_SECRET is set
+const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
+if (!INSTAGRAM_APP_SECRET) {
+  console.warn('⚠️ INSTAGRAM_APP_SECRET is not set: webhook signatures are NOT verified.');
+}
+function verifyMetaSignature(req, res, next) {
+  if (!INSTAGRAM_APP_SECRET) return next();
+  const signature = req.get('x-hub-signature-256') || '';
+  const expected = 'sha256=' + crypto.createHmac('sha256', INSTAGRAM_APP_SECRET).update(req.rawBody || '').digest('hex');
+  if (!safeEqual(signature, expected)) {
+    console.warn('🚫 Rejected webhook POST with invalid signature');
+    return res.sendStatus(403);
+  }
+  next();
+}
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(uploadsDir));
 
@@ -262,7 +300,7 @@ function handleCreatorEcho(event, accountId) {
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', verifyMetaSignature, async (req, res) => {
   const body = req.body;
   console.log(`📥 [Webhook Event Received]:`, JSON.stringify(body));
 
