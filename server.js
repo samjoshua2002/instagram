@@ -218,6 +218,8 @@ app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
 app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
 app.use('/api/workspace', requireAuth, require('./routes/workspace'));
 app.use('/api/storyboard', requireAuth, require('./routes/storyboard'));
+// Public /api/desktop/releases is registered above, so it stays open
+app.use('/api/desktop', requireAuth, require('./routes/desktop'));
 
 // CORS-safe image proxy so the frontend canvas can sample avatar colours (PLAN.md §15.2).
 // Only Instagram / Facebook CDN hosts are allowed, so it can't be used as an open proxy.
