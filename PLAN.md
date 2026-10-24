@@ -676,7 +676,7 @@ To guarantee personal AI responses are completely indistinguishable from real hu
   - Verify 1-click Workspace Switcher toggles between Personal Creator and Business & Brand.
 - [ ] **`/download` (Desktop Releases):**
   - Verify OS auto-detection card and manual installer links render with dark glass styling.
-- [ ] **Mobile Experience & Bottom Drawer:**
+- [x] **Mobile Experience & Bottom Drawer:**
   - Verify viewport <= 768px displays the 54px sticky top header and 64px bottom tabs.
   - Verify tapping the avatar in the header or bottom bar opens `MobileFeatureSheet.jsx` with 100% of platform routes accessible.
   - Verify Light and Dark theme toggles change colors instantly across all surfaces.

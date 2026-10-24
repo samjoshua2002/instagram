@@ -566,46 +566,428 @@ select:focus {
     display: none !important;
   }
 
+  /* Sticky translucent top header: 54px + safe area (PLAN.md §15.5.2) */
   .mobile-header {
     display: flex;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    height: 54px;
+    height: calc(54px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 8px 0 16px;
     background: var(--glass-fill-strong);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-border);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-bottom: 1px solid var(--glass-border);
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
     z-index: 60;
   }
 
+  /* Sticky translucent bottom tab bar: 64px + safe area */
   .mobile-bottom-tabs {
     display: flex;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding: 0 4px env(safe-area-inset-bottom, 0px);
     background: var(--glass-fill-strong);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid var(--color-border);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-top: 1px solid var(--glass-border);
     align-items: center;
     justify-content: space-around;
-    padding: 0 6px;
-    padding-bottom: env(safe-area-inset-bottom, 0);
     z-index: 100;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
   }
 
   .app-main-content {
     margin-left: 0 !important;
     width: 100vw !important;
-    margin-top: 54px !important;
-    height: calc(100vh - 54px) !important;
-    padding-bottom: 76px !important;
+    max-width: 100vw;
+    margin-top: calc(54px + env(safe-area-inset-top, 0px)) !important;
+    height: calc(100dvh - 54px - env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ── Mobile header contents ── */
+.mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  min-height: var(--tap-target);
+}
+
+.mobile-brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-small);
+  background: var(--ambient-dominant);
+  color: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.mobile-brand-text {
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: -0.3px;
+}
+
+.mobile-header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.mobile-workspace-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  min-height: 0 !important;
+  padding: 0 10px;
+  margin-right: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-fill-standard);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text-primary);
+  font: 700 0.66rem 'JetBrains Mono', monospace;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  /* Invisible 48px hit area around the compact chip */
+  position: relative;
+}
+
+.mobile-workspace-chip::after {
+  content: '';
+  position: absolute;
+  inset: -9px -2px;
+}
+
+.mobile-icon-btn {
+  width: var(--tap-target);
+  height: var(--tap-target);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+}
+
+.mobile-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  font-weight: 800;
+  font-size: 0.8rem;
+  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 3.5px var(--ambient-dominant);
+}
+
+.mobile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Mobile bottom tabs ── */
+.mobile-tab-slot {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.mobile-tab {
+  flex: 1;
+  min-height: var(--tap-target);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  font: 500 0.66rem 'Inter', sans-serif;
+  cursor: pointer;
+  transition: color var(--duration-fast) ease;
+}
+
+.mobile-tab.active {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.mobile-add-btn {
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: 50%;
+  border: none;
+  background: var(--ambient-dominant);
+  color: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--ambient-dominant) 45%, transparent);
+  cursor: pointer;
+  transform: translateY(-4px);
+  transition: transform var(--duration-fast) ease;
+}
+
+.mobile-add-btn:active {
+  transform: translateY(-4px) scale(0.94);
+}
+
+/* ═══════════════════════════════════════════
+   Mobile Feature Sheet (PLAN.md §15.5.3)
+   ═══════════════════════════════════════════ */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+}
+
+.mobile-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 201;
+  padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-large) var(--radius-large) 0 0;
+  border-top: 1px solid var(--glass-border);
+  background:
+    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--ambient-dominant) 22%, transparent), transparent 60%),
+    var(--color-surface);
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.sheet-grabber {
+  width: 40px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  margin: 4px auto 12px;
+}
+
+.sheet-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sheet-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--ambient-dominant) 45%, transparent);
+}
+
+.sheet-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sheet-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-handle {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.sheet-icon-btn {
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: 50%;
+  border: none;
+  background: var(--glass-fill-standard);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sheet-section {
+  margin-bottom: 18px;
+}
+
+.sheet-label {
+  font: 700 0.68rem 'JetBrains Mono', monospace;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.sheet-segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-fill-subtle);
+  border: 1px solid var(--glass-border);
+}
+
+.sheet-segment button {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: 600 0.88rem 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.sheet-segment button.active {
+  background: var(--color-text-primary);
+  color: var(--color-background);
+  font-weight: 700;
+}
+
+.sheet-segment button:disabled {
+  opacity: 0.6;
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr));
+  gap: 8px;
+}
+
+.sheet-tile {
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--glass-fill-standard);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  transition: background var(--duration-fast) ease;
+}
+
+.sheet-tile svg {
+  color: var(--color-text-secondary);
+}
+
+.sheet-tile.active {
+  background: color-mix(in srgb, var(--ambient-dominant) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ambient-dominant) 55%, transparent);
+}
+
+.sheet-tile.active svg {
+  color: var(--ambient-dominant);
+}
+
+.sheet-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+
+.sheet-list button {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-fill-subtle);
+  color: var(--color-text-primary);
+  font: 600 0.9rem 'Inter', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheet-list button:last-child {
+  border-bottom: none;
+}
+
+.sheet-list button span:first-of-type {
+  flex: 1;
+}
+
+.sheet-list button.danger {
+  color: #f87171;
+}
+
+.sheet-chevron {
+  color: var(--color-text-muted);
+}
+
+.sheet-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.sheet-dot.on {
+  background: var(--ambient-dominant);
+  box-shadow: 0 0 8px var(--ambient-dominant);
+}
+
+@media (min-width: 769px) {
+  .mobile-sheet,
+  .sheet-backdrop {
+    display: none;
   }
 }
 
