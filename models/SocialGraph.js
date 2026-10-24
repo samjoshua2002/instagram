@@ -75,6 +75,18 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: 'Banter back naturally matching their energy.',
   },
+  // 0 = always kind, 100 = savage roasting (contact profile tone tab)
+  roastiness: {
+    type: Number,
+    min: 0,
+    max: 100,
+    // No default: unset contacts keep the AI's current tone
+  },
+  // How to open chats with this person, e.g. "yo", "heyy", "macha"
+  greetingStyle: {
+    type: String,
+    default: '',
+  },
   chatsCount: {
     type: Number,
     default: 0,

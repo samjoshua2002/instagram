@@ -6,10 +6,40 @@ import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
   Trash2, Calendar, Bot, Film, Pause, Check, Save, User,
   Plus, RefreshCw, MessageSquare, Shield, X, Users,
-  LayoutGrid, List, AlignJustify, Table as TableIcon
+  LayoutGrid, List, AlignJustify, Table as TableIcon, Cake
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import ContactAvatar from '../components/ContactAvatar';
+import CountUp from '../components/CountUp';
+import { useAmbientImage } from '../components/AmbientBackground';
+
+// Next birthday from a stored DOB ("2002-05-14", "14 May", "May 14, 2002")
+function getNextBirthday(dob) {
+  if (!dob) return null;
+  const hasYear = /\b(19|20)\d{2}\b/.test(dob);
+  const parsed = new Date(hasYear ? dob : `${dob} 2000`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let next = new Date(today.getFullYear(), parsed.getMonth(), parsed.getDate());
+  if (next < today) next = new Date(today.getFullYear() + 1, parsed.getMonth(), parsed.getDate());
+  return {
+    days: Math.round((next - today) / 86400000),
+    label: next.toLocaleDateString(undefined, { day: 'numeric', month: 'long' }),
+    turning: hasYear ? next.getFullYear() - parsed.getFullYear() : null,
+  };
+}
+
+function formatLastContact(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '—';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MONTH_NAMES = [
@@ -98,9 +128,15 @@ export default function RelationshipsPage() {
     relationship: '',
     personalNotes: '',
     roastStyle: '',
+    roastiness: 40,
+    greetingStyle: '',
     chatsCount: 0,
     reelsCount: 0
   });
+
+  // Spotify-style inner profile tabs (PLAN.md §15.3)
+  const [profileTab, setProfileTab] = useState('identity');
+  const [dmPreview, setDmPreview] = useState({ loading: false, messages: [] });
 
   const [isAutofilling, setIsAutofilling] = useState(false);
   const [isLearning, setIsLearning] = useState(false);
@@ -159,9 +195,12 @@ export default function RelationshipsPage() {
         relationship: selectedPerson.relationship || selectedPerson.relationshipToSam || '',
         personalNotes: selectedPerson.personalNotes || (selectedPerson.lore || []).join('\n'),
         roastStyle: selectedPerson.roastStyle || '',
+        roastiness: Number.isFinite(selectedPerson.roastiness) ? selectedPerson.roastiness : 40,
+        greetingStyle: selectedPerson.greetingStyle || '',
         chatsCount: selectedPerson.chatsCount ?? selectedPerson.messageCount ?? 0,
         reelsCount: selectedPerson.reelsCount ?? 0
       });
+      setProfileTab('identity');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id, selectedPerson?.name]);
@@ -381,6 +420,8 @@ export default function RelationshipsPage() {
       personalNotes: formData.personalNotes.trim(),
       lore: formData.personalNotes.trim().split('\n').map(l => l.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean),
       roastStyle: formData.roastStyle.trim(),
+      roastiness: Number(formData.roastiness),
+      greetingStyle: formData.greetingStyle.trim(),
       chatsCount: parseInt(formData.chatsCount, 10) || 0,
       reelsCount: parseInt(formData.reelsCount, 10) || 0,
       messageCount: parseInt(formData.chatsCount, 10) || 0
@@ -604,6 +645,41 @@ export default function RelationshipsPage() {
     showToast(`Connected ${selectedPerson.name} with ${newConn.targetName}`);
   };
 
+  // Load the recent DM transcript for the profile's history tab and last-contact stat
+  useEffect(() => {
+    const senderId = selectedPerson?.senderId;
+    if (!senderId) {
+      setDmPreview({ loading: false, messages: [] });
+      return;
+    }
+    let cancelled = false;
+    setDmPreview({ loading: true, messages: [] });
+    fetch(`${API_BASE}/api/conversations/${senderId}/messages`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (cancelled) return;
+        const messages = Array.isArray(data?.messages) ? data.messages.filter(m => m?.text).slice(-12) : [];
+        setDmPreview({ loading: false, messages });
+      })
+      .catch(() => !cancelled && setDmPreview({ loading: false, messages: [] }));
+    return () => { cancelled = true; };
+  }, [selectedPerson?.senderId, API_BASE]);
+
+  // Tint the whole page from the open contact's photo (PLAN.md §15.3)
+  const personRawHandle = (selectedPerson?.handle || selectedPerson?.instagramHandle || '').replace(/^@/, '').trim();
+  const personArt = selectedPerson
+    ? (selectedPerson.profilePic?.startsWith('http')
+      ? selectedPerson.profilePic
+      : (personRawHandle ? `https://unavatar.io/instagram/${personRawHandle}?fallback=false` : null))
+    : null;
+  useAmbientImage(personArt);
+
+  const birthday = useMemo(() => getNextBirthday(formData.dob), [formData.dob]);
+  const lastMessage = dmPreview.messages[dmPreview.messages.length - 1];
+  const lastContactLabel = formatLastContact(
+    lastMessage?.timestamp || lastMessage?.createdAt || selectedPerson?.lastInteraction || selectedPerson?.updatedAt
+  );
+
   // =========================================================================
   // VIEW 1: FULL INNER PERSON PAGE (When a person is clicked/opened)
   // =========================================================================
@@ -613,116 +689,114 @@ export default function RelationshipsPage() {
     const isFullAi = currentAiMode === 'full_ai';
 
     return (
-      <div className="page-container" style={{ maxWidth: '1400px' }}>
-        {/* Top Back Navigation Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '20px', borderBottom: '1px solid var(--color-border)', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <button
-              onClick={() => setSelectedPerson(null)}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-primary)',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <ArrowLeft size={26} />
-             
-            </button>
+      <div className="page-container person-page" style={{ maxWidth: '1400px' }}>
+        {/* ================= SPOTIFY ARTIST-STYLE HERO (PLAN.md §15.3) ================= */}
+        <div className="person-hero">
+          <button type="button" className="person-back" onClick={() => setSelectedPerson(null)} aria-label="Back to directory">
+            <ArrowLeft size={22} />
+          </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <ContactAvatar contact={{ ...selectedPerson, name: formData.name, handle: formData.handle }} size={42} />
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--color-text-primary)', letterSpacing: '-0.5px', margin: 0 }}>
-                    {formData.name || selectedPerson.name}
-                  </h1>
-                  <span style={{ fontSize: '0.68rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
-                    {formData.category.replace('_', ' ').toUpperCase()}
-                  </span>
+          <div className="person-hero-body">
+            <div className="person-hero-avatar">
+              <ContactAvatar contact={{ ...selectedPerson, name: formData.name, handle: formData.handle }} size={120} showStatus={false} />
+            </div>
+
+            <div className="person-hero-text">
+              <span className="person-tag">
+                <span className="person-tag-dot" />
+                {formData.relationship || formData.category.replace('_', ' ')}
+              </span>
+              <h1 className="person-name">{formData.name || selectedPerson.name}</h1>
+              <div className="person-handle">
+                {formData.handle || 'No handle set'}
+                {selectedPerson.senderId ? ' · Instagram linked' : ' · Not linked'}
+              </div>
+
+              <div className="person-stats">
+                <div>
+                  <CountUp value={formData.chatsCount} className="person-stat-value" />
+                  <span className="person-stat-label">Total DMs</span>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>
-                  {formData.handle || 'No handle set'}
+                <div>
+                  <CountUp value={formData.reelsCount} className="person-stat-value" />
+                  <span className="person-stat-label">Shared Reels</span>
+                </div>
+                <div>
+                  <span className="person-stat-value">{lastContactLabel}</span>
+                  <span className="person-stat-label">Last Contact</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Quick Header Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Gemini Black Icon for AI Extraction from Raw Chat */}
-            <button
-              type="button"
-              onClick={() => setIsRawChatModalOpen(true)}
-              style={{
-                background: 'var(--color-text-primary)',
-                color: 'var(--color-surface)',
-                border: 'none',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '7px'
-              }}
-            >
-              <Sparkles size={14} />
-              <span>AI Extract from Raw Chat</span>
+        {/* Floating glass action bar */}
+        <div className="person-actionbar">
+          <motion.button
+            type="button"
+            className="person-cta"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => startAiInterview(selectedPerson)}
+          >
+            <Sparkles size={16} />
+            <span>Start AI Interview</span>
+          </motion.button>
+
+          <div className="person-actions">
+            <button type="button" className="person-action" onClick={handleForceLearn} disabled={isLearning}>
+              <RefreshCw size={15} className={isLearning ? 'animate-spin' : ''} />
+              <span>{isLearning ? 'Learning…' : 'Force Learn DMs'}</span>
             </button>
-
-            <button
-              type="button"
-              onClick={handleSaveInnerForm}
-              style={{
-                background: 'var(--color-text-primary)',
-                border: 'none',
-                color: 'var(--color-surface)',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Save size={14} />
-              <span>Save Profile Changes</span>
+            <button type="button" className="person-action" onClick={() => setLinkingTargetPerson(selectedPerson)}>
+              <Link2 size={15} />
+              <span>{selectedPerson.senderId ? 'Relink Instagram' : 'Link Instagram'}</span>
             </button>
-
+            <button type="button" className="person-action" onClick={() => setIsRawChatModalOpen(true)}>
+              <MessageSquare size={15} />
+              <span>Raw Chat AI Extract</span>
+            </button>
+            <button type="button" className="person-action" onClick={handleSaveInnerForm}>
+              <Save size={15} />
+              <span>Save</span>
+            </button>
             <button
               type="button"
+              className="person-action danger"
+              aria-label="Delete contact"
               onClick={() => {
-                if (window.confirm(`Delete ${selectedPerson.name} from Database?`)) {
+                if (window.confirm(`Delete ${selectedPerson.name}? This removes the contact and their saved profile.`)) {
                   deleteNode(selectedPerson);
                   setSelectedPerson(null);
                 }
               }}
-              title="Delete Person"
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-secondary)',
-                padding: '9px 12px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center'
-              }}
             >
-              <Trash2 size={14} />
+              <Trash2 size={15} />
+              <span>Delete</span>
             </button>
           </div>
+        </div>
+
+        {/* Segmented glass tabs */}
+        <div className="person-tabs" role="tablist">
+          {[
+            { id: 'identity', label: 'Identity & Lore', icon: User },
+            { id: 'routing', label: 'AI Routing & Modes', icon: Bot },
+            { id: 'memories', label: 'Memories & Facts', icon: Sparkles },
+            { id: 'history', label: 'DM History & Tone', icon: MessageSquare },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={profileTab === id}
+              className={`person-tab${profileTab === id ? ' active' : ''}`}
+              onClick={() => setProfileTab(id)}
+            >
+              <Icon size={15} />
+              <span>{label}</span>
+            </button>
+          ))}
         </div>
 
         {/* ================= MODAL: AI RAW CHAT EXTRACTION & CLARIFICATION ================= */}
@@ -908,8 +982,10 @@ export default function RelationshipsPage() {
           </div>
         )}
 
+        {profileTab === 'routing' && (
+          <>
         {/* ================= CARD 1: KNOWLEDGE SCORE & COMPLETENESS ================= */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+        <div className="person-glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
@@ -981,7 +1057,7 @@ export default function RelationshipsPage() {
         </div>
 
         {/* ================= CARD 2: CHAT AUTOMATION CONTROL ================= */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px 24px', marginBottom: '24px' }}>
+        <div className="person-glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
@@ -1073,9 +1149,33 @@ export default function RelationshipsPage() {
             </button>
           </div>
         </div>
+        </>
+        )}
+
+        {profileTab === 'identity' && (
+          <>
+          {/* Birthday countdown */}
+          <div className="person-glass-card person-birthday">
+            <div className="person-birthday-icon"><Cake size={22} /></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="person-card-eyebrow">BIRTHDAY</div>
+              {birthday ? (
+                <div className="person-card-title">
+                  {birthday.days === 0
+                    ? `It's ${formData.name || selectedPerson.name}'s birthday today 🎉`
+                    : `${birthday.days} day${birthday.days === 1 ? '' : 's'} to go`}
+                </div>
+              ) : (
+                <div className="person-card-title" style={{ color: 'var(--color-text-secondary)' }}>No birthday saved yet</div>
+              )}
+              <div className="person-card-sub">
+                {birthday ? `${birthday.label}${birthday.turning ? ` · turning ${birthday.turning}` : ''}` : 'Add a date of birth in the fields below'}
+              </div>
+            </div>
+          </div>
 
         {/* ================= CARD 3: PREDEFINED NECESSARY FIELDS ================= */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+        <div className="person-glass-card">
           <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '4px' }}>
             PROFILE FIELDS
           </div>
@@ -1327,7 +1427,7 @@ export default function RelationshipsPage() {
         </div>
 
         {/* ================= CARD 4: SOCIAL CONNECTIONS (WITH SUGGESTIONS) ================= */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+        <div className="person-glass-card">
           <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '4px' }}>
             SOCIAL GRAPH
           </div>
@@ -1451,9 +1551,13 @@ export default function RelationshipsPage() {
             </form>
           </div>
         </div>
+        </>
+        )}
 
+        {profileTab === 'memories' && (
+          <>
         {/* ================= CARD 5: SYNTHESIZED INTEL (LINKED TO LORE) ================= */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
+        <div className="person-glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
@@ -1576,6 +1680,89 @@ export default function RelationshipsPage() {
             </button>
           </div>
         </div>
+        </>
+        )}
+
+        {profileTab === 'history' && (
+          <>
+            {/* Tone controls */}
+            <div className="person-glass-card">
+              <div className="person-card-eyebrow">TONE</div>
+              <div className="person-card-title" style={{ marginBottom: '18px' }}>How the AI talks to {formData.name || selectedPerson.name}</div>
+
+              <label className="person-field-label" htmlFor="roastiness">
+                <span>Roastiness</span>
+                <span className="person-range-value">{formData.roastiness}%</span>
+              </label>
+              <input
+                id="roastiness"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={formData.roastiness}
+                onChange={e => setFormData(prev => ({ ...prev, roastiness: Number(e.target.value) }))}
+                className="person-range"
+                style={{ '--range-fill': `${formData.roastiness}%` }}
+              />
+              <div className="person-range-scale">
+                <span>Kind</span>
+                <span>Playful</span>
+                <span>Savage</span>
+              </div>
+
+              <label className="person-field-label" htmlFor="greetingStyle" style={{ marginTop: '20px' }}>
+                <span>Greeting style</span>
+              </label>
+              <input
+                id="greetingStyle"
+                type="text"
+                maxLength={120}
+                placeholder='e.g. "yo", "heyy", "macha enna da"'
+                value={formData.greetingStyle}
+                onChange={e => setFormData(prev => ({ ...prev, greetingStyle: e.target.value }))}
+              />
+              <div className="person-chip-row">
+                {['hey', 'yo', 'heyy', 'wassup', 'bro', 'macha'].map(g => (
+                  <button
+                    key={g}
+                    type="button"
+                    className={`person-chip${formData.greetingStyle === g ? ' active' : ''}`}
+                    onClick={() => setFormData(prev => ({ ...prev, greetingStyle: g }))}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+
+              <button type="button" className="person-cta" style={{ marginTop: '20px' }} onClick={handleSaveInnerForm}>
+                <Save size={15} />
+                <span>Save tone</span>
+              </button>
+            </div>
+
+            {/* DM transcript preview */}
+            <div className="person-glass-card">
+              <div className="person-card-eyebrow">RECENT DMS</div>
+              <div className="person-card-title" style={{ marginBottom: '14px' }}>Conversation preview</div>
+              {!selectedPerson.senderId ? (
+                <div className="person-card-sub">Link their Instagram to see the DM history here.</div>
+              ) : dmPreview.loading ? (
+                <div className="person-card-sub">Loading messages…</div>
+              ) : dmPreview.messages.length === 0 ? (
+                <div className="person-card-sub">No messages yet.</div>
+              ) : (
+                <div className="person-transcript">
+                  {dmPreview.messages.map((m, i) => (
+                    <div key={m.mid || i} className={`person-bubble ${m.role === 'assistant' ? 'out' : 'in'}`}>
+                      {m.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     );
   }
