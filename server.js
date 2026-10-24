@@ -24,6 +24,7 @@ const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
+const { humanizeReply, splitIntoBubbles, bubbleGapMs } = require('./services/humanizeService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
 const cryptoService = require('./services/cryptoService');
@@ -799,6 +800,9 @@ async function dispatchDebouncedReply(queueEntry) {
       replyText = replyText.replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
     }
 
+    // Strip robotic clichés / bullets and apply casual texting punctuation (§15.6)
+    if (replyText) replyText = humanizeReply(replyText, { isBusiness: isBusinessTenant });
+
     const lowerIn = (combinedText || '').toLowerCase();
     const lowerReply = (replyText || '').toLowerCase();
     const isExplicitMediaRequest = /send (?:gif|meme|pic|image)|gif send|send a (?:gif|meme)|meme anupu|gif anupu/i.test(lowerIn);
@@ -890,7 +894,15 @@ async function dispatchDebouncedReply(queueEntry) {
 
     const hasText = !!(replyText && replyText.trim().length > 0);
     if (hasText) {
-      sendResult = await instagramService.sendTextMessage(senderId, replyText, creatorAccessToken, lastMid);
+      // Personal replies with two distinct thoughts go out as 2-3 bubbles, 1-2s apart (§15.6.5)
+      const bubbles = isBusinessTenant ? [replyText] : splitIntoBubbles(replyText);
+      sendResult = await instagramService.sendTextMessage(senderId, bubbles[0], creatorAccessToken, lastMid);
+      for (const bubble of bubbles.slice(1)) {
+        if (sendResult?.success !== true) break;
+        instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, bubbleGapMs()));
+        await instagramService.sendTextMessage(senderId, bubble, creatorAccessToken);
+      }
     }
 
     // If a sticker or media attachment was chosen, send the image/GIF directly to Instagram DM!
