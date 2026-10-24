@@ -2,6 +2,7 @@ import './globals.css';
 import { AppProvider } from './context/AppContext';
 import AuthGate from './components/AuthGate';
 import AmbientBackground from './components/AmbientBackground';
+import InstagramSetupModal from './components/InstagramSetupModal';
 import { themeBootScript } from './lib/themeBoot';
 
 export const metadata = {
@@ -34,6 +35,7 @@ export default function RootLayout({ children }) {
           <AuthGate>
             {children}
           </AuthGate>
+          <InstagramSetupModal />
         </AppProvider>
       </body>
     </html>
