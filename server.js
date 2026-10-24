@@ -217,6 +217,7 @@ app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
 app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
 app.use('/api/workspace', requireAuth, require('./routes/workspace'));
+app.use('/api/storyboard', requireAuth, require('./routes/storyboard'));
 
 // CORS-safe image proxy so the frontend canvas can sample avatar colours (PLAN.md §15.2).
 // Only Instagram / Facebook CDN hosts are allowed, so it can't be used as an open proxy.
