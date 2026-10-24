@@ -122,12 +122,12 @@ function extractBookingSignals(incomingText, replyText = '', now = new Date()) {
 /**
  * Records leads and bookings for one business conversation turn. Never throws.
  */
-async function processConversationTurn({ ownerId, senderId, handle = '', incomingText, replyText = '' }) {
+async function processConversationTurn({ ownerId, senderId, handle = '', incomingText, replyText = '', captureLeads = true, captureBookings = true }) {
   if (!ownerId || !senderId) return { lead: null, booking: null };
   const result = { lead: null, booking: null };
 
   try {
-    const lead = extractLeadSignals(incomingText, replyText);
+    const lead = captureLeads ? extractLeadSignals(incomingText, replyText) : { isLead: false };
     if (lead.isLead) {
       const existing = await Lead.findOne({ ownerId, senderId });
       const summary = Array.from(new Set([
@@ -153,7 +153,7 @@ async function processConversationTurn({ ownerId, senderId, handle = '', incomin
   }
 
   try {
-    const booking = extractBookingSignals(incomingText, replyText);
+    const booking = captureBookings ? extractBookingSignals(incomingText, replyText) : { isBooking: false };
     if (booking.isBooking) {
       // Update the customer's latest open booking instead of creating duplicates
       const open = await Booking.findOne({ ownerId, senderId, status: { $in: ['pending', 'confirmed'] } }).sort({ createdAt: -1 });

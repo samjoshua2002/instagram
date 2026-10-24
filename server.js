@@ -25,6 +25,7 @@ const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
+const workspaceFeatureService = require('./services/workspaceFeatureService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
 const cryptoService = require('./services/cryptoService');
@@ -215,6 +216,7 @@ app.use('/api/giphy', requireAuth);
 app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
 app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
+app.use('/api/workspace', requireAuth, require('./routes/workspace'));
 
 // CORS-safe image proxy so the frontend canvas can sample avatar colours (PLAN.md §15.2).
 // Only Instagram / Facebook CDN hosts are allowed, so it can't be used as an open proxy.
@@ -691,7 +693,8 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   // 5. If user shared a Reel/Post or media, react with an emoji first (personal accounts only)
   const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
-  if (!isBusinessTenant && isReelOrShare && mid && mid !== 'random_mid') {
+  const workspaceFeatures = await workspaceFeatureService.getFeaturesSafe(ownerUser);
+  if (!isBusinessTenant && workspaceFeatures.enabledFeatures.reelEmojiReactions && isReelOrShare && mid && mid !== 'random_mid') {
     const ownerFilter = ownerUser
       ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] }
       : {};
@@ -788,6 +791,7 @@ async function dispatchDebouncedReply(queueEntry) {
 
   // Business tenants: no stickers or GIFs, professional fallbacks, escalations hand off to a human
   const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
+  const { enabledFeatures } = await workspaceFeatureService.getFeaturesSafe(ownerUser);
   const businessDecision = isBusinessTenant
     ? celRuleEngine.evaluateForTenant({
         accountType: 'business',
@@ -814,6 +818,7 @@ async function dispatchDebouncedReply(queueEntry) {
         incomingText: combinedText,
         config,
         tenant: ownerUser,
+        features: enabledFeatures,
       });
     } catch (aiErr) {
       console.error(`❌ [AI Generation Error]:`, aiErr.message);
@@ -833,7 +838,7 @@ async function dispatchDebouncedReply(queueEntry) {
     }
 
     // Strip robotic clichés / bullets and apply casual texting punctuation (§15.6)
-    if (replyText) replyText = humanizeReply(replyText, { isBusiness: isBusinessTenant }) || fallbackReply;
+    if (replyText && enabledFeatures.antiAiHumanMimicry) replyText = humanizeReply(replyText, { isBusiness: isBusinessTenant }) || fallbackReply;
 
     const lowerIn = (combinedText || '').toLowerCase();
     const lowerReply = (replyText || '').toLowerCase();
@@ -859,7 +864,7 @@ async function dispatchDebouncedReply(queueEntry) {
 
     // 3. SPORADIC MEDIA DISPATCH (Only when Governor permits):
     // Cadence: Reply 2 or 3 text messages in a row, then ~1 in 6 random chance ("bullet in trigger out of 6") or high-confidence reaction
-    if (!isBusinessTenant && !stickerType && canSendMedia(senderId, isExplicitMediaRequest)) {
+    if (!isBusinessTenant && enabledFeatures.mediaStickerVault && !stickerType && canSendMedia(senderId, isExplicitMediaRequest)) {
       let detectedCat = null;
       if (isExplicitMediaRequest) {
         detectedCat = 'joy';
@@ -881,8 +886,8 @@ async function dispatchDebouncedReply(queueEntry) {
       }
     }
 
-    // Stickers, GIFs and meme drops are never sent for business accounts
-    if (isBusinessTenant) stickerType = null;
+    // Stickers, GIFs and meme drops are never sent for business accounts or with the Media Vault feature off
+    if (isBusinessTenant || !enabledFeatures.mediaStickerVault) stickerType = null;
 
     // Calculate dynamic human-realistic typing latency:
     // - Emojis / reactions (<= 4 chars or pure emoji): quick tap (1800ms - 3000ms)
@@ -896,7 +901,10 @@ async function dispatchDebouncedReply(queueEntry) {
     const isUltraShort = charLength <= 4 || isEmojiOnly;
 
     let humanTypingDelayMs;
-    if (isUltraShort || (isReelOrShare && charLength <= 8)) {
+    if (!enabledFeatures.antiAiHumanMimicry) {
+      // Human Mimicry feature off: reply promptly with a short fixed pause
+      humanTypingDelayMs = 1200;
+    } else if (isUltraShort || (isReelOrShare && charLength <= 8)) {
       humanTypingDelayMs = Math.min(Math.max(charLength * 40 + 1500, 1800), 3000);
     } else if (charLength <= 35) {
       humanTypingDelayMs = Math.min(Math.max(charLength * 90 + 2000, 3500), 6500);
@@ -927,7 +935,7 @@ async function dispatchDebouncedReply(queueEntry) {
     const hasText = !!(replyText && replyText.trim().length > 0);
     if (hasText) {
       // Personal replies with two distinct thoughts go out as 2-3 bubbles, 1-2s apart (§15.6.5)
-      const bubbles = isBusinessTenant ? [replyText] : splitIntoBubbles(replyText);
+      const bubbles = (isBusinessTenant || !enabledFeatures.antiAiHumanMimicry) ? [replyText] : splitIntoBubbles(replyText);
       sendResult = await instagramService.sendTextMessage(senderId, bubbles[0], creatorAccessToken, lastMid);
       for (const bubble of bubbles.slice(1)) {
         if (sendResult?.success !== true) break;
@@ -1017,18 +1025,20 @@ async function dispatchDebouncedReply(queueEntry) {
     }
 
     // Business conversion analytics: capture leads and bookings from this exchange
-    if (isBusinessTenant && ownerUser) {
+    if (ownerUser && (enabledFeatures.leadExtraction || enabledFeatures.bookingScheduler)) {
       analyticsService.processConversationTurn({
         ownerId: ownerUser._id,
         senderId,
         handle: userMemory.username || '',
         incomingText: combinedText,
         replyText: textDelivered ? replyText : '',
+        captureLeads: enabledFeatures.leadExtraction,
+        captureBookings: enabledFeatures.bookingScheduler,
       }).catch(() => {});
     }
 
     // Business escalation: pause the bot for this customer and queue them for a human
-    if (businessDecision?.shouldEscalate) {
+    if (businessDecision?.shouldEscalate && enabledFeatures.humanHandoffInbox) {
       const reason = businessDecision.context.message.matchedEscalation || businessDecision.chatType;
       await UserMemory.updateOne(
         { senderId },

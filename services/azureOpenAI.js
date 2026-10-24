@@ -36,7 +36,7 @@ class AzureOpenAIService {
    * Generates a reply mimicking Sam Joshua's exact tone, adapting to the user's conversation style,
    * referencing remembered facts, and drawing upon the social graph network of friends.
    */
-  async generateReply({ userMemory, messageHistory, incomingText, config: passedConfig, tenant = null }) {
+  async generateReply({ userMemory, messageHistory, incomingText, config: passedConfig, tenant = null, features = null }) {
     // 1. Fetch persona config (use passed creator config or fallback)
     let config = passedConfig;
     if (!config) {
@@ -53,7 +53,20 @@ class AzureOpenAIService {
     // Business tenants get a separate prompt: no personal slang rules, stickers or forced lowercase
     const accountType = tenant?.accountType || config.accountType || 'personal';
     if (celRuleEngine.isBusinessAccount(accountType)) {
-      return this.generateBusinessReply({ userMemory, messageHistory, incomingText, config, tenant });
+      return this.generateBusinessReply({ userMemory, messageHistory, incomingText, config, tenant, features });
+    }
+
+    // Hybrid workspaces keep the personal voice but can ground replies in their documents (Feature Store)
+    let personalKnowledgeSection = '';
+    if (features?.ragKnowledgeBase && (tenant?._id || config.ownerId)) {
+      try {
+        const knowledge = await ragService.retrieve({ ownerId: tenant?._id || config.ownerId, incomingText });
+        if (knowledge.context) {
+          personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; QUOTE PRICES AND LINKS EXACTLY):\n${knowledge.context}\n`;
+        }
+      } catch (err) {
+        console.warn('⚠️ [RAG] Personal retrieval failed:', err.message);
+      }
     }
 
     // 1b. Fetch active reaction categories from user's Media Vault
@@ -230,7 +243,7 @@ STYLE & TONE GUIDELINES:
 ${config.toneGuidelines}
 
 ${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${config.customKnowledge}\n` : ''}
-
+${personalKnowledgeSection}
 ACTIVE CEL DIRECTIVE FOR THIS EXACT CONVERSATION:
 ${directives.modeInstruction}
 ${directives.lengthInstruction}
@@ -276,8 +289,10 @@ BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - Do NOT use cringe AI phrases. Never say "chose violence" or any variant.
 
 LANGUAGE RULE:
-- DEFAULT TO ENGLISH: You and your friends usually chat in casual English.
-- If the user explicitly texts in Tamil, Tanglish, or mixes Tamil/English (e.g. Arun, Rubesh, Tamil homies), reply in natural, conversational Tanglish phonetics (dei, enna da, seri seri, apdiya da, semma bro, vera level, paravala). Otherwise, stay in casual English.
+${features?.multiLanguageMirroring === false
+  ? '- ALWAYS reply in casual English, even if they text in another language.'
+  : `- DEFAULT TO ENGLISH: You and your friends usually chat in casual English.
+- If the user explicitly texts in Tamil, Tanglish, or mixes Tamil/English (e.g. Arun, Rubesh, Tamil homies), reply in natural, conversational Tanglish phonetics (dei, enna da, seri seri, apdiya da, semma bro, vera level, paravala). Otherwise, stay in casual English.`}
 
 HANDLING USER CORRECTIONS & PASSIVE LEARNING:
 - If the user corrects any detail (e.g. "no my bday is actually June 10", "no that's not my school", "i don't live in chennai"):
@@ -362,7 +377,9 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
 
     try {
       // Tenant's own AI provider first (BYO-LLM / Ollama / MCP); null means use platform Azure
-      let reply = await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 220, temperature: 0.90 });
+      let reply = features?.byoLlmCustomEndpoint === false
+        ? null
+        : await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 220, temperature: 0.90 });
       if (reply === null) {
         let client = this.getClient(selectedModel);
         let response;
@@ -445,7 +462,7 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
   /**
    * Business reply: professional brand voice driven by business CEL directives (hours, escalation, refunds, discounts)
    */
-  async generateBusinessReply({ userMemory, messageHistory, incomingText, config, tenant }) {
+  async generateBusinessReply({ userMemory, messageHistory, incomingText, config, tenant, features = null }) {
     const policy = config.businessPolicy || {};
     const business = tenant?.businessProfile || {};
     const businessName = business.businessName || config.creatorName || 'our business';
@@ -462,10 +479,12 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
 
     // Grounding: the tenant's uploaded documents that match this question
     let knowledge = { chunks: [], wantsDocument: false, context: '' };
-    try {
-      knowledge = await ragService.retrieve({ ownerId: tenant?._id || config.ownerId, incomingText });
-    } catch (err) {
-      console.warn('⚠️ [RAG] Retrieval failed:', err.message);
+    if (features?.ragKnowledgeBase !== false) {
+      try {
+        knowledge = await ragService.retrieve({ ownerId: tenant?._id || config.ownerId, incomingText });
+      } catch (err) {
+        console.warn('⚠️ [RAG] Retrieval failed:', err.message);
+      }
     }
     const knowledgeSection = knowledge.context
       ? `VERIFIED KNOWLEDGE FROM THE BUSINESS'S DOCUMENTS:
@@ -494,6 +513,7 @@ ${directives.customDirectives.length ? directives.customDirectives.map(d => `- $
 RESPONSE RULES:
 ${directives.rules.map(r => `- ${r}`).join('\n')}
 - If you do not know the answer, say a team member will confirm and follow up. Never guess.
+${features?.multiLanguageMirroring === false ? '- Always reply in English.' : '- Reply in the same language the customer writes in.'}
 ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- NEVER SAY: ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
 
 CUSTOMER:
@@ -515,7 +535,9 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     messages.push({ role: 'user', content: incomingText });
 
     // Tenant's own AI provider first; null means use platform Azure
-    let content = await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 300, temperature: 0.4 });
+    let content = features?.byoLlmCustomEndpoint === false
+      ? null
+      : await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 300, temperature: 0.4 });
     if (content === null) {
       let client = this.getClient(selectedModel);
       let response;
