@@ -102,6 +102,15 @@ const UserMemorySchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // Business handoff: set when a customer escalates; the bot pauses until a human resolves it
+  handoffRequestedAt: {
+    type: Date,
+    default: null,
+  },
+  handoffReason: {
+    type: String,
+    default: '',
+  },
   replyToMessages: {
     type: Boolean,
     default: true,
