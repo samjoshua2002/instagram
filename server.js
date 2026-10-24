@@ -373,6 +373,10 @@ function handleCreatorEcho(event, accountId) {
 
   const text = event.message?.text || (event.message?.attachments?.length ? '[Shared Media / Sticker]' : '');
   const mid = event.message?.mid || `echo_${Date.now()}`;
+
+  // Echo of a reply this app just sent: already saved, and it must not cancel the next AI reply
+  if (instagramService.isAppEcho(contactId, event.message?.mid)) return;
+
   console.log(`📱 [Creator Echo]: Sam manually replied to ${contactId}: "${text}"`);
 
   // Cancel any active AI debounce queue so the bot doesn't reply over the creator
@@ -384,16 +388,6 @@ function handleCreatorEcho(event, accountId) {
 
   const senderAccountId = accountId || event.sender?.id || process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
 
-  // Record outgoing message in DB
-  Message.create({
-    senderId: senderAccountId,
-    recipientId: contactId,
-    role: 'assistant',
-    text: text || '[Media]',
-    mid,
-    sentByAI: false,
-    timestamp: new Date(),
-  }).catch(() => {});
 
   // Update contact's memory: fresh interaction reactivates the conversation & resets reminder cycle
   UserMemory.updateOne({ senderId: contactId }, {
@@ -402,15 +396,29 @@ function handleCreatorEcho(event, accountId) {
     $inc: { messageCount: 1 }
   }).catch(() => {});
 
-  // Atomically update creator-scoped SocialGraph contact node
+  // Save the reply and update the creator-scoped SocialGraph contact node
   (async () => {
     try {
       const ownerUser = await User.findOne({
         $or: [
+          { 'instagram.accountId': senderAccountId },
           { instagramAccountId: senderAccountId },
           { 'businessProfile.instagramId': senderAccountId }
         ]
       });
+
+      // Record outgoing message in DB (owned, so business stats count the human reply)
+      await Message.create({
+        ownerId: ownerUser?._id || null,
+        senderId: senderAccountId,
+        recipientId: contactId,
+        role: 'assistant',
+        text: text || '[Media]',
+        mid,
+        sentByAI: false,
+        timestamp: new Date(),
+      }).catch(() => {});
+
       const creatorFilter = ownerUser 
         ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] } 
         : { $or: [{ ownerUsername: 'samjoshua' }, { ownerUsername: null }, { ownerUsername: { $exists: false } }] };
@@ -1155,6 +1163,7 @@ app.post('/api/conversations/:senderId/toggle-ai', async (req, res) => {
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
     memory.aiEnabled = !memory.aiEnabled;
+    if (memory.aiEnabled) memory.handoffRequestedAt = null;
     await memory.save();
 
     res.json({ success: true, aiEnabled: memory.aiEnabled });
@@ -1180,6 +1189,7 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
 
     // Save in DB
     const newMsg = await Message.create({
+      ownerId: memory?.ownerId || req.user?._id || null,
       senderId: 'me',
       recipientId: senderId,
       role: 'assistant',
@@ -1228,6 +1238,7 @@ app.post('/api/conversations/:senderId/preferences', async (req, res) => {
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
     if (typeof aiEnabled === 'boolean') memory.aiEnabled = aiEnabled;
+    if (aiEnabled === true) memory.handoffRequestedAt = null;
     if (typeof replyToMessages === 'boolean') memory.replyToMessages = replyToMessages;
     if (typeof replyToReelsAndPosts === 'boolean') memory.replyToReelsAndPosts = replyToReelsAndPosts;
     if (typeof remindersEnabled === 'boolean') memory.remindersEnabled = remindersEnabled;
@@ -1273,18 +1284,12 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
   try {
     const { senderId } = req.params;
 
-    // 1. Run memory extraction from current messages
+    // Run memory extraction from current messages
     await memoryService.updateMemoryAsync(senderId);
 
-    // 2. After learning, delete raw message TEXT from DB for this user
-    //    but do NOT touch messageCount / reelsCount (those are on UserMemory, not Message docs)
-    const deleted = await Message.deleteMany({
-      $or: [{ senderId }, { recipientId: senderId }]
-    });
-    console.log(`🧹 [Post-Learn Cleanup] Deleted ${deleted.deletedCount} raw messages for ${senderId} — intel preserved in UserMemory.`);
-
+    // Chat history is kept: the inbox and the AI's reply context both read it
     const updatedMemory = await UserMemory.findOne({ senderId });
-    res.json({ success: true, memory: updatedMemory, deletedMessages: deleted.deletedCount });
+    res.json({ success: true, memory: updatedMemory });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2038,18 +2043,6 @@ app.get('/data-deletion/status', (req, res) => {
   `);
 });
 
-
-// Endpoint to manually trigger 3-day message cleanup and view freed space
-app.post('/api/cleanup', async (req, res) => {
-  try {
-    const days = parseInt(req.body.days) || 3;
-    const deletedCount = await memoryService.cleanOldMessages(days);
-    res.json({ success: true, deletedCount, message: `Deleted ${deletedCount} messages older than ${days} days` });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Social Graph Tree Chain Endpoints (auto-discovers newly talked contacts & enriches with live DP & per-person AI settings)
 let lastTrainGraphTime = 0;
 app.get('/api/social-graph', async (req, res) => {
@@ -2744,9 +2737,17 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
     const cleanId = (identifier || '').trim();
     const cleanHandle = cleanId.replace(/^@/, '');
 
+    // Only this workspace's contacts (a name match must never pause another account's chat)
+    const isSuper = req.user?.role === 'superadmin';
+    const memoryOwner = isSuper ? {} : { ownerId: req.user._id };
+    const graphOwner = isSuper ? {} : { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] };
+    // Turning AI back on also closes an open handoff
+    const handoffReset = finalAiEnabled === true ? { handoffRequestedAt: null, handoffReason: null } : {};
+
     // Update UserMemory if present
     await UserMemory.updateMany(
       {
+        ...memoryOwner,
         $or: [
           { senderId: cleanId },
           { username: new RegExp(`^${escapeRegex(cleanHandle)}$`, 'i') },
@@ -2757,7 +2758,8 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
         $set: {
           ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
           ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
-          ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {})
+          ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {}),
+          ...handoffReset
         }
       }
     );
@@ -2765,6 +2767,7 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
     // Update SocialGraph if present
     await SocialGraph.updateMany(
       {
+        $and: [graphOwner],
         $or: [
           { senderId: cleanId },
           { instagramHandle: new RegExp(`^@?${escapeRegex(cleanHandle)}$`, 'i') },
