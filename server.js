@@ -164,6 +164,16 @@ app.use('/uploads', express.static(uploadsDir));
 // Authentication & Passkey Endpoints
 app.use('/api/auth', authRouter);
 
+// Desktop installers for the /download portal; update config/desktopReleases.json on each release
+app.get('/api/desktop/releases', (req, res) => {
+  try {
+    const releases = JSON.parse(require('fs').readFileSync(path.join(__dirname, 'config', 'desktopReleases.json'), 'utf8'));
+    res.json(releases);
+  } catch (err) {
+    res.status(500).json({ error: 'Desktop releases are not available right now' });
+  }
+});
+
 // Aliases for Instagram handle check and Admin accounts
 app.use('/api/instagram/check-handle', (req, res, next) => {
   const queryIndex = req.url.indexOf('?');

@@ -22,7 +22,11 @@ import {
   Settings,
   Plus,
   ArrowLeftRight,
-  Zap
+  Zap,
+  Activity,
+  Download,
+  FileText,
+  Inbox
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -122,19 +126,35 @@ export default function Sidebar() {
     (user?.username === 'samjoshua')
   );
 
+  // 'business' and 'agency' workspaces get the business menu; 'personal' and 'creator' the personal one
+  const isBusiness = ['business', 'agency'].includes(user?.accountType);
+
   const navItems = isPureSuperadmin
     ? [
         { href: '/', label: 'Platform Console', icon: LayoutDashboard, code: '01' },
         { href: '/admin', label: 'User Workspaces', icon: Users, code: '02' },
+        { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity, code: '03' },
+        { href: '/download', label: 'Desktop Releases', icon: Download, code: '04' },
       ]
-    : [
-        { href: '/', label: 'Dashboard', icon: LayoutDashboard, code: '01' },
-        { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
-        { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
-        { href: '/settings', label: 'Persona & Style', icon: UserCheck, code: '04' },
-        { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '05' },
-        ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '06' }] : [])
-      ];
+    : isBusiness
+      ? [
+          { href: '/', label: 'Business Dashboard', icon: LayoutDashboard, code: '01' },
+          { href: '/documents', label: 'Document & Service Vault', icon: FileText, code: '02' },
+          { href: '/controls', label: 'Business Policy & Hours', icon: Sliders, code: '03' },
+          { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck, code: '04' },
+          { href: '/relationships', label: 'Customer Inbox & Handoff', icon: Inbox, code: '05' },
+          { href: '/download', label: 'Desktop App', icon: Download, code: '06' },
+          ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '07' }] : [])
+        ]
+      : [
+          { href: '/', label: 'Dashboard', icon: LayoutDashboard, code: '01' },
+          { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
+          { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
+          { href: '/settings', label: 'Persona & AI Model', icon: UserCheck, code: '04' },
+          { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '05' },
+          { href: '/download', label: 'Desktop App', icon: Download, code: '06' },
+          ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '07' }] : [])
+        ];
 
   const displayName = isPureSuperadmin
     ? 'Platform Superadmin'
@@ -308,7 +328,29 @@ export default function Sidebar() {
               </Link>
             </motion.div>
 
-            {/* Tab 3: Security & Passkeys */}
+            {/* Tab 3: Token Health Radar */}
+            <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
+              <Link
+                href="/admin/tokens"
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  textDecoration: 'none',
+                  color: pathname === '/admin/tokens' ? '#09090b' : '#a1a1aa',
+                  transition: 'all 0.15s ease',
+                  padding: '6px 0'
+                }}
+              >
+                <Activity size={19} strokeWidth={pathname === '/admin/tokens' ? 2.5 : 1.8} />
+                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/admin/tokens' ? '700' : '500' }}>Tokens</span>
+              </Link>
+            </motion.div>
+
+            {/* Tab 4: Security & Passkeys */}
             <motion.div variants={mobileTabVariant} style={{ flex: 1, display: 'flex' }}>
               <button
                 type="button"
@@ -373,8 +415,10 @@ export default function Sidebar() {
                   padding: '6px 0'
                 }}
               >
-                <Users size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/relationships' ? '700' : '500' }}>People</span>
+                {isBusiness
+                  ? <Inbox size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />
+                  : <Users size={19} strokeWidth={pathname === '/relationships' ? 2.5 : 1.8} />}
+                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/relationships' ? '700' : '500' }}>{isBusiness ? 'Inbox' : 'People'}</span>
               </Link>
             </motion.div>
 
@@ -424,7 +468,7 @@ export default function Sidebar() {
                 }}
               >
                 <Sliders size={19} strokeWidth={pathname === '/controls' ? 2.5 : 1.8} />
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/controls' ? '700' : '500' }}>Rules</span>
+                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/controls' ? '700' : '500' }}>{isBusiness ? 'Policy' : 'Rules'}</span>
               </Link>
             </motion.div>
 
