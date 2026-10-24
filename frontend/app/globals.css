@@ -1538,9 +1538,43 @@ select:focus {
   opacity: 0.45;
 }
 
+.ambient-contours {
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+  opacity: 0.5;
+  mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 75%);
+  animation: ambient-drift 38s ease-in-out infinite alternate;
+}
+
+.ambient-contours path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ambient-accent) 22%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.ambient-contours path.strong {
+  stroke: color-mix(in srgb, var(--ambient-accent) 38%, transparent);
+}
+
+:root[data-theme="light"] .ambient-contours {
+  opacity: 0.35;
+}
+
+@keyframes ambient-drift {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(-2.5%, 1.5%, 0) rotate(-1.5deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ambient-layer {
     transition: none;
+  }
+
+  .ambient-contours {
+    animation: none;
   }
 }
 
