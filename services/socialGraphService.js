@@ -299,6 +299,14 @@ class SocialGraphService {
         if (senderNode.roastStyle) {
           lines.push(`  - How to banter/roast them: ${senderNode.roastStyle}`);
         }
+        if (Number.isFinite(senderNode.roastiness)) {
+          const r = senderNode.roastiness;
+          const tone = r >= 75 ? 'savage, roast them hard (still affectionate)' : r >= 45 ? 'playful teasing' : r >= 20 ? 'light, gentle teasing' : 'kind and warm, no roasting';
+          lines.push(`  - Roastiness ${r}/100: ${tone}`);
+        }
+        if (senderNode.greetingStyle) {
+          lines.push(`  - Greet / open chats with them like: "${senderNode.greetingStyle}"`);
+        }
       }
 
       if (mentionedNodes.size > 0) {
