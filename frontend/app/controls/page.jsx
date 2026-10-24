@@ -52,7 +52,7 @@ export default function ControlsPage() {
     setControlsLayout(mode);
     try {
       localStorage.setItem('chatter_controls_layout', mode);
-    } catch {}
+    } catch { }
   };
 
   const friendNodes = useMemo(() => {
@@ -1068,10 +1068,10 @@ export default function ControlsPage() {
               (activeTab === 'reels_only' && reelsOnlyContacts.length === 0) ||
               (activeTab === 'manual' && manualContacts.length === 0) ||
               (activeTab === 'all' && filteredFriends.length === 0)) && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: '#a1a1aa', fontSize: '0.85rem' }}>
-                No contacts found matching this view.
-              </div>
-            )}
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: '#a1a1aa', fontSize: '0.85rem' }}>
+                  No contacts found matching this view.
+                </div>
+              )}
           </motion.div>
         )}
       </div>

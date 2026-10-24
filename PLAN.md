@@ -449,3 +449,260 @@ graph TD
   - `localStorage` keys scoped per user (`chatter_persona_config_<uid>`).
   - 0ms instant optimistic UI state toggles with 350ms debounced background server sync.
   - Multi-layout switcher (`dense`, `list`, `grid`) in Chat Controls.
+
+---
+
+## 15. Pure Spotify Dynamic Ambient Glass UI & Mobile-First Design System Specification
+
+### 15.1 Architectural Vision & The True Spotify Design Philosophy
+A common misconception is that Spotify's UI is merely "black and green." In reality, Spotify's signature visual identity is **100% dynamic and image-driven**:
+1. **Dynamic Image-Reactive Atmosphere:** In every inner detail page (artist profile, album view, playlist, contact profile), the entire background ambient lighting, gradient meshes, edge highlights, and translucent tints **dynamically extract from the active picture/artwork**. The page breathes and shifts colors whenever a new photo or contact is viewed.
+2. **True Dark Foundation Surfaces:**
+   - Application Background: `#121212`
+   - Primary Surface: `#181818`
+   - Elevated Surface: `#202020`
+   - Hovered Surface: `#282828`
+   - Primary Text: `#FFFFFF`
+   - Secondary Text: `#B3B3B3`
+   - Muted Text: `#858585`
+   - System Neutral Fallback Accent: `#1DB954` (Spotify Green, used only when no image is present)
+3. **No Hardcoded Static Colors:** No arbitrary purples, blues, or random gradients. All ambient lighting is derived algorithmically from the active image or contact avatar.
+4. **Full Creative Control for Claude:** Claude has complete autonomy to redesign the entire interface. Claude is not constrained by previous layouts. Claude is instructed to master the dynamic Spotify UI system, fix all UI logic across the entire platform, and build a world-class, compact, mobile-first experience.
+
+---
+
+### 15.2 Real-Time Image Color Extraction Pipeline
+
+```mermaid
+graph TD
+    A[Active Contact Avatar / Album Art Pic] --> B[Offscreen 64x64 Canvas Sampler]
+    B --> C[Dynamic Palette Clustering: Dominant, Secondary, Accent]
+    C --> D[Luminance & Saturation Calibration]
+    D --> E[Inject CSS Variables to DOM :root]
+    E --> F[--ambient-dominant, --ambient-secondary, --ambient-accent]
+    F --> G[Multi-Layer Dynamic Radial & Linear Gradient Mesh]
+    G --> H[Smooth 400-800ms Crossfade Transition]
+```
+
+#### 15.2.1 How the Dynamic System Works:
+1. **Artwork Loading:** Load the contact's avatar or album cover image asynchronously (`crossOrigin="anonymous"`).
+2. **Canvas Sampling:** Render into an offscreen $64 \times 64$ HTML5 `<canvas>`.
+3. **Palette Clustering:**
+   - Extract chromatic pixel clusters, filtering out pure whites ($L > 92\%$) and muddy grays ($S < 15\%$).
+   - Identify the most vibrant chromatic tone as `--ambient-dominant`.
+   - Identify the secondary harmonizing tone as `--ambient-secondary`.
+   - Compute `--ambient-accent` (vibrant highlight) and `--ambient-background` (dark ambient base, $L \approx 8\%$).
+4. **Dynamic CSS Variables Injection:** Write directly to CSS custom properties so the entire page background, glow halo, and glass tint update in real time without triggering heavy React component rerenders.
+
+#### 15.2.2 Dynamic CSS Variables Exposed to the DOM:
+```css
+:root {
+  /* Spotify Core Surfaces */
+  --color-background: #121212;
+  --color-surface: #181818;
+  --color-surface-elevated: #202020;
+  --color-surface-hover: #282828;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #b3b3b3;
+  --color-text-muted: #858585;
+
+  /* Dynamic Ambient Palette (Dynamically Overwritten by Active Image) */
+  --ambient-dominant: #1db954;      /* Fallback: Spotify Green */
+  --ambient-secondary: #1ed760;     /* Fallback: Light Green */
+  --ambient-accent: #1db954;
+  --ambient-background: #0d140e;
+
+  /* Frosted Glass System */
+  --glass-fill-subtle: rgba(255, 255, 255, 0.04);
+  --glass-fill-standard: rgba(255, 255, 255, 0.075);
+  --glass-fill-strong: rgba(18, 18, 18, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.08);
+
+  /* Geometry & Radius */
+  --radius-small: 8px;
+  --radius-card: 20px;
+  --radius-large: 24px;
+  --radius-pill: 9999px;
+
+  /* Motion & Timings */
+  --duration-fast: 180ms;
+  --duration-normal: 250ms;
+  --duration-ambient: 600ms;
+}
+```
+
+#### 15.2.3 Atmospheric Multi-Layer Background Architecture
+The ambient background component sits behind all page content (`z-index: -1`, `pointer-events: none`):
+1. **Base Layer:** Solid `#121212`.
+2. **Blurred Ambient Artwork:** Enlarged blurred layer of the active photo (`filter: blur(75px) brightness(0.5) saturate(1.3)`).
+3. **Dynamic Radial Gradient Mesh:**
+   ```css
+   radial-gradient(ellipse at 25% 15%, color-mix(in srgb, var(--ambient-dominant) 45%, transparent), transparent 60%),
+   radial-gradient(circle at 80% 40%, color-mix(in srgb, var(--ambient-secondary) 30%, transparent), transparent 55%),
+   linear-gradient(180deg, var(--ambient-background) 0%, #121212 75%, #080808 100%)
+   ```
+4. **Readability Overlay:** Subtle dark vignette ensuring foreground text is always 100% crisp and readable.
+
+---
+
+### 15.3 Spotify-Style Inner Person Page (`/relationships` / `http://localhost:3000/people%20directory`)
+
+The inner detail page for any contact in the People Directory must function exactly like a **Spotify Artist / Album Experience**:
+
+1. **Massive Hero Header:**
+   - **Avatar:** Oversized 120px circular profile image with an ambient drop glow halo dynamically matching the photo's dominant color (`box-shadow: 0 12px 40px color-mix(in srgb, var(--ambient-dominant) 55%, transparent)`).
+   - **Real-Time Palette Extraction:** As soon as the contact loads, sample their avatar pic and update `--ambient-dominant` and `--ambient-secondary` so the top half of the screen illuminates in their exact color mood.
+   - **Bold Display Typography:** 36px–44px font weight 800 title displaying the person's name with negative letter spacing (`-0.03em`).
+   - **Dynamic Relationship Tag:** Glowing pill badge reflecting their relationship status (e.g. "VIP Client", "Close Friend", "Lead") with the extracted accent color.
+   - **Live Activity Counters:** Real-time stats for Total DMs, Shared Reels, and Last Contact Date.
+2. **Ambient Header Fade on Scroll:**
+   - Top 40% of the viewport glows with the extracted color mesh.
+   - Smoothly dissolves into deep `#121212` surface as the user scrolls down the details.
+3. **Floating Glass Action Bar:**
+   - **Primary CTA:** **"Start AI Interview"** (Vibrant Spotify-style pill button using the extracted dominant color or `#1db954`, hover scale 1.04).
+   - **Secondary Actions:**
+     - **"Force Learn DMs"** (Trigger memory extraction).
+     - **"Link Instagram"** (Link handle to Meta webhook stream).
+     - **"Raw Chat AI Extract"** (Upload or paste chat logs).
+     - **"Delete Contact"** (Safety confirmation dialog).
+4. **Segmented Frosted Glass Content Cards:**
+   - **Tab 1: Identity & Lore:** Birthday countdown timer card, occupation, education, city, and linked mutual friends.
+   - **Tab 2: AI Routing & Modes:** 3 interactive glass cards:
+     - *Full AI Auto-Reply* (Autonomous responses with personalized tone).
+     - *Reels Only* (Appreciates memes and reels, leaves text DMs for human).
+     - *Stop AI (Manual)* (Bypasses AI entirely).
+   - **Tab 3: Memories & Custom Facts:** Bulleted lore facts with 1-click deletion, tags, and quick-add input with instant optimistic update.
+   - **Tab 4: DM History & Tone:** Conversation transcript preview, roastiness slider (0–100%), and colloquial greeting preferences.
+
+---
+
+### 15.4 Global Zero-Hardcoding Mandate & Shadcn / Tailwind Architectural System
+
+To achieve production-grade consistency across every single page and component, **zero values may be hardcoded**:
+
+1. **Global Form Controls (Inputs, Textareas, Selects, Sliders, Dropdowns):**
+   - **No Hardcoded Colors:** Never write `#ffffff`, `#000000`, `#333`, or static colors on any input, textarea, or button. All form controls must derive dynamically from the Spotify design tokens:
+     ```css
+     input, textarea, select {
+       background: var(--input-bg, rgba(255, 255, 255, 0.055)) !important;
+       border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12)) !important;
+       color: var(--color-text-primary, #ffffff) !important;
+       border-radius: var(--radius-small, 10px);
+       transition: border-color var(--duration-fast, 180ms) ease, box-shadow var(--duration-fast, 180ms) ease;
+     }
+     input:focus, textarea:focus, select:focus {
+       outline: none !important;
+       border-color: var(--ambient-dominant, #1db954) !important;
+       box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-dominant, #1db954) 25%, transparent) !important;
+     }
+     ```
+   - **iOS Safari Auto-Zoom Prevention:** All inputs and textareas on mobile viewports must strictly maintain `font-size: 16px` (or larger) to eliminate iOS Safari's disruptive auto-zooming on focus.
+   - **Touch Hit Target Standard:** Every interactive element—buttons, tabs, inputs, checkboxes, pills, and avatar triggers—must satisfy a minimum **$48 \times 48\text{px}$ tap target** with appropriate padding.
+2. **Shadcn UI & Tailwind CSS Architectural Freedom for Claude:**
+   - **Discard Rudimentary Wireframes:** Claude is explicitly instructed to **not** follow the user's previous simplistic layout or basic wireframe logic. Claude has full authority to design and implement a world-class, premium interface.
+   - **Modern Component Primitives:** Use shadcn-style component ergonomics (accessible Radix/primitive semantics, composable variant architecture, clean token abstractions, and Tailwind CSS / custom CSS utility classes).
+   - **Dual Screen Mastery:** Craft breathtaking visual hierarchy on wide desktop viewports ($1440\text{px}+$ with glass sidebars and wide ambient glow) while completely redesigning the application for smartphone screens ($375\text{px} - 430\text{px}$).
+
+---
+
+### 15.5 Dedicated Mobile-First Redesign Directives (Smartphone-Optimized)
+
+Because over 80% of platform users are on mobile smartphones, the entire UI must be rebuilt mobile-first:
+
+1. **Compact Mobile Viewports ($375\text{px} - 430\text{px}$):**
+   - **Zero Horizontal Overflow:** All layout containers must maintain `max-width: 100vw; overflow-x: hidden;`. All grids must use dynamic wrapping: `grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr))`.
+   - Sidebars are completely hidden on mobile viewports ($\le 768\text{px}$) in favor of native mobile navigation bars.
+2. **Sticky Translucent Bars & Safe Area Handling:**
+   - **Sticky Mobile Top Header:** 54px height, `background: rgba(18, 18, 18, 0.85)`, `backdrop-filter: blur(24px)`, with safe-area top padding (`env(safe-area-inset-top)`). Contains brand mark, active workspace indicator, theme switcher, and profile trigger.
+   - **Sticky Mobile Bottom Tab Bar:** 64px height with safe-area bottom padding (`env(safe-area-inset-bottom)`), `background: rgba(18, 18, 18, 0.85)`, `backdrop-filter: blur(24px)`.
+3. **Mobile Bottom Sheet Drawer (`MobileFeatureSheet.jsx`):**
+   - Opened via the header profile avatar or the bottom bar "More" menu tab.
+   - **Zero Missing Menus:** Exposes 100% of platform capabilities: Dashboard, Documents (RAG), Persona Studio, Chat Controls, People Directory, Media Vault, Desktop Download, Profile & Passkeys, Token Health Radar.
+   - Built-in 1-click Workspace Switcher (Personal $\leftrightarrow$ Business) and Light/Dark Theme Switcher.
+4. **Mobile Native Gestures:**
+   - Long-press on user avatar in `/profile` to launch photo upload sheet.
+   - Swipeable tab bars with smooth touch snapping (`scroll-snap-type: x mandatory`).
+
+---
+
+### 15.6 Ultra-Natural Human Mimicry Reply Logic
+
+To guarantee personal AI responses are completely indistinguishable from real human texting:
+
+1. **Reading & Typing Cadence Formula:**
+   $$\text{Delay (ms)} = \text{clamp}(1200 + (\text{Word Count} \times 180) + \text{random}(-400, 600), 1500, 7000)$$
+2. **Typing Indicator Dispatch:** Send `sender_action: "typing_on"` to the Instagram Graph API 2 seconds before sending the text payload so the recipient sees the native Instagram "..." animation.
+3. **Colloquial Dialect Rules:**
+   - Omit terminal periods on single-sentence responses (terminal periods feel passive-aggressive or robotic in modern texting).
+   - Default to lowercase casual openers (e.g. "hey", "omg", "haha", "yo", "nah wait").
+   - Ban all robotic cliches: "As an AI...", "I hope this helps!", "Certainly!", and structured bulleted lists.
+4. **Reel Appreciation Engine:**
+   - When receiving an Instagram Reel attachment, comment on the specific topic with high energy (e.g. "lmaooo this is so true 😂", "nah wait where is this from?", "bro that ended me").
+5. **Multi-Bubble Splitting:** For replies containing two distinct thoughts, split into 2-3 short sequential message bubbles sent 1-2 seconds apart.
+
+---
+
+## 16. Master Execution Directive & Route Audit Guide for Claude
+
+> [!IMPORTANT]
+> **Directive for Claude:** You have full creative and architectural control to execute this plan. Do not feel constrained by previous layouts. Master the dynamic Spotify-inspired ambient glass UI and mobile-first experience using shadcn and Tailwind principles. Verify and fix all UI logic across the entire website. Follow the audit checklist below in exact sequence.
+
+### Phase A: Design System, Dynamic Ambient Foundation & Global Inputs
+- [ ] Inspect and ensure `globals.css` exports pure Spotify dark foundation tokens (`--color-background: #121212`, `--color-surface: #181818`, `--glass-fill-standard`, etc.) without hardcoded static purples.
+- [ ] Enforce global input/textarea styling: zero hardcoded colors, dynamic focus border (`var(--ambient-dominant)`), `16px` font size on mobile, and $\ge 48\text{px}$ touch targets.
+- [ ] Verify `frontend/app/components/AmbientBackground.jsx` performs color extraction from images via HTML5 canvas or ColorThief, dynamically injecting `--ambient-dominant` and `--ambient-secondary`.
+- [ ] Ensure `frontend/app/layout.jsx` mounts `<AmbientBackground />` behind the application content.
+
+### Phase B: Site-Wide UI & Route Verification Checklist
+- [ ] **`/` (Dashboard / Overview):**
+  - Verify KPI metrics cards render as translucent glass surfaces with smooth counter animations.
+  - Verify `BusinessConversionPanel.jsx` displays leads and bookings with responsive column stacking on mobile.
+- [ ] **`/relationships` (People Directory & Inner Profile):**
+  - Verify Directory Table / Cards toggle between dense, list, and grid layouts.
+  - Redesign the Inner Person Profile view into the true Spotify artist/album layout: oversized avatar with dynamic ambient glow halo, background theme dynamically adapting to the person's photo, and frosted glass cards.
+- [ ] **`/controls` (Chat Rules & Business Policy):**
+  - Verify mode selection cards (Everyone, Everyone Except, Only Selected) feature reactive glowing borders and clear touch selectors.
+  - Verify `BusinessPolicyCard.jsx` allows toggling working hours and days with touch-friendly pills.
+- [ ] **`/settings` (Persona & AI Studio):**
+  - Verify segmented pill tabs scroll horizontally without breaking on mobile.
+  - Verify `AiProviderCard.jsx` displays status badges, latency indicators, and test ping buttons.
+- [ ] **`/documents` (RAG Knowledge Vault):**
+  - Verify file upload dropzone, link submitter, and text paste tabs render with dark glass styling.
+  - Test indexing preview chips and delete actions.
+- [ ] **`/profile` (User Profile & Security):**
+  - Verify full-width responsive 2-column layout collapses cleanly on mobile.
+  - Verify avatar hover / mobile long-press allows uploading new photos.
+  - Verify 1-click Workspace Switcher toggles between Personal Creator and Business & Brand.
+- [ ] **`/download` (Desktop Releases):**
+  - Verify OS auto-detection card and manual installer links render with dark glass styling.
+- [ ] **Mobile Experience & Bottom Drawer:**
+  - Verify viewport <= 768px displays the 54px sticky top header and 64px bottom tabs.
+  - Verify tapping the avatar in the header or bottom bar opens `MobileFeatureSheet.jsx` with 100% of platform routes accessible.
+  - Verify Light and Dark theme toggles change colors instantly across all surfaces.
+
+### Phase C: Human-Mimicry AI Reply Verification
+- [ ] Verify `services/celRuleEngine.js` formats personal replies naturally without robotic bullet points or stiff corporate syntax.
+- [ ] Verify typing delay and typing indicator triggers operate asynchronously in `services/instagramService.js`.
+- [ ] Verify Reel reactions match the persona's tone guidelines.
+
+---
+*End of Blueprint. Claude, please proceed with execution based on this document.*
+
+---
+
+## 17. Production Verification & Claude Autonomous Mandate
+
+> [!NOTE]
+> **Environment Configuration for Claude:** All active production environment variables (Azure OpenAI GPT-4o, MongoDB Atlas, Instagram Graph API, Meta App Secret, Resend, Brevo, JWT Secret) are already securely configured and available in the root [`.env`](file:///Users/samjoshua/Developer/instagram/instagram/.env) file. Both the Node backend server and Claude can read them directly via `process.env`. Raw secrets must never be committed to tracked markdown files so that GitHub Push Protection is preserved.
+
+### 17.1 Claude's Final Autonomous Execution Directives
+1. **Zero Layout Restrictions:** You are not bound by previous wireframes or preliminary layout plans. You have complete autonomy to customize, modernize, and reorganize the UI using Spotify-inspired ambient aesthetics, Tailwind CSS, and shadcn component patterns.
+2. **Effortless, Minimized & Compact Experience:** The ultimate objective is for the user to feel that managing their automated Instagram engine is effortless and intuitive. Reduce visual clutter, eliminate redundant menus, provide compact layouts for mobile screens ($375\text{px} - 430\text{px}$), and maintain 100% of underlying platform power.
+3. **Enhanced Dashboard & Feature Expansion:**
+   - Elevate the primary Dashboard (`/`) into an executive command center: live KPI counters with micro-sparklines, quick-toggle mode switches, real-time lead acquisition cards, and dynamic workspace summaries.
+   - Enhance mobile interactions: ensure sticky navigation, smooth drawer transitions via `MobileFeatureSheet.jsx`, and zero horizontal scrolling.
+4. **Complete Project Logic Verification:** Verify and test all frontend and backend logic (authentication, RAG query pipelines, Instagram webhook ingestion, human-mimicry delay dispatch, passkeys, and multi-tenant isolation) using the mounted `.env` configuration.
+
+---
+*End of Blueprint. Claude, please proceed with execution based on this document.*

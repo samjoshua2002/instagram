@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   User,
@@ -19,9 +19,17 @@ import {
   Lock,
   Smartphone,
   Laptop,
-  Check
+  Check,
+  Building2,
+  Briefcase,
+  ExternalLink,
+  Sparkles,
+  Key,
+  Copy,
+  Camera,
+  UploadCloud
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { startRegistration } from '@simplewebauthn/browser';
 
 const formatAddress = (addr) => {
@@ -38,8 +46,15 @@ export default function ProfilePage() {
   const { user, token, API_BASE, updateUserProfile, showToast } = useApp();
 
   const [saving, setSaving] = useState(false);
+  const [switchingTier, setSwitchingTier] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [copiedId, setCopiedId] = useState(false);
+  const [avatarHover, setAvatarHover] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const fileInputRef = useRef(null);
+  const longPressTimerRef = useRef(null);
 
   // Profile form state
   const [formData, setFormData] = useState({
@@ -51,6 +66,8 @@ export default function ProfilePage() {
     whatsappNumber: user?.whatsappNumber || '',
     instagramUsername: user?.instagramUsername || '',
     address: formatAddress(user?.address),
+    accountType: user?.accountType || 'personal',
+    profilePicUrl: user?.profilePicUrl || '',
   });
 
   // Passkeys state
@@ -66,8 +83,10 @@ export default function ProfilePage() {
         email: user.email || '',
         mobileNumber: user.mobileNumber || '',
         whatsappNumber: user.whatsappNumber || '',
-        instagramUsername: user.instagramUsername || '',
+        instagramUsername: user?.instagramUsername || '',
         address: formatAddress(user.address),
+        accountType: user.accountType || 'personal',
+        profilePicUrl: user.profilePicUrl || '',
       });
       fetchPasskeys();
     }
@@ -88,6 +107,99 @@ export default function ProfilePage() {
     }
   };
 
+  // Immediate 1-click Workspace Tier Switcher
+  const handleSwitchTier = async (newTier) => {
+    if (formData.accountType === newTier || switchingTier) return;
+    setSwitchingTier(true);
+    setFormData(prev => ({ ...prev, accountType: newTier }));
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ accountType: newTier })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        if (updateUserProfile) {
+          updateUserProfile(data.user || { ...user, accountType: newTier });
+        }
+        showToast?.(`Switched to ${newTier === 'business' ? 'Business & Brand' : 'Personal Creator'} tier!`, 'success');
+      } else {
+        throw new Error(data.error || 'Failed to switch workspace tier');
+      }
+    } catch (err) {
+      setFormData(prev => ({ ...prev, accountType: user?.accountType || 'personal' }));
+      showToast?.(err.message || 'Could not switch tier', 'error');
+    } finally {
+      setSwitchingTier(false);
+    }
+  };
+
+  // Avatar Upload Handler
+  const handleAvatarFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast?.('Please choose an image file (PNG, JPG, WebP)', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast?.('Image size should be under 5MB', 'error');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Url = reader.result;
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ profilePicUrl: base64Url })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setFormData(prev => ({ ...prev, profilePicUrl: base64Url }));
+          if (updateUserProfile) {
+            updateUserProfile(data.user || { ...user, profilePicUrl: base64Url });
+          }
+          showToast?.('Profile picture updated successfully!', 'success');
+        } else {
+          throw new Error(data.error || 'Could not update profile picture');
+        }
+      } catch (err) {
+        showToast?.(err.message, 'error');
+      } finally {
+        setUploadingAvatar(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Mobile Long Press Handlers
+  const handleTouchStart = () => {
+    longPressTimerRef.current = setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 450);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+  };
+
   const handleSaveProfile = async (e) => {
     e?.preventDefault();
     setSaving(true);
@@ -102,15 +214,20 @@ export default function ProfilePage() {
         },
         body: JSON.stringify(formData)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update profile');
 
-      updateUserProfile(data.user || formData);
-      setSuccessMsg('Profile details updated successfully!');
-      showToast?.('Profile updated!', 'success');
-      setTimeout(() => setSuccessMsg(''), 4000);
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg('Profile details saved successfully!');
+        if (updateUserProfile) {
+          updateUserProfile(data.user || { ...user, ...formData });
+        }
+        showToast?.('Profile updated successfully', 'success');
+        setTimeout(() => setSuccessMsg(''), 3500);
+      } else {
+        setErrorMsg(data.error || 'Failed to update profile');
+      }
     } catch (err) {
-      setErrorMsg(err.message || 'Error updating profile');
+      setErrorMsg('Network error while saving profile');
     } finally {
       setSaving(false);
     }
@@ -118,18 +235,15 @@ export default function ProfilePage() {
 
   const handleRegisterPasskey = async () => {
     setPasskeyLoading(true);
+    setErrorMsg('');
     try {
-      const res = await fetch(`${API_BASE}/api/auth/passkey/register-options`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+      const optRes = await fetch(`${API_BASE}/api/auth/passkey/register-options`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      const options = await res.json();
-      if (!res.ok) throw new Error(options.error || 'Failed to initialize WebAuthn');
+      if (!optRes.ok) throw new Error('Could not get registration options');
+      const options = await optRes.json();
 
-      const registration = await startRegistration({ optionsJSON: options });
+      const regResponse = await startRegistration({ optionsJSON: options });
 
       const verifyRes = await fetch(`${API_BASE}/api/auth/passkey/register-verify`, {
         method: 'POST',
@@ -137,20 +251,19 @@ export default function ProfilePage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          response: registration,
-          name: navigator.userAgent.includes('Mac') ? 'Mac (Touch ID)' : navigator.userAgent.includes('iPhone') ? 'iPhone (Face ID)' : navigator.userAgent.includes('Windows') ? 'Windows PC (Hello)' : 'Security Key'
-        })
+        body: JSON.stringify(regResponse)
       });
 
       const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) throw new Error(verifyData.error || 'Verification failed');
-
-      showToast?.('Biometric passkey enrolled successfully!', 'success');
-      fetchPasskeys();
-    } catch (err) {
-      if (err.name !== 'NotAllowedError') {
-        showToast?.(err.message || 'Passkey setup cancelled', 'error');
+      if (verifyRes.ok && verifyData.verified) {
+        showToast?.('Biometric Passkey registered successfully!', 'success');
+        fetchPasskeys();
+      } else {
+        throw new Error(verifyData.error || 'Verification failed');
+      }
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') {
+        setErrorMsg(e.message || 'Passkey enrollment failed');
       }
     } finally {
       setPasskeyLoading(false);
@@ -158,440 +271,716 @@ export default function ProfilePage() {
   };
 
   const handleDeletePasskey = async (credentialId) => {
+    if (!confirm('Are you sure you want to remove this biometric passkey?')) return;
     try {
       const res = await fetch(`${API_BASE}/api/auth/passkey/${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        showToast?.('Passkey deleted.', 'info');
+        showToast?.('Passkey removed', 'success');
         fetchPasskeys();
       }
     } catch (e) {
-      showToast?.('Failed to delete passkey', 'error');
+      setErrorMsg('Failed to delete passkey');
     }
   };
 
+  const copyId = (id) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 1500);
+  };
+
+  const isBusiness = ['business', 'agency'].includes(formData.accountType);
+
   return (
-    <div className="profile-page-container">
-      <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
-        {/* Page Header */}
-        <div style={{ marginBottom: '24px' }}>
+    <div className="page-container settings-fullwidth" style={{ maxWidth: '1400px', width: '100%', margin: '0 auto', padding: '24px 20px 80px' }}>
+      {/* Hidden file input for avatar */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleAvatarFileSelect}
+        style={{ display: 'none' }}
+      />
+
+      {/* Top Breadcrumb & Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
           <div style={{
-            fontSize: '0.68rem',
-            fontWeight: '800',
+            fontSize: '0.7rem',
+            fontWeight: 800,
             fontFamily: "'JetBrains Mono', monospace",
-            color: '#a1a1aa',
-            letterSpacing: '0.8px',
+            color: '#71717a',
+            letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            marginBottom: '6px'
+            marginBottom: '4px'
           }}>
-            WORKSPACE // ACCOUNT &amp; SECURITY
+            WORKSPACE // IDENTITY &amp; SECURITY
           </div>
           <h1 style={{
-            fontSize: '1.75rem',
-            fontWeight: '800',
-            color: '#09090b',
-            letterSpacing: '-0.5px',
-            margin: '0 0 6px 0'
+            fontSize: '2rem',
+            fontWeight: 900,
+            color: 'var(--text, #0f172a)',
+            letterSpacing: '-0.7px',
+            margin: 0
           }}>
-            Profile &amp; Security Settings
+            Account Profile
           </h1>
-          <p style={{ fontSize: '0.86rem', color: '#71717a', margin: 0 }}>
-            Manage your personal identity details, connected Instagram account, and biometric passkeys.
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted, #64748b)', marginTop: '4px', margin: '4px 0 0' }}>
+            Manage your personal profile, connected Instagram Meta account, and biometric security keys.
           </p>
         </div>
 
-        {/* Alerts */}
-        {errorMsg && (
-          <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#b91c1c',
+        <button
+          onClick={handleSaveProfile}
+          disabled={saving}
+          style={{
+            background: 'var(--primary, #4f46e5)',
+            color: '#ffffff',
+            border: 'none',
             borderRadius: '10px',
-            padding: '12px 16px',
+            padding: '10px 22px',
             fontSize: '0.84rem',
-            marginBottom: '20px',
-            display: 'flex',
+            fontWeight: 800,
+            cursor: saving ? 'wait' : 'pointer',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px'
-          }}>
-            <AlertCircle size={16} />
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
+          <span>{saving ? 'Saving...' : 'Save Profile'}</span>
+        </button>
+      </div>
+
+      {/* Alerts */}
+      <AnimatePresence>
+        {errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#b91c1c',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              fontSize: '0.86rem',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(239,68,68,0.06)'
+            }}
+          >
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
             <span>{errorMsg}</span>
-          </div>
+          </motion.div>
         )}
 
         {successMsg && (
-          <div style={{
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            color: '#15803d',
-            borderRadius: '10px',
-            padding: '12px 16px',
-            fontSize: '0.84rem',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <CheckCircle2 size={16} />
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              color: '#15803d',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              fontSize: '0.86rem',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(22,163,74,0.06)'
+            }}
+          >
+            <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
             <span>{successMsg}</span>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        {/* 2-Column Responsive Grid */}
-        <div className="profile-main-grid">
-          {/* Column 1: Personal Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '14px',
-              padding: '24px'
-            }}>
-              <h2 style={{
-                fontSize: '1.05rem',
-                fontWeight: '700',
-                color: '#09090b',
-                margin: '0 0 16px 0',
+      {/* Hero Identity Card with Avatar Hover / Mobile Long-Press */}
+      <div style={{
+        background: 'var(--bg-card, #ffffff)',
+        border: '1px solid var(--border, #e2e8f0)',
+        borderRadius: '18px',
+        padding: '24px',
+        marginBottom: '24px',
+        boxShadow: 'var(--shadow-sm)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '20px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
+          {/* Avatar with hover / long-press overlay */}
+          <div
+            onMouseEnter={() => setAvatarHover(true)}
+            onMouseLeave={() => setAvatarHover(false)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              position: 'relative',
+              width: '72px',
+              height: '72px',
+              borderRadius: '18px',
+              cursor: 'pointer',
+              overflow: 'hidden',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+            }}
+            title="Click or hover to change photo"
+          >
+            {formData.profilePicUrl ? (
+              <img
+                src={formData.profilePicUrl}
+                alt=""
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                background: '#09090b',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                justifyContent: 'center',
+                fontSize: '1.65rem',
+                fontWeight: 800
               }}>
-                <User size={18} />
-                <span>Personal Information</span>
-              </h2>
+                {(formData.firstName || user?.username || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
 
-              <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div className="profile-row-grid">
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.firstName}
-                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
-                        fontSize: '0.84rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.lastName}
-                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
-                        fontSize: '0.84rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    disabled
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#f4f4f5',
-                      color: '#71717a',
-                      fontSize: '0.84rem',
-                      boxSizing: 'border-box',
-                      cursor: 'not-allowed'
-                    }}
-                  />
-                </div>
-
-                <div className="profile-row-grid">
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
-                      Mobile Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.mobileNumber}
-                      onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
-                      placeholder="+1 (555) 000-0000"
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
-                        fontSize: '0.84rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
-                      WhatsApp Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.whatsappNumber}
-                      onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
-                      placeholder="+1 (555) 000-0000"
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
-                        fontSize: '0.84rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
-                    Location / Address
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="City, Country"
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#ffffff',
-                      fontSize: '0.84rem',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving}
+            {/* Hover / Long-press camera overlay */}
+            <AnimatePresence>
+              {(avatarHover || uploadingAvatar) && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   style={{
-                    background: '#09090b',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '11px 18px',
-                    fontSize: '0.84rem',
-                    fontWeight: '700',
-                    cursor: saving ? 'wait' : 'pointer',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(9, 9, 11, 0.75)',
+                    backdropFilter: 'blur(3px)',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    marginTop: '8px'
+                    color: '#ffffff',
+                    gap: '2px'
                   }}
                 >
-                  {saving ? (
-                    <>
-                      <RefreshCw size={15} className="animate-spin" />
-                      <span>Saving Changes...</span>
-                    </>
+                  {uploadingAvatar ? (
+                    <RefreshCw size={18} className="animate-spin" />
                   ) : (
                     <>
-                      <Save size={15} />
-                      <span>Save Profile Details</span>
+                      <Camera size={18} />
+                      <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Change</span>
                     </>
                   )}
-                </button>
-              </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Online indicator */}
+            <span style={{
+              position: 'absolute',
+              right: '2px',
+              bottom: '2px',
+              width: '13px',
+              height: '13px',
+              borderRadius: '50%',
+              background: '#10b981',
+              border: '2px solid #ffffff',
+              zIndex: 2
+            }} />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#09090b', letterSpacing: '-0.4px' }}>
+                {formData.firstName || user?.username || 'Account Owner'} {formData.lastName || ''}
+              </span>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                fontFamily: "'JetBrains Mono', monospace",
+                background: isBusiness ? '#09090b' : '#f4f4f5',
+                color: isBusiness ? '#ffffff' : '#71717a',
+                padding: '3px 10px',
+                borderRadius: '999px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}>
+                {formData.accountType} Tier
+              </span>
+            </div>
+            <div style={{ fontSize: '0.86rem', color: '#71717a', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>@{user?.instagramUsername || user?.username || 'user'}</span>
+              <span>•</span>
+              <span>{user?.email}</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '2px' }}>
+              Tap or hover photo to update avatar
+            </div>
+          </div>
+        </div>
+
+        {/* Workspace Mode Switcher (Instant 1-Click Toggle) */}
+        <div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#71717a', fontFamily: "'JetBrains Mono', monospace", marginBottom: '6px', textAlign: 'right' }}>
+            WORKSPACE ENVIRONMENT
+          </div>
+          <div style={{
+            background: '#f4f4f5',
+            border: '1px solid #e4e4e7',
+            borderRadius: '14px',
+            padding: '5px',
+            display: 'flex',
+            gap: '5px'
+          }}>
+            <button
+              type="button"
+              onClick={() => handleSwitchTier('personal')}
+              disabled={switchingTier}
+              style={{
+                border: 'none',
+                borderRadius: '10px',
+                padding: '9px 18px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: switchingTier ? 'wait' : 'pointer',
+                background: formData.accountType === 'personal' ? '#ffffff' : 'transparent',
+                color: formData.accountType === 'personal' ? '#09090b' : '#71717a',
+                boxShadow: formData.accountType === 'personal' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+            >
+              Personal Creator
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchTier('business')}
+              disabled={switchingTier}
+              style={{
+                border: 'none',
+                borderRadius: '10px',
+                padding: '9px 18px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: switchingTier ? 'wait' : 'pointer',
+                background: formData.accountType === 'business' ? '#09090b' : 'transparent',
+                color: formData.accountType === 'business' ? '#ffffff' : '#71717a',
+                boxShadow: formData.accountType === 'business' ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+            >
+              Business &amp; Brand
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main 2-Column Responsive Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+        gap: '24px'
+      }}>
+        {/* Left Column: Personal Information */}
+        <div style={{
+          background: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--border, #e2e8f0)',
+          borderRadius: '18px',
+          padding: '24px',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '22px' }}>
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '8px',
+              background: '#09090b',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <User size={15} />
+            </div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#09090b', margin: 0, letterSpacing: '-0.3px' }}>
+              Personal Identity
+            </h3>
+          </div>
+
+          <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                Primary Email
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="email"
+                  value={formData.email}
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    background: '#f4f4f5',
+                    color: '#71717a',
+                    fontSize: '0.85rem',
+                    cursor: 'not-allowed'
+                  }}
+                />
+                <Lock size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                  Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  value={formData.mobileNumber}
+                  onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                  placeholder="+1 (555) 000-0000"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                  WhatsApp Direct
+                </label>
+                <input
+                  type="tel"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+                  placeholder="+1 (555) 000-0000"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    background: '#ffffff',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                Operating Location
+              </label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="City, Country"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #e4e4e7',
+                  background: '#ffffff',
+                  fontSize: '0.85rem'
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                background: '#09090b',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '11px 18px',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                cursor: saving ? 'wait' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '6px'
+              }}
+            >
+              {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              <span>Save Details</span>
+            </button>
+          </form>
+        </div>        {/* Right Column: Instagram & Biometric Passkeys */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Instagram Account Card */}
+          <div style={{
+            background: 'var(--bg-card, #ffffff)',
+            border: '1px solid var(--border, #e2e8f0)',
+            borderRadius: '18px',
+            padding: '24px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  background: 'var(--primary, #4f46e5)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Instagram size={15} />
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text, #0f172a)', margin: 0, letterSpacing: '-0.3px' }}>
+                  Connected Instagram
+                </h3>
+              </div>
+
+              <span style={{
+                fontSize: '0.68rem',
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 800,
+                background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success-container, #ecfdf5)' : 'var(--danger-container, #fee2e2)',
+                color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success, #15803d)' : 'var(--danger, #b91c1c)',
+                padding: '3px 10px',
+                borderRadius: '6px'
+              }}>
+                {(user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'ACTIVE & ENCRYPTED' : 'NOT LINKED'}
+              </span>
+            </div>
+
+            <div style={{
+              background: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border, #e2e8f0)',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>Instagram Username</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text, #0f172a)' }}>
+                  @{user?.instagramUsername || user?.username || 'None'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>Page Account ID</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.78rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text, #334155)' }}>
+                    {user?.instagramId || user?.instagramAccountId || 'Unlinked'}
+                  </span>
+                  {(user?.instagramId || user?.instagramAccountId) && (
+                    <button
+                      type="button"
+                      onClick={() => copyId(user?.instagramId || user?.instagramAccountId)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted, #64748b)' }}
+                      title="Copy ID"
+                    >
+                      {copiedId ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>Security Status</span>
+                <span style={{ fontSize: '0.76rem', color: 'var(--success, #16a34a)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Shield size={13} /> AES-256-GCM Encrypted
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Column 2: Instagram Status & Biometric Passkeys */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Instagram Connection Card */}
-            <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '14px',
-              padding: '24px'
-            }}>
-              <h2 style={{
-                fontSize: '1.05rem',
-                fontWeight: '700',
-                color: '#09090b',
-                margin: '0 0 16px 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <Instagram size={18} />
-                <span>Connected Instagram</span>
-              </h2>
-
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
-                borderRadius: '10px',
-                padding: '16px',
-                marginBottom: '14px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#52525b' }}>Handle</span>
-                  <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#09090b' }}>
-                    @{user?.instagramUsername || user?.username || 'None'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#52525b' }}>Account ID</span>
-                  <span style={{ fontSize: '0.76rem', fontFamily: "'JetBrains Mono', monospace", color: '#71717a' }}>
-                    {user?.instagramId || user?.instagramAccountId || 'Unlinked'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#52525b' }}>Token Status</span>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: '800',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? '#dcfce7' : '#fee2e2',
-                    color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? '#15803d' : '#b91c1c',
-                    padding: '2px 8px',
-                    borderRadius: '4px'
-                  }}>
-                    {(user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'ENCRYPTED & ACTIVE' : 'MISSING'}
-                  </span>
-                </div>
-              </div>
-
-              <p style={{ fontSize: '0.75rem', color: '#71717a', lineHeight: 1.45, margin: 0 }}>
-                To change your AI persona, texting tone, or access token, visit the <strong>Persona &amp; Style</strong> tab in the navigation menu.
-              </p>
-            </div>
-
-            {/* Passkeys & Security Card */}
-            <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '14px',
-              padding: '24px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h2 style={{
-                  fontSize: '1.05rem',
-                  fontWeight: '700',
-                  color: '#09090b',
-                  margin: 0,
+          {/* Biometric Passkeys Card */}
+          <div style={{
+            background: 'var(--bg-card, #ffffff)',
+            border: '1px solid var(--border, #e2e8f0)',
+            borderRadius: '18px',
+            padding: '24px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  background: '#09090b',
+                  color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px'
+                  justifyContent: 'center'
                 }}>
-                  <Fingerprint size={18} />
-                  <span>Biometric Passkeys</span>
-                </h2>
-                <button
-                  type="button"
-                  onClick={handleRegisterPasskey}
-                  disabled={passkeyLoading}
-                  style={{
-                    background: '#09090b',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '7px',
-                    padding: '6px 12px',
-                    fontSize: '0.74rem',
-                    fontWeight: '700',
-                    cursor: passkeyLoading ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Plus size={13} />
-                  <span>Add Passkey</span>
-                </button>
+                  <Fingerprint size={15} />
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#09090b', margin: 0, letterSpacing: '-0.3px' }}>
+                  Biometric Passkeys
+                </h3>
               </div>
 
-              <p style={{ fontSize: '0.78rem', color: '#71717a', marginBottom: '14px', lineHeight: 1.45 }}>
-                Log in instantly without typing passwords using Face ID, Touch ID, Windows Hello, or hardware security keys.
-              </p>
+              <button
+                type="button"
+                onClick={handleRegisterPasskey}
+                disabled={passkeyLoading}
+                style={{
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '7px 14px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: passkeyLoading ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <Plus size={13} />
+                <span>{passkeyLoading ? 'Enrolling...' : 'Add Passkey'}</span>
+              </button>
+            </div>
 
-              {passkeys.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {passkeys.map(pk => (
-                    <div
-                      key={pk.id}
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #e4e4e7',
-                        borderRadius: '8px',
-                        padding: '10px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Laptop size={15} color="#71717a" />
-                        <div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#09090b' }}>
-                            {pk.deviceType || pk.name || 'Biometric Passkey'}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>
-                            Created: {new Date(pk.createdAt).toLocaleDateString()}
-                          </div>
+            <p style={{ fontSize: '0.82rem', color: '#71717a', margin: '0 0 16px', lineHeight: 1.45 }}>
+              Authenticate instantly with Touch ID, Face ID, or Windows Hello without typing passwords.
+            </p>
+
+            {passkeys.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {passkeys.map(pk => (
+                  <div
+                    key={pk.id}
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Laptop size={16} color="#475569" />
+                      <div>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                          {pk.deviceType || pk.name || 'Biometric Device'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          Registered on {new Date(pk.createdAt).toLocaleDateString()}
                         </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePasskey(pk.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          padding: '4px'
-                        }}
-                        title="Delete passkey"
-                      >
-                        <Trash2 size={14} />
-                      </button>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{
-                  background: '#ffffff',
-                  border: '1px dashed #d4d4d8',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '0.78rem',
-                  color: '#71717a'
-                }}>
-                  No biometric passkeys enrolled yet. Click &quot;Add Passkey&quot; above to enroll Touch ID or Face ID.
-                </div>
-              )}
-            </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePasskey(pk.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                      title="Remove passkey"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: '10px',
+                padding: '20px',
+                textAlign: 'center',
+                fontSize: '0.82rem',
+                color: '#64748b'
+              }}>
+                No biometric passkeys configured yet. Click <strong>Add Passkey</strong> to enroll Face ID / Touch ID.
+              </div>
+            )}
           </div>
         </div>
       </div>
