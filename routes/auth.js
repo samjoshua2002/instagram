@@ -28,6 +28,9 @@ const requireAuth = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: User not found' });
     }
+    if (user.isBanned) {
+      return res.status(403).json({ error: 'This account has been suspended. Please contact support.' });
+    }
     req.user = user;
     next();
   } catch (err) {
@@ -315,6 +318,9 @@ router.post('/login', async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    if (user.isBanned) {
+      return res.status(403).json({ error: 'This account has been suspended. Please contact support.' });
     }
 
     user.lastLogin = new Date();
@@ -1711,7 +1717,7 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
     const allContacts = await SocialGraph.find({}).sort({ createdAt: -1 });
 
     const accounts = allUsers.map(u => {
-      const hasToken = Boolean(u.instagramPageAccessToken);
+      const hasToken = Boolean(u.instagramPageAccessToken || u.instagram?.accessTokenEncrypted);
       return {
         id: u._id,
         username: u.username,
@@ -1737,6 +1743,7 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
         passkeyCount: (u.passkeys || []).length,
         lastLogin: u.lastLogin,
         createdAt: u.createdAt,
+        isBanned: Boolean(u.isBanned),
       };
     });
 
@@ -1911,6 +1918,87 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
  * DELETE /api/admin/accounts/:userId
  * Superadmin can permanently delete any user workspace / account
  */
+/**
+ * GET /api/admin/tokens (Superadmin)
+ * Token Health Radar: expiry and health of every tenant's Instagram token (values are never returned)
+ */
+router.get('/admin/tokens', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+    const tokenHealthService = require('../services/tokenHealthService');
+    res.json({ success: true, tokens: await tokenHealthService.listTokenHealth() });
+  } catch (err) {
+    console.error('Token radar error:', err.message);
+    res.status(500).json({ error: 'Failed to load token health' });
+  }
+});
+
+/**
+ * POST /api/admin/tokens/:userId/refresh (Superadmin)
+ * Force an immediate refresh / re-check of one tenant's token
+ */
+router.post('/admin/tokens/:userId/refresh', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+    const target = await User.findById(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Account not found.' });
+    const tokenHealthService = require('../services/tokenHealthService');
+    const result = await tokenHealthService.refreshUserToken(target);
+    res.status(result.error ? 502 : 200).json({ success: !result.error, ...result });
+  } catch (err) {
+    console.error('Token refresh error:', err.message);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+/**
+ * POST /api/admin/accounts/:userId/ban (Superadmin)
+ * Emergency killswitch: { banned: true } suspends the tenant and revokes its Instagram token;
+ * { banned: false } lifts the suspension (the creator must reconnect Instagram)
+ */
+router.post('/admin/accounts/:userId/ban', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+    if (req.user._id.toString() === req.params.userId) {
+      return res.status(400).json({ error: 'Cannot ban your own superadmin account.' });
+    }
+    const target = await User.findById(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Account not found.' });
+
+    const banned = req.body?.banned !== false;
+    if (banned) {
+      const token = getUserInstagramToken(target);
+      const pageId = target.instagram?.pageId;
+      if (token && pageId) {
+        try {
+          await axios.delete(`https://graph.facebook.com/v21.0/${pageId}/subscribed_apps`, { params: { access_token: token } });
+        } catch (unsubErr) {
+          console.warn(`⚠️ Killswitch could not unsubscribe Page ${pageId}:`, unsubErr.response?.data?.error?.message || unsubErr.message);
+        }
+      }
+      clearUserInstagram(target);
+      const PersonaConfig = require('../models/PersonaConfig');
+      await PersonaConfig.updateMany({ ownerId: target._id }, { $set: { instagramPageAccessToken: '', globalBotActive: false } });
+      await redisService.invalidatePersonaConfig();
+    }
+    target.isBanned = banned;
+    target.bannedAt = banned ? new Date() : null;
+    await target.save();
+
+    const handle = target.instagramUsername || target.username;
+    res.json({ success: true, isBanned: banned, message: banned ? `@${handle} suspended and Instagram token revoked.` : `@${handle} reinstated.` });
+  } catch (err) {
+    console.error('Ban account error:', err.message);
+    res.status(500).json({ error: 'Failed to update account status' });
+  }
+});
+
 router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
   try {
     if (req.user.role !== 'superadmin') {
