@@ -144,6 +144,31 @@ function applyPalette(palette, imageUrl) {
   root.setProperty('--ambient-image', imageUrl ? `url("${imageUrl.replace(/"/g, '%22')}")` : 'none');
 }
 
+// Generative contour field (PLAN.md §13 Phase 5): stacked sine waves with drifting
+// phase, built once at import so server and client markup match.
+const CONTOUR_PATHS = Array.from({ length: 14 }, (_, i) => {
+  const baseY = 60 + i * 68;
+  const amp = 18 + (i % 5) * 9;
+  const freq = 0.0042 + (i % 3) * 0.0011;
+  const phase = i * 0.9;
+  let d = '';
+  for (let x = -40; x <= 1480; x += 40) {
+    const y = baseY + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 2.3 + phase * 1.7) * amp * 0.35;
+    d += `${d ? 'L' : 'M'}${x} ${y.toFixed(1)}`;
+  }
+  return d;
+});
+
+function AmbientContours() {
+  return (
+    <svg className="ambient-layer ambient-contours" viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice">
+      {CONTOUR_PATHS.map((d, i) => (
+        <path key={i} d={d} className={i % 4 === 0 ? 'strong' : ''} />
+      ))}
+    </svg>
+  );
+}
+
 export default function AmbientBackground() {
   const requestId = useRef(0);
 
@@ -168,6 +193,7 @@ export default function AmbientBackground() {
     <div className="ambient-background" aria-hidden="true">
       <div className="ambient-layer ambient-artwork" />
       <div className="ambient-layer ambient-mesh" />
+      <AmbientContours />
       <div className="ambient-layer ambient-vignette" />
     </div>
   );
