@@ -131,30 +131,31 @@ export default function Sidebar() {
 
   const navItems = isPureSuperadmin
     ? [
-        { href: '/', label: 'Platform Console', icon: LayoutDashboard, code: '01' },
-        { href: '/admin', label: 'User Workspaces', icon: Users, code: '02' },
-        { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity, code: '03' },
-        { href: '/download', label: 'Desktop Releases', icon: Download, code: '04' },
-      ]
+      { href: '/', label: 'Platform Console', icon: LayoutDashboard, code: '01' },
+      { href: '/admin', label: 'User Workspaces', icon: Users, code: '02' },
+      { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity, code: '03' },
+      { href: '/download', label: 'Desktop Releases', icon: Download, code: '04' },
+    ]
     : isBusiness
       ? [
-          { href: '/', label: 'Business Dashboard', icon: LayoutDashboard, code: '01' },
-          { href: '/documents', label: 'Document & Service Vault', icon: FileText, code: '02' },
-          { href: '/controls', label: 'Business Policy & Hours', icon: Sliders, code: '03' },
-          { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck, code: '04' },
-          { href: '/relationships', label: 'Customer Inbox & Handoff', icon: Inbox, code: '05' },
-          { href: '/download', label: 'Desktop App', icon: Download, code: '06' },
-          ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '07' }] : [])
-        ]
+        { href: '/', label: 'Business Dashboard', icon: LayoutDashboard, code: '01' },
+        { href: '/documents', label: 'Document & Service Vault', icon: FileText, code: '02' },
+        { href: '/controls', label: 'Business Policy & Hours', icon: Sliders, code: '03' },
+        { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck, code: '04' },
+        { href: '/relationships', label: 'Customer Inbox & Handoff', icon: Inbox, code: '05' },
+        { href: '/download', label: 'Desktop App', icon: Download, code: '06' },
+        ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '07' }] : [])
+      ]
       : [
-          { href: '/', label: 'Dashboard', icon: LayoutDashboard, code: '01' },
-          { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
-          { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
-          { href: '/settings', label: 'Persona & AI Model', icon: UserCheck, code: '04' },
-          { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '05' },
-          { href: '/download', label: 'Desktop App', icon: Download, code: '06' },
-          ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '07' }] : [])
-        ];
+        { href: '/', label: 'Dashboard', icon: LayoutDashboard, code: '01' },
+        { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
+        { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
+        { href: '/settings', label: 'Persona & AI Model', icon: UserCheck, code: '04' },
+        { href: '/documents', label: 'Document Vault (RAG)', icon: FileText, code: '05' },
+        { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '06' },
+        { href: '/download', label: 'Desktop App', icon: Download, code: '07' },
+        ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '08' }] : [])
+      ];
 
   const displayName = isPureSuperadmin
     ? 'Platform Superadmin'

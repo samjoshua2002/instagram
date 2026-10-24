@@ -124,7 +124,7 @@ export function AppProvider({ children }) {
       try {
         const cached = localStorage.getItem(STORAGE_NODES_KEY);
         if (cached && JSON.parse(cached)?.length > 1) return false;
-      } catch (e) {}
+      } catch (e) { }
     }
     return true;
   });
@@ -138,7 +138,7 @@ export function AppProvider({ children }) {
   })());
   // Helper to persist deleted set to localStorage
   const persistDeletedNames = (set) => {
-    try { localStorage.setItem(STORAGE_DELETED_KEY, JSON.stringify([...set])); } catch(e) {}
+    try { localStorage.setItem(STORAGE_DELETED_KEY, JSON.stringify([...set])); } catch (e) { }
   };
   // Track names that were saved locally but not yet confirmed by server (prevent sync overwrite)
   const pendingSavedNamesRef = useRef(new Set());
@@ -146,7 +146,7 @@ export function AppProvider({ children }) {
   const activeRoutingSavesRef = useRef(0);
   const routingSaveQueueRef = useRef(Promise.resolve());
   const [selectedNode, setSelectedNode] = useState(null);
-  
+
   // Authentication & Session State
   const [token, setToken] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -200,7 +200,7 @@ export function AppProvider({ children }) {
           const parsed = JSON.parse(cached);
           if (parsed && parsed.chatMode) return parsed;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return {
       chatMode: 'everyone',
@@ -240,7 +240,7 @@ export function AppProvider({ children }) {
           const stored = localStorage.getItem('chatter_saved_accounts');
           if (stored) saved = JSON.parse(stored);
           if (!Array.isArray(saved)) saved = [];
-        } catch (e) {}
+        } catch (e) { }
 
         const isConnected = Boolean(userData.hasInstagramToken || userData.isInstagramConnected || userData.instagramPageAccessToken);
         const record = {
@@ -262,7 +262,7 @@ export function AppProvider({ children }) {
         const filtered = saved.filter(a => a.email !== record.email && a.username !== record.username);
         filtered.unshift(record);
         localStorage.setItem('chatter_saved_accounts', JSON.stringify(filtered));
-      } catch (e) {}
+      } catch (e) { }
     }
     try {
       sessionStorage.setItem('chatter_session_active', 'true');
@@ -273,7 +273,7 @@ export function AppProvider({ children }) {
         sessionStorage.removeItem(`chatter_onboarding_dismissed_${userData._id}`);
         sessionStorage.removeItem('chatter_onboarding_dismissed');
       }
-    } catch (e) {}
+    } catch (e) { }
     setNodes([getRootNode(userData)]);
     setToken(jwtToken);
     setUser(userData);
@@ -287,20 +287,32 @@ export function AppProvider({ children }) {
   const switchAccount = useCallback(() => {
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
+    localStorage.removeItem('chatter_remembered_account');
     try {
       sessionStorage.removeItem('chatter_session_active');
       localStorage.setItem('chatter_show_chooser', 'true');
       localStorage.removeItem(STORAGE_NODES_KEY);
       localStorage.removeItem(STORAGE_CONFIG_KEY);
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('chatter_persona_cached') || k.startsWith('chatter_social_nodes_') || k.startsWith('chatter_persona_config_')) {
+          localStorage.removeItem(k);
+        }
+      });
       if (typeof sessionStorage !== 'undefined') {
         Object.keys(sessionStorage).forEach(k => {
           if (k.startsWith('chatter_onboarding_dismissed')) sessionStorage.removeItem(k);
         });
       }
-    } catch (e) {}
+    } catch (e) { }
     setNodes(DEFAULT_GRAPH_DATA);
     setToken(null);
     setUser(null);
+    setRoutingConfigState({
+      chatMode: 'everyone',
+      excludedContactIds: [],
+      includedContactIds: [],
+      globalBotActive: true
+    });
     showToast?.('Switching account...', 'info');
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
       window.location.href = '/';
@@ -310,22 +322,34 @@ export function AppProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
+    localStorage.removeItem('chatter_remembered_account');
     try {
       localStorage.removeItem('chatter_admin_session');
       sessionStorage.removeItem('chatter_session_active');
       localStorage.removeItem('chatter_show_chooser');
       localStorage.removeItem(STORAGE_NODES_KEY);
       localStorage.removeItem(STORAGE_CONFIG_KEY);
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('chatter_persona_cached') || k.startsWith('chatter_social_nodes_') || k.startsWith('chatter_persona_config_')) {
+          localStorage.removeItem(k);
+        }
+      });
       if (typeof sessionStorage !== 'undefined') {
         Object.keys(sessionStorage).forEach(k => {
           if (k.startsWith('chatter_onboarding_dismissed')) sessionStorage.removeItem(k);
         });
       }
-    } catch (e) {}
+    } catch (e) { }
     setNodes(DEFAULT_GRAPH_DATA);
     setAdminSession(null);
     setToken(null);
     setUser(null);
+    setRoutingConfigState({
+      chatMode: 'everyone',
+      excludedContactIds: [],
+      includedContactIds: [],
+      globalBotActive: true
+    });
     showToast?.('Signed out successfully.', 'info');
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
       window.location.href = '/';
@@ -342,7 +366,7 @@ export function AppProvider({ children }) {
       try {
         localStorage.removeItem(STORAGE_NODES_KEY);
         localStorage.removeItem(STORAGE_CONFIG_KEY);
-      } catch (e) {}
+      } catch (e) { }
       setNodes([getRootNode(creatorUser)]);
       localStorage.setItem('chatter_jwt_token', creatorToken);
       localStorage.setItem('chatter_user_profile', JSON.stringify(creatorUser));
@@ -360,7 +384,7 @@ export function AppProvider({ children }) {
         try {
           const raw = localStorage.getItem('chatter_admin_session');
           if (raw) savedSession = JSON.parse(raw);
-        } catch {}
+        } catch { }
       }
       if (savedSession) {
         localStorage.setItem('chatter_jwt_token', savedSession.token);
@@ -402,38 +426,38 @@ export function AppProvider({ children }) {
       originalFetch(`${API_BASE}/api/auth/me`, {
         headers: { Authorization: `Bearer ${savedToken}` }
       })
-      .then(async res => {
-        if (res.status === 401) {
-          // Token is genuinely invalid or expired on server
-          localStorage.removeItem('chatter_jwt_token');
-          localStorage.removeItem('chatter_user_profile');
-          setToken(null);
-          setUser(null);
-          setAuthLoading(false);
+        .then(async res => {
+          if (res.status === 401) {
+            // Token is genuinely invalid or expired on server
+            localStorage.removeItem('chatter_jwt_token');
+            localStorage.removeItem('chatter_user_profile');
+            setToken(null);
+            setUser(null);
+            setAuthLoading(false);
+            return null;
+          }
+          if (res.ok) {
+            return res.json();
+          }
+          // Non-401 error (500, 502, 503, Render spin-up) - keep cached user & token
           return null;
-        }
-        if (res.ok) {
-          return res.json();
-        }
-        // Non-401 error (500, 502, 503, Render spin-up) - keep cached user & token
-        return null;
-      })
-      .then(userData => {
-        if (userData) {
-          setUser(userData);
-          try {
-            localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
-            localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
-          } catch (e) {}
-        }
-        setAuthLoading(false);
-      })
-      .catch((err) => {
-        // Network error, connection reset, or fetch aborted on quick page refresh
-        // NEVER log out on network glitch or aborted request!
-        console.warn('Network issue during /api/auth/me, keeping cached session:', err?.message);
-        setAuthLoading(false);
-      });
+        })
+        .then(userData => {
+          if (userData) {
+            setUser(userData);
+            try {
+              localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
+              localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
+            } catch (e) { }
+          }
+          setAuthLoading(false);
+        })
+        .catch((err) => {
+          // Network error, connection reset, or fetch aborted on quick page refresh
+          // NEVER log out on network glitch or aborted request!
+          console.warn('Network issue during /api/auth/me, keeping cached session:', err?.message);
+          setAuthLoading(false);
+        });
     } else {
       setAuthLoading(false);
     }
@@ -465,7 +489,7 @@ export function AppProvider({ children }) {
           if (parsed && parsed.chatMode) {
             setRoutingConfigState(parsed);
           }
-        } catch (e) {}
+        } catch (e) { }
       } else {
         setRoutingConfigState({
           chatMode: 'everyone',
@@ -501,7 +525,7 @@ export function AppProvider({ children }) {
           const root = getRootNode(currentUser);
           const emptyGraph = [root];
           setNodes(emptyGraph);
-          try { localStorage.setItem(userKey, JSON.stringify(emptyGraph)); } catch(e) {}
+          try { localStorage.setItem(userKey, JSON.stringify(emptyGraph)); } catch (e) { }
           setIsSyncingInitial(false);
         } else {
           const pendingSaved = pendingSavedNamesRef.current;
@@ -581,7 +605,7 @@ export function AppProvider({ children }) {
               }
             }
 
-            try { localStorage.setItem(userKey, JSON.stringify(deduplicated)); } catch(e) {}
+            try { localStorage.setItem(userKey, JSON.stringify(deduplicated)); } catch (e) { }
             return deduplicated;
           });
         }
@@ -719,7 +743,7 @@ export function AppProvider({ children }) {
       const deduplicated = deduplicateNodes(next);
       try {
         localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated));
-      } catch (e) {}
+      } catch (e) { }
       return deduplicated;
     });
 
@@ -804,7 +828,7 @@ export function AppProvider({ children }) {
       }
       try {
         localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(updated));
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
 
@@ -881,7 +905,7 @@ export function AppProvider({ children }) {
       try {
         const userNodesKey = getStorageNodesKey(userRef.current);
         localStorage.setItem(userNodesKey, JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
 
@@ -959,7 +983,7 @@ export function AppProvider({ children }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fact: cleanFact })
         });
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 
@@ -979,7 +1003,7 @@ export function AppProvider({ children }) {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       });
-      routingSaveQueueRef.current = putOperation.catch(() => {});
+      routingSaveQueueRef.current = putOperation.catch(() => { });
       await putOperation;
       showToast(`💾 Saved chat routing! Mode: ${newConfig.chatMode.toUpperCase()}`);
     } catch (e) {
@@ -1007,7 +1031,7 @@ export function AppProvider({ children }) {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       });
-      routingSaveQueueRef.current = putOperation.catch(() => {});
+      routingSaveQueueRef.current = putOperation.catch(() => { });
       await putOperation;
       showToast(nextState ? '🟢 Global Bot Activated!' : '⏸️ Global Bot Paused!');
     } catch (e) {
@@ -1069,7 +1093,7 @@ export function AppProvider({ children }) {
 
       try {
         localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
 

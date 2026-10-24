@@ -46,7 +46,7 @@ export default function BusinessPolicyCard() {
         setPolicy(p);
         setKeywordsText((p.escalationKeywords || []).join(', '));
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [API_BASE, token]);
 
