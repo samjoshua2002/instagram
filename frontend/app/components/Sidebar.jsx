@@ -4,6 +4,8 @@ import React, { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
+import WorkspaceModeSwitch from './WorkspaceModeSwitch';
+import { currentMode, isFeatureOn } from '../lib/workspaceFeatures';
 import {
   LayoutDashboard,
   Users,
@@ -117,7 +119,8 @@ export default function Sidebar() {
     setIsPasskeyModalOpen,
     isImpersonating,
     exitWorkspace,
-    openOnboardingWizard
+    openOnboardingWizard,
+    workspaceFeatures
   } = useApp();
 
   const isSuperadmin = user?.role === 'superadmin' || isImpersonating;
@@ -131,36 +134,53 @@ export default function Sidebar() {
     (user?.username === 'samjoshua')
   );
 
-  // 'business' and 'agency' workspaces get the business menu; 'personal' and 'creator' the personal one
-  const isBusiness = ['business', 'agency'].includes(user?.accountType);
+  // Menu follows the Feature Store mode; pages behind a switched-off feature are hidden
+  const mode = currentMode(workspaceFeatures, user);
+  const isBusiness = mode === 'business';
+  const on = key => isFeatureOn(workspaceFeatures, key);
 
-  const navItems = isPureSuperadmin
+  const workspaceNav = {
+    business: [
+      { href: '/', label: 'Business Dashboard', icon: LayoutDashboard },
+      on('ragKnowledgeBase') && { href: '/documents', label: 'Document & Service Vault', icon: FileText },
+      { href: '/controls', label: 'Business Policy & Hours', icon: Sliders },
+      { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck },
+      { href: '/relationships', label: on('humanHandoffInbox') ? 'Customer Inbox & Handoff' : 'Customer Inbox', icon: Inbox },
+    ],
+    personal: [
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/relationships', label: 'People Directory', icon: Users },
+      { href: '/controls', label: 'Chat Rules', icon: Sliders },
+      { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
+      on('ragKnowledgeBase') && { href: '/documents', label: 'Document Vault (RAG)', icon: FileText },
+      on('mediaStickerVault') && { href: '/vault', label: 'Media Vault', icon: ImageIcon },
+    ],
+    // Hybrid: personal voice, business tools alongside
+    hybrid: [
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/relationships', label: 'People & Customers', icon: Users },
+      { href: '/controls', label: 'Chat Rules & Hours', icon: Sliders },
+      { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
+      on('ragKnowledgeBase') && { href: '/documents', label: 'Document & Service Vault', icon: FileText },
+      on('mediaStickerVault') && { href: '/vault', label: 'Media Vault', icon: ImageIcon },
+    ],
+  };
+
+  const navItems = (isPureSuperadmin
     ? [
-      { href: '/', label: 'Platform Console', icon: LayoutDashboard, code: '01' },
-      { href: '/admin', label: 'User Workspaces', icon: Users, code: '02' },
-      { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity, code: '03' },
-      { href: '/download', label: 'Desktop Releases', icon: Download, code: '04' },
+      { href: '/', label: 'Platform Console', icon: LayoutDashboard },
+      { href: '/admin', label: 'User Workspaces', icon: Users },
+      { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity },
+      { href: '/download', label: 'Desktop Releases', icon: Download },
     ]
-    : isBusiness
-      ? [
-        { href: '/', label: 'Business Dashboard', icon: LayoutDashboard, code: '01' },
-        { href: '/documents', label: 'Document & Service Vault', icon: FileText, code: '02' },
-        { href: '/controls', label: 'Business Policy & Hours', icon: Sliders, code: '03' },
-        { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck, code: '04' },
-        { href: '/relationships', label: 'Customer Inbox & Handoff', icon: Inbox, code: '05' },
-        { href: '/download', label: 'Desktop App', icon: Download, code: '06' },
-        ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '07' }] : [])
-      ]
-      : [
-        { href: '/', label: 'Dashboard', icon: LayoutDashboard, code: '01' },
-        { href: '/relationships', label: 'People Directory', icon: Users, code: '02' },
-        { href: '/controls', label: 'Chat Rules', icon: Sliders, code: '03' },
-        { href: '/settings', label: 'Persona & AI Model', icon: UserCheck, code: '04' },
-        { href: '/documents', label: 'Document Vault (RAG)', icon: FileText, code: '05' },
-        { href: '/vault', label: 'Media Vault', icon: ImageIcon, code: '06' },
-        { href: '/download', label: 'Desktop App', icon: Download, code: '07' },
-        ...(isSuperadmin ? [{ href: '/admin', label: 'Superadmin', icon: Shield, code: '08' }] : [])
-      ];
+    : [
+      ...workspaceNav[mode],
+      { href: '/settings/features', label: 'Feature Store', icon: Layers },
+      { href: '/download', label: 'Desktop App', icon: Download },
+      isSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
+    ])
+    .filter(Boolean)
+    .map((item, i) => ({ ...item, code: String(i + 1).padStart(2, '0') }));
 
   const displayName = isPureSuperadmin
     ? 'Platform Superadmin'
@@ -230,7 +250,7 @@ export default function Sidebar() {
               aria-label={routingConfig.globalBotActive ? 'Pause automation' : 'Resume automation'}
             >
               <span className={`sheet-dot${routingConfig.globalBotActive ? ' on' : ''}`} />
-              {isBusiness ? 'BUSINESS' : 'PERSONAL'}
+              {mode.toUpperCase()}
             </button>
           )}
 
@@ -369,6 +389,12 @@ export default function Sidebar() {
               </span>
             </div>
           </motion.div>
+
+          {!isPureSuperadmin && (
+            <div style={{ marginTop: '16px' }}>
+              <WorkspaceModeSwitch compact />
+            </div>
+          )}
 
           {/* Navigation Section */}
           <div style={{ marginTop: '20px' }}>
