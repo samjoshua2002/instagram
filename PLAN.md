@@ -691,10 +691,10 @@ To guarantee personal AI responses are completely indistinguishable from real hu
 
 ---
 
-## 17. Production Verification & Claude Autonomous Mandate
+## 17. Claude Autonomous Execution Mandate
 
 > [!NOTE]
-> **Environment Configuration for Claude:** All active production environment variables (Azure OpenAI GPT-4o, MongoDB Atlas, Instagram Graph API, Meta App Secret, Resend, Brevo, JWT Secret) are already securely configured and available in the root [`.env`](file:///Users/samjoshua/Developer/instagram/instagram/.env) file. Both the Node backend server and Claude can read them directly via `process.env`. Raw secrets must never be committed to tracked markdown files so that GitHub Push Protection is preserved.
+> **Environment & Credentials Notice for Claude:** Production API credentials are provided out-of-band (via manual PDF / secure local `.env`). Claude: load environment variables from the local environment when verifying live integrations. Zero plaintext secrets are stored in this file to preserve repository push protection.
 
 ### 17.1 Claude's Final Autonomous Execution Directives
 1. **Zero Layout Restrictions:** You are not bound by previous wireframes or preliminary layout plans. You have complete autonomy to customize, modernize, and reorganize the UI using Spotify-inspired ambient aesthetics, Tailwind CSS, and shadcn component patterns.
@@ -702,7 +702,7 @@ To guarantee personal AI responses are completely indistinguishable from real hu
 3. **Enhanced Dashboard & Feature Expansion:**
    - Elevate the primary Dashboard (`/`) into an executive command center: live KPI counters with micro-sparklines, quick-toggle mode switches, real-time lead acquisition cards, and dynamic workspace summaries.
    - Enhance mobile interactions: ensure sticky navigation, smooth drawer transitions via `MobileFeatureSheet.jsx`, and zero horizontal scrolling.
-4. **Complete Project Logic Verification:** Verify and test all frontend and backend logic (authentication, RAG query pipelines, Instagram webhook ingestion, human-mimicry delay dispatch, passkeys, and multi-tenant isolation) using the mounted `.env` configuration.
+4. **Complete Project Logic Verification:** Verify and test all frontend and backend logic (authentication, RAG query pipelines, Instagram webhook ingestion, human-mimicry delay dispatch, passkeys, and multi-tenant isolation).
 
 ---
 *End of Blueprint. Claude, please proceed with execution based on this document.*
