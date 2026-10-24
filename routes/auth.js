@@ -1,8 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const crypto = require('crypto');
 const User = require('../models/User');
 const authService = require('../services/authService');
+const redisService = require('../services/redisService');
+const { setUserInstagram, getUserInstagramToken, clearUserInstagram } = require('../services/instagramTokenService');
+
+const OAUTH_STATE_TTL_SECONDS = 600;
+
+// Serializes a value so it is safe to embed inside an inline <script>
+const jsValue = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
 
 // Middleware to protect routes with JWT Bearer Token
 const requireAuth = async (req, res, next) => {
@@ -976,23 +984,33 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
  * GET /api/auth/instagram/connect
  * Redirects to Meta OAuth login dialog for in-app Instagram connection
  */
-router.get('/instagram/connect', (req, res) => {
+router.get('/instagram/connect', async (req, res) => {
   try {
     const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
     const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
-    const userJwt = req.query.token || '';
+
+    // The popup cannot send an Authorization header, so the session JWT arrives as ?token= and is checked here
+    let userId = null;
+    if (req.query.token) {
+      const decoded = authService.verifyToken(req.query.token);
+      if (!decoded || !decoded.userId) {
+        return res.status(401).send('Your session has expired. Please log in again and retry.');
+      }
+      userId = decoded.userId;
+    }
 
     let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
     const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
-    const stateObj = {
-      token: userJwt,
+    // Opaque single-use state; the session data stays server-side
+    const state = crypto.randomBytes(32).toString('hex');
+    await redisService.set(`oauth_state:${state}`, {
+      userId,
       origin: clientOrigin,
       redirectUri,
       appId: metaAppId,
-    };
-    const state = Buffer.from(JSON.stringify(stateObj)).toString('base64');
+    }, OAUTH_STATE_TTL_SECONDS);
 
     const scopes = [
       'instagram_basic',
@@ -1021,19 +1039,21 @@ router.get('/instagram/callback', async (req, res) => {
     const { code, state, error, error_description } = req.query;
 
     let origin = 'https://instagram-ebon-zeta.vercel.app';
-    let userJwt = '';
+    let stateUserId = null;
     let savedRedirectUri = '';
     let savedAppId = '';
 
-    if (state) {
-      try {
-        const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
-        if (decoded.origin) origin = decoded.origin;
-        if (decoded.token) userJwt = decoded.token;
-        if (decoded.redirectUri) savedRedirectUri = decoded.redirectUri;
-        if (decoded.appId) savedAppId = decoded.appId;
-      } catch (e) {}
+    // Verify and consume the state so a callback URL cannot be replayed
+    const stateKey = /^[0-9a-f]{64}$/.test(state || '') ? `oauth_state:${state}` : null;
+    const savedState = stateKey ? await redisService.get(stateKey) : null;
+    if (!savedState) {
+      return res.status(400).send('This connection link is invalid or has expired. Please start the Instagram connection again.');
     }
+    await redisService.del(stateKey);
+    if (savedState.origin) origin = savedState.origin;
+    if (savedState.userId) stateUserId = savedState.userId;
+    if (savedState.redirectUri) savedRedirectUri = savedState.redirectUri;
+    if (savedState.appId) savedAppId = savedState.appId;
 
     if (error) {
       console.error('❌ Meta OAuth error:', error, error_description);
@@ -1051,7 +1071,7 @@ router.get('/instagram/callback', async (req, res) => {
           </div>
           <script>
             if (window.opener) {
-              window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', error: "${safeErr}" }, "*");
+              window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', error: "${safeErr}" }, ${jsValue(origin)});
               setTimeout(() => { window.close(); }, 3000);
             }
           </script>
@@ -1096,6 +1116,7 @@ router.get('/instagram/callback', async (req, res) => {
     let shortLivedToken = '';
     let instagramAccountId = '';
     let instagramUsername = '';
+    let facebookPageId = '';
     let lastExchangeError = '';
 
     // Step 1: Facebook Graph API token exchange (Primary for Facebook Login for Business)
@@ -1217,6 +1238,7 @@ router.get('/instagram/callback', async (req, res) => {
         for (const page of pages) {
           if (page.instagram_business_account) {
             longLivedToken = page.access_token || longLivedToken;
+            facebookPageId = page.id;
             instagramAccountId = page.instagram_business_account.id;
             instagramUsername = page.instagram_business_account.username;
             console.log(`✅ [Meta OAuth] Linked via Instagram Business Account: @${instagramUsername} (${instagramAccountId})`);
@@ -1226,6 +1248,7 @@ router.get('/instagram/callback', async (req, res) => {
         if (!instagramAccountId && pages.length > 0) {
           const firstPage = pages[0];
           longLivedToken = firstPage.access_token || longLivedToken;
+          facebookPageId = firstPage.id;
           instagramAccountId = firstPage.id;
           instagramUsername = firstPage.name;
           console.log(`ℹ️ [Meta OAuth] Linked via Facebook Page: ${firstPage.name} (${firstPage.id})`);
@@ -1247,48 +1270,69 @@ router.get('/instagram/callback', async (req, res) => {
       } catch (e) {}
     }
 
-    // 4. Save to User document if JWT was passed in state
+    // 4. Subscribe the Page to webhooks so the creator's DMs reach this server
     const linkedPageToken = longLivedToken;
-    if (userJwt) {
+    if (facebookPageId) {
       try {
-        const decodedToken = authService.verifyToken(userJwt);
-        if (decodedToken && decodedToken.userId) {
-          const user = await User.findById(decodedToken.userId);
-          if (user) {
-            if (linkedPageToken) user.instagramPageAccessToken = linkedPageToken;
-            if (instagramAccountId) user.instagramAccountId = instagramAccountId;
-            if (instagramUsername) user.instagramUsername = instagramUsername;
-            user.hasInstagramToken = Boolean(linkedPageToken);
-            user.isInstagramConnected = Boolean(linkedPageToken);
-            await user.save();
-
-            // Sync PersonaConfig as well
-            try {
-              const PersonaConfig = require('../models/PersonaConfig');
-              await PersonaConfig.findOneAndUpdate(
-                { ownerId: user._id },
-                {
-                  $set: {
-                    ownerId: user._id,
-                    instagramPageAccessToken: linkedPageToken,
-                    instagramAccountId: instagramAccountId,
-                    ...(instagramUsername ? { instagramHandle: `@${instagramUsername.replace(/^@/, '')}` } : {}),
-                    globalBotActive: true
-                  }
-                },
-                { upsert: true, new: true }
-              );
-            } catch (personaErr) {
-              console.warn('Could not sync PersonaConfig in OAuth callback:', personaErr.message);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Could not auto-save token from JWT state:', e.message);
+        await axios.post(`https://graph.facebook.com/v21.0/${facebookPageId}/subscribed_apps`, null, {
+          params: { subscribed_fields: 'messages,messaging_postbacks', access_token: linkedPageToken }
+        });
+        console.log(`✅ [Meta OAuth] Page ${facebookPageId} subscribed to webhooks`);
+      } catch (subErr) {
+        console.warn(`⚠️ [Meta OAuth] Webhook subscription failed for Page ${facebookPageId}:`, subErr.response?.data?.error?.message || subErr.message);
       }
     }
 
-    // 5. Return auto-closing HTML that posts message to opener
+    // 5. Save to the user who started the flow (token encrypted when ENCRYPTION_KEY is set)
+    let savedServerSide = false;
+    if (stateUserId) {
+      try {
+        const user = await User.findById(stateUserId);
+        if (user) {
+          const encrypted = setUserInstagram(user, {
+            token: linkedPageToken,
+            accountId: instagramAccountId,
+            pageId: facebookPageId,
+            username: instagramUsername,
+          });
+          await user.save();
+          savedServerSide = true;
+
+          // Sync PersonaConfig as well; it keeps a plaintext copy only when encryption is off
+          try {
+            const PersonaConfig = require('../models/PersonaConfig');
+            await PersonaConfig.findOneAndUpdate(
+              { ownerId: user._id },
+              {
+                $set: {
+                  ownerId: user._id,
+                  instagramPageAccessToken: encrypted ? '' : linkedPageToken,
+                  instagramAccountId: instagramAccountId,
+                  ...(instagramUsername ? { instagramHandle: `@${instagramUsername.replace(/^@/, '')}` } : {}),
+                  globalBotActive: true
+                }
+              },
+              { upsert: true, new: true }
+            );
+            await redisService.invalidatePersonaConfig();
+          } catch (personaErr) {
+            console.warn('Could not sync PersonaConfig in OAuth callback:', personaErr.message);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not save Instagram connection for user:', e.message);
+      }
+    }
+
+    const payload = {
+      success: true,
+      instagramUsername: instagramUsername || '',
+      instagramAccountId: instagramAccountId || '',
+      // The token only goes back to the browser when it could not be stored server-side
+      ...(savedServerSide ? {} : { instagramPageAccessToken: linkedPageToken || '' }),
+    };
+
+    // 6. Return auto-closing HTML that posts message to opener
     return res.send(`
       <!DOCTYPE html>
       <html>
@@ -1309,17 +1353,12 @@ router.get('/instagram/callback', async (req, res) => {
           <p>Connected as <strong>@${instagramUsername || 'Instagram'}</strong>.<br/>Returning to Chatter OS...</p>
         </div>
         <script>
-          const payload = {
-            success: true,
-            instagramUsername: "${instagramUsername || ''}",
-            instagramAccountId: "${instagramAccountId || ''}",
-            instagramPageAccessToken: "${linkedPageToken || ''}"
-          };
+          const payload = ${jsValue(payload)};
           if (window.opener) {
-            window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_SUCCESS', payload }, "*");
+            window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_SUCCESS', payload }, ${jsValue(origin)});
             setTimeout(() => { window.close(); }, 1200);
           } else {
-            setTimeout(() => { window.location.href = "${origin}"; }, 1500);
+            setTimeout(() => { window.location.href = ${jsValue(`${origin.replace(/\/+$/, '')}/settings?connected=success`)}; }, 1500);
           }
         </script>
       </body>
@@ -1348,6 +1387,41 @@ router.get('/instagram/callback', async (req, res) => {
       </body>
       </html>
     `);
+  }
+});
+
+/**
+ * POST /api/auth/instagram/disconnect (Protected)
+ * Unsubscribes the creator's Page from webhooks and wipes the stored Instagram credentials
+ */
+router.post('/instagram/disconnect', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const token = getUserInstagramToken(user);
+    const pageId = user.instagram?.pageId;
+
+    // Best effort: we only hold a Page token, so stop the Page's webhooks instead of revoking the user's grant
+    if (token && pageId) {
+      try {
+        await axios.delete(`https://graph.facebook.com/v21.0/${pageId}/subscribed_apps`, {
+          params: { access_token: token }
+        });
+      } catch (unsubErr) {
+        console.warn(`⚠️ Could not unsubscribe Page ${pageId}:`, unsubErr.response?.data?.error?.message || unsubErr.message);
+      }
+    }
+
+    clearUserInstagram(user);
+    await user.save();
+
+    const PersonaConfig = require('../models/PersonaConfig');
+    await PersonaConfig.updateMany({ ownerId: user._id }, { $set: { instagramPageAccessToken: '', instagramAccountId: '' } });
+    await redisService.invalidatePersonaConfig();
+
+    res.json({ success: true, message: 'Instagram disconnected' });
+  } catch (err) {
+    console.error('❌ Instagram disconnect error:', err.message);
+    res.status(500).json({ error: 'Failed to disconnect Instagram' });
   }
 });
 

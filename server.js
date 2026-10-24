@@ -24,6 +24,8 @@ const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
+const cryptoService = require('./services/cryptoService');
+const { getUserInstagramToken, setUserInstagram } = require('./services/instagramTokenService');
 const { router: authRouter, requireAuth } = require('./routes/auth');
 const authService = require('./services/authService');
 
@@ -440,6 +442,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // 1. Locate the creator (tenant) that owns the receiving Instagram account
   let ownerUser = await User.findOne({
     $or: [
+      { 'instagram.accountId': targetAccountId },
       { instagramAccountId: targetAccountId },
       { 'businessProfile.instagramId': targetAccountId }
     ]
@@ -468,9 +471,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     return;
   }
 
-  // 3. Resolve active token for this creator (env admin token only for the legacy admin account)
-  const creatorAccessToken = (config && config.instagramPageAccessToken) ||
-                             (ownerUser && ownerUser.instagramPageAccessToken) ||
+  // 3. Resolve active token for this creator: the encrypted OAuth token first, then legacy plaintext copies
+  //    (env admin token only for the legacy admin account)
+  const creatorAccessToken = getUserInstagramToken(ownerUser) ||
+                             (config && config.instagramPageAccessToken) ||
                              (isLegacyAdminAccount ? process.env.INSTAGRAM_PAGE_ACCESS_TOKEN : '');
 
   // Prevent bot from replying to itself
@@ -1311,7 +1315,10 @@ app.put('/api/persona', async (req, res) => {
     if (excludedContactIds !== undefined) config.excludedContactIds = excludedContactIds;
     if (includedContactIds !== undefined) config.includedContactIds = includedContactIds;
     if (typingDelaySeconds !== undefined) config.typingDelaySeconds = typingDelaySeconds;
-    if (instagramPageAccessToken !== undefined) config.instagramPageAccessToken = instagramPageAccessToken;
+    // A blank token field means "unchanged" (OAuth tokens are not sent back to the browser); disconnecting has its own route
+    const pastedToken = (instagramPageAccessToken || '').trim();
+    const tokenEncrypted = Boolean(pastedToken) && Boolean(req.user) && cryptoService.isConfigured();
+    if (pastedToken) config.instagramPageAccessToken = tokenEncrypted ? '' : pastedToken;
     if (instagramAccountId !== undefined) config.instagramAccountId = instagramAccountId;
     if (autoShareReelsEnabled !== undefined) config.autoShareReelsEnabled = autoShareReelsEnabled;
     if (autoShareReelsFrequencyHours !== undefined) config.autoShareReelsFrequencyHours = autoShareReelsFrequencyHours;
@@ -1322,12 +1329,17 @@ app.put('/api/persona', async (req, res) => {
     await redisService.invalidatePersonaConfig();
 
     if (req.user) {
-      if (instagramPageAccessToken !== undefined) req.user.instagramPageAccessToken = instagramPageAccessToken.trim();
       if (instagramAccountId !== undefined) req.user.instagramAccountId = instagramAccountId.trim();
       if (creatorName !== undefined) req.user.firstName = creatorName.trim();
       if (instagramHandle !== undefined) req.user.instagramUsername = instagramHandle.trim().replace(/^@/, '');
-      req.user.hasInstagramToken = Boolean(req.user.instagramPageAccessToken);
-      req.user.isInstagramConnected = Boolean(req.user.instagramPageAccessToken);
+      if (pastedToken) {
+        setUserInstagram(req.user, {
+          token: pastedToken,
+          accountId: req.user.instagramAccountId,
+          pageId: req.user.instagram?.pageId,
+          username: req.user.instagramUsername,
+        });
+      }
       await req.user.save();
     }
 
