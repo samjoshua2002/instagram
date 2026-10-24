@@ -162,10 +162,12 @@ const UserSchema = new mongoose.Schema({
   verificationOtp: {
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
   },
   resetOtp: {
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
   },
   lastLogin: {
     type: Date,

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const authService = require('../services/authService');
 const redisService = require('../services/redisService');
@@ -9,8 +10,56 @@ const { setUserInstagram, getUserInstagramToken, clearUserInstagram } = require(
 
 const OAUTH_STATE_TTL_SECONDS = 600;
 
+// A malformed account id in the URL is a 400, not a database cast error (500)
+router.param('userId', (req, res, next, id) => {
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'Invalid account id.' });
+  next();
+});
+
 // Serializes a value so it is safe to embed inside an inline <script>
 const jsValue = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
+
+// The OAuth popup posts the Instagram token back to this origin, so only our own sites may be used
+const DEFAULT_CLIENT_ORIGIN = 'https://instagram-ebon-zeta.vercel.app';
+function safeClientOrigin(raw) {
+  const allowed = [DEFAULT_CLIENT_ORIGIN, process.env.FRONTEND_URL]
+    .filter(Boolean)
+    .map((u) => { try { return new URL(u).origin; } catch { return null; } });
+  try {
+    const { origin, hostname, protocol } = new URL(String(raw || ''));
+    if (allowed.includes(origin)) return origin;
+    if (protocol === 'tauri:') return `tauri://${hostname}`; // URL.origin is "null" for custom schemes
+    const isLocal = ['localhost', '127.0.0.1', 'tauri.localhost'].includes(hostname);
+    if (isLocal && (protocol === 'http:' || protocol === 'https:')) return origin;
+  } catch { /* fall through */ }
+  return DEFAULT_CLIENT_ORIGIN;
+}
+
+// With ENCRYPTION_KEY set the plain token field is blank and the token lives encrypted
+const hasIgToken = (u) => Boolean(u?.instagramPageAccessToken || u?.instagram?.accessTokenEncrypted);
+
+const newOtpCode = () => crypto.randomInt(100000, 1000000).toString();
+const MAX_OTP_ATTEMPTS = 5;
+
+// Checks an emailed 6-digit code stored on user[field]; wipes it after too many wrong tries.
+// Returns an error message, or null when the code matches.
+async function checkOtp(user, field, code) {
+  const otp = user[field];
+  if (!otp?.code) return 'No pending code. Please request a new one.';
+  if (new Date() > new Date(otp.expiresAt)) return 'Verification code expired. Please request a new one.';
+  if (otp.code !== String(code || '').trim()) {
+    // Local copy: after the reset below, otp (a live view of the document) reads back 0
+    const attempts = (otp.attempts || 0) + 1;
+    user[field] = attempts >= MAX_OTP_ATTEMPTS
+      ? { code: '', expiresAt: null, attempts: 0 }
+      : { code: otp.code, expiresAt: otp.expiresAt, attempts };
+    await user.save();
+    return attempts >= MAX_OTP_ATTEMPTS
+      ? 'Too many wrong codes. Please request a new one.'
+      : 'Invalid 6-digit verification code.';
+  }
+  return null;
+}
 
 // Middleware to protect routes with JWT Bearer Token
 const requireAuth = async (req, res, next) => {
@@ -95,7 +144,7 @@ router.post('/register/request-otp', async (req, res) => {
     }
 
     // Generate 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = newOtpCode();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     const passwordHash = await User.hashPassword(password);
@@ -186,7 +235,7 @@ router.post('/register/resend-otp', async (req, res) => {
       return res.status(404).json({ error: 'No account found with this email.' });
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = newOtpCode();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     user.verificationOtp = {
@@ -209,12 +258,6 @@ router.post('/register/resend-otp', async (req, res) => {
       console.error('❌ [Resend OTP] Email sending failed:', mailErr.message);
       return res.status(500).json({ error: 'Failed to resend verification email: ' + mailErr.message });
     }
-
-    res.json({
-      success: true,
-      message: `A fresh 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox.`,
-      email: cleanEmail,
-    });
   } catch (err) {
     console.error('❌ Resend OTP error:', err.message);
     res.status(500).json({ error: err.message });
@@ -238,14 +281,8 @@ router.post('/register/verify-otp', async (req, res) => {
     if (!user || !user.verificationOtp?.code) {
       return res.status(400).json({ error: 'No pending verification request found for this email.' });
     }
-
-    if (new Date() > new Date(user.verificationOtp.expiresAt)) {
-      return res.status(400).json({ error: 'Verification code expired. Please request a new code.' });
-    }
-
-    if (user.verificationOtp.code !== otpCode.trim()) {
-      return res.status(400).json({ error: 'Invalid 6-digit verification code.' });
-    }
+    const otpError = await checkOtp(user, 'verificationOtp', otpCode);
+    if (otpError) return res.status(400).json({ error: otpError });
 
     user.isVerified = true;
     user.verificationOtp = { code: '', expiresAt: null };
@@ -275,8 +312,8 @@ router.post('/register/verify-otp', async (req, res) => {
         businessProfile: user.businessProfile || null,
         profilePicUrl: user.profilePicUrl,
         hasPasskeys: (user.passkeys || []).length > 0,
-        hasInstagramToken: Boolean(user.instagramPageAccessToken),
-        isInstagramConnected: Boolean(user.instagramPageAccessToken),
+        hasInstagramToken: hasIgToken(user),
+        isInstagramConnected: hasIgToken(user),
       },
     });
   } catch (err) {
@@ -319,6 +356,9 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    if (user.isVerified === false) {
+      return res.status(403).json({ error: 'Please verify your email first. Create the account again to get a new code.', needsVerification: true, email: user.email });
+    }
     if (user.isBanned) {
       return res.status(403).json({ error: 'This account has been suspended. Please contact support.' });
     }
@@ -348,8 +388,8 @@ router.post('/login', async (req, res) => {
         businessProfile: user.businessProfile || null,
         profilePicUrl: user.profilePicUrl || '',
         hasPasskeys: (user.passkeys || []).length > 0,
-        hasInstagramToken: Boolean(user.instagramPageAccessToken),
-        isInstagramConnected: Boolean(user.instagramPageAccessToken),
+        hasInstagramToken: hasIgToken(user),
+        isInstagramConnected: hasIgToken(user),
       },
     });
   } catch (err) {
@@ -434,17 +474,18 @@ router.post('/oneauth-login', async (req, res) => {
  */
 router.post('/oneauth/request-setup-otp', async (req, res) => {
   try {
-    const { email = 'guidetalk.app@gmail.com' } = req.body;
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
+    const cleanEmail = String(req.body?.email || '').trim().toLowerCase();
+    if (!cleanEmail) return res.status(400).json({ error: 'Email or username is required' });
+    const user = await User.findOne({ $or: [{ email: cleanEmail }, { username: cleanEmail }] });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = newOtpCode();
     user.resetOtp = {
       code: otpCode,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
     };
     await user.save();
 
@@ -462,24 +503,24 @@ router.post('/oneauth/request-setup-otp', async (req, res) => {
  */
 router.post('/oneauth/verify-setup-otp', async (req, res) => {
   try {
-    const { email = 'guidetalk.app@gmail.com', otpCode } = req.body;
-    const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
+    const { otpCode } = req.body || {};
+    const cleanEmail = String(req.body?.email || '').trim().toLowerCase();
+    const user = cleanEmail ? await User.findOne({ $or: [{ email: cleanEmail }, { username: cleanEmail }] }) : null;
 
     if (!user || !user.resetOtp?.code) {
       return res.status(400).json({ error: 'Invalid or expired setup request' });
     }
+    const otpError = await checkOtp(user, 'resetOtp', otpCode);
+    if (otpError) return res.status(400).json({ error: otpError });
 
-    if (new Date() > new Date(user.resetOtp.expiresAt)) {
-      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    // Reset OTP code; first-time setup also creates the authenticator secret
+    user.resetOtp = { code: '', expiresAt: null, attempts: 0 };
+    if (!user.twoFactor?.secret) {
+      const { generateSecret } = require('otplib');
+      user.twoFactor = user.twoFactor || {};
+      user.twoFactor.secret = generateSecret();
+      user.twoFactor.enabled = true;
     }
-
-    if (user.resetOtp.code !== (otpCode || '').trim()) {
-      return res.status(400).json({ error: 'Invalid 6-digit verification code' });
-    }
-
-    // Reset OTP code
-    user.resetOtp = { code: '', expiresAt: null };
     await user.save();
 
     // Return QR code and secret
@@ -494,50 +535,6 @@ router.post('/oneauth/verify-setup-otp', async (req, res) => {
   }
 });
 ;
-
-/**
- * GET /api/auth/oneauth/qr
- * Direct QR Code retrieval for easy phone scanning on the login screen
- */
-router.get('/oneauth/qr', async (req, res) => {
-  try {
-    const rawEmail = (req.query.email || '').trim().toLowerCase();
-    let user = null;
-    if (rawEmail) {
-      user = await User.findOne({
-        $or: [{ email: rawEmail }, { username: rawEmail }]
-      });
-    }
-    // If no email specified, fallback to owner account
-    if (!user && !rawEmail) {
-      user = await User.findOne({
-        $or: [{ email: 'samjoshuacs2002@gmail.com' }, { username: 'samjoshua2002' }]
-      });
-    }
-    if (!user) {
-      return res.status(404).json({ error: `Account for "${rawEmail}" was not found. Please verify your email or username.` });
-    }
-
-    if (!user.twoFactor?.secret) {
-      const { generateSecret } = require('otplib');
-      user.twoFactor = user.twoFactor || {};
-      user.twoFactor.secret = generateSecret();
-      user.twoFactor.enabled = true;
-      await user.save();
-    }
-
-    const totpData = await authService.getTotpQrCode(user);
-    res.json({
-      success: true,
-      email: user.email,
-      username: user.username,
-      ...totpData,
-    });
-  } catch (err) {
-    console.error('❌ OneAuth QR error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 /**
  * POST /api/auth/forgot-password/verify-oneauth
@@ -593,7 +590,7 @@ router.post('/forgot-password/send-otp', async (req, res) => {
     }
 
     // Generate secure 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = newOtpCode();
     user.resetOtp = {
       code: otpCode,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
@@ -639,14 +636,8 @@ router.post('/forgot-password/verify-reset', async (req, res) => {
     if (!user || !user.resetOtp?.code) {
       return res.status(400).json({ error: 'Invalid or expired verification request' });
     }
-
-    if (new Date() > new Date(user.resetOtp.expiresAt)) {
-      return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
-    }
-
-    if (user.resetOtp.code !== otpCode.trim()) {
-      return res.status(400).json({ error: 'Invalid verification code' });
-    }
+    const otpError = await checkOtp(user, 'resetOtp', otpCode);
+    if (otpError) return res.status(400).json({ error: otpError });
 
     user.passwordHash = await User.hashPassword(newPassword);
     user.resetOtp = { code: '', expiresAt: null };
@@ -733,8 +724,8 @@ router.post('/passkey/login-verify', async (req, res) => {
         isOnboarded: user.isOnboarded ?? false,
         businessProfile: user.businessProfile || null,
         hasPasskeys: (user.passkeys || []).length > 0,
-        hasInstagramToken: Boolean(user.instagramPageAccessToken),
-        isInstagramConnected: Boolean(user.instagramPageAccessToken),
+        hasInstagramToken: hasIgToken(user),
+        isInstagramConnected: hasIgToken(user),
       },
     });
   } catch (err) {
@@ -834,9 +825,9 @@ router.get('/me', requireAuth, async (req, res) => {
     accountType: user.accountType,
     isOnboarded: user.isOnboarded ?? false,
     businessProfile: user.businessProfile || null,
-    hasInstagramToken: Boolean(user.instagramPageAccessToken),
-    isInstagramConnected: Boolean(user.instagramPageAccessToken),
-    igApprovalStatus: user.igApprovalStatus || (user.instagramPageAccessToken ? 'approved' : 'none'),
+    hasInstagramToken: hasIgToken(user),
+    isInstagramConnected: hasIgToken(user),
+    igApprovalStatus: user.igApprovalStatus || (hasIgToken(user) ? 'approved' : 'none'),
     igApprovalRequestedAt: user.igApprovalRequestedAt,
     igApprovedAt: user.igApprovedAt,
     address: user.address,
@@ -877,10 +868,14 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     }
     // Store pasted tokens encrypted; a blank field means "unchanged"
     if (instagramPageAccessToken && instagramPageAccessToken.trim()) {
-      setUserInstagram(user, { token: instagramPageAccessToken.trim(), accountId: (instagramAccountId || '').trim() });
+      setUserInstagram(user, { token: instagramPageAccessToken.trim(), accountId: String(instagramAccountId || '').trim() });
     }
     if (instagramAccountId !== undefined) {
-      user.instagramAccountId = instagramAccountId.trim();
+      const cleanAccountId = String(instagramAccountId || '').trim();
+      if (cleanAccountId && await User.exists({ _id: { $ne: user._id }, $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }] })) {
+        return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
+      }
+      user.instagramAccountId = cleanAccountId;
     }
     if (businessProfile) {
       user.businessProfile = {
@@ -892,45 +887,34 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     user.isOnboarded = true;
     await user.save();
 
-    // Sync with PersonaConfig
+    // Save the onboarding choices on this account's own persona (chat mode and bot switch live there too)
     try {
       const PersonaConfig = require('../models/PersonaConfig');
-      let persona = await PersonaConfig.findOne();
+      let persona = await PersonaConfig.findOne({ ownerId: user._id });
       if (!persona) {
-        persona = new PersonaConfig();
+        persona = new PersonaConfig({ ownerId: user._id });
       }
-      if (personaTone) {
-        persona.tone = personaTone;
+      if (['personal', 'creator', 'business', 'agency'].includes(accountType)) {
+        persona.accountType = accountType;
       }
-      if (greetingMessage) {
-        persona.greeting = greetingMessage;
+      if (personaTone && typeof personaTone === 'string') {
+        persona.toneGuidelines = `Overall tone: ${personaTone.trim()}.
+${persona.toneGuidelines || ''}`.trim();
       }
-      if (accountType === 'business') {
-        persona.persona = 'helpful_assistant';
-      } else if (accountType === 'personal') {
-        persona.persona = 'friendly_peer';
+      if (greetingMessage && typeof greetingMessage === 'string') {
+        persona.replyRules = `Greeting for a new chat: "${greetingMessage.trim()}".
+${persona.replyRules || ''}`.trim();
       }
-      await persona.save();
-    } catch (e) {
-      console.warn('Could not update persona during onboarding:', e.message);
-    }
-
-    // Sync with RoutingConfig
-    try {
-      const RoutingConfig = require('../models/RoutingConfig');
-      let routing = await RoutingConfig.findOne();
-      if (!routing) {
-        routing = new RoutingConfig();
-      }
-      if (chatMode) {
-        routing.chatMode = chatMode;
+      if (['everyone', 'everyone_except', 'only_selected', 'paused'].includes(chatMode)) {
+        persona.chatMode = chatMode;
       }
       if (typeof enableGlobalBot === 'boolean') {
-        routing.globalBotActive = enableGlobalBot;
+        persona.globalBotActive = enableGlobalBot;
       }
-      await routing.save();
+      await persona.save();
+      await redisService.invalidatePersonaConfig();
     } catch (e) {
-      console.warn('Could not update routing during onboarding:', e.message);
+      console.warn('Could not update persona during onboarding:', e.message);
     }
 
     res.json({
@@ -949,7 +933,7 @@ router.post('/onboarding', requireAuth, async (req, res) => {
         profilePicUrl: user.profilePicUrl || '',
         instagramUsername: user.instagramUsername || '',
         instagramId: user.instagramId || '',
-        hasInstagramToken: Boolean(user.instagramPageAccessToken),
+        hasInstagramToken: hasIgToken(user),
       }
     });
   } catch (err) {
@@ -994,7 +978,7 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
 router.get('/instagram/connect', async (req, res) => {
   try {
     const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
-    const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
+    const clientOrigin = safeClientOrigin(req.query.origin);
 
     // The popup cannot send an Authorization header, so the session JWT arrives as ?token= and is checked here
     let userId = null;
@@ -1057,7 +1041,7 @@ router.get('/instagram/callback', async (req, res) => {
       return res.status(400).send('This connection link is invalid or has expired. Please start the Instagram connection again.');
     }
     await redisService.del(stateKey);
-    if (savedState.origin) origin = savedState.origin;
+    if (savedState.origin) origin = safeClientOrigin(savedState.origin);
     if (savedState.userId) stateUserId = savedState.userId;
     if (savedState.redirectUri) savedRedirectUri = savedState.redirectUri;
     if (savedState.appId) savedAppId = savedState.appId;
@@ -1095,7 +1079,7 @@ router.get('/instagram/callback', async (req, res) => {
     const cleanCode = (code || '').split('#')[0].trim();
     const instagramAppId = savedAppId || process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
     const metaAppId = process.env.META_APP_ID || '28946827981672606';
-    const metaAppSecret = process.env.META_APP_SECRET || process.env.INSTAGRAM_APP_SECRET || '4494347ba6f01696552b99a2e90ccd75';
+    const metaAppSecret = process.env.META_APP_SECRET || process.env.INSTAGRAM_APP_SECRET || '';
 
     let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
@@ -1470,13 +1454,17 @@ router.put('/profile', requireAuth, async (req, res) => {
         user.accountType = accountType;
       }
     }
-    if (profilePicUrl !== undefined) user.profilePicUrl = profilePicUrl;
-    if (firstName !== undefined) user.firstName = firstName.trim();
-    if (lastName !== undefined) user.lastName = lastName.trim();
-    if (mobileNumber !== undefined) user.mobileNumber = mobileNumber.trim();
-    if (whatsappNumber !== undefined) user.whatsappNumber = whatsappNumber.trim();
-    if (instagramUsername !== undefined) user.instagramUsername = instagramUsername.trim();
-    if (address && typeof address === 'object') {
+    const str = (v) => String(v ?? '').trim();
+    if (profilePicUrl !== undefined) user.profilePicUrl = str(profilePicUrl);
+    if (firstName !== undefined) user.firstName = str(firstName);
+    if (lastName !== undefined) user.lastName = str(lastName);
+    if (mobileNumber !== undefined) user.mobileNumber = str(mobileNumber);
+    if (whatsappNumber !== undefined) user.whatsappNumber = str(whatsappNumber);
+    if (instagramUsername !== undefined) user.instagramUsername = str(instagramUsername).replace(/^@/, '');
+    if (typeof address === 'string') {
+      // The profile page edits the address as one line; keep it whole in street so it reads back unchanged
+      user.address = { street: address.trim().slice(0, 300), city: '', state: '', country: '', postalCode: '' };
+    } else if (address && typeof address === 'object') {
       user.address = {
         street: address.street || user.address?.street || '',
         city: address.city || user.address?.city || '',
@@ -1813,7 +1801,7 @@ router.get('/admin/accounts', requireAuth, async (req, res) => {
  */
 router.get('/ig-request-access', requireAuth, async (req, res) => {
   return res.json({
-    igApprovalStatus: req.user.igApprovalStatus || (req.user.instagramPageAccessToken ? 'approved' : 'none'),
+    igApprovalStatus: req.user.igApprovalStatus || (hasIgToken(req.user) ? 'approved' : 'none'),
     instagramUsername: req.user.instagramUsername || '',
   });
 });
@@ -1854,7 +1842,7 @@ router.post('/admin/approve-ig-access', requireAuth, async (req, res) => {
     }
 
     const { userId, instagramUsername } = req.body;
-    if (!userId) {
+    if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ error: 'Target userId is required.' });
     }
 
@@ -1910,7 +1898,7 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
     }
     const { userId } = req.body;
-    if (!userId) {
+    if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ error: 'Target userId is required.' });
     }
     const targetUser = await User.findById(userId);
@@ -2035,7 +2023,7 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
     }
     const { userId } = req.params;
-    if (!userId) {
+    if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ error: 'Target userId is required.' });
     }
 
@@ -2057,13 +2045,8 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
     // Delete social graph / contacts associated with this user
     try {
       const SocialGraph = require('../models/SocialGraph');
-      await SocialGraph.deleteMany({
-        $or: [
-          { ownerId: userId },
-          { instagramHandle: targetUser.instagramUsername },
-          { senderId: targetUser.instagramId }
-        ]
-      });
+      // Owner only: matching on handle / senderId also hit other accounts' contacts with empty values
+      await SocialGraph.deleteMany({ ownerId: userId });
     } catch (e) {
       console.warn('SocialGraph cleanup warning:', e.message);
     }

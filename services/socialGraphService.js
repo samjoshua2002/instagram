@@ -213,7 +213,7 @@ class SocialGraphService {
    */
   async recordConnection(personAName, personBName, relationship, notes = '') {
     try {
-      const nodeA = await SocialGraph.findOne({ name: new RegExp(`^${personAName}$`, 'i') });
+      const nodeA = await SocialGraph.findOne({ name: new RegExp(`^${String(personAName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
       if (!nodeA) return;
 
       const existingIndex = (nodeA.connections || []).findIndex(
