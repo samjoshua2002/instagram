@@ -4,6 +4,34 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
+const STORAGE_API_KEY = 'chatter_dashboard_api_key';
+
+// Patch fetch once so every backend call carries the dashboard API key (x-api-key).
+// On a 401 the user is asked for the key, it is saved in this browser and the call is retried.
+if (typeof window !== 'undefined' && !window.__chatterFetchPatched) {
+  window.__chatterFetchPatched = true;
+  const nativeFetch = window.fetch.bind(window);
+  const readKey = () => { try { return localStorage.getItem(STORAGE_API_KEY) || ''; } catch { return ''; } };
+  const withKey = (init, key) => {
+    const headers = new Headers((init && init.headers) || {});
+    if (key) headers.set('x-api-key', key);
+    return { ...(init || {}), headers };
+  };
+  let pendingPrompt = null;
+  window.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url || '';
+    if (!url.startsWith(API_BASE)) return nativeFetch(input, init);
+    const res = await nativeFetch(input, withKey(init, readKey()));
+    if (res.status !== 401) return res;
+    pendingPrompt = pendingPrompt || Promise.resolve(window.prompt('Enter your dashboard API key (DASHBOARD_API_KEY):') || '');
+    const entered = (await pendingPrompt).trim();
+    pendingPrompt = null;
+    if (!entered) return res;
+    try { localStorage.setItem(STORAGE_API_KEY, entered); } catch {}
+    return nativeFetch(input, withKey(init, entered));
+  };
+}
+
 const STORAGE_NODES_KEY = 'chatter_social_nodes_v8';
 const STORAGE_CONFIG_KEY = 'chatter_persona_config_v8';
 const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
