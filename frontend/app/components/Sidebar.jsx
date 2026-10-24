@@ -29,6 +29,7 @@ import {
   Download,
   FileText,
   Inbox,
+  Workflow,
   Sun,
   Moon,
   LayoutGrid
@@ -175,6 +176,7 @@ export default function Sidebar() {
     ]
     : [
       ...workspaceNav[mode],
+      { href: isBusiness ? '/storyboard/business' : '/storyboard/personal', label: 'Storyboard', icon: Workflow },
       { href: '/settings/features', label: 'Feature Store', icon: Layers },
       { href: '/download', label: 'Desktop App', icon: Download },
       isSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
