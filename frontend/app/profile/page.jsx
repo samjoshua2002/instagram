@@ -90,7 +90,8 @@ export default function ProfilePage() {
       });
       fetchPasskeys();
     }
-  }, [user]);
+    // Only when a different account is shown: other user updates must not wipe unsaved edits
+  }, [user?.id, user?._id]);
 
   const fetchPasskeys = async () => {
     if (!token) return;
@@ -222,6 +223,7 @@ export default function ProfilePage() {
     setErrorMsg('');
     try {
       const optRes = await fetch(`${API_BASE}/api/auth/passkey/register-options`, {
+        method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!optRes.ok) throw new Error('Could not get registration options');
@@ -257,13 +259,16 @@ export default function ProfilePage() {
   const handleDeletePasskey = async (credentialId) => {
     if (!confirm('Are you sure you want to remove this biometric passkey?')) return;
     try {
-      const res = await fetch(`${API_BASE}/api/auth/passkey/${encodeURIComponent(credentialId)}`, {
+      const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         showToast?.('Passkey removed', 'success');
         fetchPasskeys();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error || 'Failed to delete passkey');
       }
     } catch (e) {
       setErrorMsg('Failed to delete passkey');

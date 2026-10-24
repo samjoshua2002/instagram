@@ -250,6 +250,7 @@ export default function AnalyticsPage() {
       enterWorkspace(data.token, data.user);
     } catch (err) {
       console.error('Workspace impersonation error:', err);
+      showToast?.(err.message || 'Failed to enter workspace.', 'error');
       setImpersonatingId(null);
     }
   };

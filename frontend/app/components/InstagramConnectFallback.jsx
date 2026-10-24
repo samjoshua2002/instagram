@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { isFromApi, onPopupClosed } from '../lib/utils';
 import {
   Instagram,
   Sparkles,
@@ -137,6 +138,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
   // Listen for OAuth postMessage from login popup window
   React.useEffect(() => {
     const handleOAuthMessage = (event) => {
+      if (!isFromApi(event, API_BASE)) return; // only our OAuth popup may set Instagram credentials
       if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
         const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
         if (igUser) setHandle(igUser);
@@ -193,6 +195,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
       const directOAuthUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
 
       const popup = window.open(directOAuthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+      onPopupClosed(popup, () => setOauthConnecting(false));
       if (!popup) {
         setOauthConnecting(false);
         setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');

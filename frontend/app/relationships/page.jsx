@@ -78,7 +78,7 @@ function formatDobForInput(dob) {
   return '';
 }
 
-export default function RelationshipsPage() {
+function RelationshipsPageContent() {
 
 
   const {
@@ -99,16 +99,6 @@ export default function RelationshipsPage() {
     isImpersonating
   } = useApp();
 
-  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
-  if (user?.role === 'superadmin' && !isImpersonating) {
-    return (
-      <SuperadminWorkspacePrompt
-        sectionTitle="Creator People Directory"
-        sectionCode="02 // RELATIONSHIPS"
-        sectionDescription="People directories, relationship tags, and contact memory belong to individual creator workspaces. Choose a creator workspace below to inspect and manage their contact directory."
-      />
-    );
-  }
 
   // Navigation State: null = Directory Table view; Object = Full Inner Person Page
   const [selectedPerson, setSelectedPerson] = useState(null);
@@ -277,8 +267,9 @@ export default function RelationshipsPage() {
       if (n.isRoot) return;
       counts.all++;
       const cat = n.category || 'online_friend';
-      if (cat === 'close_friend' || n.id === 'fami' || n.id === 'bhavani' || n.id === 'rajveer' || n.id === 'moksha') {
+      if (cat === 'close_friend') {
         counts.close_friend++;
+        counts.online_friend++; // the Online tab lists close friends too, so its count must include them
       } else if (cat === 'online_friend') {
         counts.online_friend++;
       } else if (cat === 'offline_friend') {
@@ -302,10 +293,11 @@ export default function RelationshipsPage() {
       if (activeCategory === 'unlinked') {
         if (n.handle || n.senderId) return false;
       } else if (activeCategory === 'close_friend') {
-        const isClose = n.category === 'close_friend' || n.id === 'fami' || n.id === 'bhavani' || n.id === 'rajveer' || n.id === 'moksha';
-        if (!isClose) return false;
+        if (n.category !== 'close_friend') return false;
       } else if (activeCategory === 'online_friend') {
-        if (n.category !== 'online_friend' && n.category !== 'close_friend') return false;
+        // A contact without a category counts as an online friend (same rule as the tab counts)
+        const cat = n.category || 'online_friend';
+        if (cat !== 'online_friend' && cat !== 'close_friend') return false;
       } else if (activeCategory === 'offline_friend') {
         if (n.category !== 'offline_friend') return false;
       } else if (activeCategory === 'family') {
@@ -609,14 +601,15 @@ export default function RelationshipsPage() {
       const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/learn`, {
         method: 'POST'
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `server answered ${res.status}`);
       if (data.success && data.memory) {
         showToast('Memory synthesized from recent messages');
       } else {
         showToast('Messages reviewed. Memory up to date');
       }
     } catch (e) {
-      showToast('Memory verified');
+      showToast(`Could not refresh memory: ${e.message}`, 'error');
     } finally {
       setIsLearning(false);
     }
@@ -2777,4 +2770,19 @@ export default function RelationshipsPage() {
       </div>
     </motion.div>
   );
+}
+
+// The superadmin check lives outside the page so the page's hooks always run in the same order
+export default function RelationshipsPage() {
+  const { user, isImpersonating } = useApp();
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator People Directory"
+        sectionCode="02 // RELATIONSHIPS"
+        sectionDescription="People directories, relationship tags, and contact memory belong to individual creator workspaces. Choose a creator workspace below to inspect and manage their contact directory."
+      />
+    );
+  }
+  return <RelationshipsPageContent />;
 }

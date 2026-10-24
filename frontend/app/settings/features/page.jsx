@@ -15,7 +15,7 @@ import { FEATURE_GROUPS, WORKSPACE_MODES, currentMode } from '../../lib/workspac
  * pipeline within its 30s cache.
  */
 export default function FeatureStorePage() {
-  const { user, isImpersonating, workspaceFeatures, updateWorkspaceFeatures } = useApp();
+  const { user, isImpersonating, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures } = useApp();
   const [savingKey, setSavingKey] = useState(null);
 
   if (user?.role === 'superadmin' && !isImpersonating) {
@@ -65,7 +65,13 @@ export default function FeatureStorePage() {
         </p>
       </section>
 
-      {!enabled && <div className="skeleton" style={{ height: '320px', borderRadius: '20px' }} />}
+      {!enabled && workspaceFeaturesError && (
+        <section className="download-card">
+          <p className="feature-hint" style={{ margin: '0 0 10px' }}>Your features could not be loaded.</p>
+          <button type="button" className="btn" onClick={reloadWorkspaceFeatures}>Retry</button>
+        </section>
+      )}
+      {!enabled && !workspaceFeaturesError && <div className="skeleton" style={{ height: '320px', borderRadius: '20px' }} />}
 
       {enabled && FEATURE_GROUPS.map(group => (
         <section key={group.title} className="download-card">

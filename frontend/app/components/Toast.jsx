@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Check } from 'lucide-react';
+import { Check, AlertCircle } from 'lucide-react';
 
 export default function Toast() {
-  const { toastMessage } = useApp();
+  const { toastMessage, toastType } = useApp();
+  const isError = toastType === 'error';
   if (!toastMessage) return null;
 
   // Clean away any emojis in toast message
@@ -13,6 +14,7 @@ export default function Toast() {
 
   return (
     <div
+      role={isError ? 'alert' : 'status'}
       style={{
         position: 'fixed',
         top: '20px',
@@ -31,7 +33,7 @@ export default function Toast() {
         gap: '8px'
       }}
     >
-      <Check size={14} />
+      {isError ? <AlertCircle size={14} /> : <Check size={14} />}
       <span>{cleanMsg}</span>
     </div>
   );
