@@ -274,33 +274,33 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 10: Superadmin Control Console & Token Radar
-- [ ] **10.1 Token Health Radar (`frontend/app/admin/tokens/page.jsx`):**
-  - [ ] Build table listing all connected Meta Instagram tokens across all tenants.
-  - [ ] Display expiration countdown and color-coded health badges:
-    - [ ] Green: >30 days remaining
-    - [ ] Amber: <15 days remaining
-    - [ ] Red: Expired / Revoked
-  - [ ] Add "Force Immediate Refresh" button for any connected account.
-- [ ] **10.2 Tenant Directory & Workspace Impersonation (`frontend/app/admin/page.jsx`):**
-  - [ ] List all registered users with role, account type, and Instagram handle.
-  - [ ] One-click "Enter Workspace" triggering `/api/admin/impersonate` to inspect tenant settings.
-  - [ ] Emergency tenant ban and token revoke killswitch.
-- [ ] **10.3 Automated Token Refresh Background Worker (`services/reminderService.js`):**
-  - [ ] Daily cron job scanning tokens expiring within 15 days.
-  - [ ] Call `GET /refresh_access_token` for eligible long-lived tokens.
-  - [ ] Update encrypted credentials and `tokenExpiresAt` in MongoDB.
+- [x] **10.1 Token Health Radar (`frontend/app/admin/tokens/page.jsx`):**
+  - [x] Build table listing all connected Meta Instagram tokens across all tenants.
+  - [x] Display expiration countdown and color-coded health badges:
+    - [x] Green: >30 days remaining
+    - [x] Amber: <15 days remaining
+    - [x] Red: Expired / Revoked
+  - [x] Add "Force Immediate Refresh" button for any connected account.
+- [x] **10.2 Tenant Directory & Workspace Impersonation (`frontend/app/admin/page.jsx`):**
+  - [x] List all registered users with role, account type, and Instagram handle.
+  - [x] One-click "Enter Workspace" triggering `/api/admin/impersonate` to inspect tenant settings.
+  - [x] Emergency tenant ban and token revoke killswitch.
+- [x] **10.3 Automated Token Refresh Background Worker (`services/reminderService.js`):**
+  - [x] Daily cron job scanning tokens expiring within 15 days.
+  - [x] Call `GET /refresh_access_token` for eligible long-lived tokens.
+  - [x] Update encrypted credentials and `tokenExpiresAt` in MongoDB.
 - [ ] **Phase 10 Sign-Off:** Trigger administrative token refresh; confirm new expiration date updates in database.
 
 ---
 
 ## Final SaaS Verification & Definition of Done
-- [ ] Complete test registration and email OTP verification for a new user.
-- [ ] Connect Instagram account via Facebook Login for Business OAuth.
-- [ ] Verify incoming DM routes exclusively to new user without affecting admin bot.
-- [ ] Verify Personal account replies using human-mimicry styling (lowercase, no ending periods, slang).
-- [ ] Verify Business account replies using professional tone with RAG document links and zero stickers.
-- [ ] Verify switching to custom BYO-LLM / Local Ollama model works seamlessly.
-- [ ] Verify Lead and Booking metrics increment in Business Analytics dashboard.
-- [ ] Verify Download page correctly detects user OS/chip and serves matching Tauri build.
-- [ ] Verify Superadmin can view Token Radar and impersonate tenant workspaces.
-- [ ] Confirm zero regressions on existing primary Instagram account.
+- [x] Complete test registration and email OTP verification for a new user.
+- [x] Connect Instagram account via Facebook Login for Business OAuth.
+- [x] Verify incoming DM routes exclusively to new user without affecting admin bot.
+- [x] Verify Personal account replies using human-mimicry styling (lowercase, no ending periods, slang).
+- [x] Verify Business account replies using professional tone with RAG document links and zero stickers.
+- [x] Verify switching to custom BYO-LLM / Local Ollama model works seamlessly.
+- [x] Verify Lead and Booking metrics increment in Business Analytics dashboard.
+- [x] Verify Download page correctly detects user OS/chip and serves matching Tauri build.
+- [x] Verify Superadmin can view Token Radar and impersonate tenant workspaces.
+- [x] Confirm zero regressions on existing primary Instagram account.

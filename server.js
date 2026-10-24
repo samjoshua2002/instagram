@@ -186,6 +186,11 @@ app.use('/api/admin/accounts', requireAuth, (req, res, next) => {
   req.url = '/admin/accounts' + subPath;
   authRouter(req, res, next);
 });
+app.use('/api/admin/tokens', requireAuth, (req, res, next) => {
+  const subPath = req.url === '/' ? '' : req.url;
+  req.url = '/admin/tokens' + subPath;
+  authRouter(req, res, next);
+});
 app.use('/api/admin/impersonate', requireAuth, (req, res, next) => {
   req.url = '/admin/impersonate';
   authRouter(req, res, next);
@@ -462,6 +467,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // Safe drop: never answer an unrecognized account with the admin's persona or token
   if (!ownerUser && !isLegacyAdminAccount) {
     console.warn(`⚠️ Unrecognized recipient account ${targetAccountId}. Dropping event safely.`);
+    return;
+  }
+  if (ownerUser && ownerUser.isBanned) {
+    console.warn(`⚠️ Account ${targetAccountId} belongs to a suspended tenant. Dropping event.`);
     return;
   }
 
