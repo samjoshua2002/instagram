@@ -41,7 +41,36 @@ function findAdminConfig() {
   return PersonaConfig.findOne({ ownerId: null });
 }
 
+// Echo webhooks for messages this app sent must not be read as the creator typing by hand
+const APP_SENT_MID_LIMIT = 2000;
+
 class InstagramService {
+  constructor() {
+    this.appSentMids = new Set();
+    this.sendingTo = new Map(); // recipientId -> sends in flight
+  }
+
+  async trackSend(recipientId, send) {
+    this.sendingTo.set(recipientId, (this.sendingTo.get(recipientId) || 0) + 1);
+    try {
+      const result = await send();
+      const mid = result?.data?.message_id;
+      if (mid) {
+        this.appSentMids.add(mid);
+        if (this.appSentMids.size > APP_SENT_MID_LIMIT) this.appSentMids.delete(this.appSentMids.values().next().value);
+      }
+      return result;
+    } finally {
+      const left = (this.sendingTo.get(recipientId) || 1) - 1;
+      if (left > 0) this.sendingTo.set(recipientId, left); else this.sendingTo.delete(recipientId);
+    }
+  }
+
+  /** True when an echo is for a message this app sent (or is sending right now) to the contact. */
+  isAppEcho(recipientId, mid) {
+    return (mid && this.appSentMids.has(mid)) || this.sendingTo.has(recipientId);
+  }
+
   /**
    * Admin fallback token (admin persona, then .env). Used only when a caller passes no customToken;
    * tenant callers must always pass their own token.
@@ -76,7 +105,11 @@ class InstagramService {
   /**
    * Send a text message to a user on Instagram (supports swipe-to-reply via replyToMid)
    */
-  async sendTextMessage(recipientId, text, customToken = null, replyToMid = null) {
+  sendTextMessage(recipientId, text, customToken = null, replyToMid = null) {
+    return this.trackSend(recipientId, () => this.postTextMessage(recipientId, text, customToken, replyToMid));
+  }
+
+  async postTextMessage(recipientId, text, customToken = null, replyToMid = null) {
     const token = customToken || await this.getAccessToken();
     if (!token) {
       console.warn("⚠️ Warning: Instagram Page Access Token not configured yet. Response stored in DB, but not sent via Graph API.");
@@ -138,7 +171,11 @@ class InstagramService {
   /**
    * Send a sticker or meme image attachment
    */
-  async sendImageMessage(recipientId, imageUrl, customToken = null, replyToMid = null) {
+  sendImageMessage(recipientId, imageUrl, customToken = null, replyToMid = null) {
+    return this.trackSend(recipientId, () => this.postImageMessage(recipientId, imageUrl, customToken, replyToMid));
+  }
+
+  async postImageMessage(recipientId, imageUrl, customToken = null, replyToMid = null) {
     const token = customToken || await this.getAccessToken();
     if (!token || !imageUrl) return { success: false };
 

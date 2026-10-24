@@ -35,8 +35,9 @@ router.get('/overview', async (req, res) => {
     const ownerId = ownerOf(req);
     const since30d = new Date(Date.now() - 30 * 864e5);
 
-    const [conversationIds, leads, leadsLast30d, confirmedBookings, upcomingBookings, handoffsOpen, aiReplies, humanReplies] = await Promise.all([
-      Message.distinct('senderId', { ownerId, role: 'user' }),
+    const [totalConversations, leads, leadsLast30d, confirmedBookings, upcomingBookings, handoffsOpen, aiReplies, humanReplies] = await Promise.all([
+      // Same contacts the inbox lists, so the card matches what the owner sees
+      UserMemory.countDocuments({ ownerId }),
       Lead.countDocuments({ ownerId }),
       Lead.countDocuments({ ownerId, createdAt: { $gte: since30d } }),
       Booking.countDocuments({ ownerId, status: 'confirmed' }),
@@ -53,7 +54,6 @@ router.get('/overview', async (req, res) => {
       dailyTrend(Message, { ownerId, role: 'assistant', sentByAI: true }),
     ]);
 
-    const totalConversations = conversationIds.length;
     const totalReplies = aiReplies + humanReplies;
     res.json({
       totalConversations,
