@@ -32,6 +32,11 @@ export default function AuthGate({ children }) {
   const isInstagramLinked = isSuperadmin || Boolean(user?.hasInstagramToken || user?.isInstagramConnected || user?.instagramPageAccessToken);
 
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && user?._id) {
@@ -72,8 +77,8 @@ export default function AuthGate({ children }) {
     }
   };
 
-  // Only block the screen with full loader if there is no cached token or user
-  if (authLoading && (!token || !user)) {
+  // Prevent SSR hydration mismatch: render loader until client mounts
+  if (!mounted || (authLoading && (!token || !user))) {
     return (
       <div style={{
         width: '100vw',

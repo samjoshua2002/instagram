@@ -31,9 +31,9 @@ export default function BusinessConversionPanel({ refreshKey }) {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/analytics/leads?limit=6`, { headers: authHeader() })
-      .then(r => (r.ok ? r.json() : null)).then(d => d && setLeads(d.items || [])).catch(() => {});
+      .then(r => (r.ok ? r.json() : null)).then(d => d && setLeads(d.items || [])).catch(() => { });
     fetch(`${API_BASE}/api/analytics/bookings`, { headers: authHeader() })
-      .then(r => (r.ok ? r.json() : null)).then(d => d && setBookings((d.items || []).slice(0, 6))).catch(() => {});
+      .then(r => (r.ok ? r.json() : null)).then(d => d && setBookings((d.items || []).slice(0, 6))).catch(() => { });
   }, [API_BASE, token, refreshKey]);
 
   const exportCsv = async () => {

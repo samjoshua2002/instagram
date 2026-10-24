@@ -1439,8 +1439,14 @@ router.post('/instagram/disconnect', requireAuth, async (req, res) => {
 router.put('/profile', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl } = req.body;
+    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl, accountType } = req.body;
 
+    if (accountType !== undefined) {
+      const validTiers = ['personal', 'business', 'agency', 'creator'];
+      if (validTiers.includes(accountType)) {
+        user.accountType = accountType;
+      }
+    }
     if (profilePicUrl !== undefined) user.profilePicUrl = profilePicUrl;
     if (firstName !== undefined) user.firstName = firstName.trim();
     if (lastName !== undefined) user.lastName = lastName.trim();

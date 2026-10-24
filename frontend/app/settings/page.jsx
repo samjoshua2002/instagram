@@ -132,14 +132,18 @@ export default function SettingsPage() {
     { role: 'assistant', text: 'appreciate it so much! thanks for reaching out 🙌' }
   ]);
 
-  // Fetch current persona on mount
+  // Fetch current persona on mount or when user changes
   useEffect(() => {
-    fetchPersona();
+    if (user?._id) {
+      setLoading(true);
+      fetchPersona();
+    }
   }, [user?._id]);
 
   const fetchPersona = async () => {
-    const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
-    // Only show cached persona if scoped to current user
+    if (!user?._id) return;
+    const userCacheKey = `chatter_persona_cached_${user._id}`;
+    // Only show cached persona if strictly scoped to this user ID
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem(userCacheKey);
@@ -183,7 +187,7 @@ export default function SettingsPage() {
         setFormData(updated);
         try {
           localStorage.setItem(userCacheKey, JSON.stringify(updated));
-        } catch (e) {}
+        } catch (e) { }
       }
     } catch (err) {
       console.error('Failed to load persona config:', err);
@@ -236,7 +240,7 @@ export default function SettingsPage() {
           const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
           try {
             localStorage.setItem(userCacheKey, JSON.stringify(formData));
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (updateUserProfile) {
@@ -454,19 +458,25 @@ export default function SettingsPage() {
       style={{ maxWidth: '1400px', width: '100%' }}
     >
       {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '28px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          
-            <span style={{ fontSize: '0.76rem', color: '#71717a', fontWeight: '600' }}>
-              AI PERSONA & STYLING ENGINE
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: '#71717a',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase'
+            }}>
+              INTELLIGENCE // PERSONA &amp; STYLING ENGINE
             </span>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#09090b', letterSpacing: '-0.03em', margin: 0 }}>
-            My Persona & Texting Profile
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: '#09090b', letterSpacing: '-0.7px', margin: 0 }}>
+            Persona &amp; AI Studio
           </h1>
-          <p style={{ fontSize: '0.86rem', color: '#71717a', marginTop: '4px', maxWidth: '640px' }}>
-            Teach your AI clone who you are, how you text, your characteristics, and reply rules so it talks, banters, and reacts exactly like you.
+          <p style={{ fontSize: '0.88rem', color: '#71717a', marginTop: '6px', maxWidth: '680px', lineHeight: 1.5 }}>
+            Fine-tune your AI clone's voice, texting cadence, slang vocabulary, and knowledge base so replies feel indistinguishable from your own.
           </p>
         </div>
 
@@ -475,7 +485,7 @@ export default function SettingsPage() {
           <button
             onClick={fetchPersona}
             className="btn"
-            style={{ fontSize: '0.8rem', padding: '8px 14px' }}
+            style={{ fontSize: '0.82rem', padding: '9px 15px', borderRadius: '10px', fontWeight: 700 }}
             title="Reload settings from server"
           >
             <RefreshCw size={14} />
@@ -485,22 +495,29 @@ export default function SettingsPage() {
             onClick={handleSave}
             disabled={saving}
             className="btn btn-primary"
-            style={{ fontSize: '0.8rem', padding: '8px 18px', background: saveSuccess ? '#16a34a' : '#09090b' }}
+            style={{
+              fontSize: '0.82rem',
+              padding: '9px 20px',
+              borderRadius: '10px',
+              fontWeight: 700,
+              background: saveSuccess ? '#16a34a' : '#09090b',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+            }}
           >
             {saving ? (
               <>
                 <RefreshCw size={14} className="animate-spin" />
-                <span>Saving...</span>
+                <span>Saving Changes...</span>
               </>
             ) : saveSuccess ? (
               <>
                 <CheckCircle2 size={14} />
-                <span>Saved ✓</span>
+                <span>Saved Changes ✓</span>
               </>
             ) : (
               <>
                 <Save size={14} />
-                <span>Save Settings</span>
+                <span>Save Persona</span>
               </>
             )}
           </button>
@@ -509,14 +526,37 @@ export default function SettingsPage() {
 
       {/* Error alert if any */}
       {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: '8px', color: '#991b1b', marginBottom: '20px', fontSize: '0.85rem' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          padding: '14px 18px',
+          borderRadius: '12px',
+          color: '#991b1b',
+          marginBottom: '24px',
+          fontSize: '0.86rem',
+          boxShadow: '0 2px 8px rgba(239,68,68,0.06)'
+        }}>
           <AlertCircle size={18} />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', borderBottom: '1px solid #e4e4e7' }}>
+      {/* Segmented Navigation Tabs */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        overflowX: 'auto',
+        padding: '5px',
+        marginBottom: '28px',
+        background: '#f4f4f5',
+        border: '1px solid #e4e4e7',
+        borderRadius: '14px',
+        width: 'fit-content',
+        maxWidth: '100%'
+      }}>
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -528,19 +568,20 @@ export default function SettingsPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '10px 16px',
-                borderRadius: '8px',
+                padding: '9px 16px',
+                borderRadius: '10px',
                 border: 'none',
                 background: isActive ? '#09090b' : 'transparent',
                 color: isActive ? '#ffffff' : '#71717a',
-                fontSize: '0.84rem',
-                fontWeight: isActive ? '700' : '500',
+                fontSize: '0.82rem',
+                fontWeight: isActive ? 800 : 600,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease',
+                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
-              <Icon size={15} />
+              <Icon size={14} />
               <span>{tab.label}</span>
             </button>
           );
@@ -551,11 +592,30 @@ export default function SettingsPage() {
       {activeTab === 'about' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Identity Header Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <UserCheck size={18} />
-              <span>Identity & Social Presence</span>
-            </h3>
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e4e4e7',
+            borderRadius: '16px',
+            padding: '28px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02), 0 8px 24px -4px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                background: '#09090b',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <UserCheck size={15} />
+              </div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#09090b', margin: 0, letterSpacing: '-0.3px' }}>
+                Identity &amp; Social Handle
+              </h3>
+            </div>
             <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px' }}>
               Your basic name and handle that the AI introduces itself as.
             </p>
@@ -1071,8 +1131,8 @@ export default function SettingsPage() {
               {formData.typingDelaySeconds <= 1
                 ? '⚡ Fast response (great for active testing)'
                 : formData.typingDelaySeconds <= 2.5
-                ? '✨ Natural human speed (recommended for Instagram)'
-                : '⏳ Realistic thoughtful pacing'}
+                  ? '✨ Natural human speed (recommended for Instagram)'
+                  : '⏳ Realistic thoughtful pacing'}
             </span>
           </div>
         </div>
