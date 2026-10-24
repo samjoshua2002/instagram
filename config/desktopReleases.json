@@ -1,0 +1,42 @@
+{
+  "version": "0.1.0",
+  "releaseNotesUrl": "https://github.com/samjoshua2002/instagram/releases/latest",
+  "builds": [
+    {
+      "id": "mac-arm64",
+      "os": "macos",
+      "arch": "arm64",
+      "label": "macOS Apple Silicon (M1, M2, M3, M4)",
+      "fileName": "Chatter-OS_aarch64.dmg",
+      "url": "https://github.com/samjoshua2002/instagram/releases/latest/download/Chatter-OS_aarch64.dmg",
+      "sha256": ""
+    },
+    {
+      "id": "mac-x64",
+      "os": "macos",
+      "arch": "x64",
+      "label": "macOS Intel (x86_64)",
+      "fileName": "Chatter-OS_x64.dmg",
+      "url": "https://github.com/samjoshua2002/instagram/releases/latest/download/Chatter-OS_x64.dmg",
+      "sha256": ""
+    },
+    {
+      "id": "win-x64",
+      "os": "windows",
+      "arch": "x64",
+      "label": "Windows 64-bit (x64)",
+      "fileName": "Chatter-OS_x64_en-US.msi",
+      "url": "https://github.com/samjoshua2002/instagram/releases/latest/download/Chatter-OS_x64_en-US.msi",
+      "sha256": ""
+    },
+    {
+      "id": "win-x86",
+      "os": "windows",
+      "arch": "x86",
+      "label": "Windows 32-bit (x86)",
+      "fileName": "Chatter-OS_x86-setup.exe",
+      "url": "https://github.com/samjoshua2002/instagram/releases/latest/download/Chatter-OS_x86-setup.exe",
+      "sha256": ""
+    }
+  ]
+}

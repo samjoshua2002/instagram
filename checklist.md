@@ -216,37 +216,37 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 8: Dynamic Sidebar, Mobile UI & Desktop Download Portal
-- [ ] **8.1 Dynamic Sidebar by Role & Account Type (`frontend/app/components/Sidebar.jsx`):**
-  - [ ] If `user.role === 'superadmin'`:
-    - [ ] `01 // Platform Console`
-    - [ ] `02 // User Workspaces`
-    - [ ] `03 // Token Health Radar`
-    - [ ] `04 // Desktop Releases`
-  - [ ] If `user.accountType === 'personal'`:
-    - [ ] `01 // Dashboard`
-    - [ ] `02 // People Directory`
-    - [ ] `03 // Chat Rules`
-    - [ ] `04 // Persona & AI Model`
-    - [ ] `05 // Media Vault` (Reactions & Stickers)
-    - [ ] `06 // Desktop App` (`/download`)
-  - [ ] If `user.accountType === 'business'`:
-    - [ ] `01 // Business Dashboard` (KPIs, Leads, Bookings)
-    - [ ] `02 // Document & Service Vault` (RAG Documents & Links)
-    - [ ] `03 // Business Policy & Hours` (CEL Rules)
-    - [ ] `04 // Brand Voice & AI Model` (Tone & BYO-LLM)
-    - [ ] `05 // Customer Inbox & Handoff` (Live Queue)
-    - [ ] `06 // Desktop App` (`/download`)
-- [ ] **8.2 Cross-Platform Download Portal (`frontend/app/download/page.jsx`):**
-  - [ ] Detect OS and architecture via `navigator.userAgent`:
-    - [ ] macOS Apple Silicon (M1, M2, M3, M4)
-    - [ ] macOS Intel (x86_64)
-    - [ ] Windows 64-bit (x64)
-    - [ ] Windows 32-bit (x86)
-  - [ ] Prominent "Download for Your Device" button linking to matching DMG / MSI / EXE installer.
-  - [ ] Dropdown for manual build selection with SHA-256 release checksums.
-- [ ] **8.3 Mobile-Responsive UI Optimization:**
-  - [ ] Implement touch-friendly bottom navigation bar for viewports `<= 768px`.
-  - [ ] Optimize cards on `/controls` and `/settings` for 375px mobile screens.
+- [x] **8.1 Dynamic Sidebar by Role & Account Type (`frontend/app/components/Sidebar.jsx`):**
+  - [x] If `user.role === 'superadmin'`:
+    - [x] `01 // Platform Console`
+    - [x] `02 // User Workspaces`
+    - [x] `03 // Token Health Radar`
+    - [x] `04 // Desktop Releases`
+  - [x] If `user.accountType === 'personal'`:
+    - [x] `01 // Dashboard`
+    - [x] `02 // People Directory`
+    - [x] `03 // Chat Rules`
+    - [x] `04 // Persona & AI Model`
+    - [x] `05 // Media Vault` (Reactions & Stickers)
+    - [x] `06 // Desktop App` (`/download`)
+  - [x] If `user.accountType === 'business'`:
+    - [x] `01 // Business Dashboard` (KPIs, Leads, Bookings)
+    - [x] `02 // Document & Service Vault` (RAG Documents & Links)
+    - [x] `03 // Business Policy & Hours` (CEL Rules)
+    - [x] `04 // Brand Voice & AI Model` (Tone & BYO-LLM)
+    - [x] `05 // Customer Inbox & Handoff` (Live Queue)
+    - [x] `06 // Desktop App` (`/download`)
+- [x] **8.2 Cross-Platform Download Portal (`frontend/app/download/page.jsx`):**
+  - [x] Detect OS and architecture via `navigator.userAgent`:
+    - [x] macOS Apple Silicon (M1, M2, M3, M4)
+    - [x] macOS Intel (x86_64)
+    - [x] Windows 64-bit (x64)
+    - [x] Windows 32-bit (x86)
+  - [x] Prominent "Download for Your Device" button linking to matching DMG / MSI / EXE installer.
+  - [x] Dropdown for manual build selection with SHA-256 release checksums.
+- [x] **8.3 Mobile-Responsive UI Optimization:**
+  - [x] Implement touch-friendly bottom navigation bar for viewports `<= 768px`.
+  - [x] Optimize cards on `/controls` and `/settings` for 375px mobile screens.
 - [ ] **Phase 8 Sign-Off:** Test sidebar menu switching between Personal, Business, and Superadmin; verify mobile layout on 375px screen.
 
 ---
