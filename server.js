@@ -213,6 +213,7 @@ app.use('/api/contacts', requireAuth);
 app.use('/api/giphy', requireAuth);
 app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
+app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
 
 // Webhook Verification Token
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secret_2025';

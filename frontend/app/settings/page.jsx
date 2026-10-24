@@ -9,6 +9,7 @@ import {
   Copy, Check
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
+import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
 
 export default function SettingsPage() {
@@ -365,6 +366,7 @@ export default function SettingsPage() {
     { id: 'replying', label: 'How To Reply', icon: Zap },
     { id: 'examples', label: 'Chat Examples', icon: Code },
     ...(isSuperadmin ? [{ id: 'integrations', label: 'API Keys & Giphy', icon: Key }] : []),
+    { id: 'ai-provider', label: 'AI Provider', icon: Sparkles },
     { id: 'simulator', label: 'Test My Clone', icon: Send },
   ];
 
@@ -1308,6 +1310,9 @@ export default function SettingsPage() {
       )}
 
       {/* TAB 6: LIVE TEST SIMULATOR */}
+      {/* AI PROVIDER (BYO-LLM, local models, A2A MCP) */}
+      {activeTab === 'ai-provider' && <AiProviderCard />}
+
       {activeTab === 'simulator' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
