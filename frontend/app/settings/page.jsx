@@ -177,7 +177,7 @@ export default function SettingsPage() {
           forbiddenWords: Array.isArray(data.forbiddenWords) ? data.forbiddenWords : [],
           sampleConversations: Array.isArray(data.sampleConversations) ? data.sampleConversations : [],
           typingDelaySeconds: data.typingDelaySeconds || 1.5,
-          giphyApiKey: data.giphyApiKey || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
+          giphyApiKey: data.giphyApiKey || '',
         };
         setFormData(updated);
         try {
@@ -196,7 +196,12 @@ export default function SettingsPage() {
     setTestingGiphy(true);
     setGiphyStatus(null);
     try {
-      const keyToTest = formData.giphyApiKey?.trim() || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+      const keyToTest = formData.giphyApiKey?.trim();
+      if (!keyToTest) {
+        setGiphyStatus('error');
+        showToast('Enter a GIPHY API key first', 'error');
+        return;
+      }
       const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${keyToTest}&limit=1`);
       const data = await res.json();
       if (res.ok && data.meta?.status === 200) {
@@ -1223,7 +1228,7 @@ export default function SettingsPage() {
                   type={showGiphyKey ? 'text' : 'password'}
                   value={formData.giphyApiKey || ''}
                   onChange={e => setFormData({ ...formData, giphyApiKey: e.target.value })}
-                  placeholder="Enter Giphy API Key (e.g. qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2)"
+                  placeholder="Enter Giphy API Key (from developers.giphy.com)"
                   style={{
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: '0.86rem',
