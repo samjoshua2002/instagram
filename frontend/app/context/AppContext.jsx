@@ -789,7 +789,7 @@ export function AppProvider({ children }) {
 
     setSelectedNode(formattedNode);
     setIsAiModalOpen(false);
-    showToast(`✅ Saved ${cleanName} to Knowledge Tree & DB!`);
+    showToast(`Saved ${cleanName} to Knowledge Tree & DB!`);
 
     try {
       await fetch(`${API_BASE}/api/social-graph/node`, {
@@ -963,13 +963,13 @@ export function AppProvider({ children }) {
 
     const nameStr = contactName || contactIdOrSenderId;
     if (typeof autoSendReels === 'boolean') {
-      showToast(autoSendReels ? `🎬 Auto-Reels ENABLED for ${nameStr}!` : `⏸️ Auto-Reels PAUSED for ${nameStr}!`);
+      showToast(autoSendReels ? `Auto-Reels ENABLED for ${nameStr}!` : `Auto-Reels PAUSED for ${nameStr}!`);
     } else if (aiMode === 'reels_only') {
-      showToast(`🎬 ${nameStr}: AI will ONLY react to shared Reels!`);
+      showToast(`${nameStr}: AI will ONLY react to shared Reels!`);
     } else if (aiMode === 'paused' || aiMode === 'manual') {
-      showToast(`⏸️ Stopped AI for ${nameStr}. Manual chat active!`);
+      showToast(`Stopped AI for ${nameStr}. Manual chat active!`);
     } else if (aiMode) {
-      showToast(`⚡ Full AI auto-reply enabled for ${nameStr}!`);
+      showToast(`Full AI auto-reply enabled for ${nameStr}!`);
     }
 
     try {
@@ -1015,7 +1015,7 @@ export function AppProvider({ children }) {
       }));
     }
 
-    showToast(`🧠 Fact added: "${cleanFact}"`);
+    showToast(`Fact added: "${cleanFact}"`);
 
     const target = nodes.find(n => n.id === friendIdOrName || n.name.toLowerCase() === friendIdOrName.toLowerCase());
     if (target?.senderId) {
@@ -1047,9 +1047,9 @@ export function AppProvider({ children }) {
       });
       routingSaveQueueRef.current = putOperation.catch(() => { });
       await putOperation;
-      showToast(`💾 Saved chat routing! Mode: ${newConfig.chatMode.toUpperCase()}`);
+      showToast(`Saved chat routing! Mode: ${newConfig.chatMode.toUpperCase()}`);
     } catch (e) {
-      showToast(`💾 Saved locally! Mode: ${newConfig.chatMode.toUpperCase()}`);
+      showToast(`Saved locally! Mode: ${newConfig.chatMode.toUpperCase()}`);
     } finally {
       activeRoutingSavesRef.current = Math.max(0, activeRoutingSavesRef.current - 1);
     }
@@ -1075,9 +1075,9 @@ export function AppProvider({ children }) {
       });
       routingSaveQueueRef.current = putOperation.catch(() => { });
       await putOperation;
-      showToast(nextState ? '🟢 Global Bot Activated!' : '⏸️ Global Bot Paused!');
+      showToast(nextState ? 'Global Bot Activated!' : 'Global Bot Paused!');
     } catch (e) {
-      showToast(`⚠️ Saved locally (offline): ${nextState ? 'Global Bot Active' : 'Global Bot Paused'}`);
+      showToast(`Saved locally (offline): ${nextState ? 'Global Bot Active' : 'Global Bot Paused'}`);
     } finally {
       activeRoutingSavesRef.current = Math.max(0, activeRoutingSavesRef.current - 1);
     }
@@ -1147,7 +1147,7 @@ export function AppProvider({ children }) {
       }));
     }
 
-    showToast(`🔗 Linked ${personName} with ${cleanHandle || senderId}!`);
+    showToast(`Linked ${personName} with ${cleanHandle || senderId}!`);
     setLinkingTargetPerson(null);
 
     // Call backend to persist merge and link in MongoDB
@@ -1159,11 +1159,11 @@ export function AppProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Merged & linked ${personName}! AI will recognize them in DMs.`);
+        showToast(`Merged & linked ${personName}! AI will recognize them in DMs.`);
         syncBackend();
         return true;
       } else {
-        showToast(`⚠️ Link warning: ${data.error || 'Check server connection'}`);
+        showToast(`Link warning: ${data.error || 'Check server connection'}`);
       }
     } catch (err) {
       console.warn('Backend link error:', err.message);

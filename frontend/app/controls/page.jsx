@@ -899,9 +899,9 @@ export default function ControlsPage() {
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
             {[
               { id: 'all', label: 'All Contacts', count: filteredFriends.length },
-              { id: 'full_ai', label: '⚡ Full AI', count: fullAiContacts.length },
-              { id: 'reels_only', label: '🎬 Reels Only', count: reelsOnlyContacts.length },
-              { id: 'manual', label: '⏸️ Manual Chat', count: manualContacts.length }
+              { id: 'full_ai', label: 'Full AI', count: fullAiContacts.length },
+              { id: 'reels_only', label: 'Reels Only', count: reelsOnlyContacts.length },
+              { id: 'manual', label: 'Manual Chat', count: manualContacts.length }
             ].map(tab => {
               const isTabActive = activeTab === tab.id;
               return (
