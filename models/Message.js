@@ -10,6 +10,12 @@ const MessageSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  // Which connected Instagram account this conversation belongs to
+  accountId: {
+    type: String,
+    default: '',
+    index: true,
+  },
   role: {
     type: String,
     enum: ['user', 'assistant'],

@@ -7,6 +7,12 @@ const UserMemorySchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  // Which connected Instagram account this contact messages
+  accountId: {
+    type: String,
+    default: '',
+    index: true,
+  },
   username: {
     type: String,
     default: 'Instagram User',

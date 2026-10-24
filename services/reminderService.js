@@ -34,13 +34,15 @@ class ReminderService {
         lastInteraction: { $gte: policyCutoff, $lte: cutoffTime },
       });
 
-      const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
-
       for (const user of candidateUsers) {
-        // Do not send reminders to the bot itself or known non-contacts
-        if (user.senderId === botAccountId || user.senderId === '17841445731016310') {
+        // Do not send reminders to the bots themselves or known non-contacts
+        if (instagramService.isOwnAccount(user.senderId) || user.senderId === '17841445731016310') {
           continue;
         }
+
+        // Reply from the account this contact talks to (contacts without accountId predate multi-account → primary)
+        const account = instagramService.findAccount(user.accountId) || instagramService.getPrimaryAccount();
+        const botAccountId = account.id;
 
         // Avoid sending another reminder if one was already sent after their last interaction
         if (user.lastReminderSentAt && user.lastReminderSentAt >= user.lastInteraction) {
@@ -84,12 +86,13 @@ class ReminderService {
         }
 
         // Send via Instagram Graph API
-        const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText);
+        const sendResult = await instagramService.runWithAccount(account, () => instagramService.sendTextMessage(user.senderId, reminderText));
 
         // Record reminder in DB
         await Message.create({
           senderId: botAccountId,
           recipientId: user.senderId,
+          accountId: botAccountId,
           role: 'assistant',
           text: reminderText,
           mid: sendResult?.data?.message_id || `remind_${Date.now()}`,
