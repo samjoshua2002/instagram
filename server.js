@@ -1137,7 +1137,7 @@ app.get('/api/giphy/search', async (req, res) => {
   try {
     const { q, limit = 20, rating = 'pg-13' } = req.query;
     const config = await PersonaConfig.findOne();
-    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
 
     if (!apiKey) {
       return res.status(400).json({ error: 'GIPHY API Key not configured' });
@@ -1157,7 +1157,7 @@ app.get('/api/giphy/trending', async (req, res) => {
   try {
     const { limit = 20, rating = 'pg-13' } = req.query;
     const config = await PersonaConfig.findOne();
-    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
 
     if (!apiKey) {
       return res.status(400).json({ error: 'GIPHY API Key not configured' });
