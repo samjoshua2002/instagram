@@ -176,19 +176,19 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 6: Business Knowledge RAG & Document Sharing
-- [ ] **6.1 Knowledge Ingestion Service (`services/ragService.js`):**
-  - [ ] Implement chunking and category tagging for uploaded runbooks and FAQs.
-  - [ ] Save chunks to `KnowledgeDoc` model scoped by `ownerId`.
-- [ ] **6.2 Retrieval Engine:**
-  - [ ] In `services/ragService.js`, extract keywords and intent from incoming customer message.
-  - [ ] Query `KnowledgeDoc.find({ ownerId, category: { $in: allowedCategories } })`.
-  - [ ] Format top matching text chunks and verified service URLs.
-- [ ] **6.3 Context Injection:**
-  - [ ] In `azureOpenAI.js` / `llmAdapter.js`, inject verified document chunks into system prompt.
-  - [ ] Instruct model: `"Answer grounded strictly in provided knowledge. If customer asks for documentation, provide this exact link: [fileUrl]"`.
-- [ ] **6.4 Document Vault Frontend (`frontend/app/vault/page.jsx` or `/documents`):**
-  - [ ] For business accounts, display "Document & Service Vault" instead of "Media Vault".
-  - [ ] Drag-and-drop uploader for PDF runbooks, price lists, brochures, and URL bookmarks.
+- [x] **6.1 Knowledge Ingestion Service (`services/ragService.js`):**
+  - [x] Implement chunking and category tagging for uploaded runbooks and FAQs.
+  - [x] Save chunks to `KnowledgeDoc` model scoped by `ownerId`.
+- [x] **6.2 Retrieval Engine:**
+  - [x] In `services/ragService.js`, extract keywords and intent from incoming customer message.
+  - [x] Query `KnowledgeDoc.find({ ownerId, category: { $in: allowedCategories } })`.
+  - [x] Format top matching text chunks and verified service URLs.
+- [x] **6.3 Context Injection:**
+  - [x] In `azureOpenAI.js` / `llmAdapter.js`, inject verified document chunks into system prompt.
+  - [x] Instruct model: `"Answer grounded strictly in provided knowledge. If customer asks for documentation, provide this exact link: [fileUrl]"`.
+- [x] **6.4 Document Vault Frontend (`frontend/app/vault/page.jsx` or `/documents`):**
+  - [x] For business accounts, display "Document & Service Vault" instead of "Media Vault".
+  - [x] Drag-and-drop uploader for PDF runbooks, price lists, brochures, and URL bookmarks.
 - [ ] **Phase 6 Sign-Off:** Upload a sample product PDF; verify the bot accurately quotes the document and includes the file link in DMs.
 
 ---
