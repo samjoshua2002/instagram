@@ -5,7 +5,6 @@ const PersonaConfigSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null,
-    index: true,
   },
   // Mirrors User.accountType so the reply pipeline can pick personal vs business rules
   accountType: {
@@ -148,7 +147,8 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
 // One persona per creator (the legacy admin config has ownerId null and is excluded)
 PersonaConfigSchema.index(
   { ownerId: 1 },
-  { unique: true, partialFilterExpression: { ownerId: { $type: 'objectId' } } }
+  // Named so it doesn't clash with the plain ownerId_1 index older databases already have
+  { unique: true, name: 'ownerId_unique', partialFilterExpression: { ownerId: { $type: 'objectId' } } }
 );
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);

@@ -28,8 +28,24 @@ import {
   Clock
 } from 'lucide-react';
 
+// Feature preview cards shown under the connect form, matched to the workspace type
+const PERSONAL_FEATURES = [
+  { Icon: Bot, title: 'AI DM Replies', desc: 'Automate direct messages with your personal voice, humor, and texting cadence.' },
+  { Icon: Sparkles, title: 'Social Graph', desc: 'Map your relationship tiers, track shared memories, and personalize responses.' },
+  { Icon: Sliders, title: 'Chat Rules', desc: 'Granular controls over who the AI responds to and specific forbidden phrases.' },
+  { Icon: Instagram, title: 'Media Vault', desc: 'Automatically dispatch your portfolio reels, GIFs, and media assets in chat.' },
+];
+
+const BUSINESS_FEATURES = [
+  { Icon: Bot, title: 'AI Customer Replies', desc: 'Answer customer DMs instantly in your brand voice, around the clock.' },
+  { Icon: Layers, title: 'Document & Service Vault', desc: 'Ground answers in your PDFs, links, prices, and service details.' },
+  { Icon: Clock, title: 'Business Policy & Hours', desc: 'Set opening hours, policies, and when the AI hands chats to your team.' },
+  { Icon: Send, title: 'Leads & Bookings', desc: 'Capture leads and booking requests from conversations automatically.' },
+];
+
 export default function InstagramConnectFallback({ onConnect, user }) {
   const { token, API_BASE, updateUserProfile, showToast } = useApp();
+  const isBusinessWorkspace = ['business', 'agency'].includes(user?.accountType);
 
   const initialUsername = user?.instagramUsername || user?.username || '';
   const initialAccountId = user?.instagramId || user?.instagramAccountId || '';
@@ -983,69 +999,13 @@ export default function InstagramConnectFallback({ onConnect, user }) {
 
         {/* Feature Previews Grid */}
         <div className="connect-features-grid">
-          <div style={{
-            background: '#fafafa',
-            border: '1px solid #e4e4e7',
-            borderRadius: '10px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <Bot size={18} color="#09090b" />
-            <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#09090b' }}>AI DM Replies</div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', lineHeight: 1.4 }}>
-              Automate direct messages with your personal voice, humor, and texting cadence.
+          {(isBusinessWorkspace ? BUSINESS_FEATURES : PERSONAL_FEATURES).map(({ Icon, title, desc }) => (
+            <div key={title} style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Icon size={18} color="#09090b" />
+              <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#09090b' }}>{title}</div>
+              <div style={{ fontSize: '0.72rem', color: '#71717a', lineHeight: 1.4 }}>{desc}</div>
             </div>
-          </div>
-
-          <div style={{
-            background: '#fafafa',
-            border: '1px solid #e4e4e7',
-            borderRadius: '10px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <Sparkles size={18} color="#09090b" />
-            <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#09090b' }}>Social Graph</div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', lineHeight: 1.4 }}>
-              Map your relationship tiers, track shared memories, and personalize responses.
-            </div>
-          </div>
-
-          <div style={{
-            background: '#fafafa',
-            border: '1px solid #e4e4e7',
-            borderRadius: '10px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <Sliders size={18} color="#09090b" />
-            <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#09090b' }}>Chat Rules</div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', lineHeight: 1.4 }}>
-              Granular controls over who the AI responds to and specific forbidden phrases.
-            </div>
-          </div>
-
-          <div style={{
-            background: '#fafafa',
-            border: '1px solid #e4e4e7',
-            borderRadius: '10px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <Instagram size={18} color="#09090b" />
-            <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#09090b' }}>Media Vault</div>
-            <div style={{ fontSize: '0.72rem', color: '#71717a', lineHeight: 1.4 }}>
-              Automatically dispatch your portfolio reels, GIFs, and media assets in chat.
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
