@@ -10,6 +10,7 @@ const {
   verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
 const User = require('../models/User');
+const { setUserInstagram } = require('./instagramTokenService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'chatter_jwt_secret_samjoshua_auth_2026_super_secure_key_99';
 const RP_NAME = process.env.RP_NAME || 'Chatter OS';
@@ -83,8 +84,8 @@ class AuthService {
           user.role = 'superadmin';
           changed = true;
         }
-        if (!user.instagramPageAccessToken && process.env.INSTAGRAM_PAGE_ACCESS_TOKEN) {
-          user.instagramPageAccessToken = process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
+        if (!user.instagramPageAccessToken && !user.instagram?.accessTokenEncrypted && process.env.INSTAGRAM_PAGE_ACCESS_TOKEN) {
+          setUserInstagram(user, { token: process.env.INSTAGRAM_PAGE_ACCESS_TOKEN, accountId: process.env.INSTAGRAM_ACCOUNT_ID });
           changed = true;
         }
         if (!user.instagramAccountId && process.env.INSTAGRAM_ACCOUNT_ID) {

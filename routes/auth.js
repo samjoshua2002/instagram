@@ -875,8 +875,9 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     if (instagramUsername) {
       user.instagramUsername = instagramUsername.trim().replace(/^@/, '');
     }
-    if (instagramPageAccessToken !== undefined) {
-      user.instagramPageAccessToken = instagramPageAccessToken.trim();
+    // Store pasted tokens encrypted; a blank field means "unchanged"
+    if (instagramPageAccessToken && instagramPageAccessToken.trim()) {
+      setUserInstagram(user, { token: instagramPageAccessToken.trim(), accountId: (instagramAccountId || '').trim() });
     }
     if (instagramAccountId !== undefined) {
       user.instagramAccountId = instagramAccountId.trim();
