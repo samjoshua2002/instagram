@@ -6,7 +6,7 @@ import {
   Shield, Users, UserCheck, RefreshCw, Search,
   CheckCircle2, AlertCircle, Fingerprint, Mail,
   ExternalLink, Calendar, ChevronDown, ChevronUp,
-  Layers, Lock, Sparkles, Filter, Instagram, Smartphone, Trash2
+  Layers, Lock, Sparkles, Filter, Instagram, Smartphone, Trash2, Ban
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,6 +21,7 @@ export default function SuperadminPage() {
   const [expandedAccountId, setExpandedAccountId] = useState(null);
   const [enteringId, setEnteringId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [banningId, setBanningId] = useState(null);
 
   const isSuperadmin = user?.role === 'superadmin';
 
@@ -98,6 +99,37 @@ export default function SuperadminPage() {
       showToast?.(err.message || 'Failed to delete account.', 'error');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleToggleBan = async (targetUser) => {
+    const handle = targetUser.instagramUsername || targetUser.username;
+    const banning = !targetUser.isBanned;
+    const confirmed = window.confirm(
+      banning
+        ? `Suspend @${handle}? They will be logged out, their bot stops, and their Instagram token is revoked.`
+        : `Lift the suspension for @${handle}? They will need to reconnect Instagram.`
+    );
+    if (!confirmed) return;
+
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
+
+    setBanningId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/accounts/${targetUser.id}/ban`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeToken}` },
+        body: JSON.stringify({ banned: banning })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to update account.');
+      showToast?.(resData.message, 'success');
+      await fetchAdminData();
+    } catch (err) {
+      showToast?.(err.message || 'Failed to update account.', 'error');
+    } finally {
+      setBanningId(null);
     }
   };
 
@@ -553,6 +585,34 @@ export default function SuperadminPage() {
                         <Shield size={12} color="#22c55e" />
                         <span>{enteringId === account.id ? 'Opening...' : 'Manage'}</span>
                       </button>
+
+                      {account.id !== user?.id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleBan(account);
+                          }}
+                          disabled={banningId === account.id}
+                          title={account.isBanned ? 'Lift the suspension' : 'Suspend this tenant and revoke its Instagram token'}
+                          style={{
+                            background: account.isBanned ? '#fef3c7' : '#ffffff',
+                            color: account.isBanned ? '#b45309' : '#09090b',
+                            border: `1px solid ${account.isBanned ? '#fde68a' : '#e4e4e7'}`,
+                            borderRadius: '7px',
+                            padding: '6px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: '700',
+                            cursor: banningId === account.id ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Ban size={12} />
+                          <span>{banningId === account.id ? '...' : (account.isBanned ? 'Unban' : 'Ban')}</span>
+                        </button>
+                      )}
 
                       {account.id !== user?.id && (
                         <button

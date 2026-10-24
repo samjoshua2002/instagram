@@ -118,6 +118,17 @@ class ReminderService {
     setTimeout(() => this.checkAndSendReminders(), 60 * 1000);
     // Recurring interval check
     setInterval(() => this.checkAndSendReminders(), intervalMinutes * 60 * 1000);
+    this.startTokenRefreshScheduler();
+  }
+
+  /**
+   * Daily Meta token refresh: tokens expiring within 15 days are refreshed and re-encrypted
+   */
+  startTokenRefreshScheduler() {
+    const tokenHealthService = require('./tokenHealthService');
+    const run = () => tokenHealthService.runDailyRefresh().catch(err => console.error('❌ [TokenRefresh] Job failed:', err.message));
+    setTimeout(run, 5 * 60 * 1000);
+    setInterval(run, 24 * 60 * 60 * 1000);
   }
 }
 

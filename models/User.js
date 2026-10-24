@@ -69,6 +69,15 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'superadmin'],
     default: 'user',
   },
+  // Superadmin killswitch: banned tenants cannot log in and their webhooks are dropped
+  isBanned: {
+    type: Boolean,
+    default: false,
+  },
+  bannedAt: {
+    type: Date,
+    default: null,
+  },
   igApprovalStatus: {
     type: String,
     enum: ['none', 'pending', 'approved', 'rejected'],
