@@ -69,31 +69,31 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 2: Facebook Login for Business OAuth Implementation
-- [ ] **2.1 Backend OAuth Routes (`routes/auth.js`):**
-  - [ ] Create `GET /api/auth/instagram/connect`:
-    - [ ] Authenticate user via JWT session.
-    - [ ] Generate cryptographically secure random `state` (32 bytes hex).
-    - [ ] Store state in Redis (`oauth_state:${state}`) with 10-minute TTL.
-    - [ ] Construct and return Facebook Login Dialog OAuth URL with required scopes.
-  - [ ] Create `GET /api/auth/instagram/callback`:
-    - [ ] Verify `state` parameter against Redis. Prevent replay attacks.
-    - [ ] Exchange authorization `code` for short-lived User Token via Graph API `oauth/access_token`.
-    - [ ] Exchange short-lived token for 60-day Long-Lived User Token (`grant_type=fb_exchange_token`).
-    - [ ] Fetch connected accounts via `GET /me/accounts?fields=name,access_token,instagram_business_account`.
-    - [ ] Extract Instagram Business Account ID and Page Access Token.
-    - [ ] Subscribe Page to webhooks via `POST /{page-id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`.
-    - [ ] Encrypt Page Access Token via `cryptoService.encrypt()`.
-    - [ ] Save encrypted credentials, Page ID, and Instagram Account ID to `User.instagram`.
-    - [ ] Redirect to frontend settings with `?connected=success`.
-  - [ ] Create `POST /api/auth/instagram/disconnect`:
-    - [ ] Revoke token if required via Graph API `DELETE /{user-id}/permissions`.
-    - [ ] Clear `instagram` credentials in `User` record.
-- [ ] **2.2 Instagram Service Dynamic Token Support (`services/instagramService.js`):**
-  - [ ] Update `sendTextMessage(recipientId, text, customToken, replyToMid)`.
-  - [ ] Update `sendImageMessage(recipientId, imageUrl, customToken, replyToMid)`.
-  - [ ] Update `sendSenderAction(recipientId, action, customToken)`.
-  - [ ] Update `sendMessageReaction(recipientId, messageId, emoji, customToken)`.
-  - [ ] Update `getUserProfile(senderId, customToken)`.
+- [x] **2.1 Backend OAuth Routes (`routes/auth.js`):**
+  - [x] Create `GET /api/auth/instagram/connect`:
+    - [x] Authenticate user via JWT session.
+    - [x] Generate cryptographically secure random `state` (32 bytes hex).
+    - [x] Store state in Redis (`oauth_state:${state}`) with 10-minute TTL.
+    - [x] Construct and return Facebook Login Dialog OAuth URL with required scopes.
+  - [x] Create `GET /api/auth/instagram/callback`:
+    - [x] Verify `state` parameter against Redis. Prevent replay attacks.
+    - [x] Exchange authorization `code` for short-lived User Token via Graph API `oauth/access_token`.
+    - [x] Exchange short-lived token for 60-day Long-Lived User Token (`grant_type=fb_exchange_token`).
+    - [x] Fetch connected accounts via `GET /me/accounts?fields=name,access_token,instagram_business_account`.
+    - [x] Extract Instagram Business Account ID and Page Access Token.
+    - [x] Subscribe Page to webhooks via `POST /{page-id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`.
+    - [x] Encrypt Page Access Token via `cryptoService.encrypt()`.
+    - [x] Save encrypted credentials, Page ID, and Instagram Account ID to `User.instagram`.
+    - [x] Redirect to frontend settings with `?connected=success`.
+  - [x] Create `POST /api/auth/instagram/disconnect`:
+    - [x] Unsubscribe the Page via `DELETE /{page-id}/subscribed_apps` (only a Page token is stored, so the user grant is not revoked).
+    - [x] Clear `instagram` credentials in `User` record.
+- [x] **2.2 Instagram Service Dynamic Token Support (`services/instagramService.js`):**
+  - [x] Update `sendTextMessage(recipientId, text, customToken, replyToMid)`.
+  - [x] Update `sendImageMessage(recipientId, imageUrl, customToken, replyToMid)`.
+  - [x] Update `sendSenderAction(recipientId, action, customToken)`.
+  - [x] Update `sendMessageReaction(recipientId, messageId, emoji, customToken)`.
+  - [x] Update `getUserProfile(senderId, customToken)`.
   - [ ] Ensure all functions fall back to `process.env.INSTAGRAM_PAGE_ACCESS_TOKEN` only if `customToken` is null AND account matches admin ID.
 - [ ] **Phase 2 Sign-Off:** Test OAuth connection with test account; verify encrypted credentials persist in MongoDB.
 
