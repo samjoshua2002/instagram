@@ -19,6 +19,7 @@ const MediaVault = require('./models/MediaVault');
 const instagramService = require('./services/instagramService');
 const azureOpenAI = require('./services/azureOpenAI');
 const celRuleEngine = require('./services/celRuleEngine');
+const analyticsService = require('./services/analyticsService');
 const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
@@ -210,6 +211,7 @@ app.use('/api/simulator', requireAuth);
 app.use('/api/memory', requireAuth);
 app.use('/api/contacts', requireAuth);
 app.use('/api/giphy', requireAuth);
+app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 
 // Webhook Verification Token
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secret_2025';
@@ -966,6 +968,17 @@ async function dispatchDebouncedReply(queueEntry) {
           await redisService.cacheUserMemory(senderId, memToUpdate.toObject ? memToUpdate.toObject() : memToUpdate, 3600);
         }
       } catch (bufErr) {}
+    }
+
+    // Business conversion analytics: capture leads and bookings from this exchange
+    if (isBusinessTenant && ownerUser) {
+      analyticsService.processConversationTurn({
+        ownerId: ownerUser._id,
+        senderId,
+        handle: userMemory.username || '',
+        incomingText: combinedText,
+        replyText: textDelivered ? replyText : '',
+      }).catch(() => {});
     }
 
     // Business escalation: pause the bot for this customer and queue them for a human

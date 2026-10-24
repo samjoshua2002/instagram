@@ -10,9 +10,10 @@ import {
   ExternalLink, ChevronDown, ChevronUp, Layers,
   Lock, Instagram, Smartphone, Calendar, UserCheck, Mail,
   LogIn, Building2, Briefcase, User as UserIcon, Filter,
-  ChevronLeft, Trash2, Send, Clock
+  ChevronLeft, Trash2, Send, Clock, Target, Zap
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
+import BusinessConversionPanel from './components/BusinessConversionPanel';
 
 // Butter-Smooth Framer Motion Animated Number Counter (quintic deceleration curve)
 function AnimatedNumber({ value, duration = 1.6 }) {
@@ -219,6 +220,22 @@ export default function AnalyticsPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
 
+  // Business workspaces: conversion KPIs, refreshed every 30s so new leads/bookings show up live
+  const isBusinessWorkspace = ['business', 'agency'].includes(user?.accountType);
+  const [bizStats, setBizStats] = useState(null);
+  useEffect(() => {
+    if (!isBusinessWorkspace) return;
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
+    const load = () => fetch(`${API_BASE}/api/analytics/overview`, { headers: { Authorization: `Bearer ${activeToken}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => { if (data) setBizStats(data); })
+      .catch(() => {});
+    load();
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
+  }, [isBusinessWorkspace, token, API_BASE]);
+
   const handleApproveUser = async (targetUser) => {
     const handle = targetUser.instagramUsername || targetUser.username;
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
@@ -390,6 +407,13 @@ export default function AnalyticsPage() {
     { label: 'Total DMs', value: breakdown.totalDMs, sub: 'From contacts', icon: <MessageSquare size={15} />, href: '/relationships' },
     { label: 'Reels Shared', value: breakdown.totalReels, sub: 'Reels exchanged', icon: <Film size={15} />, href: null },
     { label: 'AI Active', value: breakdown.aiActive, sub: `${breakdown.aiPaused} paused`, icon: <Bot size={15} />, href: '/controls' },
+  ];
+
+  const businessStatCards = [
+    { label: '💬 Total Conversations', value: bizStats?.totalConversations || 0, sub: `${bizStats?.openHandoffs || 0} waiting for your team`, icon: <MessageSquare size={15} />, href: '/relationships' },
+    { label: '🎯 Leads Captured', value: bizStats?.activeLeads || 0, sub: `${bizStats?.leadsLast30d || 0} in the last 30 days`, icon: <Target size={15} />, href: null },
+    { label: '📅 Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null },
+    { label: '⚡ Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls' },
   ];
 
   return (
@@ -1237,7 +1261,7 @@ export default function AnalyticsPage() {
             animate="visible"
             className="stats-grid"
           >
-            {personalStatCards.map((c, i) => (
+            {(isBusinessWorkspace ? businessStatCards : personalStatCards).map((c, i) => (
               <motion.div
                 key={i}
                 variants={statCardVariants}
@@ -1273,6 +1297,8 @@ export default function AnalyticsPage() {
               </motion.div>
             ))}
           </motion.div>
+
+          {isBusinessWorkspace && <BusinessConversionPanel refreshKey={bizStats} />}
 
           {/* MAIN 3-COL CHARTS WITH BUTTER-SMOOTH PROGRESS BARS & ANIMATED COUNTERS */}
           <motion.div
