@@ -84,7 +84,7 @@ export default function DownloadPage() {
       </div>
 
       {loadError && (
-        <div className="download-card" style={{ borderColor: '#fee2e2', color: '#b91c1c' }}>
+        <div className="download-card" style={{ borderColor: 'color-mix(in srgb, #ef4444 14%, transparent)', color: '#f87171' }}>
           {loadError}. Please try again in a moment.
         </div>
       )}

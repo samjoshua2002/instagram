@@ -98,8 +98,8 @@ export default function LinkIdModal() {
     >
       <div
         style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '12px',
           width: '560px',
           maxWidth: '100%',
@@ -114,11 +114,11 @@ export default function LinkIdModal() {
         <div
           style={{
             padding: '18px 24px',
-            borderBottom: '1px solid #e4e4e7',
+            borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: '#ffffff'
+            background: 'var(--color-surface)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -127,21 +127,21 @@ export default function LinkIdModal() {
                 width: '34px',
                 height: '34px',
                 borderRadius: '8px',
-                background: '#f4f4f5',
-                border: '1px solid #e4e4e7',
+                background: 'var(--color-surface-hover)',
+                border: '1px solid var(--color-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#09090b'
+                color: 'var(--color-text-primary)'
               }}
             >
               <Link2 size={16} />
             </div>
             <div>
-              <div style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", color: '#71717a', fontWeight: 'bold' }}>
+              <div style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>
                 IDENTITY LINK
               </div>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                 Link Instagram ID for {linkingTargetPerson.name}
               </h2>
             </div>
@@ -151,7 +151,7 @@ export default function LinkIdModal() {
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#71717a',
+              color: 'var(--color-text-secondary)',
               cursor: 'pointer',
               padding: '6px'
             }}
@@ -164,16 +164,16 @@ export default function LinkIdModal() {
         <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div
             style={{
-              background: '#f4f4f5',
-              border: '1px solid #e4e4e7',
+              background: 'var(--color-surface-hover)',
+              border: '1px solid var(--color-border)',
               borderRadius: '8px',
               padding: '12px 14px',
               fontSize: '0.8rem',
-              color: '#52525b',
+              color: 'var(--color-text-secondary)',
               lineHeight: '1.4'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#09090b', fontWeight: '700', marginBottom: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-primary)', fontWeight: '700', marginBottom: '2px' }}>
               <UserCheck size={14} />
               <span>Link with Live Instagram Direct Messages</span>
             </div>
@@ -183,11 +183,11 @@ export default function LinkIdModal() {
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Instagram Handle
               </label>
               <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa', fontWeight: '600' }}>@</span>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', fontWeight: '600' }}>@</span>
                 <input
                   type="text"
                   placeholder="username"
@@ -195,11 +195,11 @@ export default function LinkIdModal() {
                   onChange={(e) => setHandleInput(e.target.value.replace(/^@/, ''))}
                   style={{
                     width: '100%',
-                    background: '#ffffff',
-                    border: '1px solid #e4e4e7',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: '6px',
                     padding: '9px 12px 9px 30px',
-                    color: '#09090b',
+                    color: 'var(--color-text-primary)',
                     fontSize: '0.88rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -209,7 +209,7 @@ export default function LinkIdModal() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Numeric Sender ID (Optional)
               </label>
               <input
@@ -219,11 +219,11 @@ export default function LinkIdModal() {
                 onChange={(e) => setSenderIdInput(e.target.value)}
                 style={{
                   width: '100%',
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '6px',
                   padding: '9px 12px',
-                  color: '#09090b',
+                  color: 'var(--color-text-primary)',
                   fontSize: '0.82rem',
                   fontFamily: "'JetBrains Mono', monospace",
                   outline: 'none',
@@ -234,13 +234,13 @@ export default function LinkIdModal() {
 
             {/* Suggestions from Recent DMs */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Or Pick From Recent Instagram DM Chatters
               </label>
 
               {unlinkedChatters.length > 5 && (
                 <div style={{ position: 'relative', marginBottom: '8px' }}>
-                  <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
+                  <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                   <input
                     type="text"
                     placeholder="Search recent chatters..."
@@ -248,11 +248,11 @@ export default function LinkIdModal() {
                     onChange={(e) => setFilterQuery(e.target.value)}
                     style={{
                       width: '100%',
-                      background: '#ffffff',
-                      border: '1px solid #e4e4e7',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '6px',
                       padding: '6px 10px 6px 28px',
-                      color: '#09090b',
+                      color: 'var(--color-text-primary)',
                       fontSize: '0.78rem',
                       outline: 'none',
                       boxSizing: 'border-box'
@@ -263,8 +263,8 @@ export default function LinkIdModal() {
 
               <div
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '8px',
                   maxHeight: '160px',
                   overflowY: 'auto',
@@ -273,11 +273,11 @@ export default function LinkIdModal() {
                 }}
               >
                 {isLoadingChatters ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#71717a', fontSize: '0.78rem' }}>
+                  <div style={{ padding: '16px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.78rem' }}>
                     Loading recent conversation contacts...
                   </div>
                 ) : filteredChatters.length === 0 ? (
-                  <div style={{ padding: '14px', textAlign: 'center', color: '#71717a', fontSize: '0.78rem' }}>
+                  <div style={{ padding: '14px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.78rem' }}>
                     No recent unlinked chatters. Type username directly above.
                   </div>
                 ) : (
@@ -293,18 +293,18 @@ export default function LinkIdModal() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          borderBottom: '1px solid #f4f4f5',
+                          borderBottom: '1px solid var(--color-surface-hover)',
                           cursor: 'pointer',
-                          background: isSelected ? '#f4f4f5' : 'transparent'
+                          background: isSelected ? 'var(--color-surface-hover)' : 'transparent'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <ContactAvatar contact={c} size={28} showStatus={false} />
                           <div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#09090b' }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
                               {c.name || c.username}
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
                               {c.username || c.senderId}
                             </div>
                           </div>
@@ -317,10 +317,10 @@ export default function LinkIdModal() {
                             handleSelectChatter(c);
                           }}
                           style={{
-                            background: isSelected ? '#09090b' : '#ffffff',
-                            color: isSelected ? '#ffffff' : '#09090b',
+                            background: isSelected ? 'var(--color-text-primary)' : 'var(--color-surface)',
+                            color: isSelected ? 'var(--color-surface)' : 'var(--color-text-primary)',
                             border: '1px solid',
-                            borderColor: isSelected ? '#09090b' : '#e4e4e7',
+                            borderColor: isSelected ? 'var(--color-text-primary)' : 'var(--color-border)',
                             padding: '3px 8px',
                             borderRadius: '4px',
                             fontSize: '0.7rem',
@@ -343,9 +343,9 @@ export default function LinkIdModal() {
                 type="button"
                 onClick={() => setLinkingTargetPerson(null)}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
-                  color: '#71717a',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-secondary)',
                   padding: '8px 14px',
                   borderRadius: '6px',
                   fontSize: '0.8rem',
@@ -359,8 +359,8 @@ export default function LinkIdModal() {
                 type="submit"
                 disabled={isSubmitting || (!handleInput.trim() && !senderIdInput.trim())}
                 style={{
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--color-text-primary)',
+                  color: 'var(--color-surface)',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: '6px',

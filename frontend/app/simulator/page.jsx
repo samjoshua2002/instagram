@@ -60,7 +60,7 @@ export default function SimulatorPage() {
         <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px' }}>
           Live DM Simulator
         </h1>
-        <p style={{ color: '#a1a1aa', fontSize: '0.88rem', marginTop: '4px' }}>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.88rem', marginTop: '4px' }}>
           Test how your AI persona responds to specific contacts without texting on Instagram.
         </p>
       </div>
@@ -72,9 +72,9 @@ export default function SimulatorPage() {
             key={f.id}
             onClick={() => setSelectedFriendId(f.id)}
             style={{
-              background: selectedFriendId === f.id ? '#ffffff' : '#09090b',
-              color: selectedFriendId === f.id ? '#000000' : '#a1a1aa',
-              border: '1px solid #27272a',
+              background: selectedFriendId === f.id ? 'var(--color-surface)' : 'var(--color-text-primary)',
+              color: selectedFriendId === f.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              border: '1px solid var(--color-text-secondary)',
               padding: '6px 14px',
               borderRadius: '8px',
               fontSize: '0.78rem',
@@ -89,7 +89,7 @@ export default function SimulatorPage() {
       </div>
 
       {/* Chat Window */}
-      <div style={{ flex: 1, background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {messages.map((msg, i) => (
             <div
@@ -97,13 +97,13 @@ export default function SimulatorPage() {
               style={{
                 alignSelf: msg.role === 'user' ? 'flex-start' : 'flex-end',
                 maxWidth: '75%',
-                background: msg.role === 'user' ? '#18181b' : '#ffffff',
-                color: msg.role === 'user' ? '#ffffff' : '#000000',
+                background: msg.role === 'user' ? 'var(--color-text-primary)' : 'var(--color-surface)',
+                color: msg.role === 'user' ? 'var(--color-surface)' : 'var(--color-text-primary)',
                 padding: '12px 16px',
                 borderRadius: msg.role === 'user' ? '12px 12px 12px 2px' : '12px 12px 2px 12px',
                 fontSize: '0.85rem',
                 lineHeight: '1.45',
-                border: msg.role === 'user' ? '1px solid #27272a' : 'none'
+                border: msg.role === 'user' ? '1px solid var(--color-text-secondary)' : 'none'
               }}
             >
               <div>{msg.text}</div>
@@ -113,24 +113,24 @@ export default function SimulatorPage() {
             </div>
           ))}
           {isLoading && (
-            <div style={{ alignSelf: 'flex-end', background: '#18181b', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', color: '#a1a1aa' }}>
+            <div style={{ alignSelf: 'flex-end', background: 'var(--color-text-primary)', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
               AI persona is typing...
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid #27272a', display: 'flex', gap: '10px', background: '#0e0e11' }}>
+        <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid var(--color-text-secondary)', display: 'flex', gap: '10px', background: 'var(--color-text-primary)' }}>
           <input
             type="text"
             placeholder={`Type a DM as ${targetFriend?.name || 'Friend'}...`}
             value={inputMsg}
             onChange={(e) => setInputMsg(e.target.value)}
-            style={{ flex: 1, background: '#000000', border: '1px solid #27272a', borderRadius: '8px', color: '#ffffff', padding: '12px 16px', fontSize: '0.85rem', outline: 'none' }}
+            style={{ flex: 1, background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '8px', color: 'var(--color-surface)', padding: '12px 16px', fontSize: '0.85rem', outline: 'none' }}
           />
           <button
             type="submit"
             disabled={isLoading || !inputMsg.trim()}
-            style={{ background: '#ffffff', color: '#000000', border: 'none', borderRadius: '8px', padding: '0 20px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ background: 'var(--color-surface)', color: 'var(--color-text-primary)', border: 'none', borderRadius: '8px', padding: '0 20px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Send size={15} />
             <span>Send</span>

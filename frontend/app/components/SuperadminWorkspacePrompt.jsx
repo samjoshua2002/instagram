@@ -88,8 +88,8 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '16px',
           padding: '32px',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
@@ -102,8 +102,8 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
               width: '46px',
               height: '46px',
               borderRadius: '12px',
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--color-text-primary)',
+              color: 'var(--color-surface)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -118,8 +118,8 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                   fontSize: '0.65rem',
                   fontFamily: "'JetBrains Mono', monospace",
                   fontWeight: '800',
-                  background: '#f4f4f5',
-                  color: '#09090b',
+                  background: 'var(--color-surface-hover)',
+                  color: 'var(--color-text-primary)',
                   padding: '2px 6px',
                   borderRadius: '4px'
                 }}>
@@ -128,15 +128,15 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                 <span style={{
                   fontSize: '0.65rem',
                   fontFamily: "'JetBrains Mono', monospace",
-                  color: '#71717a'
+                  color: 'var(--color-text-secondary)'
                 }}>
                   [{sectionCode || 'TENANT CONFIG'}]
                 </span>
               </div>
-              <h1 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: '0 0 6px 0', letterSpacing: '-0.3px' }}>
+              <h1 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: '0 0 6px 0', letterSpacing: '-0.3px' }}>
                 {sectionTitle || 'Creator Workspace Scope'}
               </h1>
-              <p style={{ fontSize: '0.84rem', color: '#71717a', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
                 {sectionDescription ||
                   'This section configures automation for individual creator accounts. Select a creator workspace below to inspect and manage their rules, relationships, or persona.'}
               </p>
@@ -151,9 +151,9 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
               gap: '6px',
               padding: '9px 16px',
               borderRadius: '8px',
-              background: '#f4f4f5',
-              border: '1px solid #e4e4e7',
-              color: '#09090b',
+              background: 'var(--color-surface-hover)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
               textDecoration: 'none',
               fontSize: '0.8rem',
               fontWeight: '700',
@@ -172,8 +172,8 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '16px',
           padding: '24px',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)'
@@ -181,17 +181,17 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: '0.96rem', fontWeight: '700', color: '#09090b', margin: '0 0 4px 0' }}>
+            <h2 style={{ fontSize: '0.96rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 4px 0' }}>
               Select Creator Workspace to Configure
             </h2>
-            <p style={{ fontSize: '0.76rem', color: '#71717a', margin: 0 }}>
+            <p style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', margin: 0 }}>
               Showing {filteredAccounts.length} platform {filteredAccounts.length === 1 ? 'account' : 'accounts'}
             </p>
           </div>
 
           {/* Search */}
           <div style={{ position: 'relative', minWidth: '240px' }}>
-            <Search size={14} color="#a1a1aa" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={14} color="var(--color-text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               value={search}
@@ -201,26 +201,26 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                 width: '100%',
                 padding: '7px 12px 7px 30px',
                 borderRadius: '8px',
-                border: '1px solid #e4e4e7',
+                border: '1px solid var(--color-border)',
                 fontSize: '0.8rem',
                 outline: 'none',
-                background: '#fafafa'
+                background: 'var(--color-surface-elevated)'
               }}
             />
           </div>
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '8px', color: '#71717a' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '8px', color: 'var(--color-text-secondary)' }}>
             <RefreshCw size={16} className="animate-spin" />
             <span style={{ fontSize: '0.84rem' }}>Loading creator workspaces...</span>
           </div>
         ) : error ? (
-          <div style={{ padding: '16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', fontSize: '0.82rem' }}>
+          <div style={{ padding: '16px', background: 'color-mix(in srgb, #ef4444 12%, transparent)', border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)', borderRadius: '8px', color: '#f87171', fontSize: '0.82rem' }}>
             {error}
           </div>
         ) : filteredAccounts.length === 0 ? (
-          <div style={{ padding: '36px', textAlign: 'center', color: '#71717a', fontSize: '0.84rem' }}>
+          <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.84rem' }}>
             No creator accounts found matching search.
           </div>
         ) : (
@@ -234,13 +234,13 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                 <div
                   key={acc.id}
                   style={{
-                    border: '1px solid #e4e4e7',
+                    border: '1px solid var(--color-border)',
                     borderRadius: '10px',
                     padding: '14px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    background: '#fafafa',
+                    background: 'var(--color-surface-elevated)',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -249,30 +249,30 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                       <img
                         src={acc.profilePicUrl}
                         alt=""
-                        style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e4e4e7' }}
+                        style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--color-border)' }}
                       />
                     ) : (
-                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#09090b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--color-text-primary)', color: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>
                         {name.charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '0.84rem', fontWeight: '700', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: '700', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {name}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
                         @{handle}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid #eee' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--color-surface-hover)' }}>
                     <span style={{
                       fontSize: '0.62rem',
                       fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: '700',
                       textTransform: 'uppercase',
-                      color: acc.accountType === 'business' ? '#09090b' : '#71717a'
+                      color: acc.accountType === 'business' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
                     }}>
                       {acc.accountType || 'personal'}
                     </span>
@@ -284,8 +284,8 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                       style={{
                         padding: '6px 12px',
                         borderRadius: '6px',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         border: 'none',
                         fontSize: '0.72rem',
                         fontWeight: '700',
