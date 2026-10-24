@@ -470,10 +470,10 @@ export default function AnalyticsPage() {
   ];
 
   const businessStatCards = [
-    { label: '💬 Total Conversations', value: bizStats?.totalConversations || 0, sub: `${bizStats?.openHandoffs || 0} waiting for your team`, icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
-    { label: '🎯 Leads Captured', value: bizStats?.activeLeads || 0, sub: `${bizStats?.leadsLast30d || 0} in the last 30 days`, icon: <Target size={15} />, href: null, trend: bizStats?.trends?.leads },
-    { label: '📅 Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null, trend: bizStats?.trends?.bookings },
-    { label: '⚡ Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
+    { label: 'Total Conversations', value: bizStats?.totalConversations || 0, sub: `${bizStats?.openHandoffs || 0} waiting for your team`, icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
+    { label: 'Leads Captured', value: bizStats?.activeLeads || 0, sub: `${bizStats?.leadsLast30d || 0} in the last 30 days`, icon: <Target size={15} />, href: null, trend: bizStats?.trends?.leads },
+    { label: 'Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null, trend: bizStats?.trends?.bookings },
+    { label: 'Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
   ];
 
   return (

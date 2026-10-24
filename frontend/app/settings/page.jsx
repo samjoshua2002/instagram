@@ -512,7 +512,7 @@ export default function SettingsPage() {
             ) : saveSuccess ? (
               <>
                 <CheckCircle2 size={14} />
-                <span>Saved Changes ✓</span>
+                <span>Saved Changes</span>
               </>
             ) : (
               <>
@@ -1132,10 +1132,10 @@ export default function SettingsPage() {
             </div>
             <span style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '8px', display: 'block' }}>
               {formData.typingDelaySeconds <= 1
-                ? '⚡ Fast response (great for active testing)'
+                ? 'Fast response (great for active testing)'
                 : formData.typingDelaySeconds <= 2.5
-                  ? '✨ Natural human speed (recommended for Instagram)'
-                  : '⏳ Realistic thoughtful pacing'}
+                  ? 'Natural human speed (recommended for Instagram)'
+                  : 'Realistic thoughtful pacing'}
             </span>
           </div>
         </div>
