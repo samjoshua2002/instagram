@@ -14,6 +14,42 @@ import {
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import BusinessConversionPanel from './components/BusinessConversionPanel';
+import WorkspaceModeSwitch from './components/WorkspaceModeSwitch';
+
+// Tiny 14-day trend line for the KPI cards (PLAN.md §17.3); flat when there is no data yet
+function Sparkline({ points, width = 96, height = 28 }) {
+  if (!points?.length) return null;
+  const max = Math.max(...points, 1);
+  const step = width / Math.max(points.length - 1, 1);
+  const coords = points.map((v, i) => [i * step, height - 2 - (v / max) * (height - 4)]);
+  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const [lastX, lastY] = coords[coords.length - 1];
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" style={{ color: 'var(--color-text-primary)', overflow: 'visible' }}>
+      <polygon points={`0,${height} ${line} ${width},${height}`} fill="currentColor" opacity="0.08" />
+      <motion.polyline
+        points={line}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+      />
+      <circle cx={lastX} cy={lastY} r="2.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+const timeAgo = date => {
+  const mins = Math.round((Date.now() - new Date(date).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
+  return `${Math.round(mins / 1440)}d ago`;
+};
 
 // Butter-Smooth Framer Motion Animated Number Counter (quintic deceleration curve)
 function AnimatedNumber({ value, duration = 1.6 }) {
@@ -220,17 +256,26 @@ export default function AnalyticsPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
 
-  // Business workspaces: conversion KPIs, refreshed every 30s so new leads/bookings show up live
+  // KPIs + 14-day trends (and the newest leads for business), refreshed every 30s so they show up live
   const isBusinessWorkspace = ['business', 'agency'].includes(user?.accountType);
   const [bizStats, setBizStats] = useState(null);
+  const [latestLeads, setLatestLeads] = useState([]);
   useEffect(() => {
-    if (!isBusinessWorkspace) return;
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
     if (!activeToken) return;
-    const load = () => fetch(`${API_BASE}/api/analytics/overview`, { headers: { Authorization: `Bearer ${activeToken}` } })
-      .then(r => (r.ok ? r.json() : null))
-      .then(data => { if (data) setBizStats(data); })
-      .catch(() => {});
+    const headers = { Authorization: `Bearer ${activeToken}` };
+    const load = () => {
+      fetch(`${API_BASE}/api/analytics/overview`, { headers })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => { if (data) setBizStats(data); })
+        .catch(() => {});
+      if (isBusinessWorkspace) {
+        fetch(`${API_BASE}/api/analytics/leads?limit=4`, { headers })
+          .then(r => (r.ok ? r.json() : null))
+          .then(data => { if (data?.items) setLatestLeads(data.items); })
+          .catch(() => {});
+      }
+    };
     load();
     const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
@@ -404,16 +449,16 @@ export default function AnalyticsPage() {
 
   const personalStatCards = [
     { label: 'Total People', value: friendNodes.length, sub: 'Active profiles', icon: <Users size={15} />, href: '/relationships' },
-    { label: 'Total DMs', value: breakdown.totalDMs, sub: 'From contacts', icon: <MessageSquare size={15} />, href: '/relationships' },
+    { label: 'Total DMs', value: breakdown.totalDMs, sub: 'From contacts', icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
     { label: 'Reels Shared', value: breakdown.totalReels, sub: 'Reels exchanged', icon: <Film size={15} />, href: null },
-    { label: 'AI Active', value: breakdown.aiActive, sub: `${breakdown.aiPaused} paused`, icon: <Bot size={15} />, href: '/controls' },
+    { label: 'AI Active', value: breakdown.aiActive, sub: `${breakdown.aiPaused} paused`, icon: <Bot size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
   ];
 
   const businessStatCards = [
-    { label: '💬 Total Conversations', value: bizStats?.totalConversations || 0, sub: `${bizStats?.openHandoffs || 0} waiting for your team`, icon: <MessageSquare size={15} />, href: '/relationships' },
-    { label: '🎯 Leads Captured', value: bizStats?.activeLeads || 0, sub: `${bizStats?.leadsLast30d || 0} in the last 30 days`, icon: <Target size={15} />, href: null },
-    { label: '📅 Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null },
-    { label: '⚡ Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls' },
+    { label: '💬 Total Conversations', value: bizStats?.totalConversations || 0, sub: `${bizStats?.openHandoffs || 0} waiting for your team`, icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
+    { label: '🎯 Leads Captured', value: bizStats?.activeLeads || 0, sub: `${bizStats?.leadsLast30d || 0} in the last 30 days`, icon: <Target size={15} />, href: null, trend: bizStats?.trends?.leads },
+    { label: '📅 Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null, trend: bizStats?.trends?.bookings },
+    { label: '⚡ Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
   ];
 
   return (
@@ -438,6 +483,9 @@ export default function AnalyticsPage() {
               : 'Real-time analytics on your contacts, interaction volume, and AI routing.'}
           </p>
         </div>
+
+        {/* Quick mode switch: Personal / Business / Hybrid */}
+        {!isSuperadmin && <WorkspaceModeSwitch />}
 
         {/* Superadmin Quick Actions */}
         {isSuperadmin && (
@@ -1285,6 +1333,11 @@ export default function AnalyticsPage() {
                   </div>
                   <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>{c.sub}</div>
                 </div>
+                {c.trend && (
+                  <div style={{ marginTop: '10px' }} title="Last 14 days">
+                    <Sparkline points={c.trend} />
+                  </div>
+                )}
                 {c.href ? (
                   <Link href={c.href} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
                     <span>View</span><ArrowRight size={10} />
@@ -1293,6 +1346,42 @@ export default function AnalyticsPage() {
               </motion.div>
             ))}
           </motion.div>
+
+          {isBusinessWorkspace && latestLeads.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 0 3px rgba(22,163,74,0.18)' }} />
+                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>Live leads</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
+                <AnimatePresence initial={false}>
+                  {latestLeads.map(lead => (
+                    <motion.div
+                      key={lead._id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="stat-glass"
+                      style={{ padding: '14px', borderRadius: '14px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'baseline' }}>
+                        <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{(lead.handle || 'unknown').replace(/^@/, '')}</strong>
+                        <span style={{ fontSize: '0.66rem', color: 'var(--color-text-muted)', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{timeAgo(lead.updatedAt || lead.createdAt)}</span>
+                      </div>
+                      <p style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {lead.intentSummary || 'Shared contact details'}
+                      </p>
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '8px', fontSize: '0.68rem', color: 'var(--color-text-muted)', fontFamily: "'JetBrains Mono', monospace", flexWrap: 'wrap' }}>
+                        {lead.phone && <span>{lead.phone}</span>}
+                        {lead.email && <span>{lead.email}</span>}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
 
           {isBusinessWorkspace && <BusinessConversionPanel refreshKey={bizStats} />}
 
