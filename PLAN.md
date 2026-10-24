@@ -450,6 +450,16 @@ graph TD
   - 0ms instant optimistic UI state toggles with 350ms debounced background server sync.
   - Multi-layout switcher (`dense`, `list`, `grid`) in Chat Controls.
 
+### 14.2 Live Changelog (Phases 1-8 + Command Center, 2026-10-24)
+- **Phase 4 Storyboards:** Personal and Business node canvases (`/storyboard/personal`, `/storyboard/business`) with drag, link, notes and a test-chat sandbox.
+- **Storyboard -> AI prompt:** `services/storyboardService.js` compiles boards into the system prompt: character lore, the contact's closeness circle and linked cards, the Business journey playbook (Trigger -> Condition -> Knowledge -> Offer -> Action -> Handoff -> Goal), and a **Secret Vault** of off-limits topics the bot deflects naturally. Hybrid mode adds the business playbook on top of the personal voice.
+- **Storyboard cards:** person cards carry `senderId` and a closeness `circle` (close / online / offline / family / professional); new `secret` card type; old business keys `entry` / `question` / `booking` still load as Trigger / Condition / Action.
+- **Phase 5 UI:** page transitions and generative SVG contour background.
+- **Phase 6 Analytics:** lead, booking, handoff and automation KPIs; booking service-name fix.
+- **Phase 7 Settings:** standalone AI model page with provider test ping.
+- **Phase 8 Desktop:** Tauri 2 app with tray, native alerts and CI installers for macOS and Windows (macOS signing still needs an Apple certificate).
+- **§17.3 Command Center:** dashboard KPI cards show 14-day sparklines (`trends` in `GET /api/analytics/overview`), a live leads strip refreshes every 30s for business workspaces, and the Personal / Business / Hybrid mode switch sits in the dashboard header.
+
 ---
 
 ## 15. Pure Spotify Dynamic Ambient Glass UI & Mobile-First Design System Specification
