@@ -108,7 +108,7 @@ function extractBookingSignals(incomingText, replyText = '', now = new Date()) {
 
   const bookingTime = extractBookingTime(incomingText, now) || extractBookingTime(replyText, now);
   const confirmed = BOOKING_CONFIRM_RE.test(replyText || '') || /\b(confirm|done|yes book|book it)\b/i.test(incomingText || '');
-  const serviceMatch = combined.match(/\b(?:book|reserve|schedule)\s+(?:a|an|the|my)?\s*([a-z][a-z\s]{2,30}?)(?:\s+(?:for|on|at|tomorrow|today)\b|[.,!?\n]|$)/i)
+  const serviceMatch = combined.match(/\b(?:book|reserve|schedule)\s+(?:(?:a|an|the|my)\s+)?([a-z][a-z\s]{2,30}?)(?:\s+(?:for|on|at|tomorrow|today)\b|[.,!?\n]|$)/i)
     || combined.match(/\b(table for \d+|haircut|facial|massage|consultation|demo|session|appointment)\b/i);
   return {
     isBooking: Boolean(bookingTime) || confirmed,
