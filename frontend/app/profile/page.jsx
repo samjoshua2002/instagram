@@ -312,7 +312,7 @@ export default function ProfilePage() {
             fontSize: '0.7rem',
             fontWeight: 800,
             fontFamily: "'JetBrains Mono', monospace",
-            color: '#71717a',
+            color: 'var(--color-text-secondary)',
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             marginBottom: '4px'
@@ -322,13 +322,13 @@ export default function ProfilePage() {
           <h1 style={{
             fontSize: '2rem',
             fontWeight: 900,
-            color: 'var(--text, #0f172a)',
+            color: 'var(--text, var(--color-text-primary))',
             letterSpacing: '-0.7px',
             margin: 0
           }}>
             Account Profile
           </h1>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted, #64748b)', marginTop: '4px', margin: '4px 0 0' }}>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted, var(--color-text-secondary))', marginTop: '4px', margin: '4px 0 0' }}>
             Manage your personal profile, connected Instagram Meta account, and biometric security keys.
           </p>
         </div>
@@ -337,8 +337,8 @@ export default function ProfilePage() {
           onClick={handleSaveProfile}
           disabled={saving}
           style={{
-            background: 'var(--primary, #4f46e5)',
-            color: '#ffffff',
+            background: 'var(--primary, var(--ambient-dominant))',
+            color: 'var(--color-surface)',
             border: 'none',
             borderRadius: '10px',
             padding: '10px 22px',
@@ -365,9 +365,9 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#b91c1c',
+              background: 'color-mix(in srgb, #ef4444 12%, transparent)',
+              border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
+              color: '#f87171',
               borderRadius: '12px',
               padding: '14px 18px',
               fontSize: '0.86rem',
@@ -389,9 +389,9 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              color: '#15803d',
+              background: 'color-mix(in srgb, #22c55e 12%, transparent)',
+              border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
+              color: '#4ade80',
               borderRadius: '12px',
               padding: '14px 18px',
               fontSize: '0.86rem',
@@ -410,8 +410,8 @@ export default function ProfilePage() {
 
       {/* Hero Identity Card with Avatar Hover / Mobile Long-Press */}
       <div style={{
-        background: 'var(--bg-card, #ffffff)',
-        border: '1px solid var(--border, #e2e8f0)',
+        background: 'var(--bg-card, var(--color-surface))',
+        border: '1px solid var(--border, var(--color-border))',
         borderRadius: '18px',
         padding: '24px',
         marginBottom: '24px',
@@ -458,8 +458,8 @@ export default function ProfilePage() {
               <div style={{
                 width: '100%',
                 height: '100%',
-                background: '#09090b',
-                color: '#ffffff',
+                background: 'var(--color-text-primary)',
+                color: 'var(--color-surface)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -514,22 +514,22 @@ export default function ProfilePage() {
               height: '13px',
               borderRadius: '50%',
               background: '#10b981',
-              border: '2px solid #ffffff',
+              border: '2px solid var(--color-surface)',
               zIndex: 2
             }} />
           </div>
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#09090b', letterSpacing: '-0.4px' }}>
+              <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--color-text-primary)', letterSpacing: '-0.4px' }}>
                 {formData.firstName || user?.username || 'Account Owner'} {formData.lastName || ''}
               </span>
               <span style={{
                 fontSize: '0.68rem',
                 fontWeight: 800,
                 fontFamily: "'JetBrains Mono', monospace",
-                background: isBusiness ? '#09090b' : '#f4f4f5',
-                color: isBusiness ? '#ffffff' : '#71717a',
+                background: isBusiness ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+                color: isBusiness ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                 padding: '3px 10px',
                 borderRadius: '999px',
                 textTransform: 'uppercase',
@@ -538,12 +538,12 @@ export default function ProfilePage() {
                 {formData.accountType} Tier
               </span>
             </div>
-            <div style={{ fontSize: '0.86rem', color: '#71717a', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span>@{user?.instagramUsername || user?.username || 'user'}</span>
               <span>•</span>
               <span>{user?.email}</span>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
               Tap or hover photo to update avatar
             </div>
           </div>
@@ -551,12 +551,12 @@ export default function ProfilePage() {
 
         {/* Workspace Mode Switcher (Instant 1-Click Toggle) */}
         <div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#71717a', fontFamily: "'JetBrains Mono', monospace", marginBottom: '6px', textAlign: 'right' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", marginBottom: '6px', textAlign: 'right' }}>
             WORKSPACE ENVIRONMENT
           </div>
           <div style={{
-            background: '#f4f4f5',
-            border: '1px solid #e4e4e7',
+            background: 'var(--color-surface-hover)',
+            border: '1px solid var(--color-border)',
             borderRadius: '14px',
             padding: '5px',
             display: 'flex',
@@ -573,8 +573,8 @@ export default function ProfilePage() {
                 fontSize: '0.82rem',
                 fontWeight: 800,
                 cursor: switchingTier ? 'wait' : 'pointer',
-                background: formData.accountType === 'personal' ? '#ffffff' : 'transparent',
-                color: formData.accountType === 'personal' ? '#09090b' : '#71717a',
+                background: formData.accountType === 'personal' ? 'var(--color-surface)' : 'transparent',
+                color: formData.accountType === 'personal' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 boxShadow: formData.accountType === 'personal' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
@@ -592,8 +592,8 @@ export default function ProfilePage() {
                 fontSize: '0.82rem',
                 fontWeight: 800,
                 cursor: switchingTier ? 'wait' : 'pointer',
-                background: formData.accountType === 'business' ? '#09090b' : 'transparent',
-                color: formData.accountType === 'business' ? '#ffffff' : '#71717a',
+                background: formData.accountType === 'business' ? 'var(--color-text-primary)' : 'transparent',
+                color: formData.accountType === 'business' ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                 boxShadow: formData.accountType === 'business' ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
@@ -612,8 +612,8 @@ export default function ProfilePage() {
       }}>
         {/* Left Column: Personal Information */}
         <div style={{
-          background: 'var(--bg-card, #ffffff)',
-          border: '1px solid var(--border, #e2e8f0)',
+          background: 'var(--bg-card, var(--color-surface))',
+          border: '1px solid var(--border, var(--color-border))',
           borderRadius: '18px',
           padding: '24px',
           boxShadow: 'var(--shadow-sm)'
@@ -623,15 +623,15 @@ export default function ProfilePage() {
               width: '28px',
               height: '28px',
               borderRadius: '8px',
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--color-text-primary)',
+              color: 'var(--color-surface)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
               <User size={15} />
             </div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#09090b', margin: 0, letterSpacing: '-0.3px' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.3px' }}>
               Personal Identity
             </h3>
           </div>
@@ -639,7 +639,7 @@ export default function ProfilePage() {
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                   First Name
                 </label>
                 <input
@@ -650,14 +650,14 @@ export default function ProfilePage() {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
                     fontSize: '0.85rem'
                   }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                   Last Name
                 </label>
                 <input
@@ -668,8 +668,8 @@ export default function ProfilePage() {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
                     fontSize: '0.85rem'
                   }}
                 />
@@ -677,7 +677,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                 Primary Email
               </label>
               <div style={{ position: 'relative' }}>
@@ -689,20 +689,20 @@ export default function ProfilePage() {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
-                    background: '#f4f4f5',
-                    color: '#71717a',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface-hover)',
+                    color: 'var(--color-text-secondary)',
                     fontSize: '0.85rem',
                     cursor: 'not-allowed'
                   }}
                 />
-                <Lock size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a1a1aa' }} />
+                <Lock size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                   Mobile Number
                 </label>
                 <input
@@ -714,14 +714,14 @@ export default function ProfilePage() {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
                     fontSize: '0.85rem'
                   }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                   WhatsApp Direct
                 </label>
                 <input
@@ -733,8 +733,8 @@ export default function ProfilePage() {
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
                     fontSize: '0.85rem'
                   }}
                 />
@@ -742,7 +742,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#09090b', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                 Operating Location
               </label>
               <input
@@ -754,8 +754,8 @@ export default function ProfilePage() {
                   width: '100%',
                   padding: '10px 12px',
                   borderRadius: '8px',
-                  border: '1px solid #e4e4e7',
-                  background: '#ffffff',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface)',
                   fontSize: '0.85rem'
                 }}
               />
@@ -765,8 +765,8 @@ export default function ProfilePage() {
               type="submit"
               disabled={saving}
               style={{
-                background: '#09090b',
-                color: '#ffffff',
+                background: 'var(--color-text-primary)',
+                color: 'var(--color-surface)',
                 border: 'none',
                 borderRadius: '8px',
                 padding: '11px 18px',
@@ -788,8 +788,8 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Instagram Account Card */}
           <div style={{
-            background: 'var(--bg-card, #ffffff)',
-            border: '1px solid var(--border, #e2e8f0)',
+            background: 'var(--bg-card, var(--color-surface))',
+            border: '1px solid var(--border, var(--color-border))',
             borderRadius: '18px',
             padding: '24px',
             boxShadow: 'var(--shadow-sm)'
@@ -800,15 +800,15 @@ export default function ProfilePage() {
                   width: '28px',
                   height: '28px',
                   borderRadius: '8px',
-                  background: 'var(--primary, #4f46e5)',
-                  color: '#ffffff',
+                  background: 'var(--primary, var(--ambient-dominant))',
+                  color: 'var(--color-surface)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
                   <Instagram size={15} />
                 </div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text, #0f172a)', margin: 0, letterSpacing: '-0.3px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text, var(--color-text-primary))', margin: 0, letterSpacing: '-0.3px' }}>
                   Connected Instagram
                 </h3>
               </div>
@@ -817,8 +817,8 @@ export default function ProfilePage() {
                 fontSize: '0.68rem',
                 fontFamily: "'JetBrains Mono', monospace",
                 fontWeight: 800,
-                background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success-container, #ecfdf5)' : 'var(--danger-container, #fee2e2)',
-                color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success, #15803d)' : 'var(--danger, #b91c1c)',
+                background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success-container, color-mix(in srgb, #22c55e 12%, transparent))' : 'var(--danger-container, color-mix(in srgb, #ef4444 14%, transparent))',
+                color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success, #4ade80)' : 'var(--danger, #f87171)',
                 padding: '3px 10px',
                 borderRadius: '6px'
               }}>
@@ -827,8 +827,8 @@ export default function ProfilePage() {
             </div>
 
             <div style={{
-              background: 'var(--bg-subtle, #f8fafc)',
-              border: '1px solid var(--border, #e2e8f0)',
+              background: 'var(--bg-subtle, var(--color-surface-elevated))',
+              border: '1px solid var(--border, var(--color-border))',
               borderRadius: '12px',
               padding: '16px',
               display: 'flex',
@@ -836,23 +836,23 @@ export default function ProfilePage() {
               gap: '14px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>Instagram Username</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text, #0f172a)' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, var(--color-text-secondary))', fontWeight: 700 }}>Instagram Username</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text, var(--color-text-primary))' }}>
                   @{user?.instagramUsername || user?.username || 'None'}
                 </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>Page Account ID</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, var(--color-text-secondary))', fontWeight: 700 }}>Page Account ID</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '0.78rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text, #334155)' }}>
+                  <span style={{ fontSize: '0.78rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text, var(--color-text-secondary))' }}>
                     {user?.instagramId || user?.instagramAccountId || 'Unlinked'}
                   </span>
                   {(user?.instagramId || user?.instagramAccountId) && (
                     <button
                       type="button"
                       onClick={() => copyId(user?.instagramId || user?.instagramAccountId)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted, #64748b)' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted, var(--color-text-secondary))' }}
                       title="Copy ID"
                     >
                       {copiedId ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}
@@ -862,7 +862,7 @@ export default function ProfilePage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', fontWeight: 700 }}>Security Status</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, var(--color-text-secondary))', fontWeight: 700 }}>Security Status</span>
                 <span style={{ fontSize: '0.76rem', color: 'var(--success, #16a34a)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Shield size={13} /> AES-256-GCM Encrypted
                 </span>
@@ -872,8 +872,8 @@ export default function ProfilePage() {
 
           {/* Biometric Passkeys Card */}
           <div style={{
-            background: 'var(--bg-card, #ffffff)',
-            border: '1px solid var(--border, #e2e8f0)',
+            background: 'var(--bg-card, var(--color-surface))',
+            border: '1px solid var(--border, var(--color-border))',
             borderRadius: '18px',
             padding: '24px',
             boxShadow: 'var(--shadow-sm)'
@@ -884,15 +884,15 @@ export default function ProfilePage() {
                   width: '28px',
                   height: '28px',
                   borderRadius: '8px',
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--color-text-primary)',
+                  color: 'var(--color-surface)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
                   <Fingerprint size={15} />
                 </div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#09090b', margin: 0, letterSpacing: '-0.3px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.3px' }}>
                   Biometric Passkeys
                 </h3>
               </div>
@@ -902,8 +902,8 @@ export default function ProfilePage() {
                 onClick={handleRegisterPasskey}
                 disabled={passkeyLoading}
                 style={{
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--color-text-primary)',
+                  color: 'var(--color-surface)',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '7px 14px',
@@ -920,7 +920,7 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: '#71717a', margin: '0 0 16px', lineHeight: 1.45 }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.45 }}>
               Authenticate instantly with Touch ID, Face ID, or Windows Hello without typing passwords.
             </p>
 
@@ -930,8 +930,8 @@ export default function ProfilePage() {
                   <div
                     key={pk.id}
                     style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
+                      background: 'var(--color-surface-elevated)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '10px',
                       padding: '12px 16px',
                       display: 'flex',
@@ -940,12 +940,12 @@ export default function ProfilePage() {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Laptop size={16} color="#475569" />
+                      <Laptop size={16} color="var(--color-text-secondary)" />
                       <div>
-                        <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
                           {pk.deviceType || pk.name || 'Biometric Device'}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
                           Registered on {new Date(pk.createdAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -970,13 +970,13 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div style={{
-                background: '#f8fafc',
-                border: '1px dashed #cbd5e1',
+                background: 'var(--color-surface-elevated)',
+                border: '1px dashed var(--color-border-strong)',
                 borderRadius: '10px',
                 padding: '20px',
                 textAlign: 'center',
                 fontSize: '0.82rem',
-                color: '#64748b'
+                color: 'var(--color-text-secondary)'
               }}>
                 No biometric passkeys configured yet. Click <strong>Add Passkey</strong> to enroll Face ID / Touch ID.
               </div>

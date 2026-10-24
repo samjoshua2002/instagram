@@ -153,8 +153,8 @@ export default function AiInterviewModal() {
       <div
         className="interview-modal-container"
         style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '14px',
           width: '100%',
           maxWidth: '860px',
@@ -166,13 +166,13 @@ export default function AiInterviewModal() {
         }}
       >
         {/* Left: Chat Interviewer */}
-        <div className="interview-chat-pane" style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e4e4e7', background: '#ffffff' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #e4e4e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+        <div className="interview-chat-pane" style={{ flex: 1.2, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ background: '#09090b', color: '#ffffff', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface)', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
                 <Sparkles size={14} />
               </div>
-              <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.9rem' }}>
+              <span style={{ fontWeight: '800', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}>
                 Add Person (AI Interview)
               </span>
             </div>
@@ -182,8 +182,8 @@ export default function AiInterviewModal() {
                   onClick={handleSave}
                   className="mobile-header-save-btn"
                   style={{
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--color-text-primary)',
+                    color: 'var(--color-surface)',
                     border: 'none',
                     padding: '5px 12px',
                     borderRadius: '6px',
@@ -197,7 +197,7 @@ export default function AiInterviewModal() {
               )}
               <button
                 onClick={() => setIsAiModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px' }}
               >
                 <X size={18} />
               </button>
@@ -205,20 +205,20 @@ export default function AiInterviewModal() {
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', background: '#fafafa' }}>
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--color-surface-elevated)' }}>
             {aiChat.map((msg, i) => (
               <div
                 key={i}
                 style={{
                   alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
                   maxWidth: '85%',
-                  background: msg.role === 'user' ? '#09090b' : '#ffffff',
-                  color: msg.role === 'user' ? '#ffffff' : '#09090b',
+                  background: msg.role === 'user' ? 'var(--color-text-primary)' : 'var(--color-surface)',
+                  color: msg.role === 'user' ? 'var(--color-surface)' : 'var(--color-text-primary)',
                   padding: '10px 14px',
                   borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                   fontSize: '0.84rem',
                   lineHeight: '1.45',
-                  border: msg.role === 'user' ? 'none' : '1px solid #e4e4e7',
+                  border: msg.role === 'user' ? 'none' : '1px solid var(--color-border)',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                 }}
               >
@@ -226,7 +226,7 @@ export default function AiInterviewModal() {
               </div>
             ))}
             {isAiTyping && (
-              <div style={{ alignSelf: 'flex-start', background: '#ffffff', border: '1px solid #e4e4e7', padding: '8px 12px', borderRadius: '8px', color: '#71717a', fontSize: '0.78rem' }}>
+              <div style={{ alignSelf: 'flex-start', background: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '8px 12px', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '0.78rem' }}>
                 Analyzing attributes & connecting...
               </div>
             )}
@@ -234,18 +234,18 @@ export default function AiInterviewModal() {
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid #e4e4e7', display: 'flex', gap: '8px', background: '#ffffff' }}>
+          <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '8px', background: 'var(--color-surface)' }}>
             <input
               type="text"
               placeholder="Answer AI (e.g. She studies medicine, @handle, loves hamsters)..."
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
-              style={{ flex: 1, background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#09090b', padding: '10px 14px', fontSize: '0.84rem', outline: 'none' }}
+              style={{ flex: 1, background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)', padding: '10px 14px', fontSize: '0.84rem', outline: 'none' }}
             />
             <button
               type="submit"
               disabled={isAiTyping || !aiInput.trim()}
-              style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface)', border: 'none', borderRadius: '8px', padding: '0 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <Send size={15} />
             </button>
@@ -253,45 +253,45 @@ export default function AiInterviewModal() {
         </div>
 
         {/* Right: Live Preview & Save */}
-        <div className="interview-preview-pane" style={{ flex: 0.85, padding: '22px', background: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div className="interview-preview-pane" style={{ flex: 0.85, padding: '22px', background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
               LIVE PROFILE PREVIEW
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
               <ContactAvatar contact={{ ...accumulatedNode, handle: accumulatedNode?.instagramHandle }} size={44} />
               <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                   {accumulatedNode?.name || '(Waiting for name...)'}
                 </h3>
-                <span style={{ fontSize: '0.76rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
                   {accumulatedNode?.instagramHandle || 'No handle set'}
                 </span>
               </div>
             </div>
 
             <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b' }}>
-                <span style={{ fontWeight: '700', color: '#71717a' }}>RELATION: </span>
+              <div style={{ background: 'var(--color-surface-hover)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.78rem', color: 'var(--color-text-primary)' }}>
+                <span style={{ fontWeight: '700', color: 'var(--color-text-secondary)' }}>RELATION: </span>
                 <span>{accumulatedNode?.relationshipToSam || 'Not clarified yet'}</span>
               </div>
 
               {accumulatedNode?.dob && (
-                <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b' }}>
-                  <span style={{ fontWeight: '700', color: '#71717a' }}>DATE OF BIRTH: </span>
+                <div style={{ background: 'var(--color-surface-hover)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.78rem', color: 'var(--color-text-primary)' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--color-text-secondary)' }}>DATE OF BIRTH: </span>
                   <span>{accumulatedNode.dob}</span>
                 </div>
               )}
 
-              <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b' }}>
-                <span style={{ fontWeight: '700', color: '#71717a' }}>CONNECTIONS: </span>
+              <div style={{ background: 'var(--color-surface-hover)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.78rem', color: 'var(--color-text-primary)' }}>
+                <span style={{ fontWeight: '700', color: 'var(--color-text-secondary)' }}>CONNECTIONS: </span>
                 <span>{(accumulatedNode?.connections || []).map(c => c.targetName || c).join(', ') || 'None specified'}</span>
               </div>
 
               {(accumulatedNode?.lore?.length > 0 || accumulatedNode?.personalNotes) && (
-                <div style={{ background: '#f4f4f5', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e4e4e7', fontSize: '0.78rem', color: '#09090b', maxHeight: '120px', overflowY: 'auto' }}>
-                  <span style={{ fontWeight: '700', color: '#71717a', display: 'block', marginBottom: '4px' }}>LORE & NOTES:</span>
+                <div style={{ background: 'var(--color-surface-hover)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.78rem', color: 'var(--color-text-primary)', maxHeight: '120px', overflowY: 'auto' }}>
+                  <span style={{ fontWeight: '700', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>LORE & NOTES:</span>
                   <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
                     {accumulatedNode.personalNotes || (accumulatedNode.lore || []).join('\n')}
                   </div>
@@ -305,8 +305,8 @@ export default function AiInterviewModal() {
               onClick={handleSave}
               disabled={!accumulatedNode?.name}
               style={{
-                background: accumulatedNode?.name ? '#09090b' : '#f4f4f5',
-                color: accumulatedNode?.name ? '#ffffff' : '#a1a1aa',
+                background: accumulatedNode?.name ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+                color: accumulatedNode?.name ? 'var(--color-surface)' : 'var(--color-text-muted)',
                 border: 'none',
                 padding: '11px',
                 borderRadius: '8px',
@@ -324,7 +324,7 @@ export default function AiInterviewModal() {
             </button>
             <button
               onClick={() => setIsAiModalOpen(false)}
-              style={{ background: 'transparent', border: '1px solid #e4e4e7', color: '#71717a', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '600' }}
+              style={{ background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '600' }}
             >
               Cancel
             </button>

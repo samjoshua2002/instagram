@@ -5,9 +5,9 @@ import { useApp } from '../../context/AppContext';
 import { Activity, RefreshCw, Lock, AlertCircle } from 'lucide-react';
 
 const BADGE = {
-  green: { bg: '#dcfce7', fg: '#15803d', label: 'Healthy' },
-  amber: { bg: '#fef3c7', fg: '#b45309', label: 'Expiring' },
-  red: { bg: '#fee2e2', fg: '#b91c1c', label: 'Expired / Revoked' },
+  green: { bg: 'color-mix(in srgb, #22c55e 14%, transparent)', fg: '#4ade80', label: 'Healthy' },
+  amber: { bg: 'color-mix(in srgb, #f59e0b 14%, transparent)', fg: '#fbbf24', label: 'Expiring' },
+  red: { bg: 'color-mix(in srgb, #ef4444 14%, transparent)', fg: '#f87171', label: 'Expired / Revoked' },
 };
 
 function expiryText(row) {
@@ -100,7 +100,7 @@ export default function TokenRadarPage() {
       </div>
 
       {error && (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: '#b91c1c', border: '1px solid #fee2e2', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: '#f87171', border: '1px solid color-mix(in srgb, #ef4444 14%, transparent)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
           <AlertCircle size={16} /> {error}
         </div>
       )}
@@ -136,7 +136,7 @@ export default function TokenRadarPage() {
                       <div className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{row.instagramAccountId}</div>
                     </td>
                     <td style={{ padding: '10px 12px', fontSize: '0.78rem' }}>
-                      {row.encrypted ? 'Encrypted' : <span style={{ color: '#b45309', fontWeight: 600 }}>Plaintext (legacy)</span>}
+                      {row.encrypted ? 'Encrypted' : <span style={{ color: '#fbbf24', fontWeight: 600 }}>Plaintext (legacy)</span>}
                     </td>
                     <td style={{ padding: '10px 12px' }}>{expiryText(row)}</td>
                     <td style={{ padding: '10px 12px' }}>

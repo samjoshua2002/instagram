@@ -15,13 +15,13 @@ export default function WorkspaceImpersonationBanner() {
   return (
     <div
       style={{
-        background: '#09090b',
-        color: '#ffffff',
+        background: 'var(--color-text-primary)',
+        color: 'var(--color-surface)',
         padding: '8px 20px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #27272a',
+        borderBottom: '1px solid var(--color-text-secondary)',
         position: 'sticky',
         top: 0,
         zIndex: 9999,
@@ -33,7 +33,7 @@ export default function WorkspaceImpersonationBanner() {
         <span
           style={{
             background: '#22c55e',
-            color: '#09090b',
+            color: 'var(--color-text-primary)',
             fontFamily: "'JetBrains Mono', monospace",
             fontWeight: '800',
             fontSize: '0.64rem',
@@ -44,8 +44,8 @@ export default function WorkspaceImpersonationBanner() {
         >
           MANAGED WORKSPACE
         </span>
-        <span style={{ color: '#d4d4d8' }}>
-          Configuring creator: <strong style={{ color: '#ffffff' }}>@{handle}</strong> {name ? `(${name})` : ''}
+        <span style={{ color: 'var(--color-border-strong)' }}>
+          Configuring creator: <strong style={{ color: 'var(--color-surface)' }}>@{handle}</strong> {name ? `(${name})` : ''}
         </span>
       </div>
 
@@ -53,8 +53,8 @@ export default function WorkspaceImpersonationBanner() {
         type="button"
         onClick={exitWorkspace}
         style={{
-          background: '#ffffff',
-          color: '#09090b',
+          background: 'var(--color-surface)',
+          color: 'var(--color-text-primary)',
           border: 'none',
           borderRadius: '6px',
           padding: '5px 12px',
@@ -66,8 +66,8 @@ export default function WorkspaceImpersonationBanner() {
           gap: '6px',
           transition: 'all 0.15s ease'
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#f4f4f5'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-hover)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface)'; }}
       >
         <ArrowLeft size={13} />
         <span>Exit to Superadmin Console</span>

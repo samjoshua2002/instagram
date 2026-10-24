@@ -180,8 +180,8 @@ export default function InspectorDrawer() {
         bottom: 0,
         width: '520px',
         maxWidth: '96vw',
-        background: '#09090b',
-        borderLeft: '1px solid #27272a',
+        background: 'var(--color-text-primary)',
+        borderLeft: '1px solid var(--color-text-secondary)',
         padding: '24px',
         zIndex: 70,
         overflowY: 'auto',
@@ -189,15 +189,15 @@ export default function InspectorDrawer() {
       }}
     >
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #27272a' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--color-text-secondary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <ContactAvatar contact={selectedNode} size={48} showStatus={true} />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-surface)', margin: 0 }}>
                 {selectedNode.name}
               </h2>
-              <span style={{ fontSize: '0.66rem', background: '#18181b', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", border: '1px solid #27272a' }}>
+              <span style={{ fontSize: '0.66rem', background: 'var(--color-text-primary)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", border: '1px solid var(--color-text-secondary)' }}>
                 {(selectedNode.category || 'friend').toUpperCase()}
               </span>
             </div>
@@ -210,10 +210,10 @@ export default function InspectorDrawer() {
                 onClick={() => setLinkingTargetPerson(selectedNode)}
                 title={hasInstagramId ? "Edit or change linked Instagram ID" : "Link Instagram ID"}
                 style={{
-                  background: hasInstagramId ? '#18181b' : 'rgba(245, 158, 11, 0.2)',
+                  background: hasInstagramId ? 'var(--color-text-primary)' : 'rgba(245, 158, 11, 0.2)',
                   border: '1px solid',
-                  borderColor: hasInstagramId ? '#3f3f46' : '#f59e0b',
-                  color: hasInstagramId ? '#a1a1aa' : '#f59e0b',
+                  borderColor: hasInstagramId ? 'var(--color-text-secondary)' : '#f59e0b',
+                  color: hasInstagramId ? 'var(--color-text-muted)' : '#f59e0b',
                   padding: '2px 7px',
                   borderRadius: '4px',
                   fontSize: '0.68rem',
@@ -232,7 +232,7 @@ export default function InspectorDrawer() {
         </div>
         <button
           onClick={() => setSelectedNode(null)}
-          style={{ background: 'transparent', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '6px' }}
+          style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '6px' }}
         >
           <X size={20} />
         </button>
@@ -255,7 +255,7 @@ export default function InspectorDrawer() {
         >
           <div>
             <div style={{ color: '#f59e0b', fontWeight: '800', fontSize: '0.8rem' }}>⚠️ Missing Instagram ID</div>
-            <div style={{ color: '#d1d5db', fontSize: '0.74rem', marginTop: '2px' }}>
+            <div style={{ color: 'var(--color-border-strong)', fontSize: '0.74rem', marginTop: '2px' }}>
               Add Instagram @handle so AI merges past conversation and replies in live DMs.
             </div>
           </div>
@@ -263,7 +263,7 @@ export default function InspectorDrawer() {
             onClick={() => setLinkingTargetPerson(selectedNode)}
             style={{
               background: '#f59e0b',
-              color: '#000000',
+              color: 'var(--color-text-primary)',
               border: 'none',
               padding: '6px 12px',
               borderRadius: '6px',
@@ -279,9 +279,9 @@ export default function InspectorDrawer() {
       )}
 
       {/* ================= SECTION 1: CHAT CONTROL INSIDE PAGE ================= */}
-      <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '14px', marginBottom: '18px' }}>
+      <div style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '10px', padding: '14px', marginBottom: '18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
             🤖 CHAT CONTROL FOR {selectedNode.name.toUpperCase()}
           </span>
           <span
@@ -311,9 +311,9 @@ export default function InspectorDrawer() {
               fontSize: '0.74rem',
               fontWeight: isFullAi ? '800' : '500',
               cursor: 'pointer',
-              background: isFullAi ? '#ffffff' : '#18181b',
-              color: isFullAi ? '#000000' : '#a1a1aa',
-              border: isFullAi ? '1px solid #ffffff' : '1px solid #27272a',
+              background: isFullAi ? 'var(--color-surface)' : 'var(--color-text-primary)',
+              color: isFullAi ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              border: isFullAi ? '1px solid var(--color-surface)' : '1px solid var(--color-text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -333,9 +333,9 @@ export default function InspectorDrawer() {
               fontSize: '0.74rem',
               fontWeight: isReelsOnly ? '800' : '500',
               cursor: 'pointer',
-              background: isReelsOnly ? '#f59e0b' : '#18181b',
-              color: isReelsOnly ? '#000000' : '#a1a1aa',
-              border: isReelsOnly ? '1px solid #f59e0b' : '1px solid #27272a',
+              background: isReelsOnly ? '#f59e0b' : 'var(--color-text-primary)',
+              color: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              border: isReelsOnly ? '1px solid #f59e0b' : '1px solid var(--color-text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -355,9 +355,9 @@ export default function InspectorDrawer() {
               fontSize: '0.74rem',
               fontWeight: isPaused ? '800' : '500',
               cursor: 'pointer',
-              background: isPaused ? '#ef4444' : '#18181b',
-              color: isPaused ? '#ffffff' : '#a1a1aa',
-              border: isPaused ? '1px solid #ef4444' : '1px solid #27272a',
+              background: isPaused ? '#ef4444' : 'var(--color-text-primary)',
+              color: isPaused ? 'var(--color-surface)' : 'var(--color-text-muted)',
+              border: isPaused ? '1px solid #ef4444' : '1px solid var(--color-text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -371,13 +371,13 @@ export default function InspectorDrawer() {
       </div>
 
       {/* ================= NAVIGATION TABS ================= */}
-      <div style={{ display: 'flex', gap: '6px', background: '#121214', padding: '4px', borderRadius: '8px', border: '1px solid #27272a', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '6px', background: 'var(--color-text-primary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--color-text-secondary)', marginBottom: '20px' }}>
         <button
           onClick={() => setDrawerTab('edit')}
           style={{
             flex: 1,
-            background: drawerTab === 'edit' ? '#ffffff' : 'transparent',
-            color: drawerTab === 'edit' ? '#000000' : '#a1a1aa',
+            background: drawerTab === 'edit' ? 'var(--color-surface)' : 'transparent',
+            color: drawerTab === 'edit' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
             border: 'none',
             padding: '8px 4px',
             borderRadius: '6px',
@@ -392,8 +392,8 @@ export default function InspectorDrawer() {
           onClick={() => setDrawerTab('memories')}
           style={{
             flex: 1,
-            background: drawerTab === 'memories' ? '#ffffff' : 'transparent',
-            color: drawerTab === 'memories' ? '#000000' : '#a1a1aa',
+            background: drawerTab === 'memories' ? 'var(--color-surface)' : 'transparent',
+            color: drawerTab === 'memories' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
             border: 'none',
             padding: '8px 4px',
             borderRadius: '6px',
@@ -408,8 +408,8 @@ export default function InspectorDrawer() {
           onClick={() => setDrawerTab('connections')}
           style={{
             flex: 1,
-            background: drawerTab === 'connections' ? '#ffffff' : 'transparent',
-            color: drawerTab === 'connections' ? '#000000' : '#a1a1aa',
+            background: drawerTab === 'connections' ? 'var(--color-surface)' : 'transparent',
+            color: drawerTab === 'connections' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
             border: 'none',
             padding: '8px 4px',
             borderRadius: '6px',
@@ -431,7 +431,7 @@ export default function InspectorDrawer() {
               <div style={{ color: '#10b981', fontSize: '0.82rem', fontWeight: '800' }}>
                 ✨ AI Chat Intelligence
               </div>
-              <div style={{ color: '#a1a1aa', fontSize: '0.74rem', marginTop: '2px' }}>
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '0.74rem', marginTop: '2px' }}>
                 Auto-fill relationship, DOB, notes & banter from past DMs.
               </div>
             </div>
@@ -441,7 +441,7 @@ export default function InspectorDrawer() {
               disabled={isAutofilling}
               style={{
                 background: '#10b981',
-                color: '#000000',
+                color: 'var(--color-text-primary)',
                 border: 'none',
                 padding: '7px 12px',
                 borderRadius: '6px',
@@ -462,19 +462,19 @@ export default function InspectorDrawer() {
           {/* Name & Date of Birth */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Name
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                style={{ width: '100%', background: '#121214', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 🎂 Date of Birth (DOB)
               </label>
               <input
@@ -482,7 +482,7 @@ export default function InspectorDrawer() {
                 placeholder="e.g. March 12, 2007"
                 value={formData.dob}
                 onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                style={{ width: '100%', background: '#121214', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
           </div>
@@ -490,13 +490,13 @@ export default function InspectorDrawer() {
           {/* Category & Specific Relationship */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Category Filter
               </label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                style={{ width: '100%', background: '#121214', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box' }}
               >
                 <option value="close_friend">Close Circle / Fami</option>
                 <option value="online_friend">Online Friend</option>
@@ -508,7 +508,7 @@ export default function InspectorDrawer() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
                 Relationship Note
               </label>
               <input
@@ -516,7 +516,7 @@ export default function InspectorDrawer() {
                 placeholder="e.g. Medicine Student / Homie"
                 value={formData.relationship}
                 onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
-                style={{ width: '100%', background: '#121214', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
           </div>
@@ -524,10 +524,10 @@ export default function InspectorDrawer() {
           {/* Personal Notes & Bio Lore */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
                 Personal Notes & Lore (Netflix, Studies, Habits, Family)
               </label>
-              <span style={{ fontSize: '0.68rem', color: '#71717a' }}>Multi-line text</span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)' }}>Multi-line text</span>
             </div>
             <textarea
               rows={5}
@@ -536,11 +536,11 @@ export default function InspectorDrawer() {
               onChange={(e) => setFormData({ ...formData, personalNotes: e.target.value })}
               style={{
                 width: '100%',
-                background: '#121214',
-                border: '1px solid #27272a',
+                background: 'var(--color-text-primary)',
+                border: '1px solid var(--color-text-secondary)',
                 padding: '10px 12px',
                 borderRadius: '8px',
-                color: '#ffffff',
+                color: 'var(--color-surface)',
                 fontSize: '0.82rem',
                 lineHeight: '1.5',
                 outline: 'none',
@@ -560,7 +560,7 @@ export default function InspectorDrawer() {
               placeholder="e.g. Playful Hindi bro banter, sweet teasing, Tamil roasts..."
               value={formData.roastStyle}
               onChange={(e) => setFormData({ ...formData, roastStyle: e.target.value })}
-              style={{ width: '100%', background: '#121214', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#fca5a5', fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box' }}
+              style={{ width: '100%', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: '#fca5a5', fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -570,8 +570,8 @@ export default function InspectorDrawer() {
               type="submit"
               style={{
                 flex: 1,
-                background: '#ffffff',
-                color: '#000000',
+                background: 'var(--color-surface)',
+                color: 'var(--color-text-primary)',
                 border: 'none',
                 padding: '12px',
                 borderRadius: '8px',
@@ -618,8 +618,8 @@ export default function InspectorDrawer() {
             onClick={handleForceLearn}
             disabled={isLearning}
             style={{
-              background: '#ffffff',
-              color: '#000000',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text-primary)',
               border: 'none',
               padding: '12px 16px',
               borderRadius: '8px',
@@ -637,12 +637,12 @@ export default function InspectorDrawer() {
           </button>
 
           <div>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
               Remembered Facts Learned by AI
             </span>
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {(selectedNode.facts || selectedNode.lore || []).map((item, i) => (
-                <div key={i} style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '8px', padding: '9px 12px', fontSize: '0.8rem', color: '#d4d4d8', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <div key={i} style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '8px', padding: '9px 12px', fontSize: '0.8rem', color: 'var(--color-border-strong)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                   <span style={{ color: '#10b981', fontWeight: 'bold' }}>•</span>
                   <span>{item}</span>
                 </div>
@@ -655,11 +655,11 @@ export default function InspectorDrawer() {
                 placeholder="Add custom fact to memory..."
                 value={newFact}
                 onChange={(e) => setNewFact(e.target.value)}
-                style={{ flex: 1, background: '#000000', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }}
+                style={{ flex: 1, background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.8rem', outline: 'none' }}
               />
               <button
                 type="submit"
-                style={{ background: '#ffffff', color: '#000000', border: 'none', padding: '0 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer' }}
+                style={{ background: 'var(--color-surface)', color: 'var(--color-text-primary)', border: 'none', padding: '0 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer' }}
               >
                 Add
               </button>
@@ -668,10 +668,10 @@ export default function InspectorDrawer() {
 
           {selectedNode.rollingSummary && (
             <div>
-              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
                 AI Rolling Summary
               </span>
-              <div style={{ marginTop: '6px', background: '#121214', border: '1px solid #27272a', borderRadius: '8px', padding: '12px', fontSize: '0.82rem', color: '#a1a1aa', lineHeight: '1.4' }}>
+              <div style={{ marginTop: '6px', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '8px', padding: '12px', fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
                 {selectedNode.rollingSummary}
               </div>
             </div>
@@ -682,7 +682,7 @@ export default function InspectorDrawer() {
               <Clock size={14} />
               <span>5–10H FOLLOW-UP REMINDER ACTIVE</span>
             </div>
-            <p style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: '4px', margin: 0 }}>
+            <p style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '4px', margin: 0 }}>
               If a genuine conversation with {selectedNode.name} is paused for 5–10 hours, your AI will send a warm, contextual follow-up.
             </p>
           </div>
@@ -693,21 +693,21 @@ export default function InspectorDrawer() {
       {drawerTab === 'connections' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#71717a', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
               Interlinked Friends ({selectedNode.connections?.length || 0})
             </span>
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {(selectedNode.connections || []).length > 0 ? (
                 selectedNode.connections.map((c, i) => (
-                  <div key={i} style={{ background: '#121214', border: '1px solid #0284c7', borderRadius: '8px', padding: '10px 12px', fontSize: '0.82rem', color: '#38bdf8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={i} style={{ background: 'var(--color-text-primary)', border: '1px solid var(--ambient-dominant)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.82rem', color: 'var(--ambient-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <b>🔗 {c.targetName}</b>
-                      <div style={{ fontSize: '0.72rem', color: '#7dd3fc', marginTop: '2px' }}>{c.rel || c.relationship}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--ambient-secondary)', marginTop: '2px' }}>{c.rel || c.relationship}</div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '8px', padding: '16px', textAlign: 'center', color: '#71717a', fontSize: '0.8rem' }}>
+                <div style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}>
                   No connected friends linked yet.
                 </div>
               )}
@@ -715,8 +715,8 @@ export default function InspectorDrawer() {
           </div>
 
           {/* Add Connection Form */}
-          <form onSubmit={handleAddConnection} style={{ background: '#121214', border: '1px solid #27272a', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#a1a1aa', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+          <form onSubmit={handleAddConnection} style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
               + Link Another Friend to {selectedNode.name}
             </span>
             <input
@@ -724,21 +724,21 @@ export default function InspectorDrawer() {
               placeholder="Friend Name (e.g. Annie, Rajveer, Moksha)"
               value={newConnTarget}
               onChange={(e) => setNewConnTarget(e.target.value)}
-              style={{ background: '#000000', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.82rem', outline: 'none' }}
+              style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.82rem', outline: 'none' }}
             />
             <input
               type="text"
               placeholder="How do they know each other? (e.g. Talking with sister)"
               value={newConnRel}
               onChange={(e) => setNewConnRel(e.target.value)}
-              style={{ background: '#000000', border: '1px solid #27272a', padding: '9px 12px', borderRadius: '8px', color: '#ffffff', fontSize: '0.82rem', outline: 'none' }}
+              style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', padding: '9px 12px', borderRadius: '8px', color: 'var(--color-surface)', fontSize: '0.82rem', outline: 'none' }}
             />
             <button
               type="submit"
               disabled={!newConnTarget.trim()}
               style={{
-                background: !newConnTarget.trim() ? '#27272a' : '#ffffff',
-                color: !newConnTarget.trim() ? '#71717a' : '#000000',
+                background: !newConnTarget.trim() ? 'var(--color-text-secondary)' : 'var(--color-surface)',
+                color: !newConnTarget.trim() ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
                 border: 'none',
                 padding: '9px 14px',
                 borderRadius: '8px',

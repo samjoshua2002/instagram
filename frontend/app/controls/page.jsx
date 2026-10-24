@@ -322,9 +322,9 @@ export default function ControlsPage() {
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.18 }}
         style={{
-          background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
+          background: isChecked && !isEveryoneMode ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
           border: '1px solid',
-          borderColor: isChecked && !isEveryoneMode ? '#09090b' : '#e4e4e7',
+          borderColor: isChecked && !isEveryoneMode ? 'var(--color-text-primary)' : 'var(--color-border)',
           borderRadius: '8px',
           padding: controlsLayout === 'list' ? '10px 14px' : '6px 10px',
           display: 'flex',
@@ -353,13 +353,13 @@ export default function ControlsPage() {
               height: '16px',
               minWidth: '16px',
               borderRadius: '4px',
-              background: isChecked ? '#09090b' : '#ffffff',
+              background: isChecked ? 'var(--color-text-primary)' : 'var(--color-surface)',
               border: '1px solid',
-              borderColor: isChecked ? '#09090b' : '#d4d4d8',
+              borderColor: isChecked ? 'var(--color-text-primary)' : 'var(--color-border-strong)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
+              color: 'var(--color-surface)',
               flexShrink: 0
             }}
           >
@@ -367,10 +367,10 @@ export default function ControlsPage() {
           </div>
           <ContactAvatar contact={contact} size={28} showStatus={true} />
           <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: '700', fontSize: '0.8rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            <div style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
               {contact.name}
             </div>
-            <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
               {contact.handle || contact.relationship || 'Friend'}
             </div>
           </div>
@@ -388,10 +388,10 @@ export default function ControlsPage() {
               fontSize: '0.67rem',
               fontWeight: isFullAi ? '700' : '500',
               cursor: 'pointer',
-              background: isFullAi ? '#09090b' : '#f4f4f5',
-              color: isFullAi ? '#ffffff' : '#52525b',
+              background: isFullAi ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+              color: isFullAi ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               border: '1px solid',
-              borderColor: isFullAi ? '#09090b' : '#e4e4e7',
+              borderColor: isFullAi ? 'var(--color-text-primary)' : 'var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
@@ -412,10 +412,10 @@ export default function ControlsPage() {
               fontSize: '0.67rem',
               fontWeight: isReelsOnly ? '700' : '500',
               cursor: 'pointer',
-              background: isReelsOnly ? '#09090b' : '#f4f4f5',
-              color: isReelsOnly ? '#ffffff' : '#52525b',
+              background: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+              color: isReelsOnly ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               border: '1px solid',
-              borderColor: isReelsOnly ? '#09090b' : '#e4e4e7',
+              borderColor: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
@@ -436,10 +436,10 @@ export default function ControlsPage() {
               fontSize: '0.67rem',
               fontWeight: isPaused ? '700' : '500',
               cursor: 'pointer',
-              background: isPaused ? '#09090b' : '#f4f4f5',
-              color: isPaused ? '#ffffff' : '#52525b',
+              background: isPaused ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+              color: isPaused ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               border: '1px solid',
-              borderColor: isPaused ? '#09090b' : '#e4e4e7',
+              borderColor: isPaused ? 'var(--color-text-primary)' : 'var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
@@ -476,9 +476,9 @@ export default function ControlsPage() {
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.18 }}
         style={{
-          background: isChecked && !isEveryoneMode ? '#fafafa' : '#ffffff',
+          background: isChecked && !isEveryoneMode ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
           border: '1px solid',
-          borderColor: isChecked && !isEveryoneMode ? '#09090b' : '#e4e4e7',
+          borderColor: isChecked && !isEveryoneMode ? 'var(--color-text-primary)' : 'var(--color-border)',
           borderRadius: '10px',
           padding: '14px',
           display: 'flex',
@@ -510,13 +510,13 @@ export default function ControlsPage() {
                 height: '18px',
                 minWidth: '18px',
                 borderRadius: '4px',
-                background: isChecked ? '#09090b' : '#ffffff',
+                background: isChecked ? 'var(--color-text-primary)' : 'var(--color-surface)',
                 border: '1px solid',
-                borderColor: isChecked ? '#09090b' : '#d4d4d8',
+                borderColor: isChecked ? 'var(--color-text-primary)' : 'var(--color-border-strong)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#ffffff',
+                color: 'var(--color-surface)',
                 flexShrink: 0
               }}
             >
@@ -526,10 +526,10 @@ export default function ControlsPage() {
             <ContactAvatar contact={contact} size={36} showStatus={true} />
 
             <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-              <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 {contact.name}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 {contact.handle || contact.relationship || 'Friend'}
               </div>
             </div>
@@ -543,9 +543,9 @@ export default function ControlsPage() {
               borderRadius: '4px',
               fontFamily: "'JetBrains Mono', monospace",
               fontWeight: '700',
-              background: isFullAi ? '#09090b' : (isReelsOnly ? '#27272a' : '#f4f4f5'),
-              color: (isFullAi || isReelsOnly) ? '#ffffff' : '#71717a',
-              border: '1px solid #e4e4e7',
+              background: isFullAi ? 'var(--color-text-primary)' : (isReelsOnly ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)'),
+              color: (isFullAi || isReelsOnly) ? 'var(--color-surface)' : 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border)',
               whiteSpace: 'nowrap',
               flexShrink: 0
             }}
@@ -555,7 +555,7 @@ export default function ControlsPage() {
         </div>
 
         {/* Bottom Row: AI Mode Selector Buttons (Touch-optimized) */}
-        <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid #f4f4f5', width: '100%' }}>
+        <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--color-surface-hover)', width: '100%' }}>
           <button
             type="button"
             onClick={() => handleSetMode(contact, 'full_ai')}
@@ -567,10 +567,10 @@ export default function ControlsPage() {
               fontSize: '0.7rem',
               fontWeight: isFullAi ? '700' : '500',
               cursor: 'pointer',
-              background: isFullAi ? '#09090b' : '#ffffff',
-              color: isFullAi ? '#ffffff' : '#71717a',
+              background: isFullAi ? 'var(--color-text-primary)' : 'var(--color-surface)',
+              color: isFullAi ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               border: '1px solid',
-              borderColor: isFullAi ? '#09090b' : '#e4e4e7',
+              borderColor: isFullAi ? 'var(--color-text-primary)' : 'var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -594,10 +594,10 @@ export default function ControlsPage() {
               fontSize: '0.7rem',
               fontWeight: isReelsOnly ? '700' : '500',
               cursor: 'pointer',
-              background: isReelsOnly ? '#09090b' : '#ffffff',
-              color: isReelsOnly ? '#ffffff' : '#71717a',
+              background: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-surface)',
+              color: isReelsOnly ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               border: '1px solid',
-              borderColor: isReelsOnly ? '#09090b' : '#e4e4e7',
+              borderColor: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -621,10 +621,10 @@ export default function ControlsPage() {
               fontSize: '0.7rem',
               fontWeight: isPaused ? '700' : '500',
               cursor: 'pointer',
-              background: isPaused ? '#09090b' : '#ffffff',
-              color: isPaused ? '#ffffff' : '#71717a',
+              background: isPaused ? 'var(--color-text-primary)' : 'var(--color-surface)',
+              color: isPaused ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               border: '1px solid',
-              borderColor: isPaused ? '#09090b' : '#e4e4e7',
+              borderColor: isPaused ? 'var(--color-text-primary)' : 'var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -659,13 +659,13 @@ export default function ControlsPage() {
     >
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
           AUTOMATION POLICY
         </div>
-        <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: '#09090b' }}>
+        <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: 'var(--color-text-primary)' }}>
           Chat Control Rules
         </h1>
-        <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '4px' }}>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
           Configure automated Instagram AI routing: handle everyone, exclude selected contacts for manual chatting, or whitelist specific friends.
         </p>
       </div>
@@ -703,10 +703,10 @@ export default function ControlsPage() {
                 queueSave(updated);
               }}
               style={{
-                background: isSelected ? '#09090b' : '#ffffff',
-                color: isSelected ? '#ffffff' : '#09090b',
+                background: isSelected ? 'var(--color-text-primary)' : 'var(--color-surface)',
+                color: isSelected ? 'var(--color-surface)' : 'var(--color-text-primary)',
                 border: '1px solid',
-                borderColor: isSelected ? '#09090b' : '#e4e4e7',
+                borderColor: isSelected ? 'var(--color-text-primary)' : 'var(--color-border)',
                 borderRadius: '12px',
                 padding: '20px',
                 cursor: 'pointer',
@@ -723,8 +723,8 @@ export default function ControlsPage() {
                   <span
                     style={{
                       fontSize: '0.66rem',
-                      background: isSelected ? '#27272a' : '#f4f4f5',
-                      color: isSelected ? '#ffffff' : '#71717a',
+                      background: isSelected ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)',
+                      color: isSelected ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                       padding: '2px 7px',
                       borderRadius: '4px',
                       fontFamily: "'JetBrains Mono', monospace",
@@ -738,7 +738,7 @@ export default function ControlsPage() {
                       width: '16px',
                       height: '16px',
                       borderRadius: '50%',
-                      border: isSelected ? '5px solid #ffffff' : '1.5px solid #a1a1aa'
+                      border: isSelected ? '5px solid var(--color-surface)' : '1.5px solid var(--color-text-muted)'
                     }}
                   />
                 </div>
@@ -757,8 +757,8 @@ export default function ControlsPage() {
       {/* Active System Policy Bar */}
       <div
         style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '10px',
           padding: '16px 20px',
           marginBottom: '24px',
@@ -770,10 +770,10 @@ export default function ControlsPage() {
         }}
       >
         <div>
-          <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
             ACTIVE SYSTEM POLICY
           </span>
-          <div style={{ fontSize: '0.92rem', fontWeight: '700', color: '#09090b', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--color-text-primary)', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
             {routingConfig.chatMode === 'everyone' && 'AI RESPONDS TO EVERYONE AUTOMATICALLY'}
             {routingConfig.chatMode === 'everyone_except' && `AI RESPONDS TO EVERYONE EXCEPT ${activeCount} CHECKED FRIENDS`}
             {routingConfig.chatMode === 'only_selected' && `AI ONLY RESPONDS TO ${activeCount} CHECKED CONTACTS`}
@@ -784,8 +784,8 @@ export default function ControlsPage() {
           onClick={onSave}
           disabled={isSaving}
           style={{
-            background: '#09090b',
-            color: '#ffffff',
+            background: 'var(--color-text-primary)',
+            color: 'var(--color-surface)',
             border: 'none',
             padding: '9px 20px',
             borderRadius: '6px',
@@ -807,10 +807,10 @@ export default function ControlsPage() {
       <div className="controls-card-container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
               {routingConfig.chatMode === 'everyone_except' ? 'Checkbox Contacts to Exclude' : (routingConfig.chatMode === 'only_selected' ? 'Checkbox Contacts to Include' : 'All Contacts (Active)')}
             </h3>
-            <p style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '2px' }}>
+            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
               {routingConfig.chatMode === 'only_selected'
                 ? 'Only checked contacts will receive AI replies. Contacts in the Manual Chat section are silenced.'
                 : (routingConfig.chatMode === 'everyone_except'
@@ -823,13 +823,13 @@ export default function ControlsPage() {
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 onClick={handleSelectAll}
-                style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#09090b', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
+                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
               >
                 Select All
               </button>
               <button
                 onClick={handleClearAll}
-                style={{ background: '#ffffff', border: '1px solid #e4e4e7', color: '#71717a', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
+                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
               >
                 Clear
               </button>
@@ -841,7 +841,7 @@ export default function ControlsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1 }}>
-              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
               <input
                 type="text"
                 placeholder="Search contacts by name or handle..."
@@ -859,8 +859,8 @@ export default function ControlsPage() {
             {/* Layout View Switcher */}
             <div style={{
               display: 'flex',
-              background: '#ffffff',
-              border: '1px solid #e4e4e7',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
               padding: '3px',
               borderRadius: '8px',
               flexShrink: 0
@@ -878,8 +878,8 @@ export default function ControlsPage() {
                     onClick={() => handleSetControlsLayout(id)}
                     title={`${label} View`}
                     style={{
-                      background: isActive ? '#09090b' : 'transparent',
-                      color: isActive ? '#ffffff' : '#71717a',
+                      background: isActive ? 'var(--color-text-primary)' : 'transparent',
+                      color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                       border: 'none',
                       padding: '6px 10px',
                       borderRadius: '6px',
@@ -915,10 +915,10 @@ export default function ControlsPage() {
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   style={{
-                    background: isTabActive ? '#09090b' : '#ffffff',
-                    color: isTabActive ? '#ffffff' : '#52525b',
+                    background: isTabActive ? 'var(--color-text-primary)' : 'var(--color-surface)',
+                    color: isTabActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                     border: '1px solid',
-                    borderColor: isTabActive ? '#09090b' : '#e4e4e7',
+                    borderColor: isTabActive ? 'var(--color-text-primary)' : 'var(--color-border)',
                     borderRadius: '7px',
                     padding: '6px 12px',
                     fontSize: '0.75rem',
@@ -936,8 +936,8 @@ export default function ControlsPage() {
                     fontSize: '0.65rem',
                     padding: '1px 5px',
                     borderRadius: '4px',
-                    background: isTabActive ? '#27272a' : '#f4f4f5',
-                    color: isTabActive ? '#ffffff' : '#71717a',
+                    background: isTabActive ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)',
+                    color: isTabActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                     fontFamily: "'JetBrains Mono', monospace",
                     fontWeight: '700'
                   }}>
@@ -957,15 +957,15 @@ export default function ControlsPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} />
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                     1. Full AI Active (Auto-Replies to Messages & Reels)
                   </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: '#f4f4f5', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
                     {fullAiContacts.length}
                   </span>
                 </div>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#71717a', margin: '0 0 12px 16px' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', margin: '0 0 12px 16px' }}>
                 AI responds automatically to all text messages and shared reels from these selected contacts.
               </p>
               {fullAiContacts.length > 0 ? (
@@ -979,7 +979,7 @@ export default function ControlsPage() {
                   </AnimatePresence>
                 </motion.div>
               ) : (
-                <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
+                <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                   No contacts currently selected for Full AI. Check a contact below to activate Full AI.
                 </div>
               )}
@@ -989,16 +989,16 @@ export default function ControlsPage() {
             <motion.div layout>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0284c7' }} />
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--ambient-dominant)' }} />
+                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                     2. Reels Only (Reacts Exclusively to Shared Reels)
                   </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: '#f4f4f5', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
                     {reelsOnlyContacts.length}
                   </span>
                 </div>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#71717a', margin: '0 0 12px 16px' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', margin: '0 0 12px 16px' }}>
                 AI only reacts with witty quips or reactions when these contacts share an Instagram Reel or Meme. Direct text chats stay manual.
               </p>
               {reelsOnlyContacts.length > 0 ? (
@@ -1012,7 +1012,7 @@ export default function ControlsPage() {
                   </AnimatePresence>
                 </motion.div>
               ) : (
-                <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
+                <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                   No contacts in Reels Only mode.
                 </div>
               )}
@@ -1022,16 +1022,16 @@ export default function ControlsPage() {
             <motion.div layout>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#d4d4d8' }} />
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-border-strong)' }} />
+                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                     3. Manual Chat / Paused (Not Selected)
                   </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: '#f4f4f5', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
                     {manualContacts.length}
                   </span>
                 </div>
               </div>
-              <p style={{ fontSize: '0.75rem', color: '#71717a', margin: '0 0 12px 16px' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', margin: '0 0 12px 16px' }}>
                 AI is completely silenced for these unselected contacts. You chat with them manually on Instagram.
               </p>
               {manualContacts.length > 0 ? (
@@ -1045,7 +1045,7 @@ export default function ControlsPage() {
                   </AnimatePresence>
                 </motion.div>
               ) : (
-                <div style={{ padding: '20px', border: '1px dashed #e4e4e7', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: '#a1a1aa' }}>
+                <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                   All contacts are currently selected for AI.
                 </div>
               )}
@@ -1068,7 +1068,7 @@ export default function ControlsPage() {
               (activeTab === 'reels_only' && reelsOnlyContacts.length === 0) ||
               (activeTab === 'manual' && manualContacts.length === 0) ||
               (activeTab === 'all' && filteredFriends.length === 0)) && (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: '#a1a1aa', fontSize: '0.85rem' }}>
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                   No contacts found matching this view.
                 </div>
               )}

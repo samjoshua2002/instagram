@@ -1022,8 +1022,8 @@ export default function LoginPage({ onLoginSuccess }) {
               width: '42px',
               height: '42px',
               borderRadius: '11px',
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--color-text-primary)',
+              color: 'var(--color-surface)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1034,10 +1034,10 @@ export default function LoginPage({ onLoginSuccess }) {
             }}>
               C
             </div>
-            <h1 style={{ fontSize: '1.55rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '0 0 6px 0', color: '#09090b' }}>
+            <h1 style={{ fontSize: '1.55rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '0 0 6px 0', color: 'var(--color-text-primary)' }}>
               {authMode === 'signin' ? 'Welcome back to Chatter' : 'Create your Chatter Account'}
             </h1>
-            <p style={{ fontSize: '0.85rem', color: '#71717a', margin: 0 }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
               {authMode === 'signin'
                 ? 'Sign in to access your automated Instagram creator suite.'
                 : 'Enter your credentials to configure your personalized creator workspace.'}
@@ -1049,11 +1049,11 @@ export default function LoginPage({ onLoginSuccess }) {
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: '4px',
-            background: '#f4f4f5',
+            background: 'var(--color-surface-hover)',
             padding: '4px',
             borderRadius: '12px',
             marginBottom: '24px',
-            border: '1px solid #e4e4e7'
+            border: '1px solid var(--color-border)'
           }}>
             <button
               type="button"
@@ -1063,8 +1063,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 setInfoMessage('');
               }}
               style={{
-                background: authMode === 'signin' ? '#ffffff' : 'transparent',
-                color: authMode === 'signin' ? '#09090b' : '#71717a',
+                background: authMode === 'signin' ? 'var(--color-surface)' : 'transparent',
+                color: authMode === 'signin' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 border: authMode === 'signin' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
                 borderRadius: '8px',
                 padding: '9px 12px',
@@ -1091,8 +1091,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 setRegSuccess('');
               }}
               style={{
-                background: authMode === 'register' ? '#ffffff' : 'transparent',
-                color: authMode === 'register' ? '#09090b' : '#71717a',
+                background: authMode === 'register' ? 'var(--color-surface)' : 'transparent',
+                color: authMode === 'register' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 border: authMode === 'register' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
                 borderRadius: '8px',
                 padding: '9px 12px',
@@ -1120,9 +1120,9 @@ export default function LoginPage({ onLoginSuccess }) {
               {/* Feedback messages */}
               {error && (
                 <div style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  color: '#b91c1c',
+                  background: 'color-mix(in srgb, #ef4444 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
+                  color: '#f87171',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -1139,9 +1139,9 @@ export default function LoginPage({ onLoginSuccess }) {
 
               {infoMessage && (
                 <div style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  color: '#15803d',
+                  background: 'color-mix(in srgb, #22c55e 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
+                  color: '#4ade80',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -1159,10 +1159,10 @@ export default function LoginPage({ onLoginSuccess }) {
               {showAccountChooser ? (
                 <div style={{ marginBottom: '24px' }}>
                   <div style={{ marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#09090b', margin: 0 }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                       Choose an account
                     </h3>
-                    <p style={{ fontSize: '0.78rem', color: '#71717a', margin: '4px 0 0 0' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
                       Select a saved account to continue to Chatter OS:
                     </p>
                   </div>
@@ -1177,8 +1177,8 @@ export default function LoginPage({ onLoginSuccess }) {
                           onClick={() => handleSelectAccount(acc)}
                           style={{
                             border: '1.5px solid',
-                            borderColor: isCurrent ? '#09090b' : '#e4e4e7',
-                            background: isCurrent ? '#fafafa' : '#ffffff',
+                            borderColor: isCurrent ? 'var(--color-text-primary)' : 'var(--color-border)',
+                            background: isCurrent ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
                             borderRadius: '11px',
                             padding: '12px 14px',
                             cursor: 'pointer',
@@ -1194,8 +1194,8 @@ export default function LoginPage({ onLoginSuccess }) {
                               width: '40px',
                               height: '40px',
                               borderRadius: '10px',
-                              background: '#09090b',
-                              color: '#ffffff',
+                              background: 'var(--color-text-primary)',
+                              color: 'var(--color-surface)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1212,7 +1212,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             </div>
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {acc.firstName ? `${acc.firstName} ${acc.lastName || ''}`.trim() : acc.username}
                                 </span>
                                 {isSuper && (
@@ -1220,8 +1220,8 @@ export default function LoginPage({ onLoginSuccess }) {
                                     fontSize: '0.62rem',
                                     fontFamily: "'JetBrains Mono', monospace",
                                     fontWeight: '800',
-                                    background: '#09090b',
-                                    color: '#ffffff',
+                                    background: 'var(--color-text-primary)',
+                                    color: 'var(--color-surface)',
                                     padding: '2px 6px',
                                     borderRadius: '4px',
                                     flexShrink: 0
@@ -1230,7 +1230,7 @@ export default function LoginPage({ onLoginSuccess }) {
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {acc.email} • @{acc.username}
                               </div>
                             </div>
@@ -1243,7 +1243,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: '#a1a1aa',
+                              color: 'var(--color-text-muted)',
                               cursor: 'pointer',
                               padding: '6px',
                               borderRadius: '4px'
@@ -1272,9 +1272,9 @@ export default function LoginPage({ onLoginSuccess }) {
                       width: '100%',
                       padding: '11px',
                       borderRadius: '10px',
-                      border: '1.5px dashed #d4d4d8',
-                      background: '#ffffff',
-                      color: '#09090b',
+                      border: '1.5px dashed var(--color-border-strong)',
+                      background: 'var(--color-surface)',
+                      color: 'var(--color-text-primary)',
                       fontSize: '0.84rem',
                       fontWeight: '700',
                       cursor: 'pointer',
@@ -1292,8 +1292,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 /* SCENARIO 1: REMEMBERED ACCOUNT CARD */
                 <div>
                   <div style={{
-                    background: '#fafafa',
-                    border: '1px solid #e4e4e7',
+                    background: 'var(--color-surface-elevated)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: '12px',
                     padding: '14px 16px',
                     display: 'flex',
@@ -1306,8 +1306,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         width: '40px',
                         height: '40px',
                         borderRadius: '10px',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1324,7 +1324,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {rememberedAccount.firstName ? `${rememberedAccount.firstName} ${rememberedAccount.lastName || ''}`.trim() : rememberedAccount.username}
                           </span>
                           {rememberedAccount.role === 'superadmin' && (
@@ -1332,8 +1332,8 @@ export default function LoginPage({ onLoginSuccess }) {
                               fontSize: '0.6rem',
                               fontFamily: "'JetBrains Mono', monospace",
                               fontWeight: '800',
-                              background: '#09090b',
-                              color: '#ffffff',
+                              background: 'var(--color-text-primary)',
+                              color: 'var(--color-surface)',
                               padding: '1px 5px',
                               borderRadius: '3px'
                             }}>
@@ -1341,7 +1341,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: '#71717a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {rememberedAccount.email}
                         </div>
                       </div>
@@ -1351,9 +1351,9 @@ export default function LoginPage({ onLoginSuccess }) {
                       type="button"
                       onClick={handleSwitchAccount}
                       style={{
-                        background: '#ffffff',
-                        border: '1px solid #e4e4e7',
-                        color: '#09090b',
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)',
                         fontSize: '0.76rem',
                         fontWeight: '700',
                         borderRadius: '6px',
@@ -1374,8 +1374,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       disabled={passkeyLoading}
                       style={{
                         width: '100%',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         border: 'none',
                         borderRadius: '10px',
                         padding: '14px',
@@ -1393,11 +1393,11 @@ export default function LoginPage({ onLoginSuccess }) {
                       {passkeyLoading ? (
                         <RefreshCw size={18} className="animate-spin" />
                       ) : (
-                        <Fingerprint size={18} color="#ffffff" />
+                        <Fingerprint size={18} color="var(--color-surface)" />
                       )}
                       <span>{passkeyLoading ? 'Verifying Touch ID / Biometrics...' : 'Continue with Touch ID / Passkey'}</span>
                     </button>
-                    <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '7px 0 0', textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '7px 0 0', textAlign: 'center' }}>
                       Fast biometric authentication • No password required
                     </p>
                   </div>
@@ -1408,12 +1408,12 @@ export default function LoginPage({ onLoginSuccess }) {
                     alignItems: 'center',
                     gap: '12px',
                     margin: '22px 0 16px',
-                    color: '#a1a1aa',
+                    color: 'var(--color-text-muted)',
                     fontSize: '0.74rem'
                   }}>
-                    <div style={{ flex: 1, height: '1px', background: '#e4e4e7' }} />
+                    <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
                     <span>or sign in using</span>
-                    <div style={{ flex: 1, height: '1px', background: '#e4e4e7' }} />
+                    <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
                   </div>
 
                   {/* Method Toggles */}
@@ -1425,9 +1425,9 @@ export default function LoginPage({ onLoginSuccess }) {
                         setError('');
                       }}
                       style={{
-                        background: activeSignInMethod === 'password' ? '#ffffff' : '#fafafa',
-                        color: activeSignInMethod === 'password' ? '#09090b' : '#71717a',
-                        border: activeSignInMethod === 'password' ? '1px solid #09090b' : '1px solid #e4e4e7',
+                        background: activeSignInMethod === 'password' ? 'var(--color-surface)' : 'var(--color-surface-elevated)',
+                        color: activeSignInMethod === 'password' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                        border: activeSignInMethod === 'password' ? '1px solid var(--color-text-primary)' : '1px solid var(--color-border)',
                         borderRadius: '8px',
                         padding: '9px',
                         fontSize: '0.78rem',
@@ -1450,9 +1450,9 @@ export default function LoginPage({ onLoginSuccess }) {
                         setError('');
                       }}
                       style={{
-                        background: activeSignInMethod === 'oneauth' ? '#ffffff' : '#fafafa',
-                        color: activeSignInMethod === 'oneauth' ? '#09090b' : '#71717a',
-                        border: activeSignInMethod === 'oneauth' ? '1px solid #09090b' : '1px solid #e4e4e7',
+                        background: activeSignInMethod === 'oneauth' ? 'var(--color-surface)' : 'var(--color-surface-elevated)',
+                        color: activeSignInMethod === 'oneauth' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                        border: activeSignInMethod === 'oneauth' ? '1px solid var(--color-text-primary)' : '1px solid var(--color-border)',
                         borderRadius: '8px',
                         padding: '9px',
                         fontSize: '0.78rem',
@@ -1474,13 +1474,13 @@ export default function LoginPage({ onLoginSuccess }) {
                     <form onSubmit={handlePasswordLogin}>
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#3f3f46' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
                             Password
                           </label>
                           <button
                             type="button"
                             onClick={openForgotModal}
-                            style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '600' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '600' }}
                           >
                             Forgot password?
                           </button>
@@ -1494,11 +1494,11 @@ export default function LoginPage({ onLoginSuccess }) {
                             required
                             style={{
                               width: '100%',
-                              background: '#ffffff',
-                              border: '1px solid #e4e4e7',
+                              background: 'var(--color-surface)',
+                              border: '1px solid var(--color-border)',
                               borderRadius: '9px',
                               padding: '11px 40px 11px 12px',
-                              color: '#09090b',
+                              color: 'var(--color-text-primary)',
                               fontSize: '0.9rem',
                               boxSizing: 'border-box',
                               outline: 'none'
@@ -1514,7 +1514,7 @@ export default function LoginPage({ onLoginSuccess }) {
                               transform: 'translateY(-50%)',
                               background: 'none',
                               border: 'none',
-                              color: '#71717a',
+                              color: 'var(--color-text-secondary)',
                               cursor: 'pointer',
                               padding: 0
                             }}
@@ -1525,8 +1525,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       </div>
 
                       {showSecondaryTotp && (
-                        <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
-                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#09090b', marginBottom: '6px' }}>
+                        <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                             OneAuth 6-Digit Code
                           </label>
                           <input
@@ -1538,11 +1538,11 @@ export default function LoginPage({ onLoginSuccess }) {
                             autoFocus
                             style={{
                               width: '100%',
-                              background: '#ffffff',
-                              border: '1px solid #09090b',
+                              background: 'var(--color-surface)',
+                              border: '1px solid var(--color-text-primary)',
                               borderRadius: '8px',
                               padding: '10px',
-                              color: '#09090b',
+                              color: 'var(--color-text-primary)',
                               fontSize: '1.25rem',
                               fontFamily: "'JetBrains Mono', monospace",
                               letterSpacing: '5px',
@@ -1559,8 +1559,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         disabled={loading || !password}
                         style={{
                           width: '100%',
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--color-text-primary)',
+                          color: 'var(--color-surface)',
                           border: 'none',
                           borderRadius: '9px',
                           padding: '12px',
@@ -1586,7 +1586,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     <form onSubmit={handleOneAuthLogin}>
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#3f3f46' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
                             6-Digit Zoho OneAuth Code
                           </label>
                           <button
@@ -1595,7 +1595,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: '#09090b',
+                              color: 'var(--color-text-primary)',
                               fontSize: '0.74rem',
                               cursor: 'pointer',
                               padding: 0,
@@ -1611,16 +1611,16 @@ export default function LoginPage({ onLoginSuccess }) {
                         </div>
 
                         {showQrCode && (
-                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
+                          <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
                             {qrLoading ? (
-                              <RefreshCw size={18} className="animate-spin" color="#09090b" style={{ margin: '12px auto' }} />
+                              <RefreshCw size={18} className="animate-spin" color="var(--color-text-primary)" style={{ margin: '12px auto' }} />
                             ) : qrData ? (
                               <div>
                                 <img src={qrData.qrDataUrl} alt="OneAuth QR" style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto 8px', borderRadius: '6px' }} />
-                                <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '0 0 6px' }}>Scan with Zoho OneAuth on your phone</p>
+                                <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>Scan with Zoho OneAuth on your phone</p>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
-                                  <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
+                                  <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
                                     {copiedSecret ? 'Copied' : 'Copy'}
                                   </button>
                                 </div>
@@ -1639,11 +1639,11 @@ export default function LoginPage({ onLoginSuccess }) {
                           required
                           style={{
                             width: '100%',
-                            background: '#ffffff',
-                            border: '1px solid #09090b',
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-text-primary)',
                             borderRadius: '9px',
                             padding: '11px',
-                            color: '#09090b',
+                            color: 'var(--color-text-primary)',
                             fontSize: '1.25rem',
                             fontFamily: "'JetBrains Mono', monospace",
                             letterSpacing: '6px',
@@ -1659,8 +1659,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         disabled={loading || totpCode.trim().length !== 6}
                         style={{
                           width: '100%',
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--color-text-primary)',
+                          color: 'var(--color-surface)',
                           border: 'none',
                           borderRadius: '9px',
                           padding: '12px',
@@ -1691,7 +1691,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#71717a',
+                        color: 'var(--color-text-secondary)',
                         fontSize: '0.78rem',
                         cursor: 'pointer',
                         padding: 0,
@@ -1712,7 +1712,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr 1fr',
                     gap: '4px',
-                    background: '#f4f4f5',
+                    background: 'var(--color-surface-hover)',
                     padding: '3px',
                     borderRadius: '9px',
                     marginBottom: '18px'
@@ -1721,8 +1721,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       type="button"
                       onClick={() => { setActiveSignInMethod('password'); setError(''); }}
                       style={{
-                        background: activeSignInMethod === 'password' ? '#ffffff' : 'transparent',
-                        color: activeSignInMethod === 'password' ? '#09090b' : '#71717a',
+                        background: activeSignInMethod === 'password' ? 'var(--color-surface)' : 'transparent',
+                        color: activeSignInMethod === 'password' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                         border: 'none',
                         borderRadius: '6px',
                         padding: '7px 4px',
@@ -1737,8 +1737,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       type="button"
                       onClick={() => { setActiveSignInMethod('passkey'); setError(''); }}
                       style={{
-                        background: activeSignInMethod === 'passkey' ? '#ffffff' : 'transparent',
-                        color: activeSignInMethod === 'passkey' ? '#09090b' : '#71717a',
+                        background: activeSignInMethod === 'passkey' ? 'var(--color-surface)' : 'transparent',
+                        color: activeSignInMethod === 'passkey' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                         border: 'none',
                         borderRadius: '6px',
                         padding: '7px 4px',
@@ -1753,8 +1753,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       type="button"
                       onClick={() => { setActiveSignInMethod('oneauth'); setError(''); }}
                       style={{
-                        background: activeSignInMethod === 'oneauth' ? '#ffffff' : 'transparent',
-                        color: activeSignInMethod === 'oneauth' ? '#09090b' : '#71717a',
+                        background: activeSignInMethod === 'oneauth' ? 'var(--color-surface)' : 'transparent',
+                        color: activeSignInMethod === 'oneauth' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                         border: 'none',
                         borderRadius: '6px',
                         padding: '7px 4px',
@@ -1769,7 +1769,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                   {/* Identifier Input */}
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#3f3f46', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                       Email or Username
                     </label>
                     <input
@@ -1780,11 +1780,11 @@ export default function LoginPage({ onLoginSuccess }) {
                       required
                       style={{
                         width: '100%',
-                        background: '#ffffff',
-                        border: '1px solid #e4e4e7',
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '8px',
                         padding: '10px 12px',
-                        color: '#09090b',
+                        color: 'var(--color-text-primary)',
                         fontSize: '0.88rem',
                         boxSizing: 'border-box',
                         outline: 'none'
@@ -1797,13 +1797,13 @@ export default function LoginPage({ onLoginSuccess }) {
                     <form onSubmit={handlePasswordLogin}>
                       <div style={{ marginBottom: '18px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#3f3f46' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
                             Password
                           </label>
                           <button
                             type="button"
                             onClick={openForgotModal}
-                            style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '600' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '600' }}
                           >
                             Forgot password?
                           </button>
@@ -1817,11 +1817,11 @@ export default function LoginPage({ onLoginSuccess }) {
                             required
                             style={{
                               width: '100%',
-                              background: '#ffffff',
-                              border: '1px solid #e4e4e7',
+                              background: 'var(--color-surface)',
+                              border: '1px solid var(--color-border)',
                               borderRadius: '8px',
                               padding: '10px 38px 10px 12px',
-                              color: '#09090b',
+                              color: 'var(--color-text-primary)',
                               fontSize: '0.88rem',
                               boxSizing: 'border-box',
                               outline: 'none'
@@ -1830,7 +1830,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}
+                            style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
                           >
                             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                           </button>
@@ -1838,8 +1838,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       </div>
 
                       {showSecondaryTotp && (
-                        <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
-                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#09090b', marginBottom: '5px' }}>
+                        <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '5px' }}>
                             OneAuth 6-Digit Code
                           </label>
                           <input
@@ -1851,11 +1851,11 @@ export default function LoginPage({ onLoginSuccess }) {
                             autoFocus
                             style={{
                               width: '100%',
-                              background: '#ffffff',
-                              border: '1px solid #09090b',
+                              background: 'var(--color-surface)',
+                              border: '1px solid var(--color-text-primary)',
                               borderRadius: '6px',
                               padding: '8px',
-                              color: '#09090b',
+                              color: 'var(--color-text-primary)',
                               fontSize: '1.1rem',
                               fontFamily: "'JetBrains Mono', monospace",
                               letterSpacing: '4px',
@@ -1872,8 +1872,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         disabled={loading || !identifier.trim() || !password}
                         style={{
                           width: '100%',
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--color-text-primary)',
+                          color: 'var(--color-surface)',
                           border: 'none',
                           borderRadius: '8px',
                           padding: '11px',
@@ -1903,8 +1903,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         disabled={passkeyLoading || !identifier.trim()}
                         style={{
                           width: '100%',
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--color-text-primary)',
+                          color: 'var(--color-surface)',
                           border: 'none',
                           borderRadius: '8px',
                           padding: '12px',
@@ -1922,7 +1922,7 @@ export default function LoginPage({ onLoginSuccess }) {
                         {passkeyLoading ? <RefreshCw size={16} className="animate-spin" /> : <Fingerprint size={16} />}
                         <span>{passkeyLoading ? 'Authenticating...' : 'Sign In with Passkey'}</span>
                       </button>
-                      <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '8px 0 0', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '8px 0 0', textAlign: 'center' }}>
                         Uses your device Touch ID, Face ID, or Windows Hello
                       </p>
                     </div>
@@ -1933,13 +1933,13 @@ export default function LoginPage({ onLoginSuccess }) {
                     <form onSubmit={handleOneAuthLogin}>
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#3f3f46' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
                             6-Digit Verification Code
                           </label>
                           <button
                             type="button"
                             onClick={toggleQrCode}
-                            style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                           >
                             <QrCode size={13} />
                             <span>{showQrCode ? 'Hide QR' : 'Show QR'}</span>
@@ -1947,16 +1947,16 @@ export default function LoginPage({ onLoginSuccess }) {
                         </div>
 
                         {showQrCode && (
-                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
+                          <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
                             {qrLoading ? (
-                              <RefreshCw size={18} className="animate-spin" color="#09090b" style={{ margin: '12px auto' }} />
+                              <RefreshCw size={18} className="animate-spin" color="var(--color-text-primary)" style={{ margin: '12px auto' }} />
                             ) : qrData ? (
                               <div>
                                 <img src={qrData.qrDataUrl} alt="OneAuth QR" style={{ width: '130px', height: '130px', display: 'block', margin: '0 auto 8px' }} />
-                                <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '0 0 6px' }}>Scan with Zoho OneAuth</p>
+                                <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>Scan with Zoho OneAuth</p>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
-                                  <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
+                                  <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
                                     {copiedSecret ? 'Copied' : 'Copy'}
                                   </button>
                                 </div>
@@ -1975,11 +1975,11 @@ export default function LoginPage({ onLoginSuccess }) {
                           required
                           style={{
                             width: '100%',
-                            background: '#ffffff',
-                            border: '1px solid #09090b',
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-text-primary)',
                             borderRadius: '8px',
                             padding: '10px',
-                            color: '#09090b',
+                            color: 'var(--color-text-primary)',
                             fontSize: '1.25rem',
                             fontFamily: "'JetBrains Mono', monospace",
                             letterSpacing: '5px',
@@ -1995,8 +1995,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         disabled={loading || !identifier.trim() || totpCode.trim().length !== 6}
                         style={{
                           width: '100%',
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--color-text-primary)',
+                          color: 'var(--color-surface)',
                           border: 'none',
                           borderRadius: '8px',
                           padding: '11px',
@@ -2020,7 +2020,7 @@ export default function LoginPage({ onLoginSuccess }) {
               )}
 
               {/* Bottom Footer Details */}
-              <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.74rem', color: '#a1a1aa' }}>
+              <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
                 Chatter OS • End-to-End Encrypted Session
               </div>
             </div>
@@ -2034,9 +2034,9 @@ export default function LoginPage({ onLoginSuccess }) {
               {/* Feedback messages */}
               {regError && (
                 <div style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  color: '#b91c1c',
+                  background: 'color-mix(in srgb, #ef4444 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
+                  color: '#f87171',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -2061,7 +2061,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           marginTop: '6px',
                           background: 'none',
                           border: 'none',
-                          color: '#b91c1c',
+                          color: '#f87171',
                           textDecoration: 'underline',
                           fontWeight: '700',
                           fontSize: '0.78rem',
@@ -2078,9 +2078,9 @@ export default function LoginPage({ onLoginSuccess }) {
 
               {regSuccess && (
                 <div style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  color: '#15803d',
+                  background: 'color-mix(in srgb, #22c55e 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
+                  color: '#4ade80',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -2100,7 +2100,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   {/* Name fields in 2 columns */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         First Name
                       </label>
                       <input
@@ -2110,11 +2110,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         placeholder="First name"
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '8px',
                           padding: '9px 11px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box',
                           outline: 'none'
@@ -2122,7 +2122,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         Last Name
                       </label>
                       <input
@@ -2132,11 +2132,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         placeholder="Last name"
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '8px',
                           padding: '9px 11px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box',
                           outline: 'none'
@@ -2147,7 +2147,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                   {/* Username */}
                   <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                       Username *
                     </label>
                     <input
@@ -2158,11 +2158,11 @@ export default function LoginPage({ onLoginSuccess }) {
                       required
                       style={{
                         width: '100%',
-                        background: '#ffffff',
-                        border: '1px solid #e4e4e7',
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '8px',
                         padding: '9px 11px',
-                        color: '#09090b',
+                        color: 'var(--color-text-primary)',
                         fontSize: '0.86rem',
                         boxSizing: 'border-box',
                         outline: 'none'
@@ -2172,7 +2172,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                   {/* Email */}
                   <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                       Email Address *
                     </label>
                     <input
@@ -2183,11 +2183,11 @@ export default function LoginPage({ onLoginSuccess }) {
                       required
                       style={{
                         width: '100%',
-                        background: '#ffffff',
-                        border: '1px solid #e4e4e7',
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '8px',
                         padding: '9px 11px',
-                        color: '#09090b',
+                        color: 'var(--color-text-primary)',
                         fontSize: '0.86rem',
                         boxSizing: 'border-box',
                         outline: 'none'
@@ -2198,9 +2198,9 @@ export default function LoginPage({ onLoginSuccess }) {
                   {/* Instagram Username & Mobile (Optional creator info) */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
                     <div>
-                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         <span>Instagram Handle</span>
-                        {instaChecking && <RefreshCw size={11} className="animate-spin" style={{ color: '#71717a' }} />}
+                        {instaChecking && <RefreshCw size={11} className="animate-spin" style={{ color: 'var(--color-text-secondary)' }} />}
                       </label>
                       <input
                         type="text"
@@ -2209,12 +2209,12 @@ export default function LoginPage({ onLoginSuccess }) {
                         placeholder="username"
                         style={{
                           width: '100%',
-                          background: '#ffffff',
+                          background: 'var(--color-surface)',
                           border: '1px solid',
-                          borderColor: instaPreview ? '#16a34a' : (instaError ? '#ef4444' : '#e4e4e7'),
+                          borderColor: instaPreview ? '#16a34a' : (instaError ? '#ef4444' : 'var(--color-border)'),
                           borderRadius: '8px',
                           padding: '9px 11px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box',
                           outline: 'none',
@@ -2223,7 +2223,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         Mobile Number
                       </label>
                       <input
@@ -2233,11 +2233,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         placeholder="+1 555-0199"
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '8px',
                           padding: '9px 11px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box',
                           outline: 'none'
@@ -2250,15 +2250,15 @@ export default function LoginPage({ onLoginSuccess }) {
                   {instaChecking && (
                     <div style={{
                       marginBottom: '14px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
+                      background: 'var(--color-surface-elevated)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '8px',
                       padding: '8px 12px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
                       fontSize: '0.74rem',
-                      color: '#64748b'
+                      color: 'var(--color-text-secondary)'
                     }}>
                       <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                       <span>Verifying professional/business account on Instagram...</span>
@@ -2269,8 +2269,8 @@ export default function LoginPage({ onLoginSuccess }) {
                   {instaPreview && !instaChecking && (
                     <div style={{
                       marginBottom: '14px',
-                      background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
+                      background: 'color-mix(in srgb, #22c55e 12%, transparent)',
+                      border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
                       borderRadius: '8px',
                       padding: '8px 12px',
                       display: 'flex',
@@ -2294,20 +2294,20 @@ export default function LoginPage({ onLoginSuccess }) {
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ fontWeight: '700', fontSize: '0.84rem', color: '#09090b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontWeight: '700', fontSize: '0.84rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {instaPreview.fullName || instaPreview.username}
                           </span>
                           {instaPreview.isVerified && (
-                            <span title="Verified Account" style={{ color: '#0284c7', display: 'flex' }}>
-                              <CheckCircle2 size={13} fill="#0284c7" color="#ffffff" />
+                            <span title="Verified Account" style={{ color: 'var(--ambient-dominant)', display: 'flex' }}>
+                              <CheckCircle2 size={13} fill="var(--ambient-dominant)" color="var(--color-surface)" />
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#52525b', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           @{instaPreview.username} {instaPreview.instagramId ? `• ID: ${instaPreview.instagramId}` : ''}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d', fontSize: '0.68rem', fontWeight: '800', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, background: '#dcfce7', padding: '3px 7px', borderRadius: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4ade80', fontSize: '0.68rem', fontWeight: '800', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, background: 'color-mix(in srgb, #22c55e 14%, transparent)', padding: '3px 7px', borderRadius: '4px' }}>
                         <Check size={12} strokeWidth={3} />
                         <span>{instaPreview.isVerified ? 'VERIFIED' : 'READY'}</span>
                       </div>
@@ -2317,15 +2317,15 @@ export default function LoginPage({ onLoginSuccess }) {
                   {instaError && !instaChecking && (
                     <div style={{
                       marginBottom: '14px',
-                      background: '#fef2f2',
-                      border: '1px solid #fecaca',
+                      background: 'color-mix(in srgb, #ef4444 12%, transparent)',
+                      border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
                       borderRadius: '8px',
                       padding: '7px 10px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                       fontSize: '0.74rem',
-                      color: '#b91c1c'
+                      color: '#f87171'
                     }}>
                       <AlertCircle size={14} style={{ flexShrink: 0 }} />
                       <span>{instaError}</span>
@@ -2334,7 +2334,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                   {/* Password */}
                   <div style={{ marginBottom: '18px' }}>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                       Set Password *
                     </label>
                     <div style={{ position: 'relative' }}>
@@ -2347,11 +2347,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         minLength={6}
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '8px',
                           padding: '9px 38px 9px 11px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box',
                           outline: 'none'
@@ -2360,7 +2360,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       <button
                         type="button"
                         onClick={() => setShowRegPassword(!showRegPassword)}
-                        style={{ position: 'absolute', right: '11px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}
+                        style={{ position: 'absolute', right: '11px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
                       >
                         {showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
@@ -2373,8 +2373,8 @@ export default function LoginPage({ onLoginSuccess }) {
                     disabled={regLoading}
                     style={{
                       width: '100%',
-                      background: '#09090b',
-                      color: '#ffffff',
+                      background: 'var(--color-text-primary)',
+                      color: 'var(--color-surface)',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '12px',
@@ -2398,21 +2398,21 @@ export default function LoginPage({ onLoginSuccess }) {
               {/* STAGE 1.5: IN-PLACE OTP VERIFICATION */}
               {regStage === 'otp' && (
                 <div>
-                  <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#09090b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                  <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--color-text-primary)', color: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
                       <Mail size={18} />
                     </div>
-                    <h3 style={{ fontSize: '0.98rem', fontWeight: '700', color: '#09090b', margin: '0 0 4px' }}>
+                    <h3 style={{ fontSize: '0.98rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 4px' }}>
                       Verify your Email Address
                     </h3>
-                    <p style={{ fontSize: '0.78rem', color: '#71717a', margin: 0 }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: 0 }}>
                       We sent a 6-digit confirmation code to <strong>{regForm.email}</strong>.
                     </p>
                   </div>
 
                   <form onSubmit={handleVerifyRegisterOtp}>
                     <div style={{ marginBottom: '18px' }}>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: '#3f3f46', marginBottom: '6px', textAlign: 'center' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px', textAlign: 'center' }}>
                         Enter 6-Digit Verification Code
                       </label>
                       <input
@@ -2425,11 +2425,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         required
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #09090b',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-text-primary)',
                           borderRadius: '8px',
                           padding: '11px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '1.3rem',
                           fontFamily: "'JetBrains Mono', monospace",
                           letterSpacing: '6px',
@@ -2445,8 +2445,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       disabled={regLoading || regOtpCode.trim().length !== 6}
                       style={{
                         width: '100%',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '12px',
@@ -2469,7 +2469,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       <button
                         type="button"
                         onClick={() => setRegStage('form')}
-                        style={{ background: 'none', border: 'none', color: '#71717a', fontSize: '0.76rem', cursor: 'pointer', padding: 0 }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '0.76rem', cursor: 'pointer', padding: 0 }}
                       >
                         ← Edit Details
                       </button>
@@ -2477,7 +2477,7 @@ export default function LoginPage({ onLoginSuccess }) {
                         type="button"
                         onClick={handleResendOtp}
                         disabled={regLoading}
-                        style={{ background: 'none', border: 'none', color: '#09090b', fontSize: '0.76rem', fontWeight: '600', cursor: regLoading ? 'wait' : 'pointer', padding: 0 }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.76rem', fontWeight: '600', cursor: regLoading ? 'wait' : 'pointer', padding: 0 }}
                       >
                         {regLoading ? 'Sending...' : 'Resend Code'}
                       </button>
@@ -2489,8 +2489,8 @@ export default function LoginPage({ onLoginSuccess }) {
               {/* STAGE 2: IN-PLACE BIOMETRIC / PASSKEY SETUP PROMPT */}
               {regStage === 'passkey_prompt' && (
                 <div style={{
-                  background: '#fafafa',
-                  border: '1px solid #e4e4e7',
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '16px',
                   padding: '24px',
                   textAlign: 'center'
@@ -2499,8 +2499,8 @@ export default function LoginPage({ onLoginSuccess }) {
                     width: '52px',
                     height: '52px',
                     borderRadius: '14px',
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--color-text-primary)',
+                    color: 'var(--color-surface)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2509,34 +2509,34 @@ export default function LoginPage({ onLoginSuccess }) {
                     <Fingerprint size={28} />
                   </div>
 
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#09090b', margin: '0 0 6px' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: '0 0 6px' }}>
                     Want to skip typing passwords?
                   </h3>
-                  <p style={{ fontSize: '0.84rem', color: '#71717a', margin: '0 0 16px', lineHeight: 1.45 }}>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.45 }}>
                     Set up Touch ID, Face ID, or your device security key right now. Next time you can log in with 1 tap!
                   </p>
 
                   <div style={{
-                    background: '#ffffff',
-                    border: '1px solid #e4e4e7',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: '8px',
                     padding: '8px 12px',
                     fontSize: '0.76rem',
-                    color: '#52525b',
+                    color: 'var(--color-text-secondary)',
                     marginBottom: '20px',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px'
                   }}>
-                    <Sparkles size={13} color="#09090b" />
+                    <Sparkles size={13} color="var(--color-text-primary)" />
                     <span>Detected: <strong>{detectCurrentDevice()}</strong></span>
                   </div>
 
                   {regPasskeySuccess ? (
                     <div style={{
-                      background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
-                      color: '#15803d',
+                      background: 'color-mix(in srgb, #22c55e 12%, transparent)',
+                      border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
+                      color: '#4ade80',
                       borderRadius: '8px',
                       padding: '12px',
                       fontSize: '0.84rem',
@@ -2557,8 +2557,8 @@ export default function LoginPage({ onLoginSuccess }) {
                         disabled={regPasskeyLoading}
                         style={{
                           width: '100%',
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--color-text-primary)',
+                          color: 'var(--color-surface)',
                           border: 'none',
                           borderRadius: '10px',
                           padding: '13px',
@@ -2586,7 +2586,7 @@ export default function LoginPage({ onLoginSuccess }) {
                         style={{
                           width: '100%',
                           background: 'transparent',
-                          color: '#71717a',
+                          color: 'var(--color-text-secondary)',
                           border: 'none',
                           borderRadius: '8px',
                           padding: '10px',
@@ -2602,7 +2602,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 </div>
               )}
 
-              <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.74rem', color: '#a1a1aa' }}>
+              <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
                 Chatter OS • Precision Creator Infrastructure
               </div>
             </div>
@@ -2626,8 +2626,8 @@ export default function LoginPage({ onLoginSuccess }) {
           padding: '20px'
         }}>
           <div style={{
-            background: '#ffffff',
-            border: '1px solid #e4e4e7',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '420px',
@@ -2637,18 +2637,18 @@ export default function LoginPage({ onLoginSuccess }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f4f4f5', color: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <KeyRound size={18} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: '#09090b' }}>Reset Password</h3>
-                  <p style={{ fontSize: '0.74rem', color: '#71717a', margin: 0 }}>Choose your verified recovery method</p>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>Reset Password</h3>
+                  <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: 0 }}>Choose your verified recovery method</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowForgotModal(false)}
-                style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', fontSize: '1.2rem', padding: '4px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '1.2rem', padding: '4px' }}
               >
                 ✕
               </button>
@@ -2659,7 +2659,7 @@ export default function LoginPage({ onLoginSuccess }) {
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '4px',
-              background: '#f4f4f5',
+              background: 'var(--color-surface-hover)',
               padding: '3px',
               borderRadius: '8px',
               marginBottom: '16px'
@@ -2668,8 +2668,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 type="button"
                 onClick={() => { setForgotMethod('oneauth'); setForgotError(''); setForgotSuccess(''); }}
                 style={{
-                  background: forgotMethod === 'oneauth' ? '#ffffff' : 'transparent',
-                  color: forgotMethod === 'oneauth' ? '#09090b' : '#71717a',
+                  background: forgotMethod === 'oneauth' ? 'var(--color-surface)' : 'transparent',
+                  color: forgotMethod === 'oneauth' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '7px',
@@ -2684,8 +2684,8 @@ export default function LoginPage({ onLoginSuccess }) {
                 type="button"
                 onClick={() => { setForgotMethod('email'); setForgotError(''); setForgotSuccess(''); }}
                 style={{
-                  background: forgotMethod === 'email' ? '#ffffff' : 'transparent',
-                  color: forgotMethod === 'email' ? '#09090b' : '#71717a',
+                  background: forgotMethod === 'email' ? 'var(--color-surface)' : 'transparent',
+                  color: forgotMethod === 'email' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '7px',
@@ -2699,12 +2699,12 @@ export default function LoginPage({ onLoginSuccess }) {
             </div>
 
             {forgotError && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
+              <div style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)', border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)', color: '#f87171', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
                 {forgotError}
               </div>
             )}
             {forgotSuccess && (
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
+              <div style={{ background: 'color-mix(in srgb, #22c55e 12%, transparent)', border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)', color: '#4ade80', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
                 {forgotSuccess}
               </div>
             )}
@@ -2713,7 +2713,7 @@ export default function LoginPage({ onLoginSuccess }) {
             {forgotMethod === 'oneauth' && (
               <form onSubmit={handleResetViaOneAuth}>
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                     Account Email
                   </label>
                   <input
@@ -2724,11 +2724,11 @@ export default function LoginPage({ onLoginSuccess }) {
                     required
                     style={{
                       width: '100%',
-                      background: '#ffffff',
-                      border: '1px solid #e4e4e7',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '7px',
                       padding: '8px 10px',
-                      color: '#09090b',
+                      color: 'var(--color-text-primary)',
                       fontSize: '0.86rem',
                       boxSizing: 'border-box'
                     }}
@@ -2736,7 +2736,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 </div>
 
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                     6-Digit Zoho OneAuth App Code
                   </label>
                   <input
@@ -2748,11 +2748,11 @@ export default function LoginPage({ onLoginSuccess }) {
                     required
                     style={{
                       width: '100%',
-                      background: '#ffffff',
-                      border: '1px solid #09090b',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-text-primary)',
                       borderRadius: '7px',
                       padding: '8px',
-                      color: '#09090b',
+                      color: 'var(--color-text-primary)',
                       fontSize: '1.1rem',
                       fontFamily: "'JetBrains Mono', monospace",
                       letterSpacing: '4px',
@@ -2763,7 +2763,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 </div>
 
                 <div style={{ marginBottom: '18px' }}>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                     New Password (min. 8 characters)
                   </label>
                   <input
@@ -2775,11 +2775,11 @@ export default function LoginPage({ onLoginSuccess }) {
                     minLength={8}
                     style={{
                       width: '100%',
-                      background: '#ffffff',
-                      border: '1px solid #e4e4e7',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '7px',
                       padding: '8px 10px',
-                      color: '#09090b',
+                      color: 'var(--color-text-primary)',
                       fontSize: '0.86rem',
                       boxSizing: 'border-box'
                     }}
@@ -2791,8 +2791,8 @@ export default function LoginPage({ onLoginSuccess }) {
                   disabled={forgotLoading || !forgotEmail || forgotTotpCode.length !== 6 || newPassword.length < 8}
                   style={{
                     width: '100%',
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--color-text-primary)',
+                    color: 'var(--color-surface)',
                     border: 'none',
                     borderRadius: '8px',
                     padding: '11px',
@@ -2818,7 +2818,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 {!otpSent ? (
                   <form onSubmit={handleSendEmailOtp}>
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         Account Email Address
                       </label>
                       <input
@@ -2829,11 +2829,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         required
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '7px',
                           padding: '8px 10px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box'
                         }}
@@ -2845,8 +2845,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       disabled={forgotLoading || !forgotEmail}
                       style={{
                         width: '100%',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '11px',
@@ -2866,7 +2866,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 ) : (
                   <form onSubmit={handleVerifyEmailOtp}>
                     <div style={{ marginBottom: '12px' }}>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         6-Digit Verification Code
                       </label>
                       <input
@@ -2878,11 +2878,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         required
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #09090b',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-text-primary)',
                           borderRadius: '7px',
                           padding: '8px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '1.1rem',
                           fontFamily: "'JetBrains Mono', monospace",
                           letterSpacing: '4px',
@@ -2893,7 +2893,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     </div>
 
                     <div style={{ marginBottom: '18px' }}>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#3f3f46', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                         Set New Password (min. 8 characters)
                       </label>
                       <input
@@ -2905,11 +2905,11 @@ export default function LoginPage({ onLoginSuccess }) {
                         minLength={8}
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
                           borderRadius: '7px',
                           padding: '8px 10px',
-                          color: '#09090b',
+                          color: 'var(--color-text-primary)',
                           fontSize: '0.86rem',
                           boxSizing: 'border-box'
                         }}
@@ -2921,8 +2921,8 @@ export default function LoginPage({ onLoginSuccess }) {
                       disabled={forgotLoading || forgotOtpCode.length !== 6 || newPassword.length < 8}
                       style={{
                         width: '100%',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '11px',
@@ -2945,7 +2945,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#71717a',
+                        color: 'var(--color-text-secondary)',
                         fontSize: '0.74rem',
                         marginTop: '12px',
                         cursor: 'pointer',
