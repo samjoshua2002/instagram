@@ -1,5 +1,35 @@
 const axios = require('axios');
+const { AsyncLocalStorage } = require('async_hooks');
 const PersonaConfig = require('../models/PersonaConfig');
+
+// Holds the Instagram account the current webhook event / reply belongs to
+const accountContext = new AsyncLocalStorage();
+
+const PRIMARY_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+
+/**
+ * Connected accounts: the primary one (token from DB / INSTAGRAM_PAGE_ACCESS_TOKEN)
+ * plus extras from INSTAGRAM_EXTRA_ACCOUNTS, a JSON array of { "id", "token", "name" }.
+ */
+function loadAccounts() {
+  const accounts = [{ id: PRIMARY_ACCOUNT_ID, token: null, name: 'primary', isPrimary: true }];
+  const raw = (process.env.INSTAGRAM_EXTRA_ACCOUNTS || '').trim();
+  if (!raw) return accounts;
+  try {
+    for (const acc of JSON.parse(raw)) {
+      if (!acc || !acc.id || !acc.token) {
+        console.warn('⚠️ INSTAGRAM_EXTRA_ACCOUNTS: skipping entry without id/token');
+        continue;
+      }
+      if (accounts.some(a => a.id === String(acc.id))) continue;
+      accounts.push({ id: String(acc.id), token: String(acc.token).trim(), name: acc.name || String(acc.id), isPrimary: false });
+    }
+  } catch (err) {
+    console.error('❌ INSTAGRAM_EXTRA_ACCOUNTS is not valid JSON:', err.message);
+  }
+  return accounts;
+}
+const ACCOUNTS = loadAccounts();
 
 // ── Shared axios config ────────────────────────────────────────────────────
 const TIMEOUT_MS = 12000; // 12 seconds max per request
@@ -34,10 +64,41 @@ async function withRetry(fn, maxRetries = 2, label = 'API call') {
 }
 
 class InstagramService {
+  getAccounts() {
+    return ACCOUNTS;
+  }
+
+  getPrimaryAccount() {
+    return ACCOUNTS[0];
+  }
+
+  findAccount(id) {
+    if (!id) return null;
+    return ACCOUNTS.find(a => a.id === String(id)) || null;
+  }
+
+  isOwnAccount(id) {
+    return !!this.findAccount(id);
+  }
+
+  /**
+   * Runs fn with `account` as the active account: every Graph API call inside
+   * (including timers it starts) uses that account's token and ID.
+   */
+  runWithAccount(account, fn) {
+    return accountContext.run(account || this.getPrimaryAccount(), fn);
+  }
+
+  getCurrentAccount() {
+    return accountContext.getStore() || this.getPrimaryAccount();
+  }
+
   /**
    * Retrieves the current Page Access Token either from DB or .env
    */
   async getAccessToken() {
+    const active = accountContext.getStore();
+    if (active && !active.isPrimary) return active.token;
     try {
       const config = await PersonaConfig.findOne();
       if (config && config.instagramPageAccessToken && config.instagramPageAccessToken.trim() !== '') {
@@ -53,6 +114,8 @@ class InstagramService {
    * Retrieves Instagram Account ID if configured
    */
   async getAccountId() {
+    const active = accountContext.getStore();
+    if (active && !active.isPrimary) return active.id;
     try {
       const config = await PersonaConfig.findOne();
       if (config && config.instagramAccountId && config.instagramAccountId.trim() !== '') {

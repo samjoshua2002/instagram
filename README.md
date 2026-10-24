@@ -16,4 +16,16 @@ An autonomous, 24/7 AI-powered Instagram DM auto-reply engine that mimics Sam Jo
 4. Add Environment Variables from `.env.example`, plus these two security settings:
    - `INSTAGRAM_APP_SECRET`: your Meta App Secret. When set, `POST /webhook` rejects requests without a valid `X-Hub-Signature-256`.
    - `DASHBOARD_API_KEY`: any long random string. When set, every `/api/*` call must send it as the `x-api-key` header. The dashboard asks for it once and remembers it in the browser.
+
+## Multiple Instagram Accounts
+The primary account uses `INSTAGRAM_ACCOUNT_ID` + `INSTAGRAM_PAGE_ACCESS_TOKEN` (or the token saved in Settings). Add more accounts as a JSON array:
+
+```
+INSTAGRAM_EXTRA_ACCOUNTS=[{"id":"<instagram account id>","token":"<its access token>","name":"moi"}]
+```
+
+- Subscribe each account to the same `/webhook` callback in the Meta Developer Portal.
+- Every account replies with its own token; DMs to accounts not in this list are ignored.
+- Messages and memories are tagged with `accountId`. Older records without it belong to the primary account.
+- All accounts share the one persona from Settings.
 5. Update Callback URL in Meta Developer Portal to your Render URL: `https://<your-app>.onrender.com/webhook`

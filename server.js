@@ -265,9 +265,11 @@ function parseIncomingEventMessage(msg) {
 
 // Helper to record messages sent manually by the creator from the Instagram phone app
 function handleCreatorEcho(event, accountId) {
-  const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+  const account = instagramService.findAccount(accountId) || instagramService.findAccount(event.sender?.id);
+  if (!account) return;
+  const botAccountId = account.id;
   const contactId = event.recipient?.id;
-  if (!contactId || contactId === botAccountId) return;
+  if (!contactId || instagramService.isOwnAccount(contactId)) return;
 
   const text = event.message?.text || (event.message?.attachments?.length ? '[Shared Media / Sticker]' : '');
   const mid = event.message?.mid || `echo_${Date.now()}`;
@@ -284,6 +286,7 @@ function handleCreatorEcho(event, accountId) {
   Message.create({
     senderId: botAccountId,
     recipientId: contactId,
+    accountId: botAccountId,
     role: 'assistant',
     text: text || '[Media]',
     mid,
@@ -369,18 +372,27 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const mid = event.message.mid;
   const isReelOrShare = event.isReelOrShare;
 
-  const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
-
-  // Only your account should respond with AI: ignore events for other accounts (e.g. moi)
-  if (accountId && accountId !== botAccountId && recipientId !== botAccountId) {
-    console.log(`⏸️ Skipping: event is for account ${accountId || recipientId}, not primary bot ${botAccountId}`);
+  // Only connected accounts (primary + INSTAGRAM_EXTRA_ACCOUNTS) respond with AI
+  const account = instagramService.findAccount(accountId) || instagramService.findAccount(recipientId);
+  if (!account) {
+    console.log(`⏸️ Skipping: event is for account ${accountId || recipientId}, which is not connected`);
     return;
   }
 
-  // Prevent bot from replying to itself
-  if (senderId === botAccountId) {
+  // Prevent bots from replying to themselves or to each other
+  if (instagramService.isOwnAccount(senderId)) {
     return;
   }
+
+  return instagramService.runWithAccount(account, () => processIncomingMessage(event, account));
+}
+
+async function processIncomingMessage(event, account) {
+  const senderId = event.sender.id;
+  const recipientId = event.recipient.id;
+  const messageText = event.message.text;
+  const mid = event.message.mid;
+  const isReelOrShare = event.isReelOrShare;
 
   // Deduplication check (bypass for test random_mid)
   if (mid && mid !== 'random_mid' && processedMids.has(mid)) {
@@ -425,6 +437,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   await Message.create({
     senderId,
     recipientId,
+    accountId: account.id,
     role: 'user',
     text: messageText,
     mid: mid === 'random_mid' ? `test_${Date.now()}` : mid,
@@ -432,6 +445,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   });
 
   // Re-activate conversation: update lastInteraction and clear lastReminderSentAt
+  if (!userMemory.accountId) userMemory.accountId = account.id;
   userMemory.lastInteraction = msgTime;
   userMemory.lastReminderSentAt = null;
   userMemory.messageCount = (userMemory.messageCount || 0) + 1;
@@ -777,6 +791,7 @@ async function dispatchDebouncedReply(queueEntry) {
       await Message.create({
         senderId: recipientId,
         recipientId: senderId,
+        accountId: instagramService.getCurrentAccount().id,
         role: 'assistant',
         text: persistedText,
         mid: sendResult?.data?.message_id || stickerSendResult?.data?.message_id || `out_${Date.now()}`,
@@ -909,13 +924,16 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'Text required' });
 
-    // Send via Instagram
-    const sendResult = await instagramService.sendTextMessage(senderId, text);
+    // Send via Instagram from the account this contact talks to
+    const contactMemory = await UserMemory.findOne({ senderId }).select('accountId');
+    const account = instagramService.findAccount(contactMemory?.accountId) || instagramService.getPrimaryAccount();
+    const sendResult = await instagramService.runWithAccount(account, () => instagramService.sendTextMessage(senderId, text));
 
     // Save in DB
     const newMsg = await Message.create({
       senderId: 'me',
       recipientId: senderId,
+      accountId: account.id,
       role: 'assistant',
       text,
       mid: sendResult?.data?.message_id || `manual_${Date.now()}`,
