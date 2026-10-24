@@ -563,6 +563,8 @@ export function AppProvider({ children }) {
                 rel: c.relationship || c.rel || 'connected'
               })),
               roastStyle: sn.roastStyle || '',
+              ...(Number.isFinite(sn.roastiness) ? { roastiness: sn.roastiness } : {}),
+              greetingStyle: sn.greetingStyle || '',
               idleHours: 6,
               reminderEligible: false
             };
@@ -703,6 +705,8 @@ export function AppProvider({ children }) {
         rel: c.relationship || c.rel || 'connected'
       })),
       roastStyle: accumulatedNode.roastStyle || 'Playful natural banter',
+      ...(Number.isFinite(accumulatedNode.roastiness) ? { roastiness: accumulatedNode.roastiness } : {}),
+      greetingStyle: accumulatedNode.greetingStyle || '',
       aiEnabled: accumulatedNode.aiEnabled !== false,
       replyToMessages: accumulatedNode.replyToMessages !== false,
       replyToReelsAndPosts: accumulatedNode.replyToReelsAndPosts !== false,
@@ -768,6 +772,8 @@ export function AppProvider({ children }) {
           gender: formattedNode.gender,
           lore: formattedNode.lore,
           roastStyle: formattedNode.roastStyle,
+          roastiness: formattedNode.roastiness,
+          greetingStyle: formattedNode.greetingStyle,
           connections: formattedNode.connections.map(c => ({
             targetName: c.targetName,
             relationship: c.rel

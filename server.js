@@ -2311,6 +2311,8 @@ app.post('/api/social-graph/node', async (req, res) => {
           connections: parsedConnections,
           ...(typeof req.body.chatsCount === 'number' ? { chatsCount: req.body.chatsCount } : {}),
           ...(typeof req.body.reelsCount === 'number' ? { reelsCount: req.body.reelsCount } : {}),
+          ...(Number.isFinite(req.body.roastiness) ? { roastiness: Math.min(Math.max(Math.round(req.body.roastiness), 0), 100) } : {}),
+          ...(typeof req.body.greetingStyle === 'string' ? { greetingStyle: req.body.greetingStyle.trim().slice(0, 120) } : {}),
           ...(finalProfilePic ? { profilePic: finalProfilePic } : {}),
           ...(req.user ? { ownerId: req.user._id, ownerUsername: req.user.username } : {}),
           updatedAt: new Date()
