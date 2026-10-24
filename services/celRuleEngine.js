@@ -26,12 +26,80 @@ class CelRuleEngine {
       message.isCollabOrTech || message.isEmotional || message.isAskingAboutMemory || message.wordCount >= 16 ? 'gpt-5.6-luna' :
       'gpt-5.1-chat'
     `;
+
+    // ── Business rules (never evaluated for personal accounts) ──
+    this.BUSINESS_HOURS_RULE = `
+      policy.openMinutes <= policy.closeMinutes
+        ? clock.isWorkingDay && clock.minutes >= policy.openMinutes && clock.minutes < policy.closeMinutes
+        : clock.isWorkingDay && (clock.minutes >= policy.openMinutes || clock.minutes < policy.closeMinutes)
+    `;
+
+    this.BUSINESS_ESCALATION_RULE = `
+      message.isComplaint || message.asksForHuman
+    `;
+
+    this.BUSINESS_REFUND_RULE = `
+      !message.mentionsRefund ? 'none' :
+      policy.hasRefundPolicy ? 'quote_policy' :
+      'defer_to_human'
+    `;
+
+    this.BUSINESS_DISCOUNT_RULE = `
+      !message.asksForDiscount ? 'none' :
+      policy.allowDiscounts && policy.hasDiscountPolicy ? 'quote_policy' :
+      'decline_politely'
+    `;
+
+    this.BUSINESS_MODEL_ROUTING_RULE = `
+      message.isComplaint || message.mentionsRefund || message.wordCount >= 25 ? 'gpt-5.6-luna' :
+      'gpt-5.1-chat'
+    `;
   }
 
   /**
-   * Pre-processes raw inputs into typed context for CEL evaluation
+   * 'business' and 'agency' tenants use business rules; 'personal' and 'creator' use personal rules
    */
-  buildContext({ userMemory, incomingText, isReelShare = false }) {
+  isBusinessAccount(accountType) {
+    return accountType === 'business' || accountType === 'agency';
+  }
+
+  /**
+   * Appends directives from tenant-defined rules: [{ when: '<CEL expression>', directive: '<text>' }]
+   */
+  applyCustomRules(context, customRules = []) {
+    const extra = [];
+    for (const rule of customRules || []) {
+      if (!rule || !rule.when || !rule.directive) continue;
+      try {
+        if (evaluate(rule.when, context) === true) extra.push(rule.directive);
+      } catch (err) {
+        console.warn(`⚠️ [CEL Custom Rule Skipped] "${rule.when}": ${err.message}`);
+      }
+    }
+    return extra;
+  }
+
+  /**
+   * Single entry point: routes to the personal or business evaluator by tenant account type
+   */
+  evaluateForTenant({ accountType, userMemory, incomingText, isReelShare = false, businessConfig = null, customRules = [] }) {
+    if (this.isBusinessAccount(accountType)) {
+      const context = this.buildBusinessContext({ businessConfig, customerMemory: userMemory, incomingText });
+      return this.evaluateBusiness(context, customRules);
+    }
+    const context = this.buildPersonalContext({ userMemory, incomingText, isReelShare });
+    return this.evaluatePersonal(context, customRules);
+  }
+
+  // Backwards-compatible alias
+  buildContext(args) {
+    return this.buildPersonalContext(args);
+  }
+
+  /**
+   * Pre-processes raw inputs into typed context for personal CEL evaluation
+   */
+  buildPersonalContext({ userMemory, incomingText, isReelShare = false }) {
     const text = (incomingText || '').trim();
     const lower = text.toLowerCase();
     const words = text.split(/\s+/).filter(Boolean);
@@ -104,11 +172,16 @@ class CelRuleEngine {
   }
 
   /**
-   * Evaluates CEL rules and returns dynamic style directives and model routing
+   * Personal evaluation from raw inputs (kept for existing callers)
    */
   evaluate({ userMemory, incomingText, isReelShare = false }) {
-    const context = this.buildContext({ userMemory, incomingText, isReelShare });
+    return this.evaluatePersonal(this.buildPersonalContext({ userMemory, incomingText, isReelShare }));
+  }
 
+  /**
+   * Evaluates personal CEL rules and returns style directives and model routing
+   */
+  evaluatePersonal(context, customRules = []) {
     let styleMode = 'casual_peer';
     let shouldInjectFacts = false;
     let lengthTier = 'one_liner';
@@ -139,8 +212,10 @@ class CelRuleEngine {
 
     // Directives tailored to the evaluated styleMode
     const directives = this.getDirectivesForMode(styleMode, lengthTier, shouldInjectFacts, context);
+    directives.customDirectives = this.applyCustomRules(context, customRules);
 
     return {
+      accountKind: 'personal',
       styleMode,
       shouldInjectFacts,
       lengthTier,
@@ -148,6 +223,161 @@ class CelRuleEngine {
       chatType,
       directives,
       context,
+      allowStickers: true,
+      autoReactReel: true,
+    };
+  }
+
+  /**
+   * Pre-processes raw inputs into typed context for business CEL evaluation
+   */
+  buildBusinessContext({ businessConfig, customerMemory, incomingText, now = new Date() }) {
+    const policy = businessConfig?.businessPolicy || {};
+    const text = (incomingText || '').trim();
+    const lower = text.toLowerCase();
+    const words = text.split(/\s+/).filter(Boolean);
+
+    const defaultEscalation = [
+      'complaint', 'complain', 'scam', 'fraud', 'cheated', 'worst', 'terrible', 'disappointed',
+      'angry', 'unacceptable', 'manager', 'human', 'real person', 'speak to someone', 'talk to someone',
+      'customer care', 'legal', 'lawyer', 'consumer court', 'not working', 'broken', 'damaged', 'never arrived',
+    ];
+    const escalationWords = [...defaultEscalation, ...(policy.escalationKeywords || [])].map(w => String(w).toLowerCase()).filter(Boolean);
+    const matchedEscalation = escalationWords.find(w => lower.includes(w)) || '';
+    const asksForHuman = /\b(human|real person|agent|manager|someone from your team|call me)\b/i.test(lower);
+
+    const toMinutes = (hhmm, fallback) => {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || '');
+      return m ? Number(m[1]) * 60 + Number(m[2]) : fallback;
+    };
+    const timezone = policy.timezone || 'Asia/Kolkata';
+    let weekday = now.getDay();
+    let minutes = now.getHours() * 60 + now.getMinutes();
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
+      const get = (t) => parts.find(p => p.type === t)?.value;
+      weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
+      minutes = (Number(get('hour')) % 24) * 60 + Number(get('minute'));
+    } catch (_) {}
+    const workingDays = policy.workingDays && policy.workingDays.length ? policy.workingDays : [1, 2, 3, 4, 5, 6];
+
+    return {
+      business: {
+        name: businessConfig?.businessName || businessConfig?.creatorName || '',
+        category: businessConfig?.businessCategory || '',
+      },
+      policy: {
+        timezone,
+        openMinutes: toMinutes(policy.openTime, 9 * 60),
+        closeMinutes: toMinutes(policy.closeTime, 18 * 60),
+        hasRefundPolicy: Boolean((policy.refundPolicy || '').trim()),
+        allowDiscounts: Boolean(policy.allowDiscounts),
+        hasDiscountPolicy: Boolean((policy.discountPolicy || '').trim()),
+        refundPolicy: policy.refundPolicy || '',
+        discountPolicy: policy.discountPolicy || '',
+        outOfHoursMessage: policy.outOfHoursMessage || '',
+        openTime: policy.openTime || '09:00',
+        closeTime: policy.closeTime || '18:00',
+      },
+      clock: {
+        weekday,
+        minutes,
+        isWorkingDay: workingDays.includes(weekday),
+      },
+      customer: {
+        name: customerMemory?.name || customerMemory?.username || '',
+        messageCount: customerMemory?.messageCount || 0,
+        isReturning: (customerMemory?.messageCount || 0) >= 3,
+        handoffPending: Boolean(customerMemory?.handoffRequestedAt),
+      },
+      message: {
+        raw: text,
+        wordCount: words.length,
+        isComplaint: Boolean(matchedEscalation) && !/\b(no complaints?|not complaining)\b/i.test(lower),
+        matchedEscalation,
+        asksForHuman,
+        mentionsRefund: /\b(refund|money back|return (it|this|my)|chargeback|cancel (my )?order)\b/i.test(lower),
+        asksForDiscount: /\b(discount|coupon|promo|offer|cheaper|best price|price drop|deal)\b/i.test(lower),
+        isQuestion: /\?|^(what|how|when|where|do|does|can|is|are)\b/i.test(lower),
+      },
+    };
+  }
+
+  /**
+   * Evaluates business CEL rules: hours, escalation and refund/discount gates
+   */
+  evaluateBusiness(context, customRules = []) {
+    let isWithinBusinessHours = true;
+    let shouldEscalate = false;
+    let refundAction = 'none';
+    let discountAction = 'none';
+    let selectedModel = 'gpt-5.1-chat';
+
+    try {
+      isWithinBusinessHours = evaluate(this.BUSINESS_HOURS_RULE, context);
+      shouldEscalate = evaluate(this.BUSINESS_ESCALATION_RULE, context);
+      refundAction = evaluate(this.BUSINESS_REFUND_RULE, context);
+      discountAction = evaluate(this.BUSINESS_DISCOUNT_RULE, context);
+      selectedModel = evaluate(this.BUSINESS_MODEL_ROUTING_RULE, context);
+    } catch (err) {
+      console.warn('⚠️ [CEL Business Fallback]:', err.message);
+      const { message, policy } = context;
+      shouldEscalate = message.isComplaint || message.asksForHuman;
+      refundAction = !message.mentionsRefund ? 'none' : (policy.hasRefundPolicy ? 'quote_policy' : 'defer_to_human');
+      discountAction = !message.asksForDiscount ? 'none' : (policy.allowDiscounts && policy.hasDiscountPolicy ? 'quote_policy' : 'decline_politely');
+      selectedModel = (message.isComplaint || message.mentionsRefund || message.wordCount >= 25) ? 'gpt-5.6-luna' : 'gpt-5.1-chat';
+    }
+    if (refundAction === 'defer_to_human') shouldEscalate = true;
+
+    let chatType = 'customer_inquiry';
+    if (shouldEscalate) chatType = 'escalation';
+    else if (refundAction !== 'none') chatType = 'refund_request';
+    else if (discountAction !== 'none') chatType = 'pricing_discount';
+    else if (!isWithinBusinessHours) chatType = 'after_hours';
+
+    const { policy } = context;
+    const policyDirectives = [];
+    if (!isWithinBusinessHours) {
+      policyDirectives.push(policy.outOfHoursMessage
+        ? `AFTER HOURS: We are currently closed (hours ${policy.openTime}-${policy.closeTime}, ${policy.timezone}). Convey this message: "${policy.outOfHoursMessage}"`
+        : `AFTER HOURS: We are currently closed (hours ${policy.openTime}-${policy.closeTime}, ${policy.timezone}). Answer simple questions, and say the team will follow up when we reopen.`);
+    }
+    if (shouldEscalate) {
+      policyDirectives.push('ESCALATION: Acknowledge the concern with empathy, apologise once, and confirm a team member will personally follow up. Do not argue, promise compensation, or make commitments.');
+    }
+    if (refundAction === 'quote_policy') {
+      policyDirectives.push(`REFUNDS: Follow only this refund policy, word for word where possible: "${policy.refundPolicy}". Never promise anything beyond it.`);
+    } else if (refundAction === 'defer_to_human') {
+      policyDirectives.push('REFUNDS: Do not approve, deny or estimate refunds. Say the team will review the request and get back to them.');
+    }
+    if (discountAction === 'quote_policy') {
+      policyDirectives.push(`DISCOUNTS: Only offer what this policy allows: "${policy.discountPolicy}". Never invent codes or percentages.`);
+    } else if (discountAction === 'decline_politely') {
+      policyDirectives.push('DISCOUNTS: Politely say there are no discounts available right now. Never invent codes, offers or percentages.');
+    }
+
+    return {
+      accountKind: 'business',
+      isWithinBusinessHours,
+      shouldEscalate,
+      refundAction,
+      discountAction,
+      selectedModel,
+      chatType,
+      directives: {
+        policyDirectives,
+        customDirectives: this.applyCustomRules(context, customRules),
+        rules: [
+          'PROFESSIONAL BRAND VOICE: clear, friendly and helpful; standard capitalization and punctuation.',
+          'NO SLANG OR BANTER: never use rn, fr, tbh, lol, bro, da, machan or teasing.',
+          'NO EMOJI SPAM: at most one tasteful emoji, and none in complaints or refunds.',
+          'NEVER INVENT FACTS: prices, stock, policies and timelines come only from the business information provided.',
+          'CONCISE: 1 to 3 short sentences unless the customer asks for detail.',
+        ],
+      },
+      context,
+      allowStickers: false,
+      autoReactReel: false,
     };
   }
 

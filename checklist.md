@@ -126,29 +126,29 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 4: Shared CEL Evaluator with Personal & Business Separation
-- [ ] **4.1 Refactor CEL Rule Engine (`services/celRuleEngine.js`):**
-  - [ ] Implement `buildPersonalContext({ userMemory, incomingText, isReelShare })`.
-  - [ ] Implement `buildBusinessContext({ businessConfig, customerMemory, incomingText })`.
-  - [ ] Implement `evaluatePersonal(context, customRules)`:
-    - [ ] Evaluate style modes (`tanglish_homie`, `sweet_playful`, `guy_banter`, `chill_creator`, `casual_peer`).
-    - [ ] Evaluate length tiers (`ultra_short`, `one_liner`, `short_burst`).
-    - [ ] Evaluate `shouldInjectFacts` memory gating.
-    - [ ] Set `allowStickers: true` and `autoReactReel: true`.
-  - [ ] Implement `evaluateBusiness(context, customRules)`:
-    - [ ] Evaluate `isWithinBusinessHours` check.
-    - [ ] Evaluate complaint / human escalation keywords.
-    - [ ] Evaluate refund / discount policy gates.
-    - [ ] Set `allowStickers: false` and `autoReactReel: false`.
-- [ ] **4.2 Azure OpenAI Service Integration (`services/azureOpenAI.js`):**
-  - [ ] Check `tenant.accountType`.
-  - [ ] If `personal`:
-    - [ ] Apply personal CEL directives.
-    - [ ] Apply anti-AI directives (lowercase, no ending periods, casual shortcuts).
-    - [ ] Gated reel emoji reaction (`sendMessageReaction`) and media sticker matching.
-  - [ ] If `business`:
-    - [ ] Apply business CEL directives.
-    - [ ] Enforce professional brand voice and standard capitalization.
-    - [ ] Strip any sticker attachments.
+- [x] **4.1 Refactor CEL Rule Engine (`services/celRuleEngine.js`):**
+  - [x] Implement `buildPersonalContext({ userMemory, incomingText, isReelShare })`.
+  - [x] Implement `buildBusinessContext({ businessConfig, customerMemory, incomingText })`.
+  - [x] Implement `evaluatePersonal(context, customRules)`:
+    - [x] Evaluate style modes (`tanglish_homie`, `sweet_playful`, `guy_banter`, `chill_creator`, `casual_peer`).
+    - [x] Evaluate length tiers (`ultra_short`, `one_liner`, `short_burst`).
+    - [x] Evaluate `shouldInjectFacts` memory gating.
+    - [x] Set `allowStickers: true` and `autoReactReel: true`.
+  - [x] Implement `evaluateBusiness(context, customRules)`:
+    - [x] Evaluate `isWithinBusinessHours` check.
+    - [x] Evaluate complaint / human escalation keywords.
+    - [x] Evaluate refund / discount policy gates.
+    - [x] Set `allowStickers: false` and `autoReactReel: false`.
+- [x] **4.2 Azure OpenAI Service Integration (`services/azureOpenAI.js`):**
+  - [x] Check `tenant.accountType`.
+  - [x] If `personal`:
+    - [x] Apply personal CEL directives.
+    - [x] Apply anti-AI directives (lowercase, no ending periods, casual shortcuts).
+    - [x] Gated reel emoji reaction (`sendMessageReaction`) and media sticker matching.
+  - [x] If `business`:
+    - [x] Apply business CEL directives.
+    - [x] Enforce professional brand voice and standard capitalization.
+    - [x] Strip any sticker attachments.
 - [ ] **Phase 4 Sign-Off:** Test CEL evaluator with personal slang inputs and business support inputs; verify zero cross-contamination.
 
 ---

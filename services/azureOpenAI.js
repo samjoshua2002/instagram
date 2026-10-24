@@ -34,7 +34,7 @@ class AzureOpenAIService {
    * Generates a reply mimicking Sam Joshua's exact tone, adapting to the user's conversation style,
    * referencing remembered facts, and drawing upon the social graph network of friends.
    */
-  async generateReply({ userMemory, messageHistory, incomingText, config: passedConfig }) {
+  async generateReply({ userMemory, messageHistory, incomingText, config: passedConfig, tenant = null }) {
     // 1. Fetch persona config (use passed creator config or fallback)
     let config = passedConfig;
     if (!config) {
@@ -46,6 +46,12 @@ class AzureOpenAIService {
         }
         await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
       }
+    }
+
+    // Business tenants get a separate prompt: no personal slang rules, stickers or forced lowercase
+    const accountType = tenant?.accountType || config.accountType || 'personal';
+    if (celRuleEngine.isBusinessAccount(accountType)) {
+      return this.generateBusinessReply({ userMemory, messageHistory, incomingText, config, tenant });
     }
 
     // 1b. Fetch active reaction categories from user's Media Vault
@@ -427,6 +433,83 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
       console.error('❌ Azure OpenAI generation error:', err.message);
       throw err;
     }
+  }
+
+  /**
+   * Business reply: professional brand voice driven by business CEL directives (hours, escalation, refunds, discounts)
+   */
+  async generateBusinessReply({ userMemory, messageHistory, incomingText, config, tenant }) {
+    const policy = config.businessPolicy || {};
+    const business = tenant?.businessProfile || {};
+    const businessName = business.businessName || config.creatorName || 'our business';
+
+    const decision = celRuleEngine.evaluateForTenant({
+      accountType: 'business',
+      userMemory,
+      incomingText,
+      businessConfig: { ...config, businessName, businessCategory: business.category },
+      customRules: policy.customRules || [],
+    });
+    const { directives, selectedModel, chatType } = decision;
+    console.log(`🏢 [Business Routing]: "${selectedModel}" for chatType "${chatType}"`);
+
+    const systemPrompt = `You are the customer messaging assistant for ${businessName}${business.category ? ` (${business.category})` : ''}, replying to customers in Instagram Direct Messages on behalf of the team.
+
+ABOUT THE BUSINESS:
+${business.description || config.aboutMe || config.personaBio || '(no description provided)'}
+
+${config.customKnowledge ? `PRODUCTS, SERVICES & FAQ (THE ONLY SOURCE OF FACTS):\n${config.customKnowledge}\n` : ''}
+${config.toneGuidelines ? `BRAND VOICE:\n${config.toneGuidelines}\n` : ''}
+BUSINESS HOURS: ${policy.openTime || '09:00'}-${policy.closeTime || '18:00'} (${policy.timezone || 'Asia/Kolkata'}).
+
+ACTIVE BUSINESS POLICY DIRECTIVES FOR THIS MESSAGE:
+${directives.policyDirectives.length ? directives.policyDirectives.map(d => `- ${d}`).join('\n') : '- Answer the customer helpfully using only the information above.'}
+${directives.customDirectives.length ? directives.customDirectives.map(d => `- ${d}`).join('\n') : ''}
+
+RESPONSE RULES:
+${directives.rules.map(r => `- ${r}`).join('\n')}
+- If you do not know the answer, say a team member will confirm and follow up. Never guess.
+${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- NEVER SAY: ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
+
+CUSTOMER:
+- Name: ${userMemory.name || userMemory.username || 'Customer'}
+- Previous messages: ${userMemory.messageCount || 0}
+- Conversation summary: ${userMemory.rollingSummary || 'New conversation'}
+
+Only return the message text. No quotation marks, no name prefix, no attachment tags.`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+    const history = (messageHistory && messageHistory.length > 0)
+      ? messageHistory
+      : (userMemory.recentChatBuffer || []).map(b => ({ role: b.role, text: b.text }));
+    for (const msg of history || []) {
+      if (!msg.text) continue;
+      if (msg.role === 'user' && msg.text.trim() === incomingText.trim()) continue;
+      messages.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: msg.text });
+    }
+    messages.push({ role: 'user', content: incomingText });
+
+    let client = this.getClient(selectedModel);
+    let response;
+    try {
+      response = await client.chat.completions.create({
+        messages,
+        ...(selectedModel.startsWith('gpt-5') ? { max_completion_tokens: 300 } : { max_tokens: 300, temperature: 0.4 }),
+      });
+    } catch (modelErr) {
+      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
+      client = this.getClient('gpt-4o');
+      response = await client.chat.completions.create({ messages, temperature: 0.4, max_tokens: 300 });
+    }
+
+    // Strip quotes, name prefixes and any sticker/attachment tags (never sent for business)
+    return (response.choices[0].message.content || '')
+      .trim()
+      .replace(/^"|"$/g, '')
+      .replace(new RegExp(`^${businessName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*`), '')
+      .replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
   }
 
   /**
