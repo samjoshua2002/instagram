@@ -7,13 +7,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Field hints per provider; must match services/llmAdapter.js
 const PROVIDERS = [
-  { id: 'azure', label: 'Platform Azure', badge: 'DEFAULT', icon: Cloud, desc: 'Included with your plan. Managed high-availability Azure OpenAI deployment.', accent: '#0284c7' },
+  { id: 'azure', label: 'Platform Azure', badge: 'DEFAULT', icon: Cloud, desc: 'Included with your plan. Managed high-availability Azure OpenAI deployment.', accent: 'var(--ambient-dominant)' },
   { id: 'openai', label: 'Custom OpenAI', badge: 'GPT-4o', icon: Sparkles, desc: 'Direct OpenAI API connection or any compatible inference gateway.', key: true, model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1', accent: '#10a37f' },
-  { id: 'anthropic', label: 'Anthropic', badge: 'CLAUDE', icon: Zap, desc: 'High-intelligence reasoning with Claude 3.5 Sonnet and Opus.', key: true, model: 'claude-3-5-sonnet-20241022', accent: '#d97706' },
+  { id: 'anthropic', label: 'Anthropic', badge: 'CLAUDE', icon: Zap, desc: 'High-intelligence reasoning with Claude 3.5 Sonnet and Opus.', key: true, model: 'claude-3-5-sonnet-20241022', accent: '#fbbf24' },
   { id: 'groq', label: 'Groq Cloud', badge: 'ULTRA FAST', icon: Zap, desc: 'Sub-second Llama 3.3 70B inference powered by Groq LPUs.', key: true, model: 'llama-3.3-70b-versatile', accent: '#f97316' },
-  { id: 'openrouter', label: 'OpenRouter', badge: 'MULTI-MODEL', icon: Globe, desc: 'Access 200+ models with unified billing through OpenRouter.', key: true, model: 'openai/gpt-4o-mini', accent: '#6366f1' },
+  { id: 'openrouter', label: 'OpenRouter', badge: 'MULTI-MODEL', icon: Globe, desc: 'Access 200+ models with unified billing through OpenRouter.', key: true, model: 'openai/gpt-4o-mini', accent: 'var(--ambient-dominant)' },
   { id: 'ollama', label: 'Local Ollama', badge: 'SELF-HOSTED', icon: Terminal, desc: 'Run locally on your machine via Ollama, vLLM or LocalAI. Zero cloud leaks.', model: 'llama3.1', endpoint: 'http://localhost:11434/v1', optionalKey: true, accent: '#10b981' },
-  { id: 'mcp', label: 'A2A MCP', badge: 'AGENT PROTOCOL', icon: Bot, desc: 'Connect to external AI agents over Model Context Protocol (SSE/WebSocket).', model: 'reply', endpoint: 'https://agent.example.com/mcp', optionalKey: true, modelLabel: 'Tool name', accent: '#8b5cf6' },
+  { id: 'mcp', label: 'A2A MCP', badge: 'AGENT PROTOCOL', icon: Bot, desc: 'Connect to external AI agents over Model Context Protocol (SSE/WebSocket).', model: 'reply', endpoint: 'https://agent.example.com/mcp', optionalKey: true, modelLabel: 'Tool name', accent: 'var(--ambient-dominant)' },
 ];
 
 export default function AiProviderCard() {
@@ -93,8 +93,8 @@ export default function AiProviderCard() {
 
   return (
     <div style={{
-      background: '#ffffff',
-      border: '1px solid #e4e4e7',
+      background: 'var(--color-surface)',
+      border: '1px solid var(--color-border)',
       borderRadius: '16px',
       padding: '28px',
       marginBottom: '28px',
@@ -109,22 +109,22 @@ export default function AiProviderCard() {
               width: '28px',
               height: '28px',
               borderRadius: '8px',
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--color-text-primary)',
+              color: 'var(--color-surface)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
               <Cpu size={15} />
             </div>
-            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.06em' }}>
               BYO-LLM &amp; INFERENCE ENGINE
             </span>
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#09090b', letterSpacing: '-0.4px', margin: '2px 0 4px' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.4px', margin: '2px 0 4px' }}>
             AI Model Provider
           </h3>
-          <p style={{ fontSize: '0.84rem', color: '#71717a', margin: 0, lineHeight: 1.45 }}>
+          <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.45 }}>
             Select the intelligence engine powering your Instagram DMs. API credentials are encrypted with AES-256-GCM.
           </p>
         </div>
@@ -195,8 +195,8 @@ export default function AiProviderCard() {
                 justifyContent: 'space-between',
                 padding: '14px 16px',
                 borderRadius: '12px',
-                border: `1.5px solid ${on ? '#09090b' : '#e4e4e7'}`,
-                background: on ? '#fafafa' : '#ffffff',
+                border: `1.5px solid ${on ? 'var(--color-text-primary)' : 'var(--color-border)'}`,
+                background: on ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
                 cursor: 'pointer',
                 minHeight: '84px',
                 boxShadow: on ? '0 4px 14px rgba(0,0,0,0.06)' : 'none',
@@ -209,15 +209,15 @@ export default function AiProviderCard() {
                     width: '24px',
                     height: '24px',
                     borderRadius: '6px',
-                    background: on ? '#09090b' : '#f4f4f5',
-                    color: on ? '#ffffff' : '#71717a',
+                    background: on ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+                    color: on ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
                     <IconComponent size={13} />
                   </div>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#09090b', letterSpacing: '-0.2px' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>
                     {p.label}
                   </span>
                 </div>
@@ -227,8 +227,8 @@ export default function AiProviderCard() {
                   width: '16px',
                   height: '16px',
                   borderRadius: '50%',
-                  border: on ? '4.5px solid #09090b' : '1.5px solid #d4d4d8',
-                  background: '#ffffff',
+                  border: on ? '4.5px solid var(--color-text-primary)' : '1.5px solid var(--color-border-strong)',
+                  background: 'var(--color-surface)',
                   flexShrink: 0,
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }} />
@@ -241,8 +241,8 @@ export default function AiProviderCard() {
                   fontWeight: 800,
                   padding: '2px 6px',
                   borderRadius: '4px',
-                  background: on ? '#09090b' : '#f4f4f5',
-                  color: on ? '#ffffff' : '#71717a'
+                  background: on ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
+                  color: on ? 'var(--color-surface)' : 'var(--color-text-secondary)'
                 }}>
                   {p.badge}
                 </span>
@@ -259,18 +259,18 @@ export default function AiProviderCard() {
 
       {/* Description banner */}
       <div style={{
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
+        background: 'var(--color-surface-elevated)',
+        border: '1px solid var(--color-border)',
         borderRadius: '10px',
         padding: '12px 16px',
         fontSize: '0.82rem',
-        color: '#475569',
+        color: 'var(--color-text-secondary)',
         marginBottom: '20px',
         display: 'flex',
         alignItems: 'center',
         gap: '8px'
       }}>
-        <span style={{ fontWeight: 700, color: '#0f172a' }}>{meta.label}:</span>
+        <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{meta.label}:</span>
         <span>{meta.desc}</span>
       </div>
 
@@ -288,7 +288,7 @@ export default function AiProviderCard() {
           }}
         >
           <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#09090b', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
               {meta.modelLabel || 'Model Name / ID'}
             </label>
             <input
@@ -296,8 +296,8 @@ export default function AiProviderCard() {
                 width: '100%',
                 padding: '10px 12px',
                 borderRadius: '8px',
-                border: '1px solid #e4e4e7',
-                background: '#ffffff',
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
                 fontSize: '0.85rem',
                 fontFamily: "'JetBrains Mono', monospace"
               }}
@@ -308,7 +308,7 @@ export default function AiProviderCard() {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#09090b', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
               Endpoint URL {meta.id === 'mcp' ? '' : '(Optional)'}
             </label>
             <input
@@ -316,8 +316,8 @@ export default function AiProviderCard() {
                 width: '100%',
                 padding: '10px 12px',
                 borderRadius: '8px',
-                border: '1px solid #e4e4e7',
-                background: '#ffffff',
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
                 fontSize: '0.85rem',
                 fontFamily: "'JetBrains Mono', monospace"
               }}
@@ -329,7 +329,7 @@ export default function AiProviderCard() {
 
           {(meta.key || meta.optionalKey) && (
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#09090b', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
                 API Secret Key {meta.optionalKey ? '(Optional for local)' : ''}
               </label>
               <input
@@ -339,8 +339,8 @@ export default function AiProviderCard() {
                   width: '100%',
                   padding: '10px 12px',
                   borderRadius: '8px',
-                  border: '1px solid #e4e4e7',
-                  background: '#ffffff',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface)',
                   fontSize: '0.85rem',
                   fontFamily: "'JetBrains Mono', monospace"
                 }}
@@ -368,9 +368,9 @@ export default function AiProviderCard() {
               borderRadius: '8px',
               fontSize: '0.82rem',
               fontWeight: 600,
-              background: testResult.ok ? '#f0fdf4' : '#fef2f2',
-              border: `1px solid ${testResult.ok ? '#bbf7d0' : '#fecaca'}`,
-              color: testResult.ok ? '#15803d' : '#b91c1c'
+              background: testResult.ok ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'color-mix(in srgb, #ef4444 12%, transparent)',
+              border: `1px solid ${testResult.ok ? 'color-mix(in srgb, #22c55e 35%, transparent)' : 'color-mix(in srgb, #ef4444 35%, transparent)'}`,
+              color: testResult.ok ? '#4ade80' : '#f87171'
             }}
           >
             {testResult.ok ? <CheckCircle2 size={16} style={{ flexShrink: 0 }} /> : <XCircle size={16} style={{ flexShrink: 0 }} />}

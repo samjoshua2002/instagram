@@ -286,14 +286,14 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            background: '#f4f4f5',
-            border: '1px solid #e4e4e7',
+            background: 'var(--color-surface-hover)',
+            border: '1px solid var(--color-border)',
             borderRadius: '999px',
             padding: '3px 12px',
             fontSize: '0.68rem',
             fontWeight: '800',
             fontFamily: "'JetBrains Mono', monospace",
-            color: '#52525b',
+            color: 'var(--color-text-secondary)',
             letterSpacing: '0.6px',
             textTransform: 'uppercase',
             marginBottom: '12px'
@@ -307,7 +307,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
               <h1 style={{
                 fontSize: '1.75rem',
                 fontWeight: '800',
-                color: '#09090b',
+                color: 'var(--color-text-primary)',
                 letterSpacing: '-0.5px',
                 margin: '0 0 6px 0',
                 lineHeight: 1.2
@@ -316,7 +316,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
               </h1>
               <p style={{
                 fontSize: '0.86rem',
-                color: '#71717a',
+                color: 'var(--color-text-secondary)',
                 lineHeight: 1.5,
                 margin: 0,
                 maxWidth: '680px'
@@ -330,13 +330,13 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 type="button"
                 onClick={onConnect}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '8px',
                   padding: '7px 13px',
                   fontSize: '0.78rem',
                   fontWeight: '600',
-                  color: '#52525b',
+                  color: 'var(--color-text-secondary)',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -354,9 +354,9 @@ export default function InstagramConnectFallback({ onConnect, user }) {
         {/* Error message if any */}
         {errorMsg && (
           <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#b91c1c',
+            background: 'color-mix(in srgb, #ef4444 12%, transparent)',
+            border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
+            color: '#f87171',
             borderRadius: '10px',
             padding: '12px 16px',
             fontSize: '0.84rem',
@@ -373,8 +373,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
         {/* Account Info Bar */}
         <div style={{
           width: '100%',
-          background: '#fafafa',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface-elevated)',
+          border: '1px solid var(--color-border)',
           borderRadius: '12px',
           padding: '14px 18px',
           display: 'flex',
@@ -390,8 +390,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
               width: '38px',
               height: '38px',
               borderRadius: '10px',
-              background: '#e4e4e7',
-              color: '#18181b',
+              background: 'var(--color-border)',
+              color: 'var(--color-text-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -401,10 +401,10 @@ export default function InstagramConnectFallback({ onConnect, user }) {
               {username[0]?.toUpperCase() || 'U'}
             </div>
             <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#09090b' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>
                 @{username.replace(/^@/, '')}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#71717a' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
                 {user?.accountType ? `${user.accountType.charAt(0).toUpperCase() + user.accountType.slice(1)} Tier` : 'Creator Account'}
                 {user?.email ? ` • ${user.email}` : ''}
               </div>
@@ -414,9 +414,9 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             fontSize: '0.68rem',
             fontWeight: '800',
             fontFamily: "'JetBrains Mono', monospace",
-            background: approvalStatus === 'pending' ? '#fef3c7' : (approvalStatus === 'approved' ? '#eff6ff' : '#f4f4f5'),
-            color: approvalStatus === 'pending' ? '#b45309' : (approvalStatus === 'approved' ? '#1d4ed8' : '#71717a'),
-            border: `1px solid ${approvalStatus === 'pending' ? '#fde68a' : (approvalStatus === 'approved' ? '#bfdbfe' : '#e4e4e7')}`,
+            background: approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 14%, transparent)' : (approvalStatus === 'approved' ? 'color-mix(in srgb, var(--ambient-dominant) 12%, transparent)' : 'var(--color-surface-hover)'),
+            color: approvalStatus === 'pending' ? '#fbbf24' : (approvalStatus === 'approved' ? 'var(--ambient-dominant)' : 'var(--color-text-secondary)'),
+            border: `1px solid ${approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 35%, transparent)' : (approvalStatus === 'approved' ? 'color-mix(in srgb, var(--ambient-dominant) 35%, transparent)' : 'var(--color-border)')}`,
             padding: '4px 10px',
             borderRadius: '6px'
           }}>
@@ -427,24 +427,24 @@ export default function InstagramConnectFallback({ onConnect, user }) {
         {/* Meta Sandbox / Test Mode Whitelist Notice */}
         {user?.role !== 'superadmin' && (
           <div style={{
-            background: approvalStatus === 'approved' ? '#f0fdf4' : (approvalStatus === 'pending' ? '#fffbeb' : '#f8fafc'),
-            border: `1px solid ${approvalStatus === 'approved' ? '#bbf7d0' : (approvalStatus === 'pending' ? '#fde68a' : '#e2e8f0')}`,
+            background: approvalStatus === 'approved' ? 'color-mix(in srgb, #22c55e 12%, transparent)' : (approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 12%, transparent)' : 'var(--color-surface-elevated)'),
+            border: `1px solid ${approvalStatus === 'approved' ? 'color-mix(in srgb, #22c55e 35%, transparent)' : (approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 35%, transparent)' : 'var(--color-border)')}`,
             borderRadius: '12px',
             padding: '16px 20px',
             marginBottom: '22px',
             fontSize: '0.82rem',
-            color: approvalStatus === 'approved' ? '#166534' : (approvalStatus === 'pending' ? '#92400e' : '#334155'),
+            color: approvalStatus === 'approved' ? '#4ade80' : (approvalStatus === 'pending' ? '#fbbf24' : 'var(--color-text-secondary)'),
             boxSizing: 'border-box'
           }}>
             {approvalStatus === 'pending' ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: '240px' }}>
-                  <Clock size={18} color="#d97706" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <Clock size={18} color="#fbbf24" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#78350f', marginBottom: '3px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#fbbf24', marginBottom: '3px' }}>
                       ⏳ Request Submitted — Waiting for Admin Whitelist
                     </div>
-                    <div style={{ lineHeight: 1.5, color: '#92400e' }}>
+                    <div style={{ lineHeight: 1.5, color: '#fbbf24' }}>
                       Your handle <strong>@{user?.instagramUsername || handle}</strong> is awaiting addition into Meta App Roles by the Superadmin. Once added, you will receive an automated email with direct steps to accept the invite.
                     </div>
                   </div>
@@ -454,13 +454,13 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   onClick={handleCheckApprovalStatus}
                   disabled={checkingStatus}
                   style={{
-                    background: '#fef3c7',
+                    background: 'color-mix(in srgb, #f59e0b 14%, transparent)',
                     border: '1px solid #fcd34d',
                     borderRadius: '8px',
                     padding: '7px 12px',
                     fontSize: '0.74rem',
                     fontWeight: '700',
-                    color: '#b45309',
+                    color: '#fbbf24',
                     cursor: checkingStatus ? 'wait' : 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -474,12 +474,12 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             ) : approvalStatus === 'approved' ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: '240px' }}>
-                  <CheckCircle2 size={18} color="#15803d" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <CheckCircle2 size={18} color="#4ade80" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#14532d', marginBottom: '3px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#4ade80', marginBottom: '3px' }}>
                       🎉 Whitelisted in Meta Roles! Complete Next 2 Steps:
                     </div>
-                    <div style={{ lineHeight: 1.5, color: '#166534' }}>
+                    <div style={{ lineHeight: 1.5, color: '#4ade80' }}>
                       <strong>Step 1:</strong> Accept the invite in Instagram: <em>Settings &rarr; Website Permissions (or Apps and Websites) &rarr; Tester Invites</em>.<br />
                       <strong>Step 2:</strong> Click <strong>1-Click Meta Login</strong> below to grant token access.
                     </div>
@@ -490,9 +490,9 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    background: '#15803d',
-                    border: '1px solid #166534',
-                    color: '#ffffff',
+                    background: '#4ade80',
+                    border: '1px solid #4ade80',
+                    color: 'var(--color-surface)',
                     borderRadius: '8px',
                     padding: '8px 14px',
                     fontSize: '0.74rem',
@@ -510,26 +510,26 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             ) : (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <Lock size={16} color="#0284c7" />
-                  <span style={{ fontWeight: '800', fontSize: '0.86rem', color: '#0f172a' }}>
+                  <Lock size={16} color="var(--ambient-dominant)" />
+                  <span style={{ fontWeight: '800', fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>
                     Meta Test Mode: Request Access Whitelist
                   </span>
                 </div>
-                <p style={{ margin: '0 0 12px 0', lineHeight: 1.5, color: '#475569' }}>
+                <p style={{ margin: '0 0 12px 0', lineHeight: 1.5, color: 'var(--color-text-secondary)' }}>
                   Since Chatter OS is running in Meta Sandbox mode, your Instagram account must be manually added to <strong>Meta App Roles &rarr; Instagram Testers</strong> before token authorization can succeed. Request access below:
                 </p>
                 <form onSubmit={handleRequestAccess} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border-strong)',
                     borderRadius: '8px',
                     padding: '6px 10px',
                     flex: '1 1 220px',
                     maxWidth: '360px'
                   }}>
-                    <span style={{ color: '#94a3b8', fontWeight: '700', marginRight: '4px' }}>@</span>
+                    <span style={{ color: 'var(--color-text-muted)', fontWeight: '700', marginRight: '4px' }}>@</span>
                     <input
                       type="text"
                       value={requestHandle}
@@ -540,7 +540,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                         outline: 'none',
                         fontSize: '0.82rem',
                         width: '100%',
-                        color: '#0f172a',
+                        color: 'var(--color-text-primary)',
                         fontWeight: '600'
                       }}
                     />
@@ -549,9 +549,9 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     type="submit"
                     disabled={requestingAccess}
                     style={{
-                      background: '#09090b',
-                      border: '1px solid #09090b',
-                      color: '#ffffff',
+                      background: 'var(--color-text-primary)',
+                      border: '1px solid var(--color-text-primary)',
+                      color: 'var(--color-surface)',
                       borderRadius: '8px',
                       padding: '8px 14px',
                       fontSize: '0.78rem',
@@ -575,8 +575,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
         <div className="connect-grid-layout">
           {/* Main Credentials Card */}
           <div style={{
-            background: '#fafafa',
-            border: '1px solid #e4e4e7',
+            background: 'var(--color-surface-elevated)',
+            border: '1px solid var(--color-border)',
             borderRadius: '14px',
             padding: '24px',
             boxSizing: 'border-box'
@@ -585,7 +585,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
               <h2 style={{
                 fontSize: '1.05rem',
                 fontWeight: '700',
-                color: '#09090b',
+                color: 'var(--color-text-primary)',
                 margin: 0,
                 display: 'flex',
                 alignItems: 'center',
@@ -599,11 +599,11 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             {/* Clean Segmented Tab Switcher */}
             <div style={{
               display: 'flex',
-              background: '#f4f4f5',
+              background: 'var(--color-surface-hover)',
               padding: '4px',
               borderRadius: '9px',
               marginBottom: '20px',
-              border: '1px solid #e4e4e7'
+              border: '1px solid var(--color-border)'
             }}>
               <button
                 type="button"
@@ -613,8 +613,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   padding: '8px 12px',
                   borderRadius: '7px',
                   border: 'none',
-                  background: setupTab === 'oauth' ? '#ffffff' : 'transparent',
-                  color: setupTab === 'oauth' ? '#09090b' : '#71717a',
+                  background: setupTab === 'oauth' ? 'var(--color-surface)' : 'transparent',
+                  color: setupTab === 'oauth' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontWeight: '700',
                   fontSize: '0.8rem',
                   cursor: 'pointer',
@@ -626,12 +626,12 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   gap: '6px'
                 }}
               >
-                <Zap size={14} color={setupTab === 'oauth' ? '#7c3aed' : '#71717a'} />
+                <Zap size={14} color={setupTab === 'oauth' ? 'var(--ambient-dominant)' : 'var(--color-text-secondary)'} />
                 <span>1-Click Meta Login</span>
                 <span style={{
                   fontSize: '0.62rem',
-                  background: '#dcfce7',
-                  color: '#15803d',
+                  background: 'color-mix(in srgb, #22c55e 14%, transparent)',
+                  color: '#4ade80',
                   padding: '1px 6px',
                   borderRadius: '999px',
                   fontWeight: '800'
@@ -646,8 +646,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   padding: '8px 12px',
                   borderRadius: '7px',
                   border: 'none',
-                  background: setupTab === 'manual' ? '#ffffff' : 'transparent',
-                  color: setupTab === 'manual' ? '#09090b' : '#71717a',
+                  background: setupTab === 'manual' ? 'var(--color-surface)' : 'transparent',
+                  color: setupTab === 'manual' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontWeight: '700',
                   fontSize: '0.8rem',
                   cursor: 'pointer',
@@ -667,28 +667,28 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             {/* TAB 1: 1-Click Meta OAuth (Streamlined & Clean) */}
             {setupTab === 'oauth' && (
               <div>
-                <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '18px', lineHeight: 1.5 }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '18px', lineHeight: 1.5 }}>
                   Log in directly through official Meta dialog to automatically grant permissions, link your Instagram business profile, and generate encrypted long-lived tokens.
                 </p>
 
                 <div style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '12px',
                   padding: '20px',
                   marginBottom: '20px'
                 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', fontSize: '0.82rem', color: '#52525b' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#15803d" />
+                      <CheckCircle2 size={16} color="#4ade80" />
                       <span>Automatic Instagram Business ID resolution</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#15803d" />
+                      <CheckCircle2 size={16} color="#4ade80" />
                       <span>60-day auto-refreshing encrypted Page Access Token</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#15803d" />
+                      <CheckCircle2 size={16} color="#4ade80" />
                       <span>Instant webhook routing for real-time AI responses</span>
                     </div>
                   </div>
@@ -699,8 +699,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     disabled={oauthConnecting}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)',
-                      color: '#ffffff',
+                      background: 'linear-gradient(135deg, var(--ambient-dominant) 0%, var(--ambient-dominant) 50%, #db2777 100%)',
+                      color: 'var(--color-surface)',
                       border: 'none',
                       borderRadius: '11px',
                       padding: '14px 20px',
@@ -728,7 +728,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       </>
                     )}
                   </button>
-                  <span style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '8px', display: 'block', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '8px', display: 'block', textAlign: 'center' }}>
                     Official Meta Graph API dialog opens in a secure popup window.
                   </span>
                 </div>
@@ -739,7 +739,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             {setupTab === 'manual' && (
               <form onSubmit={handleConnectDirectly} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', textTransform: 'uppercase', color: '#52525b', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
                     Instagram Handle
                   </label>
                   <input
@@ -751,8 +751,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#ffffff',
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface)',
                       fontSize: '0.86rem',
                       boxSizing: 'border-box'
                     }}
@@ -760,7 +760,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', textTransform: 'uppercase', color: '#52525b', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
                     Instagram Business Account ID
                   </label>
                   <input
@@ -772,8 +772,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#ffffff',
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface)',
                       fontSize: '0.86rem',
                       fontFamily: 'monospace',
                       boxSizing: 'border-box'
@@ -783,7 +783,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: '700', textTransform: 'uppercase', color: '#52525b' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>
                       Page Access Token
                     </label>
                     <button
@@ -792,7 +792,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#71717a',
+                        color: 'var(--color-text-secondary)',
                         fontSize: '0.72rem',
                         fontWeight: '600',
                         cursor: 'pointer',
@@ -814,14 +814,14 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#ffffff',
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface)',
                       fontSize: '0.86rem',
                       fontFamily: 'monospace',
                       boxSizing: 'border-box'
                     }}
                   />
-                  <span style={{ fontSize: '0.7rem', color: '#a1a1aa', marginTop: '4px', display: 'block' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
                     Requires <code>instagram_basic</code> &amp; <code>instagram_manage_messages</code> permissions.
                   </span>
                 </div>
@@ -831,8 +831,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   disabled={saving}
                   style={{
                     width: '100%',
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--color-text-primary)',
+                    color: 'var(--color-surface)',
                     border: 'none',
                     borderRadius: '10px',
                     padding: '13px 20px',
@@ -868,8 +868,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
           {/* Guide / Instructions Card */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-border)',
               borderRadius: '14px',
               padding: '24px'
             }}>
@@ -877,7 +877,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 <h3 style={{
                   fontSize: '0.98rem',
                   fontWeight: '700',
-                  color: '#09090b',
+                  color: 'var(--color-text-primary)',
                   margin: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -888,14 +888,14 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 </h3>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem', color: '#52525b', lineHeight: 1.5 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <span style={{
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    background: '#e4e4e7',
-                    color: '#09090b',
+                    background: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
                     fontWeight: '800',
                     fontSize: '0.72rem',
                     display: 'flex',
@@ -911,8 +911,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    background: '#e4e4e7',
-                    color: '#09090b',
+                    background: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
                     fontWeight: '800',
                     fontSize: '0.72rem',
                     display: 'flex',
@@ -928,8 +928,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    background: '#e4e4e7',
-                    color: '#09090b',
+                    background: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
                     fontWeight: '800',
                     fontSize: '0.72rem',
                     display: 'flex',
@@ -945,8 +945,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    background: '#e4e4e7',
-                    color: '#09090b',
+                    background: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
                     fontWeight: '800',
                     fontSize: '0.72rem',
                     display: 'flex',
@@ -958,7 +958,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 </div>
               </div>
 
-              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #e4e4e7' }}>
+              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--color-border)' }}>
                 <a
                   href="https://developers.facebook.com/tools/explorer/"
                   target="_blank"
@@ -969,7 +969,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     gap: '6px',
                     fontSize: '0.78rem',
                     fontWeight: '700',
-                    color: '#09090b',
+                    color: 'var(--color-text-primary)',
                     textDecoration: 'none'
                   }}
                 >
@@ -981,16 +981,16 @@ export default function InstagramConnectFallback({ onConnect, user }) {
 
             {/* Privacy & Safety Note */}
             <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-border)',
               borderRadius: '12px',
               padding: '16px 20px',
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px'
             }}>
-              <Lock size={16} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.45 }}>
+              <Lock size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
                 Your access token is encrypted in MongoDB and never shared. Only the authenticated automation engine communicates with Meta's official Graph API.
               </div>
             </div>
@@ -1000,10 +1000,10 @@ export default function InstagramConnectFallback({ onConnect, user }) {
         {/* Feature Previews Grid */}
         <div className="connect-features-grid">
           {(isBusinessWorkspace ? BUSINESS_FEATURES : PERSONAL_FEATURES).map(({ Icon, title, desc }) => (
-            <div key={title} style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <Icon size={18} color="#09090b" />
-              <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#09090b' }}>{title}</div>
-              <div style={{ fontSize: '0.72rem', color: '#71717a', lineHeight: 1.4 }}>{desc}</div>
+            <div key={title} style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Icon size={18} color="var(--color-text-primary)" />
+              <div style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>{title}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>{desc}</div>
             </div>
           ))}
         </div>

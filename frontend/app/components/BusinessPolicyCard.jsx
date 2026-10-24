@@ -19,8 +19,8 @@ const EMPTY_POLICY = {
   customRules: [],
 };
 
-const labelStyle = { fontSize: '0.78rem', fontWeight: 700, color: '#09090b', display: 'block', marginBottom: '6px' };
-const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '1px solid #e4e4e7', borderRadius: '8px', fontSize: '0.86rem', fontFamily: 'inherit', background: '#ffffff', color: '#09090b' };
+const labelStyle = { fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'block', marginBottom: '6px' };
+const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '0.86rem', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text-primary)' };
 const sectionTitle = { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.95rem', margin: '0 0 12px' };
 
 /**
@@ -89,8 +89,8 @@ export default function BusinessPolicyCard() {
     <div className="controls-card-container" style={{ marginBottom: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
-          <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>BUSINESS POLICY & HOURS</div>
-          <div style={{ fontSize: '0.85rem', color: '#71717a', marginTop: '2px' }}>The AI follows these rules for every customer DM.</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>BUSINESS POLICY & HOURS</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>The AI follows these rules for every customer DM.</div>
         </div>
         <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
           <Save size={14} /> {saving ? 'Saving…' : 'Save Policy'}
@@ -104,7 +104,7 @@ export default function BusinessPolicyCard() {
           const on = policy.workingDays.includes(d);
           return (
             <button key={name} type="button" onClick={() => toggleDay(d)}
-              style={{ padding: '7px 12px', borderRadius: '999px', border: `1px solid ${on ? '#09090b' : '#e4e4e7'}`, background: on ? '#09090b' : '#ffffff', color: on ? '#ffffff' : '#71717a', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', minHeight: '36px' }}>
+              style={{ padding: '7px 12px', borderRadius: '999px', border: `1px solid ${on ? 'var(--color-text-primary)' : 'var(--color-border)'}`, background: on ? 'var(--color-text-primary)' : 'var(--color-surface)', color: on ? 'var(--color-surface)' : 'var(--color-text-secondary)', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', minHeight: '36px' }}>
               {name}
             </button>
           );
@@ -123,7 +123,7 @@ export default function BusinessPolicyCard() {
       <h3 style={sectionTitle}><ShieldAlert size={16} /> Human handoff</h3>
       <label style={labelStyle}>Extra escalation keywords (comma separated)</label>
       <input style={{ ...inputStyle, marginBottom: '6px' }} value={keywordsText} onChange={e => setKeywordsText(e.target.value)} placeholder="late delivery, wrong size, invoice" />
-      <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '20px' }}>
+      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
         Complaints and requests for a human are always detected. The bot replies once, then pauses that chat for your team.
       </div>
 
@@ -147,7 +147,7 @@ export default function BusinessPolicyCard() {
 
       {/* Custom CEL rules */}
       <h3 style={sectionTitle}>Advanced rules (CEL)</h3>
-      <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '10px' }}>
+      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
         When the condition is true, the instruction is added for that reply. Example condition: <code>message.isQuestion &amp;&amp; customer.isReturning</code>
       </div>
       {policy.customRules.map((rule, i) => (

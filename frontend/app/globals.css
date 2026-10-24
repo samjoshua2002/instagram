@@ -734,7 +734,7 @@ select:focus {
   padding: 44px;
   box-sizing: border-box;
   overflow: hidden;
-  background: var(--color-text-primary);
+  background: var(--color-surface);
 }
 
 .login-form-panel {
@@ -1154,4 +1154,27 @@ select:focus {
   .ambient-layer {
     transition: none;
   }
+}
+
+/* SVG presentation attributes cannot resolve var(); map token-valued icon colours via CSS */
+[stroke="var(--ambient-dominant)"] { stroke: var(--ambient-dominant); }
+[fill="var(--ambient-dominant)"] { fill: var(--ambient-dominant); }
+[stroke="var(--ambient-secondary)"] { stroke: var(--ambient-secondary); }
+[fill="var(--ambient-secondary)"] { fill: var(--ambient-secondary); }
+[stroke="var(--color-surface)"] { stroke: var(--color-surface); }
+[fill="var(--color-surface)"] { fill: var(--color-surface); }
+[stroke="var(--color-surface-hover)"] { stroke: var(--color-surface-hover); }
+[fill="var(--color-surface-hover)"] { fill: var(--color-surface-hover); }
+[stroke="var(--color-text-primary)"] { stroke: var(--color-text-primary); }
+[fill="var(--color-text-primary)"] { fill: var(--color-text-primary); }
+[stroke="var(--color-text-secondary)"] { stroke: var(--color-text-secondary); }
+[fill="var(--color-text-secondary)"] { fill: var(--color-text-secondary); }
+[stroke="var(--color-text-muted)"] { stroke: var(--color-text-muted); }
+[fill="var(--color-text-muted)"] { fill: var(--color-text-muted); }
+[stroke="var(--color-border)"] { stroke: var(--color-border); }
+[fill="var(--color-border)"] { fill: var(--color-border); }
+
+/* html paints the base colour; body stays clear so the fixed ambient layer (z-index -1) shows */
+body {
+  background-color: transparent;
 }

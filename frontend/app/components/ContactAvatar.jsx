@@ -72,8 +72,8 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
           height: '100%',
           borderRadius: '8px',
           overflow: 'hidden',
-          background: '#f4f4f5',
-          border: '1px solid #e4e4e7',
+          background: 'var(--color-surface-hover)',
+          border: '1px solid var(--color-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -96,8 +96,8 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
             style={{
               width: '100%',
               height: '100%',
-              background: '#f4f4f5',
-              color: '#09090b',
+              background: 'var(--color-surface-hover)',
+              color: 'var(--color-text-primary)',
               fontSize: `${Math.max(10, Math.floor(size * 0.36))}px`,
               fontWeight: '700',
               fontFamily: "'JetBrains Mono', monospace",
@@ -122,9 +122,9 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
             width: `${Math.max(8, Math.floor(size * 0.22))}px`,
             height: `${Math.max(8, Math.floor(size * 0.22))}px`,
             borderRadius: '50%',
-            background: isPaused ? '#ffffff' : '#09090b',
-            border: isPaused ? '2px solid #a1a1aa' : (isReelsOnly ? '2px solid #09090b' : '2px solid #ffffff'),
-            boxShadow: '0 0 0 1px #e4e4e7',
+            background: isPaused ? 'var(--color-surface)' : 'var(--color-text-primary)',
+            border: isPaused ? '2px solid var(--color-text-muted)' : (isReelsOnly ? '2px solid var(--color-text-primary)' : '2px solid var(--color-surface)'),
+            boxShadow: '0 0 0 1px var(--color-border)',
             display: 'block'
           }}
         />

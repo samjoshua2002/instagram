@@ -357,12 +357,12 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       <div style={{
-        background: '#ffffff',
-        border: '1px solid #e4e4e7',
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
         borderRadius: '16px',
         width: '100%',
         maxWidth: '560px',
-        color: '#09090b',
+        color: 'var(--color-text-primary)',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
         overflow: 'hidden'
       }}>
@@ -372,31 +372,31 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '18px 24px',
-          borderBottom: '1px solid #f4f4f5'
+          borderBottom: '1px solid var(--color-surface-hover)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#09090b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'var(--color-text-primary)', color: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield size={18} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, letterSpacing: '-0.3px', color: '#09090b' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: '700', margin: 0, letterSpacing: '-0.3px', color: 'var(--color-text-primary)' }}>
                 Account & Security Settings
               </h2>
-              <p style={{ fontSize: '0.74rem', color: '#71717a', margin: 0 }}>
+              <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: 0 }}>
                 Manage passkeys, profile picture, and Zoho OneAuth
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+            style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px' }}
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #f4f4f5', background: '#fafafa', padding: '0 16px' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--color-surface-hover)', background: 'var(--color-surface-elevated)', padding: '0 16px' }}>
           <button
             onClick={() => setActiveTab('passkeys')}
             style={{
@@ -405,8 +405,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               background: 'none',
               fontSize: '0.82rem',
               fontWeight: activeTab === 'passkeys' ? '700' : '500',
-              color: activeTab === 'passkeys' ? '#09090b' : '#71717a',
-              borderBottom: activeTab === 'passkeys' ? '2px solid #09090b' : '2px solid transparent',
+              color: activeTab === 'passkeys' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'passkeys' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -424,8 +424,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               background: 'none',
               fontSize: '0.82rem',
               fontWeight: activeTab === 'oneauth' ? '700' : '500',
-              color: activeTab === 'oneauth' ? '#09090b' : '#71717a',
-              borderBottom: activeTab === 'oneauth' ? '2px solid #09090b' : '2px solid transparent',
+              color: activeTab === 'oneauth' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'oneauth' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -443,8 +443,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               background: 'none',
               fontSize: '0.82rem',
               fontWeight: activeTab === 'profile' ? '700' : '500',
-              color: activeTab === 'profile' ? '#09090b' : '#71717a',
-              borderBottom: activeTab === 'profile' ? '2px solid #09090b' : '2px solid transparent',
+              color: activeTab === 'profile' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'profile' ? '2px solid var(--color-text-primary)' : '2px solid transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -462,21 +462,21 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
           {activeTab === 'passkeys' && (
             <div>
               <div style={{ marginBottom: '18px' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px', color: '#09090b' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
                   Biometric Passkey Authentication
                 </h4>
-                <p style={{ fontSize: '0.78rem', color: '#71717a', margin: 0 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: 0 }}>
                   Add Face ID, Touch ID, or fingerprint sensors from any phone, laptop, or desktop.
                 </p>
               </div>
 
               {/* Add New Passkey Box */}
-              <div style={{ background: '#f4f4f5', borderRadius: '10px', padding: '14px', marginBottom: '20px' }}>
+              <div style={{ background: 'var(--color-surface-hover)', borderRadius: '10px', padding: '14px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: '600', color: '#52525b', textTransform: 'uppercase' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
                     Device Label
                   </label>
-                  <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: '500' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--ambient-dominant)', fontWeight: '500' }}>
                     Auto-detected
                   </span>
                 </div>
@@ -488,13 +488,13 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     placeholder="e.g. iPhone 15 Pro, Pixel 8, Windows Hello"
                     style={{
                       flex: 1,
-                      background: '#ffffff',
-                      border: '1px solid #e4e4e7',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '8px',
                       padding: '8px 12px',
                       fontSize: '0.84rem',
                       outline: 'none',
-                      color: '#09090b'
+                      color: 'var(--color-text-primary)'
                     }}
                   />
                   <button
@@ -502,8 +502,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     onClick={handleRegisterPasskey}
                     disabled={passkeyLoading}
                     style={{
-                      background: '#09090b',
-                      color: '#ffffff',
+                      background: 'var(--color-text-primary)',
+                      color: 'var(--color-surface)',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '8px 16px',
@@ -522,19 +522,19 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               </div>
 
               {/* Registered Passkeys List */}
-              <h5 style={{ fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', margin: '0 0 10px' }}>
+              <h5 style={{ fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', margin: '0 0 10px' }}>
                 Your Registered Devices ({passkeys.length})
               </h5>
               {passkeys.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 12px', color: '#a1a1aa', fontSize: '0.82rem', border: '1px dashed #e4e4e7', borderRadius: '10px' }}>
+                <div style={{ textAlign: 'center', padding: '24px 12px', color: 'var(--color-text-muted)', fontSize: '0.82rem', border: '1px dashed var(--color-border)', borderRadius: '10px' }}>
                   No biometric passkeys registered yet on this account.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {passkeys.map(p => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px' }}>
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                        <Fingerprint size={20} color="#09090b" style={{ flexShrink: 0 }} />
+                        <Fingerprint size={20} color="var(--color-text-primary)" style={{ flexShrink: 0 }} />
                         {editingPasskeyId === p.id ? (
                           <div style={{ display: 'flex', gap: '6px', flex: 1, marginRight: '10px' }}>
                             <input
@@ -542,34 +542,34 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                               value={editingPasskeyName}
                               onChange={(e) => setEditingPasskeyName(e.target.value)}
                               autoFocus
-                              style={{ flex: 1, padding: '4px 8px', border: '1px solid #09090b', borderRadius: '6px', fontSize: '0.82rem' }}
+                              style={{ flex: 1, padding: '4px 8px', border: '1px solid var(--color-text-primary)', borderRadius: '6px', fontSize: '0.82rem' }}
                             />
                             <button
                               onClick={() => handleRenamePasskey(p.id)}
-                              style={{ background: '#09090b', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.74rem' }}
+                              style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface)', border: 'none', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.74rem' }}
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingPasskeyId(null)}
-                              style={{ background: 'none', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.74rem' }}
+                              style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.74rem' }}
                             >
                               Cancel
                             </button>
                           </div>
                         ) : (
                           <div>
-                            <div style={{ fontSize: '0.84rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '0.84rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>{p.name}</span>
                               <button
                                 onClick={() => { setEditingPasskeyId(p.id); setEditingPasskeyName(p.name); }}
-                                style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: 0 }}
+                                style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0 }}
                                 title="Rename device"
                               >
                                 <Edit2 size={12} />
                               </button>
                             </div>
-                            <div style={{ fontSize: '0.72rem', color: '#71717a' }}>Added {new Date(p.createdAt).toLocaleDateString()}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>Added {new Date(p.createdAt).toLocaleDateString()}</div>
                           </div>
                         )}
                       </div>
@@ -591,36 +591,36 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
           {activeTab === 'oneauth' && (
             <div>
               <div style={{ marginBottom: '16px' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px', color: '#09090b' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
                   Zoho OneAuth 2FA
                 </h4>
-                <p style={{ fontSize: '0.78rem', color: '#71717a', margin: 0 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: 0 }}>
                   Scan this QR code in Zoho OneAuth or Google Authenticator to generate 6-digit codes.
                 </p>
               </div>
 
               {totpLoading ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: '#71717a', fontSize: '0.84rem' }}>
+                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--color-text-secondary)', fontSize: '0.84rem' }}>
                   Generating QR Code...
                 </div>
               ) : totpData ? (
-                <div style={{ textAlign: 'center', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px' }}>
+                <div style={{ textAlign: 'center', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
                   <img
                     src={totpData.qrDataUrl}
                     alt="OneAuth QR Code"
-                    style={{ width: '180px', height: '180px', margin: '0 auto 14px', borderRadius: '8px', border: '1px solid #e4e4e7' }}
+                    style={{ width: '180px', height: '180px', margin: '0 auto 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                   />
-                  <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#71717a', marginBottom: '4px' }}>Manual Secret Key</div>
-                  <div style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '0.95rem', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 12px', display: 'inline-block', letterSpacing: '1.5px' }}>
+                  <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Manual Secret Key</div>
+                  <div style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '0.95rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 12px', display: 'inline-block', letterSpacing: '1.5px' }}>
                     {totpData.secret}
                   </div>
-                  <p style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '12px' }}>
+                  <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', marginTop: '12px' }}>
                     Enter this secret key in Zoho OneAuth if scanning does not work.
                   </p>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <button onClick={loadTotpQrCode} style={{ background: '#09090b', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+                  <button onClick={loadTotpQrCode} style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface)', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
                     Load QR Code
                   </button>
                 </div>
@@ -633,8 +633,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
             <form onSubmit={handleSaveProfile}>
               {/* Profile Picture Upload Section */}
               <div style={{
-                background: '#fafafa',
-                border: '1px solid #e4e4e7',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-border)',
                 borderRadius: '12px',
                 padding: '16px',
                 marginBottom: '20px',
@@ -652,7 +652,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                         height: '72px',
                         borderRadius: '16px',
                         objectFit: 'cover',
-                        border: '2px solid #09090b',
+                        border: '2px solid var(--color-text-primary)',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                       }}
                     />
@@ -661,8 +661,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                       width: '72px',
                       height: '72px',
                       borderRadius: '16px',
-                      background: '#09090b',
-                      color: '#ffffff',
+                      background: 'var(--color-text-primary)',
+                      color: 'var(--color-surface)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -681,9 +681,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                       position: 'absolute',
                       right: '-6px',
                       bottom: '-6px',
-                      background: '#09090b',
-                      color: '#ffffff',
-                      border: '2px solid #ffffff',
+                      background: 'var(--color-text-primary)',
+                      color: 'var(--color-surface)',
+                      border: '2px solid var(--color-surface)',
                       borderRadius: '50%',
                       width: '28px',
                       height: '28px',
@@ -706,10 +706,10 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                 </div>
 
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.86rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '0.86rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
                     Profile Picture
                   </div>
-                  <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '0 0 10px', lineHeight: 1.35 }}>
+                  <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 10px', lineHeight: 1.35 }}>
                     Upload any photo from your phone or device. Automatically compressed for instant load times.
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -717,8 +717,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       style={{
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--color-text-primary)',
+                        color: 'var(--color-surface)',
                         border: 'none',
                         borderRadius: '6px',
                         padding: '6px 12px',
@@ -738,9 +738,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                         type="button"
                         onClick={() => setProfileData(prev => ({ ...prev, profilePicUrl: '' }))}
                         style={{
-                          background: '#ffffff',
-                          border: '1px solid #e4e4e7',
-                          color: '#b91c1c',
+                          background: 'var(--color-surface)',
+                          border: '1px solid var(--color-border)',
+                          color: '#f87171',
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: '0.76rem',
@@ -758,23 +758,23 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               {/* Names */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>First Name</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>First Name</label>
                   <input
                     type="text"
                     value={profileData.firstName}
                     onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
                     placeholder="First Name"
-                    style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>Last Name</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Last Name</label>
                   <input
                     type="text"
                     value={profileData.lastName}
                     onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
                     placeholder="Last Name"
-                    style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -782,44 +782,44 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               {/* Phone & WhatsApp */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>Mobile Number</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Mobile Number</label>
                   <input
                     type="text"
                     value={profileData.mobileNumber}
                     onChange={(e) => setProfileData({ ...profileData, mobileNumber: e.target.value })}
                     placeholder="+91..."
-                    style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>WhatsApp Number</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>WhatsApp Number</label>
                   <input
                     type="text"
                     value={profileData.whatsappNumber}
                     onChange={(e) => setProfileData({ ...profileData, whatsappNumber: e.target.value })}
                     placeholder="+91..."
-                    style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
               {/* Instagram Handle */}
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#52525b', marginBottom: '4px' }}>Instagram Handle / Username</label>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Instagram Handle / Username</label>
                 <input
                   type="text"
                   value={profileData.instagramUsername}
                   onChange={(e) => setProfileData({ ...profileData, instagramUsername: e.target.value })}
                   placeholder="username without @"
-                  style={{ width: '100%', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '8px 10px', fontSize: '0.84rem', boxSizing: 'border-box' }}
                 />
               </div>
 
               {/* Address Fields */}
-              <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', border: '1px solid #f4f4f5', marginBottom: '18px' }}>
+              <div style={{ background: 'var(--color-surface-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-surface-hover)', marginBottom: '18px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <MapPin size={13} color="#71717a" />
-                  <span style={{ fontSize: '0.74rem', fontWeight: '600', color: '#52525b', textTransform: 'uppercase' }}>Address (Optional)</span>
+                  <MapPin size={13} color="var(--color-text-secondary)" />
+                  <span style={{ fontSize: '0.74rem', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Address (Optional)</span>
                 </div>
                 <div style={{ marginBottom: '8px' }}>
                   <input
@@ -827,7 +827,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     value={profileData.address?.street || ''}
                     onChange={(e) => setProfileData({ ...profileData, address: { ...profileData.address, street: e.target.value } })}
                     placeholder="Street Address"
-                    style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -836,14 +836,14 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     value={profileData.address?.city || ''}
                     onChange={(e) => setProfileData({ ...profileData, address: { ...profileData.address, city: e.target.value } })}
                     placeholder="City"
-                    style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
                   />
                   <input
                     type="text"
                     value={profileData.address?.country || ''}
                     onChange={(e) => setProfileData({ ...profileData, address: { ...profileData.address, country: e.target.value } })}
                     placeholder="Country"
-                    style={{ width: '100%', background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -853,8 +853,8 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                   type="submit"
                   disabled={profileSaving}
                   style={{
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--color-text-primary)',
+                    color: 'var(--color-surface)',
                     border: 'none',
                     borderRadius: '8px',
                     padding: '10px 18px',

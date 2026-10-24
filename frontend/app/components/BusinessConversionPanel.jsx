@@ -4,11 +4,11 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Target, Calendar, Download, Phone, Mail } from 'lucide-react';
 
-const cardStyle = { background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '20px', minWidth: 0 };
-const kicker = { fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' };
+const cardStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px', minWidth: 0 };
+const kicker = { fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' };
 const STATUS = {
-  confirmed: { bg: '#dcfce7', fg: '#15803d' },
-  pending: { bg: '#fef3c7', fg: '#b45309' },
+  confirmed: { bg: 'color-mix(in srgb, #22c55e 14%, transparent)', fg: '#4ade80' },
+  pending: { bg: 'color-mix(in srgb, #f59e0b 14%, transparent)', fg: '#fbbf24' },
 };
 
 function formatWhen(date) {
@@ -64,17 +64,17 @@ export default function BusinessConversionPanel({ refreshKey }) {
           </button>
         </div>
         {leads.length === 0 ? (
-          <div style={{ color: '#a1a1aa', fontSize: '0.85rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Target size={15} /> Leads appear here when customers share contact details or ask about prices.
           </div>
         ) : leads.map(l => (
-          <div key={l._id} style={{ padding: '10px 0', borderTop: '1px solid #f4f4f5' }}>
+          <div key={l._id} style={{ padding: '10px 0', borderTop: '1px solid var(--color-surface-hover)' }}>
             <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>@{l.handle || l.senderId}</div>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.78rem', color: '#52525b', marginTop: '3px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '3px' }}>
               {l.phone && <a href={`tel:${l.phone.replace(/\s/g, '')}`} style={{ color: 'inherit', display: 'inline-flex', gap: '4px', alignItems: 'center' }}><Phone size={12} />{l.phone}</a>}
               {l.email && <a href={`mailto:${l.email}`} style={{ color: 'inherit', display: 'inline-flex', gap: '4px', alignItems: 'center', wordBreak: 'break-all' }}><Mail size={12} />{l.email}</a>}
             </div>
-            {l.intentSummary && <div style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: '3px' }}>{l.intentSummary}</div>}
+            {l.intentSummary && <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '3px' }}>{l.intentSummary}</div>}
           </div>
         ))}
       </div>
@@ -85,16 +85,16 @@ export default function BusinessConversionPanel({ refreshKey }) {
           <div style={{ fontSize: '1rem', fontWeight: 800, marginTop: '2px' }}>Upcoming bookings</div>
         </div>
         {bookings.length === 0 ? (
-          <div style={{ color: '#a1a1aa', fontSize: '0.85rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Calendar size={15} /> Bookings appear here when customers agree a time in DMs.
           </div>
         ) : bookings.map(b => {
           const s = STATUS[b.status] || STATUS.pending;
           return (
-            <div key={b._id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', padding: '10px 0', borderTop: '1px solid #f4f4f5' }}>
+            <div key={b._id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--color-surface-hover)' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{b.serviceName || 'Booking'}</div>
-                <div style={{ fontSize: '0.78rem', color: '#52525b' }}>@{b.handle || b.senderId} · {formatWhen(b.bookingTime)}</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>@{b.handle || b.senderId} · {formatWhen(b.bookingTime)}</div>
               </div>
               <span style={{ background: s.bg, color: s.fg, fontWeight: 700, fontSize: '0.7rem', padding: '3px 9px', borderRadius: '999px', textTransform: 'capitalize', flexShrink: 0 }}>{b.status}</span>
             </div>
