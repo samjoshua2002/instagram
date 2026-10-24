@@ -103,8 +103,8 @@ export default function BusinessPolicyCard() {
         {DAYS.map((name, d) => {
           const on = policy.workingDays.includes(d);
           return (
-            <button key={name} type="button" onClick={() => toggleDay(d)}
-              style={{ padding: '7px 12px', borderRadius: '999px', border: `1px solid ${on ? 'var(--color-text-primary)' : 'var(--color-border)'}`, background: on ? 'var(--color-text-primary)' : 'var(--color-surface)', color: on ? 'var(--color-surface)' : 'var(--color-text-secondary)', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', minHeight: '36px' }}>
+            <button key={name} type="button" aria-pressed={on} onClick={() => toggleDay(d)}
+              style={{ padding: '0 16px', borderRadius: '999px', border: `1px solid ${on ? 'var(--ambient-dominant)' : 'var(--glass-border)'}`, background: on ? 'color-mix(in srgb, var(--ambient-dominant) 22%, transparent)' : 'var(--glass-fill-subtle)', color: on ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', minHeight: '44px', minWidth: '52px', touchAction: 'manipulation', transition: 'background 0.15s ease, border-color 0.15s ease' }}>
               {name}
             </button>
           );

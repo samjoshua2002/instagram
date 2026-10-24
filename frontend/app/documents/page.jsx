@@ -188,9 +188,12 @@ export default function DocumentsPage() {
           <div className="download-icon"><SourceIcon type={item.sourceType} /></div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 6px' }}>
-              {(item.categories || []).filter(Boolean).join(', ') || 'general'} · {item.chunks} section{item.chunks === 1 ? '' : 's'}
-              {item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString()}` : ''}
+            <div className="docs-chips">
+              {((item.categories || []).filter(Boolean).length ? item.categories.filter(Boolean) : ['general']).map(c => (
+                <span key={c} className="docs-chip">{c}</span>
+              ))}
+              <span className="docs-chip docs-chip-indexed">{item.chunks} section{item.chunks === 1 ? '' : 's'} indexed</span>
+              {item.createdAt && <span className="docs-chip-date">{new Date(item.createdAt).toLocaleDateString()}</span>}
             </div>
             <div className="docs-preview">{item.preview}</div>
           </div>

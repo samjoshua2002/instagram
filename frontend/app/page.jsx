@@ -1266,17 +1266,13 @@ export default function AnalyticsPage() {
                 key={i}
                 variants={statCardVariants}
                 whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
-                className="stat-card-item"
+                className="stat-card-item stat-glass"
                 style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '12px',
                   padding: '18px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  minHeight: '120px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                  minHeight: '120px'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
