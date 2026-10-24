@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { animate, useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'framer-motion';
+import gsap from 'gsap';
 
-/** Animated number counter: eases from the previous value to `value`. */
+/** Animated number counter (GSAP): eases from the previous value to `value`. */
 export default function CountUp({ value = 0, duration = 1.1, className, style }) {
   const ref = useRef(null);
   const from = useRef(0);
@@ -18,13 +19,15 @@ export default function CountUp({ value = 0, duration = 1.1, className, style })
       from.current = target;
       return;
     }
-    const controls = animate(from.current, target, {
+    const counter = { v: from.current };
+    const tween = gsap.to(counter, {
+      v: target,
       duration,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate: v => { node.textContent = Math.round(v).toLocaleString(); },
+      ease: 'expo.out',
+      onUpdate: () => { node.textContent = Math.round(counter.v).toLocaleString(); },
     });
     from.current = target;
-    return () => controls.stop();
+    return () => tween.kill();
   }, [value, duration, reduce]);
 
   return <span ref={ref} className={className} style={style}>0</span>;

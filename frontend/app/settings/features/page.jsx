@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import SuperadminWorkspacePrompt from '../../components/SuperadminWorkspacePrompt';
 import WorkspaceModeSwitch from '../../components/WorkspaceModeSwitch';
+import { Switch } from '../../components/ui/switch';
 import { FEATURE_GROUPS, WORKSPACE_MODES, currentMode } from '../../lib/workspaceFeatures';
 
 /**
@@ -79,13 +80,10 @@ export default function FeatureStorePage() {
                     {setupHref && <> <Link href={setupHref} className="feature-setup">Set up</Link></>}
                   </span>
                 </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  className="feature-switch"
+                <Switch
                   checked={enabled[key]}
                   disabled={savingKey !== null}
-                  onChange={() => toggle(key)}
+                  onCheckedChange={() => toggle(key)}
                   aria-label={label}
                 />
               </label>
