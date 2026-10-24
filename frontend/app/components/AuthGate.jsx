@@ -39,9 +39,9 @@ export default function AuthGate({ children }) {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && user?._id) {
+    if (typeof window !== 'undefined' && (user?._id || user?.id)) {
       try {
-        const userDismissKey = `chatter_onboarding_dismissed_${user._id}`;
+        const userDismissKey = `chatter_onboarding_dismissed_${user._id || user.id}`;
         if (sessionStorage.getItem(userDismissKey) === 'true') {
           setWizardDismissed(true);
         } else {
@@ -49,7 +49,7 @@ export default function AuthGate({ children }) {
         }
       } catch (e) {}
     }
-  }, [user?._id]);
+  }, [user?._id, user?.id]);
 
   // Fresh launch detector: when user closes tab/window and opens fresh,
   // sessionStorage is cleared. We automatically redirect them to start on Dashboard (/)!
@@ -135,8 +135,8 @@ export default function AuthGate({ children }) {
         onClose={() => {
           setWizardDismissed(true);
           setIsOnboardingModalOpen(false);
-          if (user?._id) {
-            try { sessionStorage.setItem(`chatter_onboarding_dismissed_${user._id}`, 'true'); } catch (e) {}
+          if (user?._id || user?.id) {
+            try { sessionStorage.setItem(`chatter_onboarding_dismissed_${user._id || user.id}`, 'true'); } catch (e) {}
           }
         }}
       />

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { isFromApi, onPopupClosed } from '../lib/utils';
 import {
   UserCheck, Save, Sparkles, MessageSquare, AlertCircle,
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
@@ -12,22 +13,14 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating, updateUserProfile } = useApp();
 
-  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
-  if (user?.role === 'superadmin' && !isImpersonating) {
-    return (
-      <SuperadminWorkspacePrompt
-        sectionTitle="Creator Persona & Style"
-        sectionCode="04 // SETTINGS"
-        sectionDescription="Persona, bio, texting style, tone guidelines, and forbidden words are configured per individual creator workspace. Choose a creator workspace below to inspect and manage their persona."
-      />
-    );
-  }
 
   const [activeTab, setActiveTab] = useState('about');
   const [loading, setLoading] = useState(true);
+  // Saving after a failed load would overwrite the real settings with the empty form
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -67,6 +60,7 @@ export default function SettingsPage() {
   // Listen for OAuth postMessage from login popup window
   useEffect(() => {
     const handleOAuthMessage = (event) => {
+      if (!isFromApi(event, API_BASE)) return; // only our OAuth popup may set Instagram credentials
       if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
         const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
         setFormData(prev => ({
@@ -102,6 +96,7 @@ export default function SettingsPage() {
       const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
       const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
       const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+      onPopupClosed(popup, () => setOauthConnecting(false));
       if (!popup) {
         setOauthConnecting(false);
         setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
@@ -134,15 +129,15 @@ export default function SettingsPage() {
 
   // Fetch current persona on mount or when user changes
   useEffect(() => {
-    if (user?._id) {
+    if (user?._id || user?.id) {
       setLoading(true);
       fetchPersona();
     }
-  }, [user?._id]);
+  }, [user?._id, user?.id]);
 
   const fetchPersona = async () => {
-    if (!user?._id) return;
-    const userCacheKey = `chatter_persona_cached_${user._id}`;
+    if (!user?._id && !user?.id) return;
+    const userCacheKey = `chatter_persona_cached_${user._id || user.id}`;
     // Only show cached persona if strictly scoped to this user ID
     if (typeof window !== 'undefined') {
       try {
@@ -185,12 +180,17 @@ export default function SettingsPage() {
           giphyApiKey: data.giphyApiKey || '',
         };
         setFormData(updated);
+        setLoadFailed(false);
         try {
           localStorage.setItem(userCacheKey, JSON.stringify(updated));
         } catch (e) { }
+      } else {
+        setLoadFailed(true);
+        setErrorMsg('Could not load your saved settings. Reload the page before saving.');
       }
     } catch (err) {
       console.error('Failed to load persona config:', err);
+      setLoadFailed(true);
       setErrorMsg('Could not fetch settings from server. Check your connection.');
     } finally {
       setLoading(false);
@@ -225,6 +225,10 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    if (loadFailed) {
+      showToast('Settings did not load, so saving is paused to protect your data. Reload the page.', 'error');
+      return;
+    }
     setSaving(true);
     setErrorMsg('');
     try {
@@ -237,20 +241,21 @@ export default function SettingsPage() {
       if (res.ok) {
         setSaveSuccess(true);
         if (typeof window !== 'undefined') {
-          const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
+          const userCacheKey = (user?._id || user?.id) ? `chatter_persona_cached_${user._id || user.id}` : 'chatter_persona_cached';
           try {
             localStorage.setItem(userCacheKey, JSON.stringify(formData));
           } catch (e) { }
         }
 
         if (updateUserProfile) {
+          // A blank token box means "unchanged" (OAuth tokens are never sent back), so it must not mark Instagram disconnected
+          const pastedToken = (formData.instagramPageAccessToken || '').trim();
+          const [firstName, ...rest] = (formData.creatorName || '').trim().split(/\s+/);
           updateUserProfile({
-            hasInstagramToken: Boolean(formData.instagramPageAccessToken),
-            isInstagramConnected: Boolean(formData.instagramPageAccessToken),
-            instagramPageAccessToken: formData.instagramPageAccessToken,
+            ...(pastedToken ? { hasInstagramToken: true, isInstagramConnected: true, instagramPageAccessToken: pastedToken } : {}),
             instagramAccountId: formData.instagramAccountId,
             instagramUsername: formData.instagramHandle?.replace(/^@/, ''),
-            firstName: formData.creatorName,
+            ...(firstName ? { firstName, lastName: rest.join(' ') } : {}),
           });
         }
 
@@ -348,11 +353,12 @@ export default function SettingsPage() {
         })
       });
 
-      const data = await res.json();
-      if (data.success && data.reply) {
-        setTestMessages(prev => [...prev, { role: 'assistant', text: data.reply }]);
+      const data = await res.json().catch(() => ({}));
+      // /api/simulator/chat answers with { replyText, userMemory }
+      if (res.ok && data.replyText) {
+        setTestMessages(prev => [...prev, { role: 'assistant', text: data.replyText }]);
       } else {
-        setTestMessages(prev => [...prev, { role: 'assistant', text: '(AI generation error or empty response)' }]);
+        setTestMessages(prev => [...prev, { role: 'assistant', text: `(${data.error || 'AI generation error or empty response'})` }]);
       }
     } catch (err) {
       setTestMessages(prev => [...prev, { role: 'assistant', text: '(Connection failed to simulator)' }]);
@@ -1473,4 +1479,19 @@ export default function SettingsPage() {
       )}
     </motion.div>
   );
+}
+
+// The superadmin check lives outside the page so the page's hooks always run in the same order
+export default function SettingsPage() {
+  const { user, isImpersonating } = useApp();
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator Persona & Style"
+        sectionCode="04 // SETTINGS"
+        sectionDescription="Persona, bio, texting style, tone guidelines, and forbidden words are configured per individual creator workspace. Choose a creator workspace below to inspect and manage their persona."
+      />
+    );
+  }
+  return <SettingsPageContent />;
 }

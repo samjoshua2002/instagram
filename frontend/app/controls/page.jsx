@@ -11,27 +11,17 @@ import {
   LayoutGrid, List, AlignJustify
 } from 'lucide-react';
 
-export default function ControlsPage() {
+function ControlsPageContent() {
   const {
     nodes,
     routingConfig,
     saveRouting,
     setRoutingConfig,
     updateContactPreferences,
+    showToast,
     user,
-    isImpersonating
   } = useApp();
 
-  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
-  if (user?.role === 'superadmin' && !isImpersonating) {
-    return (
-      <SuperadminWorkspacePrompt
-        sectionTitle="Creator Chat Rules & AI Routing"
-        sectionCode="03 // CONTROLS"
-        sectionDescription="Chat rules, contact exclusion lists, and AI routing logic are configured per individual creator workspace. Choose a creator workspace below to inspect and manage their rules."
-      />
-    );
-  }
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'
@@ -232,33 +222,44 @@ export default function ControlsPage() {
     queueSave(updated);
   }, [routingConfig, getContactKey, getTargetKeys, queueSave, updateContactPreferences]);
 
-  // Bulk Actions
+  // Bulk Actions: a few requests at a time and one summary toast, not one request burst + toast per contact
+  const bulkSetMode = useCallback(async (contacts, aiMode) => {
+    let failed = 0;
+    for (let i = 0; i < contacts.length; i += 5) {
+      const results = await Promise.allSettled(
+        contacts.slice(i, i + 5).map(f => updateContactPreferences(f.senderId || f.id, { aiMode }, { silent: true }))
+      );
+      failed += results.filter(r => r.status === 'rejected').length;
+    }
+    if (failed) showToast(`${failed} of ${contacts.length} contacts could not be updated. Please try again.`, 'error');
+  }, [updateContactPreferences, showToast]);
+
   const handleSelectAll = useCallback(() => {
     const allKeys = friendNodes.map(n => getContactKey(n)).filter(Boolean);
     const baseConfig = currentConfigRef.current || routingConfig;
     let updated;
     if (baseConfig.chatMode === 'everyone_except') {
       updated = { ...baseConfig, excludedContactIds: allKeys };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'paused' }));
+      bulkSetMode(friendNodes, 'paused');
     } else if (baseConfig.chatMode === 'only_selected') {
       updated = { ...baseConfig, includedContactIds: allKeys };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'full_ai' }));
+      bulkSetMode(friendNodes, 'full_ai');
     }
     if (updated) queueSave(updated);
-  }, [friendNodes, routingConfig, getContactKey, queueSave, updateContactPreferences]);
+  }, [friendNodes, routingConfig, getContactKey, queueSave, bulkSetMode]);
 
   const handleClearAll = useCallback(() => {
     const baseConfig = currentConfigRef.current || routingConfig;
     let updated;
     if (baseConfig.chatMode === 'everyone_except') {
       updated = { ...baseConfig, excludedContactIds: [] };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'full_ai' }));
+      bulkSetMode(friendNodes, 'full_ai');
     } else if (baseConfig.chatMode === 'only_selected') {
       updated = { ...baseConfig, includedContactIds: [] };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'paused' }));
+      bulkSetMode(friendNodes, 'paused');
     }
     if (updated) queueSave(updated);
-  }, [friendNodes, routingConfig, queueSave, updateContactPreferences]);
+  }, [friendNodes, routingConfig, queueSave, bulkSetMode]);
 
   const onSave = async () => {
     setIsSaving(true);
@@ -1072,4 +1073,19 @@ export default function ControlsPage() {
       </div>
     </motion.div>
   );
+}
+
+// The superadmin check lives outside the page so the page's hooks always run in the same order
+export default function ControlsPage() {
+  const { user, isImpersonating } = useApp();
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator Chat Rules & AI Routing"
+        sectionCode="03 // CONTROLS"
+        sectionDescription="Chat rules, contact exclusion lists, and AI routing logic are configured per individual creator workspace. Choose a creator workspace below to inspect and manage their rules."
+      />
+    );
+  }
+  return <ControlsPageContent />;
 }

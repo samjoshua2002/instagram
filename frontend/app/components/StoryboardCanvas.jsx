@@ -34,6 +34,8 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
   const [saveState, setSaveState] = useState('saved');
   const dragRef = useRef(null);
   const saveTimer = useRef(null);
+  // After a failed load the starter layout is shown, but it must never be saved over the real board
+  const loadFailedRef = useRef(false);
   const worldRef = useRef(null);
 
   const typeOf = key => nodeTypes.find(t => t.key === key) || nodeTypes[0];
@@ -48,11 +50,12 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
         if (cancelled) return;
         setBoard(data.nodes?.length ? { nodes: data.nodes, edges: data.edges || [] } : seed());
       })
-      .catch(() => { if (!cancelled) { setBoard(seed()); setSaveState('offline'); } });
+      .catch(() => { if (!cancelled) { loadFailedRef.current = true; setBoard(seed()); setSaveState('offline'); } });
     return () => { cancelled = true; };
   }, [API_BASE, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = useCallback(next => {
+    if (loadFailedRef.current) return;
     clearTimeout(saveTimer.current);
     setSaveState('saving');
     saveTimer.current = setTimeout(async () => {

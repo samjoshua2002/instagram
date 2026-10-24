@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { isFromApi, onPopupClosed } from '../lib/utils';
 import {
   Briefcase, User, Sparkles, Bot, ShieldCheck, Check,
   ArrowRight, ArrowLeft, RefreshCw, Sliders, CheckCircle2,
@@ -11,7 +12,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
-  const { user, token, API_BASE, updateUserProfile, showToast, setRoutingConfigState } = useApp();
+  const { user, token, API_BASE, updateUserProfile, showToast, setRoutingConfig } = useApp();
 
   const TOTAL_STEPS = 5;
   const [step, setStep] = useState(1);
@@ -60,6 +61,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   // Listen for OAuth postMessage from login popup window
   useEffect(() => {
     const handleOAuthMessage = (event) => {
+      if (!isFromApi(event, API_BASE)) return; // only our OAuth popup may set Instagram credentials
       if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
         const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
         if (igUser) setInstagramUsername(igUser);
@@ -85,6 +87,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
       const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
       const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
       const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+      onPopupClosed(popup, () => setOauthConnecting(false));
       if (!popup) {
         setOauthConnecting(false);
         setError('Popup was blocked by your browser. Please allow popups for this site or enter your token below.');
@@ -98,7 +101,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
 
   const handleCloseOrSkip = async () => {
     try {
-      const dismissKey = user?._id ? `chatter_onboarding_dismissed_${user._id}` : 'chatter_onboarding_dismissed';
+      const dismissKey = (user?._id || user?.id) ? `chatter_onboarding_dismissed_${user._id || user.id}` : 'chatter_onboarding_dismissed';
       sessionStorage.setItem(dismissKey, 'true');
     } catch (e) {}
 
@@ -184,8 +187,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         instagramPageAccessToken: instagramPageAccessToken.trim(),
       });
 
-      if (setRoutingConfigState) {
-        setRoutingConfigState(prev => ({
+      if (setRoutingConfig) {
+        setRoutingConfig(prev => ({
           ...prev,
           chatMode,
           globalBotActive: enableGlobalBot

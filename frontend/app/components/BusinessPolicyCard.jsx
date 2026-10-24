@@ -32,6 +32,8 @@ export default function BusinessPolicyCard() {
   const [keywordsText, setKeywordsText] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Saving after a failed load would overwrite the real policy with the empty one
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const authHeader = () => {
     const t = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
@@ -40,13 +42,13 @@ export default function BusinessPolicyCard() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/persona`, { headers: authHeader() })
-      .then(r => r.json())
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('load failed'))))
       .then(cfg => {
         const p = { ...EMPTY_POLICY, ...(cfg?.businessPolicy || {}) };
         setPolicy(p);
         setKeywordsText((p.escalationKeywords || []).join(', '));
       })
-      .catch(() => { })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, [API_BASE, token]);
 
@@ -59,6 +61,10 @@ export default function BusinessPolicyCard() {
   const updateRule = (i, key, value) => set('customRules', policy.customRules.map((r, idx) => (idx === i ? { ...r, [key]: value } : r)));
 
   const save = async () => {
+    if (loadFailed) {
+      showToast('Your policy did not load, so saving is paused to protect it. Reload the page.', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const body = {
