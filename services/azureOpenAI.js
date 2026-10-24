@@ -5,6 +5,7 @@ const stickerService = require('./stickerService');
 const celRuleEngine = require('./celRuleEngine');
 const redisService = require('./redisService');
 const ragService = require('./ragService');
+const llmAdapter = require('./llmAdapter');
 
 class AzureOpenAIService {
   constructor() {
@@ -360,29 +361,34 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
     });
 
     try {
-      let client = this.getClient(selectedModel);
-      let response;
-      const isGpt5 = selectedModel.startsWith('gpt-5');
-      const requestParams = {
-        messages,
-        ...(isGpt5 ? { max_completion_tokens: 220 } : { max_tokens: 220, temperature: 0.90, frequency_penalty: 0.35, presence_penalty: 0.35 }),
-      };
-
-      try {
-        response = await client.chat.completions.create(requestParams);
-      } catch (modelErr) {
-        console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
-        client = this.getClient('gpt-4o');
-        response = await client.chat.completions.create({
+      // Tenant's own AI provider first (BYO-LLM / Ollama / MCP); null means use platform Azure
+      let reply = await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 220, temperature: 0.90 });
+      if (reply === null) {
+        let client = this.getClient(selectedModel);
+        let response;
+        const isGpt5 = selectedModel.startsWith('gpt-5');
+        const requestParams = {
           messages,
-          temperature: 0.90,
-          frequency_penalty: 0.35,
-          presence_penalty: 0.35,
-          max_tokens: 220,
-        });
+          ...(isGpt5 ? { max_completion_tokens: 220 } : { max_tokens: 220, temperature: 0.90, frequency_penalty: 0.35, presence_penalty: 0.35 }),
+        };
+
+        try {
+          response = await client.chat.completions.create(requestParams);
+        } catch (modelErr) {
+          console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
+          client = this.getClient('gpt-4o');
+          response = await client.chat.completions.create({
+            messages,
+            temperature: 0.90,
+            frequency_penalty: 0.35,
+            presence_penalty: 0.35,
+            max_tokens: 220,
+          });
+        }
+        reply = response.choices[0].message.content;
       }
 
-      let reply = response.choices[0].message.content.trim();
+      reply = reply.trim();
 
       // Post-process to remove unwanted quotes or prefixes
       reply = reply.replace(/^"|"$/g, '').trim();
@@ -508,21 +514,26 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     }
     messages.push({ role: 'user', content: incomingText });
 
-    let client = this.getClient(selectedModel);
-    let response;
-    try {
-      response = await client.chat.completions.create({
-        messages,
-        ...(selectedModel.startsWith('gpt-5') ? { max_completion_tokens: 300 } : { max_tokens: 300, temperature: 0.4 }),
-      });
-    } catch (modelErr) {
-      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
-      client = this.getClient('gpt-4o');
-      response = await client.chat.completions.create({ messages, temperature: 0.4, max_tokens: 300 });
+    // Tenant's own AI provider first; null means use platform Azure
+    let content = await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 300, temperature: 0.4 });
+    if (content === null) {
+      let client = this.getClient(selectedModel);
+      let response;
+      try {
+        response = await client.chat.completions.create({
+          messages,
+          ...(selectedModel.startsWith('gpt-5') ? { max_completion_tokens: 300 } : { max_tokens: 300, temperature: 0.4 }),
+        });
+      } catch (modelErr) {
+        console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
+        client = this.getClient('gpt-4o');
+        response = await client.chat.completions.create({ messages, temperature: 0.4, max_tokens: 300 });
+      }
+      content = response.choices[0].message.content;
     }
 
     // Strip quotes, name prefixes and any sticker/attachment tags (never sent for business)
-    return (response.choices[0].message.content || '')
+    return (content || '')
       .trim()
       .replace(/^"|"$/g, '')
       .replace(new RegExp(`^${businessName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*`), '')
