@@ -10,6 +10,8 @@ const nodeSchema = new mongoose.Schema({
   label: { type: String, default: '', maxlength: 120 },
   notes: { type: String, default: '', maxlength: 2000 },
   contactId: { type: String, default: '' },
+  senderId: { type: String, default: '' },
+  circle: { type: String, enum: ['', 'close', 'online', 'offline', 'family', 'professional'], default: '' },
   x: { type: Number, default: 0 },
   y: { type: Number, default: 0 },
 }, { _id: false });

@@ -6,6 +6,7 @@ const celRuleEngine = require('./celRuleEngine');
 const redisService = require('./redisService');
 const ragService = require('./ragService');
 const llmAdapter = require('./llmAdapter');
+const storyboardService = require('./storyboardService');
 
 class AzureOpenAIService {
   constructor() {
@@ -92,6 +93,13 @@ class AzureOpenAIService {
         }).join('\n');
       }
     } catch (_) {}
+
+    // Storyboard canvases (PLAN.md §5): lore, Secret Vault, this contact's circle; Hybrid adds the journey playbook
+    const storyboardOwner = tenant?._id || config.ownerId;
+    const [personalStoryboard, hybridPlaybook] = await Promise.all([
+      storyboardService.getPersonalContext(storyboardOwner, userMemory),
+      features?.activeMode === 'hybrid' ? storyboardService.getBusinessContext(storyboardOwner) : '',
+    ]);
 
     // 2. Fetch social knowledge graph context (tree chain linking friends & lore)
     const socialTreeContext = await socialGraphService.getContextForConversation(
@@ -244,6 +252,9 @@ ${config.toneGuidelines}
 
 ${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${config.customKnowledge}\n` : ''}
 ${personalKnowledgeSection}
+${personalStoryboard}
+${hybridPlaybook ? `${hybridPlaybook}- Use this playbook only when the person is asking about your products, services or bookings; keep your personal voice.
+` : ''}
 ACTIVE CEL DIRECTIVE FOR THIS EXACT CONVERSATION:
 ${directives.modeInstruction}
 ${directives.lengthInstruction}
@@ -496,6 +507,8 @@ KNOWLEDGE RULES:
 ${knowledge.wantsDocument ? '- The customer is asking for a document or link right now: include the most relevant verified link in your reply.\n' : ''}`
       : '';
 
+    const journeySection = await storyboardService.getBusinessContext(tenant?._id || config.ownerId);
+
     const systemPrompt = `You are the customer messaging assistant for ${businessName}${business.category ? ` (${business.category})` : ''}, replying to customers in Instagram Direct Messages on behalf of the team.
 
 ABOUT THE BUSINESS:
@@ -503,6 +516,7 @@ ${business.description || config.aboutMe || config.personaBio || '(no descriptio
 
 ${config.customKnowledge ? `PRODUCTS, SERVICES & FAQ (THE ONLY SOURCE OF FACTS):\n${config.customKnowledge}\n` : ''}
 ${knowledgeSection}
+${journeySection}
 ${config.toneGuidelines ? `BRAND VOICE:\n${config.toneGuidelines}\n` : ''}
 BUSINESS HOURS: ${policy.openTime || '09:00'}-${policy.closeTime || '18:00'} (${policy.timezone || 'Asia/Kolkata'}).
 

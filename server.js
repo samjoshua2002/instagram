@@ -794,7 +794,7 @@ async function dispatchDebouncedReply(queueEntry) {
 
   // Business tenants: no stickers or GIFs, professional fallbacks, escalations hand off to a human
   const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
-  const { enabledFeatures } = await workspaceFeatureService.getFeaturesSafe(ownerUser);
+  const { enabledFeatures, activeMode } = await workspaceFeatureService.getFeaturesSafe(ownerUser);
   const businessDecision = isBusinessTenant
     ? celRuleEngine.evaluateForTenant({
         accountType: 'business',
@@ -821,7 +821,7 @@ async function dispatchDebouncedReply(queueEntry) {
         incomingText: combinedText,
         config,
         tenant: ownerUser,
-        features: enabledFeatures,
+        features: { ...enabledFeatures, activeMode },
       });
     } catch (aiErr) {
       console.error(`❌ [AI Generation Error]:`, aiErr.message);
@@ -1569,12 +1569,15 @@ app.post('/api/simulator/chat', async (req, res) => {
 
     // 4. Generate AI response with the signed-in creator's persona (personal or business rules)
     const simConfig = req.user ? await PersonaConfig.findOne({ ownerId: req.user._id }) : null;
+    const simFeatures = req.user ? await workspaceFeatureService.getFeaturesSafe(req.user) : null;
     const replyText = await azureOpenAI.generateReply({
       userMemory,
       messageHistory: history,
       incomingText: messageText,
       ...(simConfig ? { config: simConfig } : {}),
       tenant: req.user || null,
+      // Same feature switches and mode as live replies, so the sandbox matches production
+      features: simFeatures ? { ...simFeatures.enabledFeatures, activeMode: simFeatures.activeMode } : null,
     });
 
     // 5. Save assistant reply
