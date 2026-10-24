@@ -36,15 +36,16 @@ export default function SimulatorPage() {
           messageText: userText
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      // Never invent a reply: a failure must look like a failure, not a working bot
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', text: data.replyText || 'haha chill bro got it', time: 'Just now' }
+        { role: 'assistant', text: (res.ok && data.replyText) || `(No reply: ${data.error || 'the AI returned nothing'})`, time: 'Just now' }
       ]);
     } catch (e) {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', text: 'yoo wassup! (local simulation reply)', time: 'Just now' }
+        { role: 'assistant', text: '(No reply: could not reach the server)', time: 'Just now' }
       ]);
     } finally {
       setIsLoading(false);

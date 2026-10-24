@@ -8,6 +8,12 @@ const STORAGE_NODES_KEY = 'chatter_social_nodes_v8';
 const STORAGE_CONFIG_KEY = 'chatter_persona_config_v8';
 const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 
+// Fields whose server-side change must reach the screen on the next background sync
+const SYNC_COMPARE_FIELDS = [
+  'id', 'name', 'handle', 'senderId', 'profilePic', 'category', 'relationship', 'dob', 'personalNotes',
+  'chatsCount', 'reelsCount', 'aiEnabled', 'replyToMessages', 'replyToReelsAndPosts', 'roastiness', 'greetingStyle',
+];
+
 export function getStorageNodesKey(u) {
   const uid = u?._id || u?.id || u?.username;
   return uid ? `chatter_social_nodes_${uid}` : STORAGE_NODES_KEY;
@@ -215,6 +221,8 @@ export function AppProvider({ children }) {
     setRoutingConfigState(updater);
   }, []);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('info');
+  const toastTimerRef = useRef(null);
 
   // AI Interview Modal State
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -225,7 +233,10 @@ export function AppProvider({ children }) {
 
   const showToast = useCallback((msg, type = 'info') => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 4000);
+    setToastType(type);
+    // A new toast restarts the timer, so the previous toast's timer cannot hide it early
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMessage(''), 4000);
   }, []);
 
   const login = useCallback((jwtToken, userData) => {
@@ -405,6 +416,9 @@ export function AppProvider({ children }) {
 
   // Feature Store (PLAN.md §4): mode + toggles that drive the nav and the reply pipeline
   const [workspaceFeatures, setWorkspaceFeatures] = useState(null);
+  const [workspaceFeaturesError, setWorkspaceFeaturesError] = useState(false);
+  const [featuresReloadKey, setFeaturesReloadKey] = useState(0);
+  const reloadWorkspaceFeatures = useCallback(() => setFeaturesReloadKey(k => k + 1), []);
   const isPureSuperadminUser = user?.role === 'superadmin' && !adminSession;
 
   useEffect(() => {
@@ -413,12 +427,13 @@ export function AppProvider({ children }) {
       return;
     }
     let cancelled = false;
+    setWorkspaceFeaturesError(false);
     fetch(`${API_BASE}/api/workspace/features`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => { if (!cancelled && data) setWorkspaceFeatures(data); })
-      .catch(() => {});
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('load failed'))))
+      .then(data => { if (!cancelled) setWorkspaceFeatures(data); })
+      .catch(() => { if (!cancelled) setWorkspaceFeaturesError(true); });
     return () => { cancelled = true; };
-  }, [API_BASE, token, user?._id, user?.id, isPureSuperadminUser]);
+  }, [API_BASE, token, user?._id, user?.id, isPureSuperadminUser, featuresReloadKey]);
 
   /** PUT a partial change ({ activeMode } or { enabledFeatures: { key: bool } }); returns true on success. */
   const updateWorkspaceFeatures = useCallback(async (changes) => {
@@ -549,6 +564,8 @@ export function AppProvider({ children }) {
   }, [user?._id || user?.username]);
 
   const syncBackend = async () => {
+    // Signed out (login screen): polling would only collect 401s
+    try { if (!localStorage.getItem('chatter_jwt_token')) return; } catch (e) { return; }
     try {
       // 1. Sync social graph directly from live MongoDB database
       const res = await fetch(`${API_BASE}/api/social-graph`);
@@ -628,10 +645,7 @@ export function AppProvider({ children }) {
                 const p = prev[i];
                 const d = deduplicated[i];
                 if (
-                  p.id !== d.id ||
-                  p.chatsCount !== d.chatsCount ||
-                  p.reelsCount !== d.reelsCount ||
-                  p.aiEnabled !== d.aiEnabled ||
+                  SYNC_COMPARE_FIELDS.some(k => p[k] !== d[k]) ||
                   (p.facts || []).length !== (d.facts || []).length
                 ) {
                   hasChanged = true;
@@ -782,17 +796,16 @@ export function AppProvider({ children }) {
 
       const deduplicated = deduplicateNodes(next);
       try {
-        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(deduplicated));
+        localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(deduplicated));
       } catch (e) { }
       return deduplicated;
     });
 
     setSelectedNode(formattedNode);
     setIsAiModalOpen(false);
-    showToast(`Saved ${cleanName} to Knowledge Tree & DB!`);
 
     try {
-      await fetch(`${API_BASE}/api/social-graph/node`, {
+      const saveRes = await fetch(`${API_BASE}/api/social-graph/node`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -816,6 +829,11 @@ export function AppProvider({ children }) {
           }))
         })
       });
+      if (!saveRes.ok) {
+        const data = await saveRes.json().catch(() => ({}));
+        throw new Error(data.error || `server answered ${saveRes.status}`);
+      }
+      showToast(`Saved ${cleanName} to Knowledge Tree & DB!`);
 
       for (const dup of toDelete) {
         if (dup && dup.trim().toLowerCase() !== cleanName.toLowerCase()) {
@@ -826,6 +844,7 @@ export function AppProvider({ children }) {
       }
     } catch (err) {
       console.warn('Backend node save error:', err.message);
+      showToast(`Could not save ${cleanName}: ${err.message}`, 'error');
     }
   };
 
@@ -869,7 +888,7 @@ export function AppProvider({ children }) {
         };
       }
       try {
-        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(updated));
+        localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(updated));
       } catch (e) { }
       return updated;
     });
@@ -882,20 +901,25 @@ export function AppProvider({ children }) {
       setSelectedNode(null);
     }
 
-    showToast(`Deleted ${targetName || 'contact'} from Directory`);
-
     try {
       const param = encodeURIComponent(targetName || targetSenderId || targetId);
-      await fetch(`${API_BASE}/api/social-graph/node/${param}`, {
+      const delRes = await fetch(`${API_BASE}/api/social-graph/node/${param}`, {
         method: 'DELETE'
       });
+      if (!delRes.ok) {
+        const data = await delRes.json().catch(() => ({}));
+        throw new Error(data.error || `server answered ${delRes.status}`);
+      }
+      showToast(`Deleted ${targetName || 'contact'} from Directory`);
     } catch (err) {
       console.warn('Backend delete node error:', err.message);
+      showToast(`Could not delete ${targetName || 'contact'}: ${err.message}`, 'error');
     }
   };
 
   // Update Per-Person AI Reply Mode (Full AI, Reels Only, Paused / Sam Manual)
-  const updateContactPreferences = async (contactIdOrSenderId, prefs) => {
+  // silent: bulk callers show one summary toast themselves; a failure is then thrown to them
+  const updateContactPreferences = async (contactIdOrSenderId, prefs, { silent = false } = {}) => {
     if (!contactIdOrSenderId) return;
     const { aiMode, autoSendReels } = (typeof prefs === 'object' && prefs !== null) ? prefs : { aiMode: prefs };
     let finalAiEnabled;
@@ -962,18 +986,9 @@ export function AppProvider({ children }) {
     }
 
     const nameStr = contactName || contactIdOrSenderId;
-    if (typeof autoSendReels === 'boolean') {
-      showToast(autoSendReels ? `Auto-Reels ENABLED for ${nameStr}!` : `Auto-Reels PAUSED for ${nameStr}!`);
-    } else if (aiMode === 'reels_only') {
-      showToast(`${nameStr}: AI will ONLY react to shared Reels!`);
-    } else if (aiMode === 'paused' || aiMode === 'manual') {
-      showToast(`Stopped AI for ${nameStr}. Manual chat active!`);
-    } else if (aiMode) {
-      showToast(`Full AI auto-reply enabled for ${nameStr}!`);
-    }
 
     try {
-      await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(contactIdOrSenderId)}/preferences`, {
+      const prefRes = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(contactIdOrSenderId)}/preferences`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -984,8 +999,24 @@ export function AppProvider({ children }) {
           autoSendReels
         })
       });
+      if (!prefRes.ok) {
+        const data = await prefRes.json().catch(() => ({}));
+        throw new Error(data.error || `server answered ${prefRes.status}`);
+      }
+      if (silent) return;
+      if (typeof autoSendReels === 'boolean') {
+        showToast(autoSendReels ? `Auto-Reels ENABLED for ${nameStr}!` : `Auto-Reels PAUSED for ${nameStr}!`);
+      } else if (aiMode === 'reels_only') {
+        showToast(`${nameStr}: AI will ONLY react to shared Reels!`);
+      } else if (aiMode === 'paused' || aiMode === 'manual') {
+        showToast(`Stopped AI for ${nameStr}. Manual chat active!`);
+      } else if (aiMode) {
+        showToast(`Full AI auto-reply enabled for ${nameStr}!`);
+      }
     } catch (e) {
       console.warn('Preferences backend sync note:', e.message);
+      if (silent) throw e;
+      showToast(`Could not update ${nameStr}: ${e.message}`, 'error');
     }
   };
 
@@ -1003,7 +1034,7 @@ export function AppProvider({ children }) {
         }
         return n;
       });
-      localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(next));
+      localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(next));
       return next;
     });
 
@@ -1015,17 +1046,24 @@ export function AppProvider({ children }) {
       }));
     }
 
-    showToast(`Fact added: "${cleanFact}"`);
-
     const target = nodes.find(n => n.id === friendIdOrName || n.name.toLowerCase() === friendIdOrName.toLowerCase());
-    if (target?.senderId) {
+    if (!target?.senderId) {
+      showToast(`Fact added: "${cleanFact}"`);
+    } else {
       try {
-        await fetch(`${API_BASE}/api/conversations/${target.senderId}/fact`, {
+        const factRes = await fetch(`${API_BASE}/api/conversations/${target.senderId}/fact`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fact: cleanFact })
         });
-      } catch (e) { }
+        if (!factRes.ok) {
+          const data = await factRes.json().catch(() => ({}));
+          throw new Error(data.error || `server answered ${factRes.status}`);
+        }
+        showToast(`Fact added: "${cleanFact}"`);
+      } catch (e) {
+        showToast(`Could not save the fact: ${e.message}`, 'error');
+      }
     }
   };
 
@@ -1134,7 +1172,7 @@ export function AppProvider({ children }) {
       });
 
       try {
-        localStorage.setItem(STORAGE_NODES_KEY, JSON.stringify(next));
+        localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(next));
       } catch (e) { }
       return next;
     });
@@ -1219,6 +1257,7 @@ export function AppProvider({ children }) {
         addFact,
         showToast,
         toastMessage,
+        toastType,
         isAiModalOpen,
         setIsAiModalOpen,
         editingNode,
@@ -1240,6 +1279,8 @@ export function AppProvider({ children }) {
         switchAccount,
         updateUserProfile,
         workspaceFeatures,
+        workspaceFeaturesError,
+        reloadWorkspaceFeatures,
         updateWorkspaceFeatures,
         isPasskeyModalOpen,
         setIsPasskeyModalOpen,

@@ -80,7 +80,7 @@ export default function AiInterviewModal() {
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.success) {
         if (data.node) {
           // If handle was mentioned, check if DB knows them
@@ -104,11 +104,13 @@ export default function AiInterviewModal() {
         }
         const reply = data.question || (data.isComplete ? `Got all details saved to preview. Review the attributes and click Save Person!` : data.summary);
         setAiChat(prev => [...prev, { role: 'assistant', content: reply }]);
+      } else {
+        throw new Error(data.error || 'The AI did not answer');
       }
     } catch (err) {
       setAiChat(prev => [...prev, {
         role: 'assistant',
-        content: `Got that noted! What else should Sam's clone remember about them (handle, connections, or banter style)?`
+        content: `Sorry, that did not go through (${err.message}). Please send it again.`
       }]);
     } finally {
       setIsAiTyping(false);

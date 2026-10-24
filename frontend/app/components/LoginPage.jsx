@@ -185,6 +185,10 @@ export default function LoginPage({ onLoginSuccess }) {
   const [showQrCode, setShowQrCode] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrData, setQrData] = useState(null);
+  // The QR holds the account's secret, so it is shown only after an emailed code is entered
+  const [qrEmail, setQrEmail] = useState('');
+  const [qrUnlockCode, setQrUnlockCode] = useState('');
+  const [qrNotice, setQrNotice] = useState('');
   const [copiedSecret, setCopiedSecret] = useState(false);
 
   // Create Account Flow States
@@ -602,12 +606,19 @@ export default function LoginPage({ onLoginSuccess }) {
     setError('');
     setShowQrCode(true);
     setQrLoading(true);
+    setQrData(null);
+    setQrUnlockCode('');
+    setQrEmail(emailToFetch);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/oneauth/qr?email=${encodeURIComponent(emailToFetch)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate QR code.');
-      setQrData(data);
+      const res = await fetch(`${API_BASE}/api/auth/oneauth/request-setup-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToFetch }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not send the code.');
+      setQrNotice(data.message || 'We emailed you a 6-digit code.');
     } catch (err) {
       setError(err.message || 'Could not load QR code.');
       setShowQrCode(false);
@@ -615,6 +626,64 @@ export default function LoginPage({ onLoginSuccess }) {
       setQrLoading(false);
     }
   };
+
+  const unlockQrCode = async () => {
+    if (qrUnlockCode.length !== 6) return;
+    setQrLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/oneauth/verify-setup-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: qrEmail, otpCode: qrUnlockCode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not load QR code.');
+      setQrData(data);
+    } catch (err) {
+      setQrNotice(err.message || 'Could not load QR code.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const renderQrPanel = (size) => (
+    <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
+      {qrLoading ? (
+        <RefreshCw size={18} className="animate-spin" color="var(--color-text-primary)" style={{ margin: '12px auto' }} />
+      ) : qrData ? (
+        <div>
+          <img src={qrData.qrDataUrl} alt="OneAuth QR" style={{ width: size, height: size, display: 'block', margin: '0 auto 8px', borderRadius: '6px' }} />
+          <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>Scan with Zoho OneAuth on your phone</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
+            <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
+              {copiedSecret ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>{qrNotice}</p>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={qrUnlockCode}
+              onChange={(e) => setQrUnlockCode(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); unlockQrCode(); } }}
+              placeholder="Email code"
+              aria-label="6-digit code from your email"
+              style={{ width: '120px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: '2px' }}
+            />
+            <button type="button" onClick={unlockQrCode} disabled={qrUnlockCode.length !== 6} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-text-primary)', color: 'var(--color-surface)', fontSize: '0.74rem', fontWeight: 600, cursor: qrUnlockCode.length === 6 ? 'pointer' : 'not-allowed', opacity: qrUnlockCode.length === 6 ? 1 : 0.5 }}>
+              Show QR
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   const copySecret = () => {
     if (qrData?.secret) {
@@ -1610,24 +1679,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           </button>
                         </div>
 
-                        {showQrCode && (
-                          <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
-                            {qrLoading ? (
-                              <RefreshCw size={18} className="animate-spin" color="var(--color-text-primary)" style={{ margin: '12px auto' }} />
-                            ) : qrData ? (
-                              <div>
-                                <img src={qrData.qrDataUrl} alt="OneAuth QR" style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto 8px', borderRadius: '6px' }} />
-                                <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>Scan with Zoho OneAuth on your phone</p>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
-                                  <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
-                                    {copiedSecret ? 'Copied' : 'Copy'}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
+                        {showQrCode && renderQrPanel('140px')}
 
                         <input
                           type="text"
@@ -1946,24 +1998,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           </button>
                         </div>
 
-                        {showQrCode && (
-                          <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px', textAlign: 'center' }}>
-                            {qrLoading ? (
-                              <RefreshCw size={18} className="animate-spin" color="var(--color-text-primary)" style={{ margin: '12px auto' }} />
-                            ) : qrData ? (
-                              <div>
-                                <img src={qrData.qrDataUrl} alt="OneAuth QR" style={{ width: '130px', height: '130px', display: 'block', margin: '0 auto 8px' }} />
-                                <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>Scan with Zoho OneAuth</p>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
-                                  <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
-                                    {copiedSecret ? 'Copied' : 'Copy'}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
+                        {showQrCode && renderQrPanel('130px')}
 
                         <input
                           type="text"
