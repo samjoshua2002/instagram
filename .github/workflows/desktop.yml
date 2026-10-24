@@ -1,0 +1,84 @@
+# Desktop installers (PLAN.md §13 Phase 8). Push a tag like desktop-v0.1.0
+# (or run it by hand) and each build is attached to a GitHub Release under the
+# fixed names that config/desktopReleases.json links to.
+name: Desktop build
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bundle: dmg
+            from: dmg/*.dmg
+            name: Chatter-OS_aarch64.dmg
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bundle: dmg
+            from: dmg/*.dmg
+            name: Chatter-OS_x64.dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundle: msi
+            from: msi/*.msi
+            name: Chatter-OS_x64_en-US.msi
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            bundle: nsis
+            from: nsis/*-setup.exe
+            name: Chatter-OS_x86-setup.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Export the web app as static files
+        working-directory: frontend
+        env:
+          DESKTOP_EXPORT: '1'
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com' }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build the installer
+        run: npx --yes @tauri-apps/cli@2 build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
+
+      - name: Rename to the download-page file name
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.from }} "dist/${{ matrix.name }}"
+          ls -l dist
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('desktop-build-{0}', github.run_number) }}
+          name: Chatter OS ${{ github.ref_type == 'tag' && github.ref_name || format('build {0}', github.run_number) }}
+          draft: ${{ github.ref_type != 'tag' }}
+          files: dist/${{ matrix.name }}

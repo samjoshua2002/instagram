@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Chatter-OS",
+  "version": "0.1.0",
+  "identifier": "com.chatteros.desktop",
+  "build": {
+    "frontendDist": "../frontend/out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Chatter OS",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 380,
+        "minHeight": 600,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "msi", "nsis"],
+    "category": "SocialNetworking",
+    "shortDescription": "AI Instagram DM assistant",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}
