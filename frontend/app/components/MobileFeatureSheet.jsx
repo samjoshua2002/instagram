@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -8,8 +8,6 @@ import {
   X,
   Sun,
   Moon,
-  User,
-  Briefcase,
   Fingerprint,
   LogOut,
   Play,
@@ -18,21 +16,18 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../lib/theme';
+import WorkspaceModeSwitch from './WorkspaceModeSwitch';
 
 /**
  * Mobile Bottom Sheet Drawer (PLAN.md §15.5.3)
  * Opened from the header avatar or the bottom bar "More" tab. Exposes every
- * route for the current workspace, the Personal <-> Business switcher and the
+ * route for the current workspace, the Personal / Business / Hybrid switch and the
  * Light / Dark theme switch.
  */
 export default function MobileFeatureSheet({ open, onClose, items }) {
   const pathname = usePathname();
   const {
     user,
-    token,
-    API_BASE,
-    updateUserProfile,
-    showToast,
     routingConfig,
     toggleGlobalBot,
     logout,
@@ -40,10 +35,8 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
     isImpersonating,
   } = useApp();
   const { theme, setTheme } = useTheme();
-  const [switchingTier, setSwitchingTier] = useState(false);
 
   const isPureSuperadmin = user?.role === 'superadmin' && !isImpersonating;
-  const tier = ['business', 'agency'].includes(user?.accountType) ? 'business' : 'personal';
 
   // Close on route change and on Escape
   useEffect(() => { onClose(); }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -57,26 +50,6 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
       document.body.style.overflow = '';
     };
   }, [open, onClose]);
-
-  const switchTier = async next => {
-    if (next === tier || switchingTier) return;
-    setSwitchingTier(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ accountType: next }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to switch workspace');
-      updateUserProfile(data.user || { ...user, accountType: next });
-      showToast?.(`Switched to ${next === 'business' ? 'Business & Brand' : 'Personal Creator'}`, 'success');
-    } catch (err) {
-      showToast?.(err.message || 'Could not switch workspace', 'error');
-    } finally {
-      setSwitchingTier(false);
-    }
-  };
 
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName || ''}`.trim()
@@ -130,14 +103,7 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
             {!isPureSuperadmin && (
               <div className="sheet-section">
                 <div className="sheet-label">Workspace</div>
-                <div className="sheet-segment">
-                  <button type="button" className={tier === 'personal' ? 'active' : ''} onClick={() => switchTier('personal')} disabled={switchingTier}>
-                    <User size={16} /> Personal
-                  </button>
-                  <button type="button" className={tier === 'business' ? 'active' : ''} onClick={() => switchTier('business')} disabled={switchingTier}>
-                    <Briefcase size={16} /> Business
-                  </button>
-                </div>
+                <WorkspaceModeSwitch />
               </div>
             )}
 

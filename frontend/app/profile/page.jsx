@@ -43,7 +43,7 @@ const formatAddress = (addr) => {
 };
 
 export default function ProfilePage() {
-  const { user, token, API_BASE, updateUserProfile, showToast } = useApp();
+  const { user, token, API_BASE, updateUserProfile, showToast, updateWorkspaceFeatures } = useApp();
 
   const [saving, setSaving] = useState(false);
   const [switchingTier, setSwitchingTier] = useState(false);
@@ -113,32 +113,16 @@ export default function ProfilePage() {
     setSwitchingTier(true);
     setFormData(prev => ({ ...prev, accountType: newTier }));
 
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ accountType: newTier })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        if (updateUserProfile) {
-          updateUserProfile(data.user || { ...user, accountType: newTier });
-        }
-        showToast?.(`Switched to ${newTier === 'business' ? 'Business & Brand' : 'Personal Creator'} tier!`, 'success');
-      } else {
-        throw new Error(data.error || 'Failed to switch workspace tier');
-      }
-    } catch (err) {
+    // Goes through the Feature Store so the mode, nav and reply voice stay in step
+    const ok = await updateWorkspaceFeatures({ activeMode: newTier });
+    if (ok) {
+      showToast?.(`Switched to ${newTier === 'business' ? 'Business & Brand' : 'Personal Creator'} tier!`, 'success');
+    } else {
       setFormData(prev => ({ ...prev, accountType: user?.accountType || 'personal' }));
-      showToast?.(err.message || 'Could not switch tier', 'error');
-    } finally {
-      setSwitchingTier(false);
     }
+    setSwitchingTier(false);
   };
+
 
   // Avatar Upload Handler
   const handleAvatarFileSelect = async (e) => {
