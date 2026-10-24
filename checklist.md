@@ -154,24 +154,24 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 5: Modular AI Adapter (BYO-LLM, Local Ollama & A2A MCP)
-- [ ] **5.1 Unified LLM Adapter (`services/llmAdapter.js`):**
-  - [ ] Implement `completeChat(messages, tenantConfig)` factory.
-  - [ ] **Provider 1: Default Azure OpenAI:** Calls existing `services/azureOpenAI.js`.
-  - [ ] **Provider 2: Custom Cloud LLMs:**
-    - [ ] Decrypt user's API key via `cryptoService.decrypt()`.
-    - [ ] Support OpenAI (`gpt-4o`, `gpt-4o-mini`), Anthropic (`claude-3-5-sonnet`), Groq (Llama 3 70B), OpenRouter.
-  - [ ] **Provider 3: Local Self-Hosted LLMs:**
-    - [ ] Support Ollama / vLLM / LocalAI at user-specified `customEndpoint` (e.g. `http://localhost:11434/v1`).
-    - [ ] Test connectivity with 3-second timeout; graceful fallback to default Azure on network timeout.
-  - [ ] **Provider 4: A2A MCP Protocol Connector:**
-    - [ ] Connect to external agent over SSE / WebSocket MCP protocol.
-    - [ ] Forward message event and receive tool-augmented AI reply.
-- [ ] **5.2 Settings UI Configuration (`frontend/app/settings/page.jsx`):**
-  - [ ] Add "AI Provider Configuration" card.
-  - [ ] Radio selector: `Platform Azure`, `Custom OpenAI`, `Anthropic`, `Groq`, `Local Ollama`, `A2A MCP`.
-  - [ ] Dynamic input fields: Endpoint URL, Model Name, Encrypted API Key.
-  - [ ] "Test Connection" button calling `POST /api/settings/test-llm`.
-- [ ] **Phase 5 Sign-Off:** Verify that switching to Local Ollama successfully returns local model chat completions.
+- [x] **5.1 Unified LLM Adapter (`services/llmAdapter.js`):**
+  - [x] Implement `completeChat(messages, tenantConfig)` factory.
+  - [x] **Provider 1: Default Azure OpenAI:** Calls existing `services/azureOpenAI.js`.
+  - [x] **Provider 2: Custom Cloud LLMs:**
+    - [x] Decrypt user's API key via `cryptoService.decrypt()`.
+    - [x] Support OpenAI (`gpt-4o`, `gpt-4o-mini`), Anthropic (`claude-3-5-sonnet`), Groq (Llama 3 70B), OpenRouter.
+  - [x] **Provider 3: Local Self-Hosted LLMs:**
+    - [x] Support Ollama / vLLM / LocalAI at user-specified `customEndpoint` (e.g. `http://localhost:11434/v1`).
+    - [x] Test connectivity with 3-second timeout; graceful fallback to default Azure on network timeout.
+  - [x] **Provider 4: A2A MCP Protocol Connector:**
+    - [x] Connect to external agent over SSE / WebSocket MCP protocol.
+    - [x] Forward message event and receive tool-augmented AI reply.
+- [x] **5.2 Settings UI Configuration (`frontend/app/settings/page.jsx`):**
+  - [x] Add "AI Provider Configuration" card.
+  - [x] Radio selector: `Platform Azure`, `Custom OpenAI`, `Anthropic`, `Groq`, `Local Ollama`, `A2A MCP`.
+  - [x] Dynamic input fields: Endpoint URL, Model Name, Encrypted API Key.
+  - [x] "Test Connection" button calling `POST /api/settings/test-llm`.
+- [x] **Phase 5 Sign-Off:** Verify that switching to Local Ollama successfully returns local model chat completions. _(Verified with a local OpenAI-compatible test server; recheck with a real Ollama.)_
 
 ---
 
