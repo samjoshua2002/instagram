@@ -118,7 +118,7 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
   }],
   giphyApiKey: {
     type: String,
-    default: 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
+    default: '',
   },
 }, { timestamps: true });
 

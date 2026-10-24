@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const connectDB = require('./config/db');
 
@@ -109,8 +110,52 @@ const upload = multer({
 // Middleware
 app.enable('trust proxy');
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
+// Keep the raw body so the Meta webhook signature can be checked byte-for-byte
+app.use(express.json({ limit: '25mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+
+const safeEqual = (a, b) => {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+};
+
+// App secrets used to sign webhooks / signed_requests (Instagram Login and Facebook Login apps can differ)
+const META_SIGNING_SECRETS = [process.env.META_APP_SECRET, process.env.INSTAGRAM_APP_SECRET]
+  .map(s => (s || '').trim())
+  .filter(Boolean);
+if (!META_SIGNING_SECRETS.length) {
+  console.warn('⚠️ META_APP_SECRET is not set: webhook signatures are NOT verified.');
+}
+
+// X-Hub-Signature-256 check, enforced once META_APP_SECRET / INSTAGRAM_APP_SECRET is set
+function verifyMetaSignature(req, res, next) {
+  if (!META_SIGNING_SECRETS.length) return next();
+  const signature = req.get('x-hub-signature-256') || '';
+  const valid = META_SIGNING_SECRETS.some(secret =>
+    safeEqual(signature, 'sha256=' + crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex'))
+  );
+  if (!valid) {
+    console.warn('🚫 Rejected webhook POST with invalid signature');
+    return res.sendStatus(401);
+  }
+  next();
+}
+
+// Decode and verify Meta's signed_request (base64url signature + payload, HMAC-SHA256 with the App Secret)
+function parseSignedRequest(signedRequest) {
+  const [encodedSig, payload] = String(signedRequest || '').split('.', 2);
+  if (!encodedSig || !payload) return null;
+  const valid = META_SIGNING_SECRETS.some(secret =>
+    safeEqual(encodedSig, crypto.createHmac('sha256', secret).update(payload).digest('base64url'))
+  );
+  if (!valid) return null;
+  try {
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(uploadsDir));
 
@@ -321,7 +366,7 @@ function handleCreatorEcho(event, accountId) {
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', verifyMetaSignature, async (req, res) => {
   const body = req.body;
   console.log(`📥 [Webhook Event Received]:`, JSON.stringify(body));
 
@@ -392,17 +437,22 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   const targetAccountId = accountId || recipientId;
 
-  // 1. Locate the creator account in MongoDB
+  // 1. Locate the creator (tenant) that owns the receiving Instagram account
   let ownerUser = await User.findOne({
     $or: [
       { instagramAccountId: targetAccountId },
-      { 'businessProfile.instagramId': targetAccountId },
-      { username: 'qereydoun' },
-      { instagramUsername: 'qereydoun' }
+      { 'businessProfile.instagramId': targetAccountId }
     ]
   });
+  const isLegacyAdminAccount = targetAccountId === (process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232');
 
-  // 2. Fetch the creator's specific PersonaConfig
+  // Safe drop: never answer an unrecognized account with the admin's persona or token
+  if (!ownerUser && !isLegacyAdminAccount) {
+    console.warn(`⚠️ Unrecognized recipient account ${targetAccountId}. Dropping event safely.`);
+    return;
+  }
+
+  // 2. Fetch the creator's specific PersonaConfig (global config is only for the legacy admin bot)
   let config = null;
   if (ownerUser) {
     config = await PersonaConfig.findOne({ ownerId: ownerUser._id });
@@ -410,14 +460,18 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   if (!config) {
     config = await PersonaConfig.findOne({ instagramAccountId: targetAccountId });
   }
-  if (!config) {
+  if (!config && isLegacyAdminAccount) {
     config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
   }
+  if (!config) {
+    console.warn(`⚠️ No persona configured for account ${targetAccountId}. Dropping event safely.`);
+    return;
+  }
 
-  // 3. Resolve active token for this creator
+  // 3. Resolve active token for this creator (env admin token only for the legacy admin account)
   const creatorAccessToken = (config && config.instagramPageAccessToken) ||
                              (ownerUser && ownerUser.instagramPageAccessToken) ||
-                             process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
+                             (isLegacyAdminAccount ? process.env.INSTAGRAM_PAGE_ACCESS_TOKEN : '');
 
   // Prevent bot from replying to itself
   if (senderId === targetAccountId) {
@@ -1285,7 +1339,7 @@ app.get('/api/giphy/search', async (req, res) => {
   try {
     const { q, limit = 20, rating = 'pg-13' } = req.query;
     const config = await PersonaConfig.findOne();
-    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
 
     if (!apiKey) {
       return res.status(400).json({ error: 'GIPHY API Key not configured' });
@@ -1305,7 +1359,7 @@ app.get('/api/giphy/trending', async (req, res) => {
   try {
     const { limit = 20, rating = 'pg-13' } = req.query;
     const config = await PersonaConfig.findOne();
-    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
 
     if (!apiKey) {
       return res.status(400).json({ error: 'GIPHY API Key not configured' });
@@ -1737,17 +1791,82 @@ app.get('/privacy', (req, res) => {
   `);
 });
 
-// Deauthorize Callback for Meta
-app.all('/deauthorize', (req, res) => {
-  res.json({ success: true, message: 'Account deauthorized successfully' });
+// Finds the creator whose Instagram account Meta's signed_request refers to
+async function findCreatorByMetaUserId(metaUserId) {
+  return User.findOne({
+    $or: [{ instagramId: metaUserId }, { instagramAccountId: metaUserId }, { 'businessProfile.instagramId': metaUserId }]
+  });
+}
+
+// Removes a creator's stored Instagram credentials (user record + persona)
+async function clearCreatorInstagramCredentials(creator) {
+  await User.updateOne({ _id: creator._id }, { $set: { instagramPageAccessToken: '', igApprovalStatus: 'none' } });
+  await PersonaConfig.updateMany({ ownerId: creator._id }, { $set: { instagramPageAccessToken: '' } });
+}
+
+// Deauthorize Callback for Meta: the creator removed the app, so stop using their token
+app.post('/deauthorize', async (req, res) => {
+  const data = parseSignedRequest(req.body.signed_request);
+  if (!data || !data.user_id) {
+    return res.status(400).json({ error: 'Invalid or missing signed_request' });
+  }
+  try {
+    const creator = await findCreatorByMetaUserId(String(data.user_id));
+    if (creator) await clearCreatorInstagramCredentials(creator);
+    console.log(`🔌 Deauthorized Instagram user ${data.user_id} (creator found: ${!!creator})`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Deauthorize error:', err.message);
+    res.status(500).json({ error: 'Deauthorize failed, please retry' });
+  }
 });
 
-// User Data Deletion Callback for Meta
-app.all('/data-deletion', (req, res) => {
-  res.json({
-    url: 'https://instagram-ai-bot-64tf.onrender.com/privacy',
-    confirmation_code: 'chatter_deletion_success'
-  });
+// User Data Deletion Callback for Meta: deletes the Instagram data stored for that user
+app.post('/data-deletion', async (req, res) => {
+  const data = parseSignedRequest(req.body.signed_request);
+  if (!data || !data.user_id) {
+    return res.status(400).json({ error: 'Invalid or missing signed_request' });
+  }
+
+  const metaUserId = String(data.user_id);
+  try {
+    const creator = await findCreatorByMetaUserId(metaUserId);
+    const accountIds = [metaUserId, creator?.instagramAccountId, creator?.instagramId].filter(Boolean);
+
+    // Conversations to/from the account, plus the user's own contact data if they were a DM contact
+    const [messages, memories, nodes] = await Promise.all([
+      Message.deleteMany({ $or: [{ senderId: { $in: accountIds } }, { recipientId: { $in: accountIds } }] }),
+      UserMemory.deleteMany({ senderId: { $in: accountIds } }),
+      SocialGraph.deleteMany(creator ? { $or: [{ ownerId: creator._id }, { senderId: { $in: accountIds } }] } : { senderId: { $in: accountIds } })
+    ]);
+    if (creator) {
+      await clearCreatorInstagramCredentials(creator);
+      await User.updateOne({ _id: creator._id }, { $set: { instagramId: '', instagramAccountId: '', instagramUsername: '' } });
+    }
+    socialGraphService.clearCache();
+
+    const confirmationCode = crypto.randomBytes(8).toString('hex');
+    console.log(`🗑️ Data deletion ${confirmationCode}: ${messages.deletedCount} messages, ${memories.deletedCount} memories, ${nodes.deletedCount} graph nodes (creator found: ${!!creator})`);
+    res.json({
+      url: `https://${req.get('host')}/data-deletion/status?code=${confirmationCode}`,
+      confirmation_code: confirmationCode
+    });
+  } catch (err) {
+    console.error('Data deletion error:', err.message);
+    res.status(500).json({ error: 'Deletion failed, please retry' });
+  }
+});
+
+// Status page Meta links users to after a deletion request
+app.get('/data-deletion/status', (req, res) => {
+  const code = String(req.query.code || '').replace(/[^a-f0-9]/gi, '');
+  res.send(`
+    <html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 16px;">
+      <h1>Data Deletion Status</h1>
+      <p>Confirmation code: <strong>${code || 'unknown'}</strong></p>
+      <p>All Instagram messages, memories and account data Chatter AI stored for you have been permanently deleted.</p>
+    </body></html>
+  `);
 });
 
 

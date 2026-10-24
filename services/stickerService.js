@@ -559,7 +559,7 @@ class StickerService {
   async fetchFromGiphyApi(category, contextText = '') {
     try {
       const config = await PersonaConfig.findOne();
-      const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+      const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
       if (!apiKey) return null;
 
       // Extract trigger words from conversation context
