@@ -30,7 +30,7 @@ export const FEATURE_GROUPS = [
   {
     title: 'Platform',
     features: [
-      { key: 'byoLlmCustomEndpoint', label: 'Bring your own AI model', hint: 'Use your own OpenAI-compatible endpoint or a local Ollama model.' },
+      { key: 'byoLlmCustomEndpoint', label: 'Bring your own AI model', hint: 'Use your own OpenAI-compatible endpoint or a local Ollama model.', setupHref: '/settings/model' },
       { key: 'desktopPushAlerts', label: 'Desktop push alerts', hint: 'Native notifications from the desktop app for new leads and handoffs.' },
     ],
   },
