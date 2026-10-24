@@ -194,23 +194,23 @@ Before checking off any task, you must observe these strict constraints:
 ---
 
 ## Phase 7: Conversion Analytics (Leads & Bookings Tracker)
-- [ ] **7.1 Analytics Extractor Service (`services/analyticsService.js`):**
-  - [ ] Scan incoming message and AI reply for lead intent:
-    - [ ] Regex patterns for phone numbers, email addresses, pricing requests, demo inquiries.
-    - [ ] Upsert record in `models/Lead.js` (`ownerId`, `handle`, `phone`, `email`, `intentSummary`).
-  - [ ] Scan for booking intent:
-    - [ ] Detect appointment scheduling, date/time agreements, table reservations, Calendly clicks.
-    - [ ] Upsert record in `models/Booking.js` (`ownerId`, `handle`, `serviceName`, `bookingTime`, `status: 'confirmed'`).
-- [ ] **7.2 Business Analytics API (`routes/analytics.js`):**
-  - [ ] Create `GET /api/analytics/overview`: returns total conversations, active leads count, confirmed bookings count, resolution rate.
-  - [ ] Create `GET /api/analytics/leads`: returns paginated lead list with phone/email exports.
-  - [ ] Create `GET /api/analytics/bookings`: returns scheduled bookings calendar feed.
-- [ ] **7.3 Dashboard Overview UI (`frontend/app/page.jsx`):**
-  - [ ] For business accounts, display KPI Stat Cards:
-    - [ ] `💬 Total Conversations`
-    - [ ] `🎯 Leads Captured`
-    - [ ] `📅 Bookings Confirmed`
-    - [ ] `⚡ Automation Rate`
+- [x] **7.1 Analytics Extractor Service (`services/analyticsService.js`):**
+  - [x] Scan incoming message and AI reply for lead intent:
+    - [x] Regex patterns for phone numbers, email addresses, pricing requests, demo inquiries.
+    - [x] Upsert record in `models/Lead.js` (`ownerId`, `handle`, `phone`, `email`, `intentSummary`).
+  - [x] Scan for booking intent:
+    - [x] Detect appointment scheduling, date/time agreements, table reservations, Calendly clicks.
+    - [x] Upsert record in `models/Booking.js` (`ownerId`, `handle`, `serviceName`, `bookingTime`, `status: 'confirmed'`).
+- [x] **7.2 Business Analytics API (`routes/analytics.js`):**
+  - [x] Create `GET /api/analytics/overview`: returns total conversations, active leads count, confirmed bookings count, resolution rate.
+  - [x] Create `GET /api/analytics/leads`: returns paginated lead list with phone/email exports.
+  - [x] Create `GET /api/analytics/bookings`: returns scheduled bookings calendar feed.
+- [x] **7.3 Dashboard Overview UI (`frontend/app/page.jsx`):**
+  - [x] For business accounts, display KPI Stat Cards:
+    - [x] `💬 Total Conversations`
+    - [x] `🎯 Leads Captured`
+    - [x] `📅 Bookings Confirmed`
+    - [x] `⚡ Automation Rate`
 - [ ] **Phase 7 Sign-Off:** Send a test DM containing a phone number and booking time; verify stats increment in real-time.
 
 ---
