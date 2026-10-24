@@ -24,7 +24,7 @@ const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
-const { humanizeReply, splitIntoBubbles, bubbleGapMs } = require('./services/humanizeService');
+const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
 const cryptoService = require('./services/cryptoService');
@@ -692,7 +692,13 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // 5. If user shared a Reel/Post or media, react with an emoji first (personal accounts only)
   const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
   if (!isBusinessTenant && isReelOrShare && mid && mid !== 'random_mid') {
-    instagramService.sendMessageReaction(senderId, mid, '😂', creatorAccessToken).catch(() => {});
+    const ownerFilter = ownerUser
+      ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] }
+      : {};
+    SocialGraph.findOne({ senderId, ...ownerFilter }, { roastiness: 1 }).lean()
+      .catch(() => null)
+      .then(node => instagramService.sendMessageReaction(senderId, mid, reelReactionEmoji(node?.roastiness), creatorAccessToken))
+      .catch(() => {});
   }
 
   // 6. Anti-Spam / Debounce Logic:
@@ -793,11 +799,11 @@ async function dispatchDebouncedReply(queueEntry) {
     : null;
   const fallbackReply = isBusinessTenant
     ? 'Thanks for your message! Our team will get back to you shortly.'
-    : (isReelOrShare ? '😂😂' : 'yoo wassup!');
+    : (isReelOrShare ? '😂😂😂' : 'yoo wassup!');
 
   try {
-    // Turn on typing indicator while generating
-    await instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken);
+    // Turn on typing indicator while generating (fire-and-forget so a slow Graph call never delays the reply)
+    instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
 
     // Generate response mimicking creator persona
     console.log(`🤖 Generating ${config?.creatorName || 'Creator'}'s response via Azure OpenAI...`);
@@ -827,7 +833,7 @@ async function dispatchDebouncedReply(queueEntry) {
     }
 
     // Strip robotic clichés / bullets and apply casual texting punctuation (§15.6)
-    if (replyText) replyText = humanizeReply(replyText, { isBusiness: isBusinessTenant });
+    if (replyText) replyText = humanizeReply(replyText, { isBusiness: isBusinessTenant }) || fallbackReply;
 
     const lowerIn = (combinedText || '').toLowerCase();
     const lowerReply = (replyText || '').toLowerCase();
@@ -905,7 +911,7 @@ async function dispatchDebouncedReply(queueEntry) {
     console.log(`⏳ [Realistic Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
 
     // Keep typing indicator actively pulsing on Instagram every 3.5 seconds so it NEVER drops while typing
-    await instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken);
+    instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
     const typingPulseInterval = setInterval(() => {
       instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
     }, 3500);
