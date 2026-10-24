@@ -9,6 +9,12 @@ const NODE_H = 64;
 const WORLD_W = 1800;
 const WORLD_H = 1100;
 
+// Closeness circles a person card can sit in (matches the Storyboard model)
+const CIRCLES = [
+  ['', 'No circle'], ['close', 'Close friends'], ['online', 'Online friends'],
+  ['offline', 'Offline friends'], ['family', 'Family'], ['professional', 'Professional'],
+];
+
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
@@ -17,7 +23,7 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
  * link them, edit notes in the side panel. Saves to /api/storyboard/:kind a
  * moment after each change.
  *
- * nodeTypes: [{ key, label, color, icon }]; seed(): { nodes, edges } for an empty board.
+ * nodeTypes: [{ key, label, color, icon, circles? }] (circles: true shows the closeness picker); seed(): { nodes, edges } for an empty board.
  * onSelect(node|null) lets the page react (e.g. pick who the test chat is with).
  */
 export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extraAdd }) {
@@ -220,6 +226,7 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
                 >
                   <div className="story-node-type"><Icon size={12} /> {t.label}</div>
                   <div className="story-node-label">{n.label || 'Untitled'}</div>
+                  {n.circle && <div className="story-node-type">{CIRCLES.find(c => c[0] === n.circle)?.[1]}</div>}
                   <button
                     type="button"
                     className="story-link-btn"
@@ -249,9 +256,17 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
             <label className="story-field">
               <span>Type</span>
               <select value={selected.type} onChange={e => patchNode(selected.id, { type: e.target.value })}>
-                {nodeTypes.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                {nodeTypes.filter(t => !t.hideAdd || t.key === selected.type).map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
               </select>
             </label>
+            {typeOf(selected.type).circles && (
+              <label className="story-field">
+                <span>Circle</span>
+                <select value={selected.circle || ''} onChange={e => patchNode(selected.id, { circle: e.target.value })}>
+                  {CIRCLES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
+            )}
             <label className="story-field">
               <span>Notes</span>
               <textarea rows={5} maxLength={2000} value={selected.notes} placeholder={typeOf(selected.type).placeholder || 'Details the AI should know'}
