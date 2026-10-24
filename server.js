@@ -216,6 +216,32 @@ app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
 app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
 
+// CORS-safe image proxy so the frontend canvas can sample avatar colours (PLAN.md §15.2).
+// Only Instagram / Facebook CDN hosts are allowed, so it can't be used as an open proxy.
+const IMAGE_PROXY_HOSTS = /(^|\.)(cdninstagram\.com|fbcdn\.net)$/i;
+app.get('/api/image-proxy', async (req, res) => {
+  let target;
+  try {
+    target = new URL(String(req.query.url || ''));
+  } catch {
+    return res.status(400).json({ error: 'Invalid url' });
+  }
+  if (target.protocol !== 'https:' || !IMAGE_PROXY_HOSTS.test(target.hostname)) {
+    return res.status(403).json({ error: 'Host not allowed' });
+  }
+  try {
+    const upstream = await fetch(target.href, { redirect: 'error', signal: AbortSignal.timeout(8000) });
+    const type = upstream.headers.get('content-type') || '';
+    if (!upstream.ok || !type.startsWith('image/')) return res.status(502).end();
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    if (buf.length > 5 * 1024 * 1024) return res.status(413).end();
+    res.set({ 'Content-Type': type, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
+    res.send(buf);
+  } catch {
+    res.status(502).end();
+  }
+});
+
 // Webhook Verification Token
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secret_2025';
 

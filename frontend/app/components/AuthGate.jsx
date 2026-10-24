@@ -83,8 +83,8 @@ export default function AuthGate({ children }) {
       <div style={{
         width: '100vw',
         height: '100vh',
-        background: '#ffffff',
-        color: '#09090b',
+        background: 'transparent',
+        color: 'var(--color-text-primary)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -92,13 +92,13 @@ export default function AuthGate({ children }) {
         gap: '14px',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       }}>
-        <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: '#09090b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: 'var(--ambient-dominant)', color: 'var(--color-background)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ShieldCheck size={22} />
         </div>
-        <div style={{ fontSize: '0.86rem', fontWeight: '700', letterSpacing: '-0.3px', color: '#09090b' }}>
+        <div style={{ fontSize: '0.86rem', fontWeight: '700', letterSpacing: '-0.3px', color: 'var(--color-text-primary)' }}>
           CHATTER OS
         </div>
-        <RefreshCw size={16} className="animate-spin" color="#71717a" />
+        <RefreshCw size={16} className="animate-spin" style={{ color: 'var(--color-text-secondary)' }} />
       </div>
     );
   }
@@ -109,7 +109,7 @@ export default function AuthGate({ children }) {
 
   return (
     <>
-      <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: '#ffffff' }}>
+      <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: 'transparent' }}>
         <Sidebar />
         <main className="app-main-content">
           <WorkspaceImpersonationBanner />

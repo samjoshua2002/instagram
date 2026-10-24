@@ -649,10 +649,10 @@ To guarantee personal AI responses are completely indistinguishable from real hu
 > **Directive for Claude:** You have full creative and architectural control to execute this plan. Do not feel constrained by previous layouts. Master the dynamic Spotify-inspired ambient glass UI and mobile-first experience using shadcn and Tailwind principles. Verify and fix all UI logic across the entire website. Follow the audit checklist below in exact sequence.
 
 ### Phase A: Design System, Dynamic Ambient Foundation & Global Inputs
-- [ ] Inspect and ensure `globals.css` exports pure Spotify dark foundation tokens (`--color-background: #121212`, `--color-surface: #181818`, `--glass-fill-standard`, etc.) without hardcoded static purples.
-- [ ] Enforce global input/textarea styling: zero hardcoded colors, dynamic focus border (`var(--ambient-dominant)`), `16px` font size on mobile, and $\ge 48\text{px}$ touch targets.
-- [ ] Verify `frontend/app/components/AmbientBackground.jsx` performs color extraction from images via HTML5 canvas or ColorThief, dynamically injecting `--ambient-dominant` and `--ambient-secondary`.
-- [ ] Ensure `frontend/app/layout.jsx` mounts `<AmbientBackground />` behind the application content.
+- [x] Inspect and ensure `globals.css` exports pure Spotify dark foundation tokens (`--color-background: #121212`, `--color-surface: #181818`, `--glass-fill-standard`, etc.) without hardcoded static purples.
+- [x] Enforce global input/textarea styling: zero hardcoded colors, dynamic focus border (`var(--ambient-dominant)`), `16px` font size on mobile, and $\ge 48\text{px}$ touch targets.
+- [x] Verify `frontend/app/components/AmbientBackground.jsx` performs color extraction from images via HTML5 canvas or ColorThief, dynamically injecting `--ambient-dominant` and `--ambient-secondary`.
+- [x] Ensure `frontend/app/layout.jsx` mounts `<AmbientBackground />` behind the application content.
 
 ### Phase B: Site-Wide UI & Route Verification Checklist
 - [ ] **`/` (Dashboard / Overview):**
