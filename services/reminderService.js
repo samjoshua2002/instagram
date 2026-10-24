@@ -2,6 +2,7 @@ const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const PersonaConfig = require('../models/PersonaConfig');
 const instagramService = require('./instagramService');
+const { getOwnerSendToken } = require('./instagramTokenService');
 const azureOpenAI = require('./azureOpenAI');
 
 class ReminderService {
@@ -83,8 +84,13 @@ class ReminderService {
           continue;
         }
 
-        // Send via Instagram Graph API
-        const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText);
+        // Send with the contact owner's token; never the admin token for a tenant's contact
+        const ownerToken = await getOwnerSendToken(user.ownerId);
+        if (ownerToken === '') {
+          console.warn(`⚠️ [Reminder Service] Skipping @${user.username}: owner's Instagram is not connected.`);
+          continue;
+        }
+        const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText, ownerToken);
 
         // Record reminder in DB
         await Message.create({
