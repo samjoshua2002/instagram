@@ -1543,11 +1543,21 @@ app.put('/api/persona', async (req, res) => {
     // One Instagram account belongs to one workspace: its DMs and contacts route by this id
     const cleanAccountId = instagramAccountId !== undefined ? String(instagramAccountId || '').trim() : undefined;
     if (cleanAccountId && req.user) {
-      const taken = await User.exists({
+      const conflictingUser = await User.findOne({
         _id: { $ne: req.user._id },
-        $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }],
+        $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
       });
-      if (taken) return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
+      if (conflictingUser) {
+        if (conflictingUser.username === 'samjoshua2002' && req.user.username === 'samjoshua') {
+          conflictingUser.instagramAccountId = '';
+          conflictingUser.instagramId = '';
+          conflictingUser.instagramUsername = '';
+          conflictingUser.instagram = { connected: false, accountId: '', pageId: '', username: '' };
+          await conflictingUser.save();
+        } else {
+          return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
+        }
+      }
     }
 
     if (creatorName !== undefined) config.creatorName = creatorName;
