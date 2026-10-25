@@ -689,7 +689,21 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     text: messageText,
     timestamp: msgTime,
   });
-  await userMemory.save();
+  try {
+    await userMemory.save();
+  } catch (saveErr) {
+    // If a concurrent webhook or background job modified the record, apply atomic update
+    await UserMemory.updateOne({ _id: userMemory._id }, {
+      $set: { lastInteraction: msgTime, lastReminderSentAt: null },
+      $inc: { messageCount: 1, ...(isReelOrShare ? { reelsCount: 1 } : {}) },
+      $push: {
+        recentChatBuffer: {
+          $each: [{ role: 'user', text: messageText, timestamp: msgTime }],
+          $slice: -10
+        }
+      }
+    }).catch(e => console.warn('UserMemory fallback update notice:', e.message));
+  }
   await redisService.pushMessage(senderId, { role: 'user', text: messageText, timestamp: msgTime });
 
   // Atomically persist cumulative counts to SocialGraph node or auto-create for creator
