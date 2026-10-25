@@ -135,22 +135,32 @@ const safeEqual = (a, b) => {
 };
 
 // App secrets used to sign webhooks / signed_requests (Instagram Login and Facebook Login apps can differ)
-const META_SIGNING_SECRETS = [process.env.META_APP_SECRET, process.env.INSTAGRAM_APP_SECRET]
-  .map(s => (s || '').trim())
-  .filter(Boolean);
-if (!META_SIGNING_SECRETS.length) {
-  console.warn('⚠️ META_APP_SECRET is not set: webhook signatures are NOT verified.');
+function getMetaSigningSecrets() {
+  return [process.env.META_APP_SECRET, process.env.INSTAGRAM_APP_SECRET]
+    .map(s => (s || '').trim())
+    .filter(Boolean);
+}
+if (!getMetaSigningSecrets().length) {
+  console.warn('⚠️ META_APP_SECRET / INSTAGRAM_APP_SECRET is not set: webhook signatures are NOT verified.');
 }
 
 // X-Hub-Signature-256 check, enforced once META_APP_SECRET / INSTAGRAM_APP_SECRET is set
 function verifyMetaSignature(req, res, next) {
-  if (!META_SIGNING_SECRETS.length) return next();
+  if (process.env.BYPASS_WEBHOOK_VERIFY === 'true') {
+    return next();
+  }
+  const secrets = getMetaSigningSecrets();
+  if (!secrets.length) return next();
   const signature = req.get('x-hub-signature-256') || '';
-  const valid = META_SIGNING_SECRETS.some(secret =>
+  if (!signature) {
+    console.warn('🚫 Webhook POST missing x-hub-signature-256 header');
+    return res.sendStatus(401);
+  }
+  const valid = secrets.some(secret =>
     safeEqual(signature, 'sha256=' + crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex'))
   );
   if (!valid) {
-    console.warn('🚫 Rejected webhook POST with invalid signature');
+    console.warn(`🚫 Rejected webhook POST with invalid signature. Received: ${signature.slice(0, 16)}... | Checked ${secrets.length} secret(s) (META_APP_SECRET: ${Boolean(process.env.META_APP_SECRET)}, INSTAGRAM_APP_SECRET: ${Boolean(process.env.INSTAGRAM_APP_SECRET)})`);
     return res.sendStatus(401);
   }
   next();
@@ -160,7 +170,7 @@ function verifyMetaSignature(req, res, next) {
 function parseSignedRequest(signedRequest) {
   const [encodedSig, payload] = String(signedRequest || '').split('.', 2);
   if (!encodedSig || !payload) return null;
-  const valid = META_SIGNING_SECRETS.some(secret =>
+  const valid = getMetaSigningSecrets().some(secret =>
     safeEqual(encodedSig, crypto.createHmac('sha256', secret).update(payload).digest('base64url'))
   );
   if (!valid) return null;
