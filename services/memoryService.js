@@ -346,8 +346,33 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
       }
 
       memory.messageCount = (memory.messageCount || 0) + 1;
-      memory.lastInteraction = new Date();
-      await memory.save();
+      try {
+        await memory.save();
+      } catch (saveErr) {
+        // If a concurrent incoming message bumped the document, apply fields atomically
+        await UserMemory.updateOne({ _id: memory._id }, {
+          $set: {
+            name: memory.name,
+            nickname: memory.nickname,
+            dob: memory.dob,
+            gender: memory.gender,
+            conversationStyle: memory.conversationStyle,
+            samSpeakingStyleWithUser: memory.samSpeakingStyleWithUser,
+            relationshipType: memory.relationshipType,
+            personalNotes: memory.personalNotes,
+            roastStyle: memory.roastStyle,
+            insideJokes: memory.insideJokes,
+            rollingSummary: memory.rollingSummary,
+            fewShotExchanges: memory.fewShotExchanges,
+            facts: memory.facts,
+            importantDates: memory.importantDates,
+            favoriteThings: memory.favoriteThings,
+            lifeEvents: memory.lifeEvents,
+            lastInteraction: new Date(),
+          },
+          $inc: { messageCount: 1 }
+        }).catch(e => console.warn('MemoryService fallback update notice:', e.message));
+      }
 
       // Immediate cache sync in Redis
       await redisService.cacheUserMemory(senderId, memory.toObject ? memory.toObject() : memory, 3600);
