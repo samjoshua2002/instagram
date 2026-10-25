@@ -86,13 +86,31 @@ class AuthService {
           user.role = 'superadmin';
           changed = true;
         }
-        if (!user.instagramPageAccessToken && !user.instagram?.accessTokenEncrypted && process.env.INSTAGRAM_PAGE_ACCESS_TOKEN) {
-          setUserInstagram(user, { token: process.env.INSTAGRAM_PAGE_ACCESS_TOKEN, accountId: process.env.INSTAGRAM_ACCOUNT_ID });
-          changed = true;
-        }
-        if (!user.instagramAccountId && process.env.INSTAGRAM_ACCOUNT_ID) {
-          user.instagramAccountId = process.env.INSTAGRAM_ACCOUNT_ID;
-          changed = true;
+        const envAccountId = (process.env.INSTAGRAM_ACCOUNT_ID || '').trim();
+        if (envAccountId) {
+          const claimedByOther = await User.exists({
+            _id: { $ne: user._id },
+            $or: [{ instagramAccountId: envAccountId }, { instagramId: envAccountId }, { 'instagram.accountId': envAccountId }]
+          });
+          if (claimedByOther) {
+            // Unlink from superadmin if claimed by another workspace (e.g. samjoshua / guidetalk.app@gmail.com)
+            if (user.instagramAccountId === envAccountId || user.instagram?.accountId === envAccountId) {
+              user.instagramAccountId = '';
+              user.instagramId = '';
+              user.instagramUsername = '';
+              user.instagram = { connected: false, accountId: '', pageId: '', username: '' };
+              changed = true;
+            }
+          } else {
+            if (!user.instagramPageAccessToken && !user.instagram?.accessTokenEncrypted && process.env.INSTAGRAM_PAGE_ACCESS_TOKEN) {
+              setUserInstagram(user, { token: process.env.INSTAGRAM_PAGE_ACCESS_TOKEN, accountId: envAccountId });
+              changed = true;
+            }
+            if (!user.instagramAccountId) {
+              user.instagramAccountId = envAccountId;
+              changed = true;
+            }
+          }
         }
         if (!user.twoFactor?.secret) {
           user.twoFactor = user.twoFactor || {};
