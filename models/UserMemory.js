@@ -139,7 +139,7 @@ const UserMemorySchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
-}, { timestamps: true });
+}, { timestamps: true, versionKey: false });
 
 // One memory per contact per creator (legacy records without ownerId are excluded)
 UserMemorySchema.index(
