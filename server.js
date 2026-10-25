@@ -471,6 +471,7 @@ function handleCreatorEcho(event, accountId) {
         $or: [
           { 'instagram.accountId': senderAccountId },
           { instagramAccountId: senderAccountId },
+          { instagramId: senderAccountId },
           { 'businessProfile.instagramId': senderAccountId }
         ]
       });
@@ -572,6 +573,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     $or: [
       { 'instagram.accountId': targetAccountId },
       { instagramAccountId: targetAccountId },
+      { instagramId: targetAccountId },
       { 'businessProfile.instagramId': targetAccountId }
     ]
   });
