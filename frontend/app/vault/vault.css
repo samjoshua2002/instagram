@@ -155,13 +155,20 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
+  grid-auto-rows: auto;
+  align-items: start;
   max-height: 460px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 2px;
+  /* Never let the flex column squash the grid: Safari then overlaps the rows */
+  flex: 0 0 auto;
 }
 .vx-pick {
   position: relative;
-  aspect-ratio: 1;
+  display: block;
+  width: 100%;
+  min-width: 0;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 8px;
@@ -172,7 +179,9 @@
 }
 .vx-pick:hover { transform: scale(1.02); }
 .vx-pick.selected { border-color: #1db954; }
-.vx-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Square tile via padding (works in every browser, unlike aspect-ratio on grid buttons) */
+.vx-pick::before { content: ''; display: block; padding-top: 100%; }
+.vx-pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .vx-pick-check {
   position: absolute;
   top: 6px;
