@@ -848,6 +848,22 @@ select:focus {
   box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.45);
 }
 
+/* Body scrolls on touch; only the top bar starts drag-to-close */
+.mobile-sheet {
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sheet-drag-zone,
+.sheet-identity {
+  touch-action: none;
+}
+
+.sheet-drag-zone {
+  padding: 4px 0;
+  cursor: grab;
+}
+
 .sheet-grabber {
   width: 40px;
   height: 5px;
