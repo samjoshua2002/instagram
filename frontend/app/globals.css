@@ -309,8 +309,8 @@ select:focus {
 
 /* Universal Page Container */
 .page-container {
-  padding: 32px 36px 80px 36px;
-  max-width: 1400px;
+  padding: clamp(16px, 2.2vw, 28px) clamp(14px, 2.2vw, 28px) 80px;
+  max-width: none;
   margin: 0 auto;
   width: 100%;
 }
@@ -363,9 +363,9 @@ select:focus {
 
 /* Settings & Vault Container — Unified to match People Directory max-width */
 .settings-fullwidth {
-  max-width: 1400px !important;
+  max-width: none !important;
   width: 100% !important;
-  padding: 32px 36px 80px 36px !important;
+  padding: clamp(16px, 2.2vw, 28px) clamp(14px, 2.2vw, 28px) 80px !important;
   margin: 0 auto !important;
 }
 
@@ -562,6 +562,30 @@ select:focus {
   justify-content: space-between;
   z-index: 50;
   box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* Small laptops and tablets: slimmer sidebar so pages keep their width */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .floating-sidebar {
+    top: 10px;
+    left: 10px;
+    bottom: 10px;
+    width: 224px;
+    padding: 16px 12px;
+  }
+
+  .app-main-content {
+    margin-left: 238px;
+    width: calc(100vw - 238px);
+  }
+  /* Fit the profile buttons inside the slimmer sidebar: Switch shows its icon only */
+  .sidebar-profile-actions > * {
+    min-width: 0;
+  }
+
+  .sidebar-switch-label {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
@@ -998,8 +1022,8 @@ select:focus {
    Dashboard & Analytics Grid
    ═══════════════════════════════════════════ */
 .dashboard-container {
-  padding: 32px 36px 80px 36px;
-  max-width: 1400px;
+  padding: clamp(16px, 2.2vw, 28px) clamp(14px, 2.2vw, 28px) 80px;
+  max-width: none;
   margin: 0 auto;
   width: 100%;
 }
@@ -2383,7 +2407,7 @@ body {
 
 /* ═══ Storyboard canvas + test chat (PLAN.md §13 Phase 4) ═══ */
 .story-page {
-  max-width: 1400px;
+  max-width: none;
 }
 
 .story-layout {

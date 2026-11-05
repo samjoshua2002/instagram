@@ -382,7 +382,7 @@ function SettingsPageContent() {
 
   if (loading) {
     return (
-      <div className="page-container settings-fullwidth" style={{ maxWidth: '1400px', width: '100%' }}>
+      <div className="page-container settings-fullwidth">
         {/* Skeleton Page Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
           <div>
@@ -461,7 +461,7 @@ function SettingsPageContent() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className="page-container settings-fullwidth"
-      style={{ maxWidth: '1400px', width: '100%' }}
+     
     >
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '28px' }}>

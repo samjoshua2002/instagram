@@ -474,7 +474,7 @@ function MediaVaultPageContent() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className="page-container settings-fullwidth"
-      style={{ maxWidth: '1400px', width: '100%' }}
+     
     >
 
       {/* Page Header */}

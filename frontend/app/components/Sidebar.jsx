@@ -754,7 +754,7 @@ export default function Sidebar() {
             )}
 
             {/* Profile Action Row */}
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div className="sidebar-profile-actions" style={{ display: 'flex', gap: '6px' }}>
               <Link
                 href="/profile"
                 style={{
@@ -797,7 +797,7 @@ export default function Sidebar() {
                 }}
               >
                 <ArrowLeftRight size={12} />
-                <span>Switch</span>
+                <span className="sidebar-switch-label">Switch</span>
               </button>
 
               <button

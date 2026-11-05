@@ -656,7 +656,7 @@ function ControlsPageContent() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className="page-container"
-      style={{ maxWidth: '1400px' }}
+     
     >
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>

@@ -220,7 +220,7 @@ export default function SuperadminPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className="page-container"
-      style={{ maxWidth: '1400px' }}
+     
     >
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>

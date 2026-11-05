@@ -70,7 +70,7 @@ export default function DownloadPage() {
     build?.os === 'macos' ? <Apple size={size} /> : <Monitor size={size} />;
 
   return (
-    <div className="page-container" style={{ maxWidth: '860px' }}>
+    <div className="page-container">
       <div style={{ marginBottom: '24px' }}>
         <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
           // DESKTOP APP {release?.version ? `v${release.version}` : ''}
