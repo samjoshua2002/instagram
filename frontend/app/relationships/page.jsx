@@ -47,6 +47,12 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// Drop broken years (e.g. "0002" from a half-typed date picker) so only day + month show
+function cleanDob(dob) {
+  if (!dob) return "";
+  return String(dob).replace(/,?s*0d{3}/, "").replace(/^0d{3}-/, "").trim();
+}
+
 // Robust timezone-agnostic helper to parse date strings into YYYY-MM-DD
 function formatDobForInput(dob) {
   if (!dob) return '';
@@ -1310,7 +1316,8 @@ function RelationshipsPageContent() {
                         }
                         const [y, m, d] = val.split('-');
                         const monthName = MONTH_NAMES[parseInt(m, 10) - 1] || m;
-                        setFormData({ ...formData, dob: `${monthName} ${parseInt(d, 10)}, ${y}` });
+                        const validYear = parseInt(y, 10) >= 1900;
+                        setFormData({ ...formData, dob: validYear ? `${monthName} ${parseInt(d, 10)}, ${y}` : `${monthName} ${parseInt(d, 10)}` });
                       }}
                       style={{ width: '100%' }}
                     />
@@ -1388,7 +1395,7 @@ function RelationshipsPageContent() {
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 >
-                  <option value="close_friend">Close Circle / Fami</option>
+                  <option value="close_friend">Close Circle / Family</option>
                   <option value="online_friend">Online Friend</option>
                   <option value="offline_friend">Offline Friend</option>
                   <option value="family">Family / Relatives</option>
@@ -1937,12 +1944,12 @@ function RelationshipsPageContent() {
       )}
 
       {/* Filter Tabs & Search Bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+      <div className="people-filters" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
         {/* Category Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="people-pills" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           {[
             { id: 'all', label: 'All People', count: categoryCounts.all },
-            { id: 'close_friend', label: 'Close Circle / Fami', count: categoryCounts.close_friend },
+            { id: 'close_friend', label: 'Close Circle / Family', count: categoryCounts.close_friend },
             { id: 'online_friend', label: 'Online Friends', count: categoryCounts.online_friend },
             { id: 'offline_friend', label: 'Offline Friends', count: categoryCounts.offline_friend },
             { id: 'family', label: 'Family / Relatives', count: categoryCounts.family },
@@ -1954,6 +1961,7 @@ function RelationshipsPageContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveCategory(tab.id)}
+                className="people-pill"
                 style={{
                   background: isActive ? 'var(--color-text-primary)' : 'var(--color-surface)',
                   color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
@@ -1990,12 +1998,12 @@ function RelationshipsPageContent() {
         </div>
 
         {/* Search Input & Layout Mode Switcher */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+        <div className="people-toolbar" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="people-search" style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
             <input
               type="text"
-              placeholder="Filter people by name, @username, birth date, relation, or lore..."
+              placeholder="Search name, @username, relation..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -2010,6 +2018,7 @@ function RelationshipsPageContent() {
           {/* Sort order */}
           <select
             aria-label="Sort people"
+            className="people-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
             style={{ height: '38px', fontSize: '0.82rem', padding: '0 10px', borderRadius: '8px', flexShrink: 0, cursor: 'pointer' }}
@@ -2021,7 +2030,7 @@ function RelationshipsPageContent() {
           </select>
 
           {/* Layout Switcher Icons (Table / Grid / Dense) */}
-          <div style={{
+          <div className="people-layout-switch" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '3px',
@@ -2042,6 +2051,7 @@ function RelationshipsPageContent() {
                   key={id}
                   type="button"
                   onClick={() => handleSetLayout(id)}
+                  className="people-layout-btn"
                   title={`${label} Layout View`}
                   style={{
                     background: isActive ? 'var(--color-text-primary)' : 'transparent',
@@ -2152,7 +2162,7 @@ function RelationshipsPageContent() {
                   pagedPeople.map((person) => {
                     const hasHandle = Boolean(person.handle || person.instagramHandle);
                     const handleDisplay = person.handle || person.instagramHandle;
-                    const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+                    const dobDisplay = cleanDob(person.dob || person.importantDates?.[0]?.date || '');
                     const chatsCount = person.chatsCount || person.messageCount || 0;
                     const reelsCount = person.reelsCount || 0;
 
@@ -2349,7 +2359,7 @@ function RelationshipsPageContent() {
             pagedPeople.map((person) => {
               const hasHandle = Boolean(person.handle || person.instagramHandle);
               const handleDisplay = person.handle || person.instagramHandle;
-              const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+              const dobDisplay = cleanDob(person.dob || person.importantDates?.[0]?.date || '');
               const chatsCount = person.chatsCount || person.messageCount || 0;
               const reelsCount = person.reelsCount || 0;
               const relDisplay = person.relationship || person.relationshipToSam || 'Friend';
@@ -2588,7 +2598,7 @@ function RelationshipsPageContent() {
             pagedPeople.map((person) => {
               const hasHandle = Boolean(person.handle || person.instagramHandle);
               const handleDisplay = person.handle || person.instagramHandle;
-              const dobDisplay = person.dob || person.importantDates?.[0]?.date || '';
+              const dobDisplay = cleanDob(person.dob || person.importantDates?.[0]?.date || '');
               const chatsCount = person.chatsCount || person.messageCount || 0;
               const reelsCount = person.reelsCount || 0;
               const relDisplay = person.relationship || person.relationshipToSam || 'Friend';

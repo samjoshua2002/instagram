@@ -2877,3 +2877,21 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sandbox-bubble.typing span { animation: none; }
 }
+
+/* People page filters: tidy mobile layout */
+@media (max-width: 640px) {
+  .people-pills {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px 2px;
+    scroll-padding: 0 14px;
+  }
+  .people-pills::-webkit-scrollbar { display: none; }
+  .people-pill { flex-shrink: 0; white-space: nowrap; height: 36px; }
+  .people-search { flex: 1 1 100% !important; min-width: 0 !important; }
+  .people-sort { flex: 1 1 0; min-width: 0; }
+  .people-layout-switch { flex: 1.6 1 0; }
+  .people-layout-btn { flex: 1; justify-content: center; }
+}
