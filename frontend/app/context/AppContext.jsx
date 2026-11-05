@@ -10,7 +10,7 @@ const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 
 // Fields whose server-side change must reach the screen on the next background sync
 const SYNC_COMPARE_FIELDS = [
-  'id', 'name', 'handle', 'senderId', 'profilePic', 'category', 'relationship', 'dob', 'personalNotes',
+  'id', 'name', 'handle', 'senderId', 'profilePic', 'category', 'relationship', 'dob', 'age', 'gender', 'personalNotes',
   'chatsCount', 'reelsCount', 'aiEnabled', 'replyToMessages', 'replyToReelsAndPosts', 'roastiness', 'greetingStyle',
 ];
 
@@ -604,6 +604,7 @@ export function AppProvider({ children }) {
               relationship: sn.relationshipToSam || 'Friend',
               category: sn.category || 'online_friend',
               dob: sn.dob || '',
+              age: Number.isFinite(sn.age) ? sn.age : null,
               gender: sn.gender || 'unknown',
               personalNotes: sn.personalNotes || (sn.lore || []).join('\n'),
               rollingSummary: sn.relationshipToSam || 'Friend in circle',
@@ -653,7 +654,7 @@ export function AppProvider({ children }) {
                 const d = deduplicated[i];
                 if (
                   SYNC_COMPARE_FIELDS.some(k => p[k] !== d[k]) ||
-                  (p.facts || []).length !== (d.facts || []).length
+                  JSON.stringify(p.facts || []) !== JSON.stringify(d.facts || [])
                 ) {
                   hasChanged = true;
                   break;

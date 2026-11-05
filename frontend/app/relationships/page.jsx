@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
@@ -167,14 +167,23 @@ function RelationshipsPageContent() {
   const [extractedData, setExtractedData] = useState(null);
   const [userClarification, setUserClarification] = useState('');
   const [knowBirthYear, setKnowBirthYear] = useState(true);
+  const [dobFocused, setDobFocused] = useState(false);
+  // Last server values shown in the form; a field that still equals this is not being edited
+  const serverSnapshot = useRef({});
 
   // Initialize form data ONLY when switching to a different person (not on every node poll)
   // This prevents typing from being reset by the 4s background sync
   useEffect(() => {
     if (selectedPerson) {
-      const currentDob = selectedPerson.dob || selectedPerson.importantDates?.[0]?.date || '';
+      const currentDob = selectedPerson.dob || (selectedPerson.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''))?.date || '';
       const hasYear = /\b(19|20)\d{2}\b/.test(currentDob);
       setKnowBirthYear(currentDob ? hasYear : true);
+      serverSnapshot.current = {
+        name: selectedPerson.name || '',
+        dob: currentDob,
+        gender: selectedPerson.gender || 'unknown',
+        personalNotes: selectedPerson.personalNotes || (selectedPerson.lore || []).join('\n'),
+      };
 
       setFormData({
         name: selectedPerson.name || '',
@@ -194,7 +203,40 @@ function RelationshipsPageContent() {
       setProfileTab('identity');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPerson?.id, selectedPerson?.name]);
+  }, [selectedPerson?.id]);
+
+  // Live profile: the open person follows the 8s background sync, so a name, birthday, age or
+  // fact learned from DMs shows up without leaving the page. Fields you are editing are kept.
+  useEffect(() => {
+    if (!selectedPerson) return;
+    const fresh = nodes.find(n => !n.isRoot && n.id === selectedPerson.id);
+    if (!fresh) return;
+    const watched = ['name', 'dob', 'age', 'gender', 'personalNotes', 'facts', 'lore', 'chatsCount', 'reelsCount', 'messageCount', 'handle', 'profilePic'];
+    if (!watched.some(k => JSON.stringify(fresh[k] ?? null) !== JSON.stringify(selectedPerson[k] ?? null))) return;
+
+    setSelectedPerson(prev => (prev && prev.id === fresh.id ? { ...prev, ...fresh } : prev));
+    const snap = serverSnapshot.current;
+    const incoming = {
+      name: fresh.name || '',
+      dob: fresh.dob || '',
+      gender: fresh.gender || 'unknown',
+      personalNotes: fresh.personalNotes || (fresh.lore || []).join('\n'),
+    };
+    const changed = Object.keys(incoming)
+      .filter(field => incoming[field] !== snap[field])
+      .map(field => ({ field, oldValue: snap[field], value: incoming[field] }));
+    changed.forEach(({ field, value }) => { snap[field] = value; });
+    setFormData(prev => {
+      const next = { ...prev, chatsCount: fresh.chatsCount ?? prev.chatsCount, reelsCount: fresh.reelsCount ?? prev.reelsCount };
+      for (const { field, oldValue, value } of changed) {
+        if (prev[field] === oldValue || !prev[field]) next[field] = value;
+      }
+      return next;
+    });
+    const dobChange = changed.find(c => c.field === 'dob');
+    if (dobChange?.value) setKnowBirthYear(/\b(19|20)\d{2}\b/.test(dobChange.value));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes]);
 
   // Optional background fetch of latest memory on person open (one-shot, non-blocking, no addFact loop)
   useEffect(() => {
@@ -1167,10 +1209,16 @@ function RelationshipsPageContent() {
                     : `${birthday.days} day${birthday.days === 1 ? '' : 's'} to go`}
                 </div>
               ) : (
-                <div className="person-card-title" style={{ color: 'var(--color-text-secondary)' }}>No birthday saved yet</div>
+                <div className="person-card-title" style={{ color: 'var(--color-text-secondary)' }}>
+                  {Number.isFinite(selectedPerson.age) ? `${selectedPerson.age} years old` : 'No birthday saved yet'}
+                </div>
               )}
               <div className="person-card-sub">
-                {birthday ? `${birthday.label}${birthday.turning ? ` · turning ${birthday.turning}` : ''}` : 'Add a date of birth in the fields below'}
+                {birthday
+                  ? `${birthday.label}${birthday.turning ? ` · turning ${birthday.turning}` : ''}`
+                  : Number.isFinite(selectedPerson.age)
+                    ? 'Age told in DMs · birthday not known yet'
+                    : 'Add a date of birth in the fields below'}
               </div>
             </div>
           </div>
@@ -1247,7 +1295,12 @@ function RelationshipsPageContent() {
                 {knowBirthYear ? (
                   <div>
                     <input
-                      type="date"
+                      // Safari paints today's date in an empty date box, which looked like a fake birthday;
+                      // show a plain "not known" box until a date exists or the box is clicked
+                      type={formData.dob || dobFocused ? 'date' : 'text'}
+                      placeholder="Not known yet · click to pick"
+                      onFocus={() => setDobFocused(true)}
+                      onBlur={() => setDobFocused(false)}
                       value={formatDobForInput(formData.dob)}
                       onChange={(e) => {
                         const val = e.target.value;

@@ -3,6 +3,69 @@ const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const redisService = require('./redisService');
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const AGE_FACT_RE = /\b\d{1,3}\s*(?:years?|yrs?|y\/o)\s*old\b|\b\d{1,3}\s*y\/o\b|\b(?:turned|turning|aged?)\s+\d{1,3}\b(?!\s*(?:am|pm|%|k\b))/i;
+// Filler words ignored when checking if two facts say the same thing
+const FACT_FILLER = new Set(['a', 'an', 'the', 'in', 'at', 'of', 'to', 'from', 'is', 'was', 'are', 'he', 'she', 'they', 'his', 'her', 'their',
+  'studies', 'studied', 'study', 'studying', 'works', 'worked', 'work', 'working', 'currently', 'also', 'and']);
+
+// "Jai Harish studied in Panimalar College." and "Studies/works at Panimalar College" -> same key
+function factKey(text, nameWords) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(w => w && !FACT_FILLER.has(w) && !nameWords.has(w)).join(' ');
+}
+
+const isSubset = (A, B) => [...A].every(w => B.has(w));
+
+function sameFact(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const A = new Set(a.split(' '));
+  const B = new Set(b.split(' '));
+  // "panimalar college" vs "panimalar college chennai": the longer one just adds detail
+  if (Math.min(A.size, B.size) >= 2 && (isSubset(A, B) || isSubset(B, A))) return true;
+  const shared = [...A].filter(w => B.has(w)).length;
+  return shared / new Set([...A, ...B]).size >= 0.75;
+}
+
+// One fact per group that says the same thing, keeping the most detailed wording in the first one's place
+function dedupeFacts(list, getText, nameWords) {
+  const kept = [];
+  for (const item of list) {
+    const key = factKey(getText(item), nameWords);
+    if (!key) continue;
+    const match = kept.find(k => sameFact(k.key, key));
+    if (!match) kept.push({ key, item });
+    else if (key.split(' ').length > match.key.split(' ').length) Object.assign(match, { key, item });
+  }
+  return kept.map(k => k.item);
+}
+
+// Name and birthday have their own fields; as facts they only repeat or go stale
+const PROFILE_FIELD_FACT_RE = /\b(birthday|bday|b'day|born on|date of birth)\b|\b(?:real |actual |full )?name is\b|\bgoes by\b|\bprefers to be called\b/i;
+
+// "Oct 12" / "12 October" / "October 12, 2002" / "2002-10-12" -> { day, month (0-11), year|null }
+function parseDob(dob) {
+  const s = String(dob || '').trim();
+  if (!s) return null;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return { year: +iso[1], month: +iso[2] - 1, day: +iso[3] };
+  const lower = s.toLowerCase();
+  const month = MONTHS.findIndex(m => lower.includes(m.slice(0, 3).toLowerCase()));
+  const day = (s.replace(/\b(19|20)\d{2}\b/, '').match(/\b([1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\b/) || [])[1];
+  if (month === -1 || !day) return null;
+  const year = (s.match(/\b(19|20)\d{2}\b/) || [])[0];
+  return { day: +day, month, year: year ? +year : null };
+}
+
+// Birth year from their current age and birthday: not had this year's birthday yet -> one year earlier
+function birthYearFromAge(age, month, day, now = new Date()) {
+  const hadBirthday = now.getMonth() > month || (now.getMonth() === month && now.getDate() >= day);
+  return now.getFullYear() - age - (hadBirthday ? 0 : 1);
+}
+
+const formatDob = ({ day, month, year }) => `${MONTHS[month]} ${day}${year ? `, ${year}` : ''}`;
+
 class MemoryService {
   constructor() {
     this.client = new AzureOpenAI({
@@ -53,9 +116,37 @@ class MemoryService {
    * Asynchronously updates the user's memory, conversation style analysis,
    * facts extracted, and rolling summary.
    */
-  async updateMemoryAsync(senderId) {
+  updateMemoryAsync(senderId) {
+    // One run per person at a time. Every DM used to start its own run; parallel runs read the
+    // same old facts and each saved its own copy (duplicate facts) and slowed each other down.
+    // A DM that arrives mid-run just asks for one more run after this one.
+    if (!this._runs) this._runs = new Map();
+    const running = this._runs.get(senderId);
+    if (running) {
+      running.again = true;
+      return running.done;
+    }
+    const state = { again: false };
+    state.done = (async () => {
+      try {
+        do {
+          state.again = false;
+          await this._updateMemoryOnce(senderId);
+        } while (state.again);
+      } finally {
+        this._runs.delete(senderId);
+      }
+    })();
+    this._runs.set(senderId, state);
+    return state.done;
+  }
+
+  async _updateMemoryOnce(senderId) {
     try {
       let memory = await this.getOrCreateUserMemory(senderId);
+      const previousName = memory.name || '';
+      const previousDob = memory.dob || '';
+      const previousAge = memory.age ?? null;
 
       // Intelligent message sampling: if > 100 messages, capture first 25 (origin/lore) + latest 75 (current style/inside jokes)
       const totalMsgCount = await Message.countDocuments({
@@ -122,6 +213,8 @@ CONTACT INFO:
 - Sender ID: ${senderId}
 - Current Name in DB: ${memory.name || 'Unknown'}
 - Username in DB: @${memory.username || 'Unknown'}
+- Known Age: ${memory.age ?? 'Unknown'}
+- Known Birthday: ${memory.dob || 'Unknown'}
 - Existing Facts: ${currentFacts || 'None'}
 - Existing Dates: ${currentDates || 'None'}
 - Existing Favorites: ${currentFavorites || 'None'}
@@ -135,6 +228,8 @@ ${formattedChat}
 INSTRUCTIONS:
 1. REAL IDENTITY & LORE:
    - Identify their real first name or preferred name (look for introductions or how Sam addresses them).
+     If THEY state their own name ("i'm X", "my name is X", "call me X", "this is X"), that wins over the DB name; set nameSource to "self".
+   - Their current age if THEY state it ("im 24", "24 years old", "turned 19"). If they correct it later, use the LATEST value.
    - Any nicknames Sam uses for them or they use for Sam.
    - Exact birthday / DOB if mentioned or celebrated anywhere in the chat.
    - School, college, workplace, or city/location if mentioned.
@@ -162,6 +257,8 @@ INSTRUCTIONS:
 Return a valid JSON object matching EXACTLY this structure:
 {
   "name": "Real name if stated or clearly known, else empty string",
+  "nameSource": "self (they told their own name) | sam (how Sam addresses them) | empty string",
+  "age": "Their current age as a number if they stated it, else null",
   "nickname": "Extracted nickname or what Sam calls them, else empty string",
   "dob": "Birthday e.g. 'Oct 12' or '18 May' if stated, else empty string",
   "schoolOrCollege": "School/college/workplace if mentioned, else empty string",
@@ -190,7 +287,8 @@ Return a valid JSON object matching EXACTLY this structure:
     { "name": "Person name", "relationship": "friend/sister/bro", "notes": "context" }
   ]
 }
-Only extract genuine details explicitly stated or strongly implied by the chat. Do not invent information. If an array has no items, return empty array.`;
+Only extract genuine details explicitly stated or strongly implied by the chat. Do not invent information. If an array has no items, return empty array.
+"newFacts" must contain ONLY facts not already in Existing Facts (no rewording of a known fact). Do not put name, age or birthday in newFacts; use "name", "age" and "dob".`;
 
       const response = await this.client.chat.completions.create({
         messages: [
@@ -203,9 +301,12 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
 
       const parsed = JSON.parse(response.choices[0].message.content.trim());
 
-      if (parsed.name && parsed.name.trim() !== '') {
+      if (typeof parsed.name === 'string' && parsed.name.trim() !== '') {
         const cleanExtractedName = parsed.name.trim();
-        if (!memory.name || memory.name.startsWith('User_') || memory.name.startsWith('ig_tester_')) {
+        const placeholderName = !memory.name || memory.name.startsWith('User_') || memory.name.startsWith('ig_tester_');
+        // A name they told us themselves replaces the Instagram display name
+        const toldByThem = String(parsed.nameSource || '').toLowerCase() === 'self';
+        if (placeholderName || (toldByThem && cleanExtractedName.toLowerCase() !== memory.name.toLowerCase())) {
           memory.name = cleanExtractedName;
         }
       }
@@ -214,19 +315,38 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         memory.nickname = parsed.nickname.trim();
       }
 
+      // Age they told (latest wins)
+      const statedAge = parseInt(parsed.age, 10);
+      if (Number.isFinite(statedAge) && statedAge >= 5 && statedAge <= 100) {
+        memory.age = statedAge;
+      }
+
       // Extract and record Birthday / DOB
       const bdayItem = (parsed.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''));
-      const detectedDob = (parsed.dob && parsed.dob.trim()) || bdayItem?.date || '';
-      if (detectedDob) {
-        memory.dob = detectedDob;
-        const hasBdayDate = (memory.importantDates || []).some(d => /birth|bday/i.test(d.title));
-        if (!hasBdayDate) {
-          memory.importantDates.push({
-            title: 'Birthday',
-            date: detectedDob,
-            details: 'Learned from DM conversation'
-          });
+      const detectedDob = (typeof parsed.dob === 'string' && parsed.dob.trim()) || bdayItem?.date || '';
+      if (detectedDob) memory.dob = detectedDob;
+
+      // Know the birthday but not the year, and know their age -> work out the year
+      const dobParts = parseDob(memory.dob);
+      if (dobParts && !dobParts.year && memory.age) {
+        dobParts.year = birthYearFromAge(memory.age, dobParts.month, dobParts.day);
+      }
+      if (dobParts) memory.dob = formatDob(dobParts);
+
+      if (memory.dob) {
+        const bday = (memory.importantDates || []).find(d => /birth|bday/i.test(d.title));
+        if (bday) {
+          bday.date = memory.dob;
+        } else {
+          memory.importantDates.push({ title: 'Birthday', date: memory.dob, details: 'Learned from DM conversation' });
         }
+      }
+
+      // Facts tab: one current age fact, replaced when the age changes
+      if (memory.age) {
+        const firstName = (memory.name || memory.nickname || memory.username || 'They').split(' ')[0];
+        memory.facts = (memory.facts || []).filter(f => !AGE_FACT_RE.test(f.fact));
+        memory.facts.push({ fact: `${firstName} is ${memory.age} years old` });
       }
 
       // Extract and record School / College
@@ -292,16 +412,14 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         }
       }
 
-      // Merge new facts
-      if (Array.isArray(parsed.newFacts) && parsed.newFacts.length > 0) {
-        const existingFactTexts = new Set(memory.facts.map(f => f.fact.toLowerCase()));
-        for (const factStr of parsed.newFacts) {
-          if (factStr && !existingFactTexts.has(factStr.toLowerCase())) {
-            memory.facts.push({ fact: factStr });
-            existingFactTexts.add(factStr.toLowerCase());
-          }
+      // Merge new facts, then drop any that repeat an existing fact in other words
+      const nameWords = new Set(`${memory.name || ''} ${memory.nickname || ''} ${memory.username || ''}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+      for (const factStr of (Array.isArray(parsed.newFacts) ? parsed.newFacts : [])) {
+        if (typeof factStr === 'string' && factStr.trim() && !(memory.age && AGE_FACT_RE.test(factStr)) && !PROFILE_FIELD_FACT_RE.test(factStr)) {
+          memory.facts.push({ fact: factStr.trim() });
         }
       }
+      memory.facts = dedupeFacts(memory.facts || [], f => f.fact, nameWords);
 
       // Merge important dates
       if (Array.isArray(parsed.importantDates) && parsed.importantDates.length > 0) {
@@ -354,6 +472,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           $set: {
             name: memory.name,
             nickname: memory.nickname,
+            age: memory.age,
             dob: memory.dob,
             gender: memory.gender,
             conversationStyle: memory.conversationStyle,
@@ -404,7 +523,9 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           orConditions.push({ name: new RegExp(`^${nk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
         }
 
-        const node = await SocialGraph.findOne({ $or: orConditions });
+        // Their own card first, so a name change can never land on another person with the same name
+        const node = (memory.senderId && await SocialGraph.findOne({ senderId: memory.senderId }))
+          || await SocialGraph.findOne({ $or: orConditions });
 
         const allFacts = [
           ...(memory.facts || []).map(f => f.fact),
@@ -416,9 +537,22 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         const activeDob = memory.dob || (memory.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''))?.date || '';
 
         if (node) {
-          node.lore = Array.from(new Set([...(node.lore || []), ...allFacts]));
-          if (activeDob && (!node.dob || node.dob.trim() === '')) {
+          // Old age / birthday lines are replaced by the current ones; reworded repeats are dropped
+          const oldLore = (node.lore || []).filter(l =>
+            !(memory.age && AGE_FACT_RE.test(l)) && !(activeDob && /^(birthday|bday)\s*:/i.test(l)));
+          const loreNameWords = new Set(`${memory.name || ''} ${memory.nickname || ''} ${memory.username || ''} ${node.name || ''}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+          node.lore = dedupeFacts([...oldLore, ...allFacts], l => l, loreNameWords);
+
+          // New birthday from the chat (or the year worked out from their age) replaces the card's value
+          if (activeDob && (!node.dob || !node.dob.trim() || memory.dob !== previousDob)) {
             node.dob = activeDob;
+          }
+          if (memory.age && (node.age == null || memory.age !== previousAge)) {
+            node.age = memory.age;
+          }
+          // They told us their name: rename the card (only when the name changed, so a manual rename sticks)
+          if (memory.name && memory.name !== previousName && !memory.name.startsWith('User_')) {
+            node.name = memory.name;
           }
           if (memory.personalNotes) {
             node.personalNotes = memory.personalNotes;
@@ -447,6 +581,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
             instagramHandle: cleanU ? `@${cleanU}` : '',
             senderId: memory.senderId,
             dob: activeDob,
+            age: memory.age ?? null,
             profilePic: memory.profilePic || '',
             gender: memory.gender || 'unknown',
             relationshipToSam: memory.relationshipType && memory.relationshipType !== 'stranger'

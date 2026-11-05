@@ -2279,7 +2279,8 @@ app.get('/api/social-graph', async (req, res) => {
         }
       }
 
-      const memoryDob = memory?.importantDates && memory.importantDates.length > 0 ? memory.importantDates[0].date : '';
+      // Only a real birthday entry counts (the first important date can be an exam or event)
+      const memoryDob = memory?.dob || (memory?.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''))?.date || '';
 
       // Authoritative creator-scoped persistent chats & reels count (immune to cross-account pollution)
       const chatsCount = typeof n.chatsCount === 'number' ? n.chatsCount : 0;
@@ -2290,6 +2291,7 @@ app.get('/api/social-graph', async (req, res) => {
         senderId: effectiveSenderId,
         category: n.category || (memory?.relationshipType ? (memory.relationshipType === 'collaborator' || memory.relationshipType === 'client' ? 'professional' : 'online_friend') : 'online_friend'),
         dob: n.dob || memoryDob || '',
+        age: Number.isFinite(n.age) ? n.age : (Number.isFinite(memory?.age) ? memory.age : null),
         personalNotes: n.personalNotes || (n.lore || []).join('\n'),
         profilePic: memory?.profilePic || n.profilePic || '',
         aiEnabled: memory ? memory.aiEnabled !== false : true,
