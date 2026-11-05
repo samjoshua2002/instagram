@@ -8,10 +8,11 @@ const UserMemorySchema = new mongoose.Schema({
     default: null,
     index: true,
   },
+  // Instagram-scoped sender id. Unique per owner only (see the compound index below), never globally:
+  // the same id can be a contact of more than one workspace
   senderId: {
     type: String,
     required: true,
-    unique: true,
     index: true,
   },
   username: {
@@ -146,10 +147,9 @@ const UserMemorySchema = new mongoose.Schema({
   },
 }, { timestamps: true, versionKey: false });
 
-// One memory per contact per creator (legacy records without ownerId are excluded)
-UserMemorySchema.index(
-  { ownerId: 1, senderId: 1 },
-  { unique: true, partialFilterExpression: { ownerId: { $type: 'objectId' } } }
-);
+// One memory per contact per creator (legacy ownerless records are unique per senderId too).
+// Existing databases: run scripts/migrate_indexes.js once to drop the old global senderId_1 unique
+// index and the old partial ownerId_1_senderId_1 index before this one can be built.
+UserMemorySchema.index({ ownerId: 1, senderId: 1 }, { unique: true, name: 'ownerId_1_senderId_1' });
 
 module.exports = mongoose.model('UserMemory', UserMemorySchema);

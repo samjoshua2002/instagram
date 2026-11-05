@@ -30,8 +30,18 @@ const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
 const cryptoService = require('./services/cryptoService');
 const { getUserInstagramToken, getOwnerSendToken, setUserInstagram } = require('./services/instagramTokenService');
+const {
+  isProduction, checkMetaSignature, resolveInsideDir, isHttpUrl, randomFilename, serializePersona,
+  validatePersonaUpdate, ownerFilter, contactKey,
+} = require('./lib/serverSecurity');
 const { router: authRouter, requireAuth } = require('./routes/auth');
 const authService = require('./services/authService');
+const { rateLimit, MINUTE } = require('./services/rateLimiter');
+
+// Per-IP limits for the public (no login) endpoints other than the Meta webhook
+const publicLimiter = rateLimit({ name: 'public', windowMs: MINUTE, max: 60, message: 'Too many requests. Please slow down.' });
+const imageProxyLimiter = rateLimit({ name: 'image-proxy', windowMs: MINUTE, max: 300, message: 'Too many requests. Please slow down.' });
+const metaCallbackLimiter = rateLimit({ name: 'meta-callback', windowMs: 15 * MINUTE, max: 30, message: 'Too many requests. Please try again later.' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -103,9 +113,8 @@ if (!fs.existsSync(uploadsDir)) {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname).toLowerCase() || '.gif';
-    cb(null, `${unique}${ext}`);
+    cb(null, randomFilename('media-', ext));
   }
 });
 // Only media files: an uploaded .html or .svg would run scripts on this origin
@@ -128,11 +137,7 @@ app.use(cors());
 app.use(express.json({ limit: '25mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-const safeEqual = (a, b) => {
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
-};
+const { safeEqual } = require('./lib/serverSecurity');
 
 // App secrets used to sign webhooks / signed_requests (Instagram Login and Facebook Login apps can differ)
 function getMetaSigningSecrets() {
@@ -141,29 +146,27 @@ function getMetaSigningSecrets() {
     .filter(Boolean);
 }
 if (!getMetaSigningSecrets().length) {
-  console.warn('⚠️ META_APP_SECRET / INSTAGRAM_APP_SECRET is not set: webhook signatures are NOT verified.');
+  console.warn(isProduction()
+    ? '🚨🚨 META_APP_SECRET / INSTAGRAM_APP_SECRET is not set: ALL webhook POSTs will be REJECTED (503) until it is configured.'
+    : '⚠️ META_APP_SECRET / INSTAGRAM_APP_SECRET is not set: webhook signatures are NOT verified (development only).');
+}
+if (process.env.BYPASS_WEBHOOK_VERIFY === 'true') {
+  console.warn(isProduction()
+    ? '🚨🚨 BYPASS_WEBHOOK_VERIFY=true is IGNORED in production: webhook signatures are still verified.'
+    : '⚠️ BYPASS_WEBHOOK_VERIFY=true: webhook signatures are NOT verified (development only).');
 }
 
-// X-Hub-Signature-256 check, enforced once META_APP_SECRET / INSTAGRAM_APP_SECRET is set
+// X-Hub-Signature-256 check. Production always requires a signing secret; the bypass flag is dev-only.
 function verifyMetaSignature(req, res, next) {
-  if (process.env.BYPASS_WEBHOOK_VERIFY === 'true') {
-    return next();
-  }
-  const secrets = getMetaSigningSecrets();
-  if (!secrets.length) return next();
-  const signature = req.get('x-hub-signature-256') || '';
-  if (!signature) {
-    console.warn('🚫 Webhook POST missing x-hub-signature-256 header');
-    return res.sendStatus(401);
-  }
-  const valid = secrets.some(secret =>
-    safeEqual(signature, 'sha256=' + crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex'))
-  );
-  if (!valid) {
-    console.warn(`🚫 Rejected webhook POST with invalid signature. Received: ${signature.slice(0, 16)}... | Checked ${secrets.length} secret(s) (META_APP_SECRET: ${Boolean(process.env.META_APP_SECRET)}, INSTAGRAM_APP_SECRET: ${Boolean(process.env.INSTAGRAM_APP_SECRET)})`);
-    return res.sendStatus(401);
-  }
-  next();
+  const result = checkMetaSignature({
+    rawBody: req.rawBody,
+    signature: req.get('x-hub-signature-256') || '',
+    secrets: getMetaSigningSecrets(),
+  });
+  if (result.ok) return next();
+  if (result.reason === 'no-secret') console.error('🚫 Webhook POST rejected: no Meta signing secret configured in production.');
+  else console.warn(`🚫 Webhook POST rejected (${result.reason}).`);
+  return res.sendStatus(result.status);
 }
 
 // Decode and verify Meta's signed_request (base64url signature + payload, HMAC-SHA256 with the App Secret)
@@ -180,8 +183,17 @@ function parseSignedRequest(signedRequest) {
     return null;
   }
 }
-app.use(express.static(path.join(__dirname, 'public')));
+// The legacy dashboard (public/index.html, public/app.js) is no longer served; the Next.js frontend replaces it
+app.get('/', (req, res) => {
+  const frontend = (process.env.FRONTEND_URL || '').trim();
+  if (frontend && isHttpUrl(frontend)) return res.redirect(302, frontend);
+  res.json({ status: 'ok', service: 'chatter-api' });
+});
+app.use('/stickers', express.static(path.join(__dirname, 'public', 'stickers'), { index: false }));
+// Old knowledge documents were saved here; they are served only through the owner-checked /api/knowledge route
+app.use('/uploads', (req, res, next) => (/^\/doc-/i.test(req.path) ? res.sendStatus(404) : next()));
 app.use('/uploads', express.static(uploadsDir, {
+  index: false,
   setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
 }));
 
@@ -231,35 +243,42 @@ app.use('/api/storyboard', requireAuth, require('./routes/storyboard'));
 // Browser notification feed (new DMs, leads, bookings, handoffs)
 app.use('/api/alerts', requireAuth, require('./routes/alerts'));
 
-// Contact and graph queries only see the signed-in account's records (superadmin sees all)
+// Contact, chat, graph and media queries only see the signed-in account's records, by ownerId.
+// The superadmin also owns legacy records saved before records had an owner (ownerId null).
+// ownerUsername is never used for access: a re-registered username must not inherit old data.
 const isSuperUser = (req) => req.user?.role === 'superadmin';
-const ownerScope = (req) => (isSuperUser(req) ? {} : { ownerId: req.user._id });
-// Wraps a SocialGraph / UserMemory filter so it only matches this account's records
-const inGraph = (req, q) => (isSuperUser(req)
-  ? q
-  : { $and: [{ $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] }, q] });
-// Chat records (UserMemory): own records, plus legacy ones with no owner yet whose senderId is in this
-// account's own contact list (older chats were saved before records had an owner)
-const inMemories = async (req, q) => {
-  if (isSuperUser(req)) return q;
-  const graphSenderIds = await SocialGraph.distinct('senderId', inGraph(req, { senderId: { $nin: ['', null] } }));
-  return {
-    $and: [
-      { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }, { ownerId: null, senderId: { $in: graphSenderIds } }] },
-      q,
-    ],
-  };
-};
-const ownedMemoryQuery = (req, senderId) => inMemories(req, { senderId });
+const ownedBy = (req) => ownerFilter(req.user);
+// Wraps a SocialGraph / UserMemory / Message filter so it only matches this account's records
+const inGraph = (req, q) => ({ $and: [ownedBy(req), q] });
+const inMemories = (req, q) => ({ $and: [ownedBy(req), q] });
+const ownedMemoryQuery = (req, senderId) => inMemories(req, { senderId: String(senderId) });
+// Owner options for memory / graph services. Only the superadmin may adopt legacy (ownerId null) contacts.
+const memOptsFor = (ownerUser) => ({ ownerId: ownerUser?._id || null, adoptLegacy: ownerUser?.role === 'superadmin' });
+// Owner options for a contact the signed-in account owns (its record decides the owner)
+async function contactMemOpts(req, senderId) {
+  const mem = await UserMemory.findOne(ownedMemoryQuery(req, senderId)).select('ownerId').lean();
+  return { ownerId: mem?.ownerId || null, adoptLegacy: false };
+}
+// Messages of one conversation, owned by the same account as its contact record
+const conversationMessages = (ownerId, senderId) => ({
+  ownerId: ownerId || null,
+  $or: [{ senderId }, { recipientId: senderId }],
+});
 
-// A contact may only be given a senderId whose chat is new, this account's own, or an ownerless legacy
-// chat this account already has in its contacts; otherwise any account could claim another's chat
+// A contact may only be given a senderId that is new to this account or already its own chat;
+// an id another workspace already chats with stays theirs
 async function canUseSenderId(req, senderId) {
-  if (!senderId || isSuperUser(req)) return true;
-  const mem = await UserMemory.findOne({ senderId }, { ownerId: 1 }).lean();
-  if (!mem) return true;
-  if (mem.ownerId) return String(mem.ownerId) === String(req.user._id);
-  return Boolean(await SocialGraph.exists(inGraph(req, { senderId })));
+  if (!senderId) return true;
+  if (await UserMemory.exists(ownedMemoryQuery(req, senderId))) return true;
+  return !(await UserMemory.exists({ senderId: String(senderId) }));
+}
+
+// Generic 500: the real error goes to the log only
+function sendServerError(res, err, label = 'Request') {
+  console.error(`❌ ${label} failed:`, err && err.message);
+  if (res.headersSent) return;
+  const status = err && (err.name === 'ValidationError' || err.name === 'CastError') ? 400 : 500;
+  res.status(status).json({ error: status === 400 ? 'Invalid input' : 'Something went wrong. Please try again.' });
 }
 
 // Every /api/conversations/:senderId/* route works only on a contact this account owns
@@ -271,8 +290,8 @@ app.param('id', (req, res, next, id) => {
 
 app.param('senderId', async (req, res, next, senderId) => {
   try {
-    if (!req.user || isSuperUser(req)) return next();
-    const owned = await UserMemory.exists(await ownedMemoryQuery(req, senderId));
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const owned = await UserMemory.exists(ownedMemoryQuery(req, senderId));
     if (!owned) return res.status(404).json({ error: 'User not found' });
     next();
   } catch (err) {
@@ -283,7 +302,7 @@ app.param('senderId', async (req, res, next, senderId) => {
 // CORS-safe image proxy so the frontend canvas can sample avatar colours (PLAN.md §15.2).
 // Only Instagram / Facebook CDN hosts are allowed, so it can't be used as an open proxy.
 const IMAGE_PROXY_HOSTS = /(^|\.)(cdninstagram\.com|fbcdn\.net)$/i;
-app.get('/api/image-proxy', async (req, res) => {
+app.get('/api/image-proxy', imageProxyLimiter, async (req, res) => {
   let target;
   try {
     target = new URL(String(req.query.url || ''));
@@ -307,12 +326,16 @@ app.get('/api/image-proxy', async (req, res) => {
 });
 
 // Webhook Verification Token
-const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'chatter_instagram_secret_2025';
+// Required; there is no built-in fallback token
+const VERIFY_TOKEN = (process.env.WEBHOOK_VERIFY_TOKEN || '').trim();
+if (!VERIFY_TOKEN) console.warn('⚠️ WEBHOOK_VERIFY_TOKEN is not set: Meta webhook verification (GET /webhook) will fail.');
 
 // Cache for recent message IDs to prevent duplicate processing
 const processedMids = new Set();
 
 // Anti-spam debounce queue: aggregates rapid-fire/spam messages and replies once
+// Keyed by contactKey(ownerId, senderId) (also inFlightReplies and the media governor) so two
+// workspaces chatting with the same senderId never share state
 const userDebounceQueues = new Map();
 const DEBOUNCE_WAIT_MS = 1000; // Hold on for 1s to group quick back-to-back messages into one reply
 
@@ -336,10 +359,11 @@ app.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  console.log(`📡 Webhook challenge received. Mode: ${mode}, Token: ${token}`);
+  console.log(`📡 Webhook challenge received. Mode: ${mode}`);
 
+  if (!VERIFY_TOKEN) return res.sendStatus(503);
   if (mode && token) {
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    if (mode === 'subscribe' && safeEqual(token, VERIFY_TOKEN)) {
       console.log('✅ Webhook verified successfully by Meta!');
       return res.status(200).send(challenge);
     } else {
@@ -432,6 +456,29 @@ function parseIncomingEventMessage(msg) {
   return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply };
 }
 
+// Finds the one workspace that owns an Instagram account id. Fields are checked in order of trust
+// (the OAuth-verified instagram.accountId first); an id linked to more than one workspace is ambiguous
+// and matches nobody, so an event is never handled with the wrong tenant's persona or token.
+const OWNER_ACCOUNT_FIELDS = ['instagram.accountId', 'instagramAccountId', 'instagramId', 'businessProfile.instagramId'];
+async function findOwnerByInstagramAccountId(accountId) {
+  const id = String(accountId || '').trim();
+  if (!id) return { user: null, ambiguous: false };
+  for (const field of OWNER_ACCOUNT_FIELDS) {
+    const matches = await User.find({ [field]: id }).sort({ _id: 1 }).limit(5);
+    if (matches.length === 1) return { user: matches[0], ambiguous: false };
+    if (matches.length > 1) {
+      const connected = matches.filter(u => u.instagram?.connected && u.instagram?.accountId === id);
+      if (connected.length === 1) return { user: connected[0], ambiguous: false };
+      console.warn(`⚠️ Instagram account ${id} is linked to ${matches.length} workspaces (${field}); ignoring the event.`);
+      return { user: null, ambiguous: true };
+    }
+  }
+  return { user: null, ambiguous: false };
+}
+
+// SocialGraph filter for the contacts of a webhook owner (legacy admin contacts have no owner)
+const graphOwnerFilter = (ownerUser) => ({ ownerId: ownerUser ? ownerUser._id : null });
+
 // Helper to record messages sent manually by the creator from the Instagram phone app
 function handleCreatorEcho(event, accountId) {
   const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
@@ -444,37 +491,31 @@ function handleCreatorEcho(event, accountId) {
   // Echo of a reply this app just sent: already saved, and it must not cancel the next AI reply
   if (instagramService.isAppEcho(contactId, event.message?.mid)) return;
 
-  console.log(`📱 [Creator Echo]: Sam manually replied to ${contactId}: "${text}"`);
-
-  // Cancel any active AI debounce queue so the bot doesn't reply over the creator
-  cancelInFlightReply(contactId);
-  if (userDebounceQueues.has(contactId)) {
-    clearTimeout(userDebounceQueues.get(contactId).timer);
-    userDebounceQueues.delete(contactId);
-    console.log(`🛑 [Creator Intervened]: Cancelled pending AI auto-reply for ${contactId}`);
-  }
+  console.log(`📱 [Creator Echo]: Creator manually replied to ${contactId} (${text.length} chars)`);
 
   const senderAccountId = accountId || event.sender?.id || process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
-
-
-  // Update contact's memory: fresh interaction reactivates the conversation & resets reminder cycle
-  UserMemory.updateOne({ senderId: contactId }, {
-    lastInteraction: new Date(),
-    lastReminderSentAt: null,
-    $inc: { messageCount: 1 }
-  }).catch(() => {});
 
   // Save the reply and update the creator-scoped SocialGraph contact node
   (async () => {
     try {
-      const ownerUser = await User.findOne({
-        $or: [
-          { 'instagram.accountId': senderAccountId },
-          { instagramAccountId: senderAccountId },
-          { instagramId: senderAccountId },
-          { 'businessProfile.instagramId': senderAccountId }
-        ]
-      });
+      const { user: ownerUser, ambiguous } = await findOwnerByInstagramAccountId(senderAccountId);
+      if (ambiguous) return;
+      const key = contactKey(ownerUser?._id, contactId);
+
+      // Cancel any active AI debounce queue so the bot doesn't reply over the creator
+      cancelInFlightReply(key);
+      if (userDebounceQueues.has(key)) {
+        clearTimeout(userDebounceQueues.get(key).timer);
+        userDebounceQueues.delete(key);
+        console.log(`🛑 [Creator Intervened]: Cancelled pending AI auto-reply for ${contactId}`);
+      }
+
+      // Update contact's memory: fresh interaction reactivates the conversation & resets reminder cycle
+      await UserMemory.updateOne({ ownerId: ownerUser?._id || null, senderId: contactId }, {
+        lastInteraction: new Date(),
+        lastReminderSentAt: null,
+        $inc: { messageCount: 1 }
+      }).catch(() => {});
 
       // Record outgoing message in DB (owned, so business stats count the human reply)
       await Message.create({
@@ -488,18 +529,17 @@ function handleCreatorEcho(event, accountId) {
         timestamp: new Date(),
       }).catch(() => {});
 
-      const creatorFilter = ownerUser 
-        ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] } 
-        : { $or: [{ ownerUsername: 'samjoshua' }, { ownerUsername: null }, { ownerUsername: { $exists: false } }] };
-      await SocialGraph.updateOne({ senderId: contactId, ...creatorFilter }, { $inc: { chatsCount: 1 } });
+      await SocialGraph.updateOne({ senderId: contactId, ...graphOwnerFilter(ownerUser) }, { $inc: { chatsCount: 1 } });
     } catch (_) {}
   })();
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
 app.post('/webhook', verifyMetaSignature, async (req, res) => {
-  const body = req.body;
-  console.log(`📥 [Webhook Event Received]:`, JSON.stringify(body));
+  const body = req.body || {};
+  // Only ids and counts are logged, never message text
+  const entries = Array.isArray(body.entry) ? body.entry : [];
+  console.log(`📥 [Webhook Event Received]: object=${body.object || '?'} entries=${entries.length} ids=${entries.map(e => e && e.id).filter(Boolean).join(',')}`);
 
   // Immediately respond 200 OK so Meta doesn't retry
   res.status(200).send('EVENT_RECEIVED');
@@ -569,14 +609,8 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const targetAccountId = accountId || recipientId;
 
   // 1. Locate the creator (tenant) that owns the receiving Instagram account
-  let ownerUser = await User.findOne({
-    $or: [
-      { 'instagram.accountId': targetAccountId },
-      { instagramAccountId: targetAccountId },
-      { instagramId: targetAccountId },
-      { 'businessProfile.instagramId': targetAccountId }
-    ]
-  });
+  const { user: ownerUser, ambiguous } = await findOwnerByInstagramAccountId(targetAccountId);
+  if (ambiguous) return;
   const isLegacyAdminAccount = targetAccountId === (process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232');
 
   // Safe drop: never answer an unrecognized account with the admin's persona or token
@@ -594,11 +628,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   if (ownerUser) {
     config = await PersonaConfig.findOne({ ownerId: ownerUser._id });
   }
-  if (!config) {
-    config = await PersonaConfig.findOne({ instagramAccountId: targetAccountId });
-  }
-  if (!config && isLegacyAdminAccount) {
-    config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
+  // Only the legacy admin bot (no owner, or the superadmin) may use the ownerless persona
+  if (!config && isLegacyAdminAccount && (!ownerUser || ownerUser.role === 'superadmin')) {
+    config = await PersonaConfig.findOne({ ownerId: null });
   }
   if (!config) {
     console.warn(`⚠️ No persona configured for account ${targetAccountId}. Dropping event safely.`);
@@ -634,7 +666,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     }
   }
 
-  console.log(`\n💬 [Incoming DM] Creator: ${config?.creatorName || 'Bot'} (${targetAccountId}) | From: ${senderId} | Text: "${messageText}"`);
+  console.log(`\n💬 [Incoming DM] Account: ${targetAccountId} | From: ${senderId} | ${String(messageText || '').length} chars`);
 
   // Safe timestamp parser
   let msgTime = new Date();
@@ -652,7 +684,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   } catch (e) {
     // ignore
   }
-  const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile);
+  const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile, memOptsFor(ownerUser));
   if (ownerUser && !userMemory.ownerId) userMemory.ownerId = ownerUser._id;
 
   // 3. Save incoming user message in DB
@@ -703,9 +735,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
         chatsCount: 1,
         ...(isReelOrShare ? { reelsCount: 1 } : {})
       };
-      const creatorFilter = ownerUser 
-        ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] } 
-        : { $or: [{ ownerUsername: 'samjoshua' }, { ownerUsername: null }, { ownerUsername: { $exists: false } }] };
+      const creatorFilter = graphOwnerFilter(ownerUser);
 
       const res = await SocialGraph.updateOne({ senderId, ...creatorFilter }, { $inc: incPayload });
       if (res.matchedCount === 0) {
@@ -747,7 +777,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // Memory extraction runs in background on EVERY incoming DM.
   // This ensures the profile auto-fills even when you manually manage chats.
   // ─────────────────────────────────────────────────────────────────────────
-  memoryService.updateMemoryAsync(senderId).catch(err => {
+  memoryService.updateMemoryAsync(senderId, memOptsFor(ownerUser)).catch(err => {
     console.error('Background memory update failed (non-critical):', err.message);
   });
 
@@ -790,10 +820,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
   const workspaceFeatures = await workspaceFeatureService.getFeaturesSafe(ownerUser);
   if (!isBusinessTenant && workspaceFeatures.enabledFeatures.reelEmojiReactions && isReelOrShare && mid && mid !== 'random_mid') {
-    const ownerFilter = ownerUser
-      ? { $or: [{ ownerId: ownerUser._id }, { ownerUsername: ownerUser.username }] }
-      : {};
-    SocialGraph.findOne({ senderId, ...ownerFilter }, { roastiness: 1 }).lean()
+    SocialGraph.findOne({ senderId, ...graphOwnerFilter(ownerUser) }, { roastiness: 1 }).lean()
       .catch(() => null)
       .then(node => instagramService.sendMessageReaction(senderId, mid, reelReactionEmoji(node?.roastiness), creatorAccessToken))
       .catch(() => {});
@@ -802,8 +829,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // 6. Anti-Spam / Debounce Logic:
   // If the user is rapid-firing messages or spamming, hold on until they stop typing!
   // This aggregates their messages, saves tokens, and replies once naturally like a human.
-  if (userDebounceQueues.has(senderId)) {
-    const existing = userDebounceQueues.get(senderId);
+  const queueKey = contactKey(ownerUser?._id, senderId);
+  if (userDebounceQueues.has(queueKey)) {
+    const existing = userDebounceQueues.get(queueKey);
     clearTimeout(existing.timer);
     existing.messages.push({ text: messageText, mid });
     existing.lastMid = mid;
@@ -812,7 +840,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     console.log(`⏳ [Anti-Spam / Debounce]: User ${senderId} sent another message (${existing.messages.length} queued). Holding on for ${DEBOUNCE_WAIT_MS / 1000}s...`);
 
     existing.timer = setTimeout(() => {
-      userDebounceQueues.delete(senderId);
+      userDebounceQueues.delete(queueKey);
       dispatchDebouncedReply(existing).catch(err => {
         console.error('❌ Error dispatching debounced reply:', err);
       });
@@ -822,6 +850,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   // First message in a potential cluster: start debounce window
   const queueEntry = {
+    key: queueKey,
     senderId,
     recipientId,
     targetAccountId,
@@ -835,9 +864,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     timer: null,
   };
 
-  userDebounceQueues.set(senderId, queueEntry);
+  userDebounceQueues.set(queueKey, queueEntry);
   queueEntry.timer = setTimeout(() => {
-    userDebounceQueues.delete(senderId);
+    userDebounceQueues.delete(queueKey);
     dispatchDebouncedReply(queueEntry).catch(err => {
       console.error('❌ Error dispatching debounced reply:', err);
     });
@@ -849,35 +878,30 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
  */
 async function dispatchDebouncedReply(queueEntry) {
   // This reply replaces any older one still being written for the same contact
-  cancelInFlightReply(queueEntry.senderId);
+  cancelInFlightReply(queueEntry.key);
   const flight = { cancelled: false };
-  inFlightReplies.set(queueEntry.senderId, flight);
+  inFlightReplies.set(queueEntry.key, flight);
   try {
     await writeAndSendReply(queueEntry, flight);
   } finally {
-    if (inFlightReplies.get(queueEntry.senderId) === flight) inFlightReplies.delete(queueEntry.senderId);
+    if (inFlightReplies.get(queueEntry.key) === flight) inFlightReplies.delete(queueEntry.key);
   }
 }
 
 async function writeAndSendReply(queueEntry, flight) {
-  const { senderId, recipientId, targetAccountId, creatorAccessToken, ownerUser, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
+  const { key: mediaKey, senderId, recipientId, targetAccountId, creatorAccessToken, ownerUser, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
 
   // Combine multiple messages if user sent a cluster
   const combinedText = messages.map(m => m.text).join('\n');
   if (messages.length > 1) {
-    console.log(`🧠 [Anti-Spam Batching]: Aggregated ${messages.length} messages from ${senderId}:\n"${combinedText}"`);
+    console.log(`🧠 [Anti-Spam Batching]: Aggregated ${messages.length} messages from ${senderId}`);
   }
 
   // Send read receipt immediately (fire-and-forget so the Graph round-trip never delays the reply)
   instagramService.sendSenderAction(senderId, 'mark_seen', creatorAccessToken).catch(() => {});
 
   // Fetch recent conversation history
-  let history = await Message.find({
-    $or: [
-      { senderId },
-      { recipientId: senderId }
-    ]
-  })
+  let history = await Message.find(conversationMessages(ownerUser?._id, senderId))
   .sort({ createdAt: -1 })
   .limit(10);
 
@@ -964,14 +988,14 @@ async function writeAndSendReply(queueEntry, flight) {
 
     // 2. GOVERNOR RATE & PACING CHECK:
     // If AI appended an attachment, check if governor permits it (chat pacing: 2-3 text replies, and hourly limit < 60/hr)
-    if (stickerType && !canSendMedia(senderId, isExplicitMediaRequest)) {
+    if (stickerType && !canSendMedia(mediaKey, isExplicitMediaRequest)) {
       console.log(`🛡️ [Media Governor]: Suppressed AI attachment [${stickerType}] to enforce 2-3 text pacing or hourly limit.`);
       stickerType = null;
     }
 
     // 3. SPORADIC MEDIA DISPATCH (Only when Governor permits):
     // Cadence: Reply 2 or 3 text messages in a row, then ~1 in 6 random chance ("bullet in trigger out of 6") or high-confidence reaction
-    if (!isBusinessTenant && enabledFeatures.mediaStickerVault && !stickerType && canSendMedia(senderId, isExplicitMediaRequest)) {
+    if (!isBusinessTenant && enabledFeatures.mediaStickerVault && !stickerType && canSendMedia(mediaKey, isExplicitMediaRequest)) {
       let detectedCat = null;
       if (isExplicitMediaRequest) {
         detectedCat = 'joy';
@@ -1028,14 +1052,14 @@ async function writeAndSendReply(queueEntry, flight) {
       clearInterval(typingPulseInterval);
     }
 
-    console.log(`✨ [${config?.creatorName || 'AI'}'s Reply]: "${replyText}" ${stickerType ? `[Media/Sticker: ${stickerType}]` : ''}`);
+    console.log(`✨ [AI Reply]: ${String(replyText || "").length} chars to ${senderId} ${stickerType ? `[Media/Sticker: ${stickerType}]` : ""}`);
 
     // The wait above can be up to ~34s: drop this reply if it was replaced, or AI was switched off meanwhile
     if (flight.cancelled) {
       console.log(`🛑 [Reply Superseded]: A newer reply or the creator took over for ${senderId}; not sending.`);
       return;
     }
-    const latestMemory = await UserMemory.findOne({ senderId }, { aiEnabled: 1 }).lean();
+    const latestMemory = await UserMemory.findById(userMemory._id, { aiEnabled: 1 }).lean();
     if (latestMemory && latestMemory.aiEnabled === false) {
       console.log(`⏸️ AI was switched off for ${senderId} while typing; not sending.`);
       return;
@@ -1068,7 +1092,7 @@ async function writeAndSendReply(queueEntry, flight) {
             const accRes = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
             if (accRes?.success) {
               mediaWasSent = true;
-              recordMediaSent(senderId);
+              recordMediaSent(mediaKey);
             } else {
               console.warn(`⚠️ [Sticker Dispatch]: Sticker accessory send unsuccessful:`, accRes?.error);
             }
@@ -1081,7 +1105,7 @@ async function writeAndSendReply(queueEntry, flight) {
             stickerSendResult = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
             if (stickerSendResult?.success) {
               mediaWasSent = true;
-              recordMediaSent(senderId);
+              recordMediaSent(mediaKey);
             } else {
               console.warn(`⚠️ [Sticker Dispatch]: Sticker-only send unsuccessful:`, stickerSendResult?.error);
             }
@@ -1098,7 +1122,7 @@ async function writeAndSendReply(queueEntry, flight) {
 
     // Track conversational text count if text was delivered without media
     if (textDelivered && !mediaWasSent) {
-      recordTextSent(senderId);
+      recordTextSent(mediaKey);
     }
 
     if (textDelivered || stickerDelivered) {
@@ -1118,7 +1142,7 @@ async function writeAndSendReply(queueEntry, flight) {
 
       // Also append outgoing assistant reply to UserMemory recentChatBuffer
       try {
-        const memToUpdate = await UserMemory.findOne({ senderId });
+        const memToUpdate = await UserMemory.findById(userMemory._id);
         if (memToUpdate) {
           memToUpdate.recentChatBuffer = (memToUpdate.recentChatBuffer || []).slice(-9);
           memToUpdate.recentChatBuffer.push({
@@ -1138,6 +1162,7 @@ async function writeAndSendReply(queueEntry, flight) {
       analyticsService.processConversationTurn({
         ownerId: ownerUser._id,
         senderId,
+        timeZone: config?.businessPolicy?.timezone || null,
         handle: userMemory.username || '',
         incomingText: combinedText,
         replyText: textDelivered ? replyText : '',
@@ -1150,7 +1175,7 @@ async function writeAndSendReply(queueEntry, flight) {
     if (businessDecision?.shouldEscalate && enabledFeatures.humanHandoffInbox) {
       const reason = businessDecision.context.message.matchedEscalation || businessDecision.chatType;
       await UserMemory.updateOne(
-        { senderId },
+        { _id: userMemory._id },
         { $set: { aiEnabled: false, handoffRequestedAt: new Date(), handoffReason: reason } }
       ).catch(err => console.warn('⚠️ [Handoff] Could not flag customer:', err.message));
       await redisService.invalidateUserMemory(senderId);
@@ -1164,7 +1189,7 @@ async function writeAndSendReply(queueEntry, flight) {
   // Memory update already triggered earlier (ALWAYS-LEARN block) — no duplicate needed here.
   // But re-trigger if the reply itself contained new info (e.g. we asked a curiosity question)
   setTimeout(() => {
-    memoryService.updateMemoryAsync(senderId).catch(() => {});
+    memoryService.updateMemoryAsync(senderId, memOptsFor(ownerUser)).catch(() => {});
   }, 3000); // slight delay so the outgoing message is saved first
 }
 
@@ -1175,41 +1200,44 @@ async function writeAndSendReply(queueEntry, flight) {
  */
 
 // Status check endpoint
-app.get('/api/status', async (req, res) => {
+// Public callers only get { status: 'ok' }; a signed-in superadmin gets the details
+app.get('/api/status', publicLimiter, (req, res, next) => {
+  const auth = req.get('authorization') || '';
+  if (!auth.startsWith('Bearer ')) return res.json({ status: 'ok' });
+  requireAuth(req, res, next);
+}, async (req, res) => {
+  if (!isSuperUser(req)) return res.json({ status: 'ok' });
   try {
-    const config = await PersonaConfig.findOne() || {};
+    const config = (await PersonaConfig.findOne({ ownerId: req.user._id })) || (await PersonaConfig.findOne({ ownerId: null })) || {};
     const totalUsers = await UserMemory.countDocuments();
     const totalMessages = await Message.countDocuments();
     const token = await instagramService.getAccessToken();
 
     res.json({
-      status: 'online',
-      creatorName: config.creatorName || 'Sam Joshua',
-      instagramHandle: config.instagramHandle || '@chipichappa.daily',
+      status: 'ok',
+      creatorName: config.creatorName || '',
+      instagramHandle: config.instagramHandle || '',
       globalBotActive: config.globalBotActive ?? true,
       chatMode: config.chatMode || 'everyone',
       hasPageAccessToken: !!(token && token.length > 10),
-      appId: process.env.META_APP_ID || '1037131122693653',
+      appId: process.env.META_APP_ID || '',
       totalUsers,
       totalMessages,
       azureModel: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err, 'Status');
   }
 });
 
 // List all conversations
 app.get('/api/conversations', async (req, res) => {
   try {
-    const query = req.user ? await inMemories(req, {}) : {};
-    const users = await UserMemory.find(query).sort({ lastInteraction: -1 }).limit(50);
+    const users = await UserMemory.find(inMemories(req, {})).sort({ lastInteraction: -1 }).limit(50);
     const conversations = [];
 
     for (const u of users) {
-      const lastMessage = await Message.findOne({
-        $or: [{ senderId: u.senderId }, { recipientId: u.senderId }]
-      }).sort({ createdAt: -1 });
+      const lastMessage = await Message.findOne(conversationMessages(u.ownerId, u.senderId)).sort({ createdAt: -1 });
 
       conversations.push({
         user: u,
@@ -1223,7 +1251,7 @@ app.get('/api/conversations', async (req, res) => {
 
     res.json(conversations);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1231,14 +1259,13 @@ app.get('/api/conversations', async (req, res) => {
 app.get('/api/conversations/:senderId/messages', async (req, res) => {
   try {
     const { senderId } = req.params;
-    const memory = await UserMemory.findOne({ senderId });
-    const messages = await Message.find({
-      $or: [{ senderId }, { recipientId: senderId }]
-    }).sort({ createdAt: 1 }).limit(100);
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
+    if (!memory) return res.status(404).json({ error: 'User not found' });
+    const messages = await Message.find(conversationMessages(memory.ownerId, senderId)).sort({ createdAt: 1 }).limit(100);
 
     res.json({ memory, messages });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1246,7 +1273,7 @@ app.get('/api/conversations/:senderId/messages', async (req, res) => {
 app.post('/api/conversations/:senderId/toggle-ai', async (req, res) => {
   try {
     const { senderId } = req.params;
-    const memory = await UserMemory.findOne({ senderId });
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
     memory.aiEnabled = !memory.aiEnabled;
@@ -1255,7 +1282,7 @@ app.post('/api/conversations/:senderId/toggle-ai', async (req, res) => {
 
     res.json({ success: true, aiEnabled: memory.aiEnabled });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1267,16 +1294,17 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
     if (!text) return res.status(400).json({ error: 'Text required' });
 
     // Send with the contact owner's token; only legacy admin contacts use the admin token
-    const memory = await UserMemory.findOne({ senderId });
-    const ownerToken = await getOwnerSendToken(memory && memory.ownerId);
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
+    if (!memory) return res.status(404).json({ error: 'User not found' });
+    const ownerToken = await getOwnerSendToken(memory.ownerId);
     if (ownerToken === '') {
       return res.status(409).json({ error: 'Instagram is not connected for this account.' });
     }
     const sendResult = await instagramService.sendTextMessage(senderId, text, ownerToken);
 
-    // Save in DB
+    // Save in DB (same owner as the contact, so it shows in this conversation)
     const newMsg = await Message.create({
-      ownerId: memory?.ownerId || req.user?._id || null,
+      ownerId: memory.ownerId || null,
       senderId: 'me',
       recipientId: senderId,
       role: 'assistant',
@@ -1287,14 +1315,15 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
     });
 
     // Cancel any active AI debounce queue so the bot doesn't reply over the creator
-    cancelInFlightReply(senderId);
-    if (userDebounceQueues.has(senderId)) {
-      clearTimeout(userDebounceQueues.get(senderId).timer);
-      userDebounceQueues.delete(senderId);
+    const key = contactKey(memory.ownerId, senderId);
+    cancelInFlightReply(key);
+    if (userDebounceQueues.has(key)) {
+      clearTimeout(userDebounceQueues.get(key).timer);
+      userDebounceQueues.delete(key);
     }
 
     // Update memory interaction time & reset reminder cycle to reactivate conversation
-    await UserMemory.updateOne({ senderId }, { 
+    await UserMemory.updateOne({ _id: memory._id }, {
       lastInteraction: new Date(),
       lastReminderSentAt: null,
       $inc: { messageCount: 1 }
@@ -1302,7 +1331,7 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
 
     res.json({ success: true, message: newMsg, graphResult: sendResult });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1322,7 +1351,7 @@ app.post('/api/conversations/:senderId/preferences', async (req, res) => {
       relationshipType
     } = req.body;
 
-    const memory = await UserMemory.findOne({ senderId });
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
     if (typeof aiEnabled === 'boolean') memory.aiEnabled = aiEnabled;
@@ -1340,7 +1369,7 @@ app.post('/api/conversations/:senderId/preferences', async (req, res) => {
 
     res.json({ success: true, memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1350,7 +1379,7 @@ app.put('/api/conversations/:senderId/memory', async (req, res) => {
     const { senderId } = req.params;
     const { conversationStyle, relationshipType, facts, rollingSummary } = req.body;
 
-    const memory = await UserMemory.findOne({ senderId });
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
     if (conversationStyle) memory.conversationStyle = conversationStyle;
@@ -1363,7 +1392,7 @@ app.put('/api/conversations/:senderId/memory', async (req, res) => {
     await memory.save();
     res.json({ success: true, memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1373,13 +1402,13 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
     const { senderId } = req.params;
 
     // Run memory extraction from current messages
-    await memoryService.updateMemoryAsync(senderId);
+    await memoryService.updateMemoryAsync(senderId, await contactMemOpts(req, senderId));
 
     // Chat history is kept: the inbox and the AI's reply context both read it
-    const updatedMemory = await UserMemory.findOne({ senderId });
+    const updatedMemory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     res.json({ success: true, memory: updatedMemory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1387,10 +1416,14 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
 app.post('/api/memory/sync-all-history', async (req, res) => {
   try {
     if (!isSuperUser(req)) return res.status(403).json({ error: 'Superadmin only' });
-    const results = await memoryService.batchSyncAllChatsFromMongo();
+    // Superadmin: its own contacts plus the legacy (ownerless) ones
+    const results = [
+      ...(await memoryService.batchSyncAllChatsFromMongo({ ownerId: null })),
+      ...(await memoryService.batchSyncAllChatsFromMongo({ ownerId: req.user._id })),
+    ];
     res.json({ success: true, count: results.length, contacts: results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1399,11 +1432,11 @@ app.post('/api/memory/sync-all-history', async (req, res) => {
 app.get('/api/conversations/:senderId/memory', async (req, res) => {
   try {
     const { senderId } = req.params;
-    const memory = await UserMemory.findOne({ senderId });
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     if (!memory) return res.status(404).json({ error: 'Memory not found' });
     res.json({ memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1415,86 +1448,104 @@ app.post('/api/conversations/:senderId/fact', async (req, res) => {
     const { fact } = req.body;
     if (!fact) return res.status(400).json({ error: 'Fact is required' });
 
-    const memory = await UserMemory.findOne({ senderId });
+    const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
-    memory.facts.push({ fact: fact.trim() });
+    memory.facts.push({ fact: String(fact).trim() });
     await memory.save();
     res.json({ success: true, memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 // Get Persona Configuration
+// Secrets (Instagram token, GIPHY key) are never sent back: the browser gets hasInstagramToken / hasGiphyKey
+const PERSONA_CHAT_MODES = PersonaConfig.schema.path('chatMode')?.enumValues || ['everyone', 'everyone_except', 'only_selected', 'paused'];
+
+// The signed-in account's persona; the superadmin also owns the legacy ownerless one
+async function findOwnPersona(req) {
+  const config = await PersonaConfig.findOne({ ownerId: req.user._id });
+  if (config || !isSuperUser(req)) return config;
+  return PersonaConfig.findOne({ ownerId: null });
+}
+
+const personaForBrowser = (config, user) => {
+  const view = serializePersona(config, { hasUserToken: Boolean(getUserInstagramToken(user)) });
+  if (user) {
+    if (!view.creatorName) {
+      view.creatorName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.username;
+    }
+    if (!view.instagramHandle) {
+      view.instagramHandle = user.instagramUsername ? `@${user.instagramUsername.replace(/^@/, '')}` : `@${user.username}`;
+    }
+    view.instagramAccountId = view.instagramAccountId || user.instagram?.accountId || user.instagramAccountId || user.instagramId || '';
+  }
+  return view;
+};
+
 app.get('/api/persona', async (req, res) => {
   try {
-    let query = {};
-    if (req.user) {
-      query = { ownerId: req.user._id };
+    let config = await findOwnPersona(req);
+    if (!config) {
+      const displayName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
+      const handle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
+      config = await PersonaConfig.create({
+        ownerId: req.user._id,
+        creatorName: displayName,
+        instagramHandle: handle,
+        personaBio: req.user.businessProfile?.description || `I am ${displayName}, creator of ${handle}.`,
+        aboutMe: `I am ${displayName}, creator of ${handle}.`,
+        characteristics: 'Friendly, helpful, approachable, authentic.',
+        textingHabits: 'Casual lowercase, friendly, short messages.',
+        replyRules: 'Default to natural friendly replies without sounding robotic.',
+        toneGuidelines: '1. Talk naturally like a real human.\n2. Keep replies engaging and warm.\n3. Never sound like a robot.',
+        customKnowledge: `Account: ${handle}\nCreator: ${displayName}`,
+        instagramAccountId: req.user.instagram?.accountId || req.user.instagramAccountId || '',
+      });
     }
-
-    let config = await PersonaConfig.findOne(query);
-    if (!config && req.user) {
-      if (req.user.role === 'superadmin') {
-        config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
-      }
-      if (!config) {
-        const displayName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
-        const handle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
-        config = await PersonaConfig.create({
-          ownerId: req.user._id,
-          creatorName: displayName,
-          instagramHandle: handle,
-          personaBio: req.user.businessProfile?.description || `I am ${displayName}, creator of ${handle}.`,
-          aboutMe: `I am ${displayName}, creator of ${handle}.`,
-          characteristics: 'Friendly, helpful, approachable, authentic.',
-          textingHabits: 'Casual lowercase, friendly, short messages.',
-          replyRules: 'Default to natural friendly replies without sounding robotic.',
-          toneGuidelines: '1. Talk naturally like a real human.\n2. Keep replies engaging and warm.\n3. Never sound like a robot.',
-          customKnowledge: `Account: ${handle}\nCreator: ${displayName}`,
-          instagramPageAccessToken: req.user.instagramPageAccessToken || '',
-          instagramAccountId: req.user.instagramAccountId || '',
-        });
-      }
-    }
-
-    if (config) {
-      const userConfig = config.toObject();
-      if (req.user) {
-        if (!userConfig.creatorName) {
-          userConfig.creatorName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
-        }
-        if (!userConfig.instagramHandle) {
-          userConfig.instagramHandle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
-        }
-        userConfig.instagramPageAccessToken = config.instagramPageAccessToken || req.user.instagramPageAccessToken || '';
-        userConfig.instagramAccountId = config.instagramAccountId || req.user.instagramAccountId || req.user.instagramId || '';
-      }
-      return res.json(userConfig);
-    }
-
-    res.json(config || {});
+    res.json(personaForBrowser(config, req.user));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err, 'Load persona');
   }
 });
+
+// Instagram account ids this user has already proven (OAuth / token flow), plus legacy linked ids
+const verifiedAccountIds = (user) => [user.instagram?.accountId, user.instagramAccountId, user.instagramId]
+  .map(v => String(v || '').trim())
+  .filter(Boolean);
+
+// Asks Instagram which account a pasted token belongs to; returns its ids (empty on failure)
+async function accountIdsForToken(token) {
+  const axios = require('axios');
+  const ids = new Set();
+  try {
+    const ig = await axios.get('https://graph.instagram.com/v21.0/me', {
+      params: { fields: 'id,user_id,username', access_token: token }, timeout: 8000,
+    });
+    [ig.data?.id, ig.data?.user_id].forEach(v => v && ids.add(String(v)));
+  } catch (_) { /* not an Instagram Login token */ }
+  if (!ids.size) {
+    try {
+      const fb = await axios.get('https://graph.facebook.com/v21.0/me', {
+        params: { fields: 'id,instagram_business_account', access_token: token }, timeout: 8000,
+      });
+      const igb = fb.data?.instagram_business_account?.id;
+      if (igb) ids.add(String(igb));
+    } catch (_) { /* invalid token */ }
+  }
+  return [...ids];
+}
 
 // Update Persona Configuration
 app.put('/api/persona', async (req, res) => {
   try {
-    let query = {};
-    if (req.user) {
-      query = { ownerId: req.user._id };
-    }
+    const body = req.body || {};
+    const invalid = validatePersonaUpdate(body, { chatModes: PERSONA_CHAT_MODES });
+    if (invalid) return res.status(400).json({ error: invalid });
 
-    let config = await PersonaConfig.findOne(query);
-    if (!config && req.user && req.user.role === 'superadmin') {
-      config = (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
-    }
-    if (!config) {
-      config = new PersonaConfig({ ...query });
-    }
+    let config = await findOwnPersona(req);
+    if (!config) config = new PersonaConfig({ ownerId: req.user._id });
 
     const {
       creatorName,
@@ -1515,29 +1566,30 @@ app.put('/api/persona', async (req, res) => {
       typingDelaySeconds,
       instagramPageAccessToken,
       instagramAccountId,
-      autoShareReelsEnabled,
-      autoShareReelsFrequencyHours,
-      autoShareReelsTopics,
       giphyApiKey,
-    } = req.body;
+      clearGiphyApiKey,
+    } = body;
 
-    // One Instagram account belongs to one workspace: its DMs and contacts route by this id
+    const pastedToken = (instagramPageAccessToken || '').trim();
+
+    // One Instagram account belongs to one workspace, and only an account this user has proven:
+    // either already linked by the Instagram login / token flow, or owned by the token pasted with it
     const cleanAccountId = instagramAccountId !== undefined ? String(instagramAccountId || '').trim() : undefined;
-    if (cleanAccountId && req.user) {
-      const conflictingUser = await User.findOne({
+    if (cleanAccountId && !verifiedAccountIds(req.user).includes(cleanAccountId)) {
+      const tokenIds = pastedToken ? await accountIdsForToken(pastedToken) : [];
+      if (!tokenIds.includes(cleanAccountId)) {
+        return res.status(400).json({
+          error: 'This Instagram account id could not be verified. Connect Instagram with the Connect button, or paste a valid access token for this account.',
+        });
+      }
+    }
+    if (cleanAccountId) {
+      const conflictingUser = await User.exists({
         _id: { $ne: req.user._id },
         $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
       });
       if (conflictingUser) {
-        if (conflictingUser.username === 'samjoshua2002' && req.user.username === 'samjoshua') {
-          conflictingUser.instagramAccountId = '';
-          conflictingUser.instagramId = '';
-          conflictingUser.instagramUsername = '';
-          conflictingUser.instagram = { connected: false, accountId: '', pageId: '', username: '' };
-          await conflictingUser.save();
-        } else {
-          return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
-        }
+        return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
       }
     }
 
@@ -1556,22 +1608,21 @@ app.put('/api/persona', async (req, res) => {
     if (chatMode !== undefined) config.chatMode = chatMode;
     if (excludedContactIds !== undefined) config.excludedContactIds = excludedContactIds;
     if (includedContactIds !== undefined) config.includedContactIds = includedContactIds;
-    if (typingDelaySeconds !== undefined) config.typingDelaySeconds = typingDelaySeconds;
-    // A blank token field means "unchanged" (OAuth tokens are not sent back to the browser); disconnecting has its own route
-    const pastedToken = (instagramPageAccessToken || '').trim();
-    const tokenEncrypted = Boolean(pastedToken) && Boolean(req.user) && cryptoService.isConfigured();
+    if (typingDelaySeconds !== undefined && typingDelaySeconds !== null) config.typingDelaySeconds = Number(typingDelaySeconds);
+    // A blank token field means "unchanged" (tokens are not sent back to the browser); disconnecting has its own route
+    const tokenEncrypted = Boolean(pastedToken) && cryptoService.isConfigured();
     if (pastedToken) config.instagramPageAccessToken = tokenEncrypted ? '' : pastedToken;
     if (cleanAccountId !== undefined) config.instagramAccountId = cleanAccountId;
-    if (autoShareReelsEnabled !== undefined) config.autoShareReelsEnabled = autoShareReelsEnabled;
-    if (autoShareReelsFrequencyHours !== undefined) config.autoShareReelsFrequencyHours = autoShareReelsFrequencyHours;
-    if (autoShareReelsTopics !== undefined) config.autoShareReelsTopics = autoShareReelsTopics;
-    if (giphyApiKey !== undefined) config.giphyApiKey = (giphyApiKey || '').trim();
-    if (req.body.businessPolicy && typeof req.body.businessPolicy === 'object') {
-      const bp = req.body.businessPolicy;
+    // A blank GIPHY key also means "unchanged"; send clearGiphyApiKey: true to remove it
+    const cleanGiphy = typeof giphyApiKey === 'string' ? giphyApiKey.trim() : '';
+    if (cleanGiphy) config.giphyApiKey = cleanGiphy;
+    else if (clearGiphyApiKey === true) config.giphyApiKey = '';
+    if (body.businessPolicy && typeof body.businessPolicy === 'object') {
+      const bp = body.businessPolicy;
       const hhmm = (v, fallback) => (/^\d{1,2}:\d{2}$/.test(v || '') ? v : fallback);
       const current = config.businessPolicy || {};
       config.businessPolicy = {
-        timezone: (bp.timezone || current.timezone || 'Asia/Kolkata').trim(),
+        timezone: String(bp.timezone || current.timezone || 'Asia/Kolkata').trim(),
         workingDays: Array.isArray(bp.workingDays) ? bp.workingDays.map(Number).filter(d => d >= 0 && d <= 6) : current.workingDays,
         openTime: hhmm(bp.openTime, current.openTime || '09:00'),
         closeTime: hhmm(bp.closeTime, current.closeTime || '18:00'),
@@ -1589,29 +1640,27 @@ app.put('/api/persona', async (req, res) => {
     await config.save();
     await redisService.invalidatePersonaConfig();
 
-    if (req.user) {
-      if (cleanAccountId !== undefined) req.user.instagramAccountId = cleanAccountId;
-      // creatorName is the full name; storing it all in firstName showed the surname twice
-      const [firstName, ...rest] = String(creatorName || '').trim().split(/\s+/);
-      if (firstName) {
-        req.user.firstName = firstName;
-        req.user.lastName = rest.join(' ');
-      }
-      if (instagramHandle !== undefined) req.user.instagramUsername = String(instagramHandle || '').trim().replace(/^@/, '');
-      if (pastedToken) {
-        setUserInstagram(req.user, {
-          token: pastedToken,
-          accountId: req.user.instagramAccountId,
-          pageId: req.user.instagram?.pageId,
-          username: req.user.instagramUsername,
-        });
-      }
-      await req.user.save();
+    if (cleanAccountId !== undefined) req.user.instagramAccountId = cleanAccountId;
+    // creatorName is the full name; storing it all in firstName showed the surname twice
+    const [firstName, ...rest] = String(creatorName || '').trim().split(/\s+/);
+    if (firstName) {
+      req.user.firstName = firstName;
+      req.user.lastName = rest.join(' ');
     }
+    if (instagramHandle !== undefined) req.user.instagramUsername = String(instagramHandle || '').trim().replace(/^@/, '');
+    if (pastedToken) {
+      setUserInstagram(req.user, {
+        token: pastedToken,
+        accountId: req.user.instagramAccountId,
+        pageId: req.user.instagram?.pageId,
+        username: req.user.instagramUsername,
+      });
+    }
+    await req.user.save();
 
-    res.json({ success: true, config });
+    res.json({ success: true, config: personaForBrowser(config, req.user) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err, 'Save persona');
   }
 });
 
@@ -1639,7 +1688,7 @@ app.get('/api/giphy/search', async (req, res) => {
     const data = await response.json();
     res.json({ success: true, data: data.data || [] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1655,7 +1704,7 @@ app.get('/api/giphy/trending', async (req, res) => {
     const data = await response.json();
     res.json({ success: true, data: data.data || [] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1668,7 +1717,7 @@ app.post('/api/simulator/chat', async (req, res) => {
     let testSenderId = String(req.body?.testSenderId || 'test_fan_01');
     if (/^test_/.test(testSenderId)) {
       testSenderId = `${testSenderId}_${req.user._id}`;
-    } else if (!(await UserMemory.exists(await ownedMemoryQuery(req, testSenderId)))) {
+    } else if (!(await UserMemory.exists(ownedMemoryQuery(req, testSenderId)))) {
       return res.status(404).json({ error: 'User not found' });
     }
 
@@ -1676,7 +1725,7 @@ app.post('/api/simulator/chat', async (req, res) => {
     const userMemory = await memoryService.getOrCreateUserMemory(testSenderId, {
       username: testUsername,
       name: testUsername,
-    });
+    }, /^test_/.test(testSenderId) ? { ownerId: req.user._id } : await contactMemOpts(req, testSenderId));
 
     if (!userMemory.ownerId) {
       userMemory.ownerId = req.user._id;
@@ -1695,12 +1744,7 @@ app.post('/api/simulator/chat', async (req, res) => {
     await redisService.pushMessage(testSenderId, { role: 'user', text: messageText, timestamp: new Date() });
 
     // 3. Get recent history
-    const history = await Message.find({
-      $or: [
-        { senderId: testSenderId },
-        { recipientId: testSenderId }
-      ]
-    }).sort({ createdAt: -1 }).limit(10);
+    const history = await Message.find(conversationMessages(userMemory.ownerId, testSenderId)).sort({ createdAt: -1 }).limit(10);
     history.reverse();
 
     // 4. Generate AI response with the signed-in creator's persona (personal or business rules)
@@ -1729,15 +1773,15 @@ app.post('/api/simulator/chat', async (req, res) => {
     await redisService.pushMessage(testSenderId, { role: 'assistant', text: replyText, timestamp: new Date() });
 
     // 6. Asynchronously update memory
-    await memoryService.updateMemoryAsync(testSenderId);
-    const updatedMemory = await UserMemory.findOne({ senderId: testSenderId });
+    await memoryService.updateMemoryAsync(testSenderId, { ownerId: userMemory.ownerId || null });
+    const updatedMemory = await UserMemory.findById(userMemory._id);
 
     res.json({
       replyText,
       userMemory: updatedMemory,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1749,12 +1793,12 @@ app.delete('/api/conversations/:senderId/facts', async (req, res) => {
     if (!fact) return res.status(400).json({ error: 'Fact is required' });
 
     await UserMemory.updateOne(
-      { senderId },
-      { $pull: { facts: { fact } } }
+      ownedMemoryQuery(req, senderId),
+      { $pull: { facts: { fact: String(fact) } } }
     );
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1789,20 +1833,15 @@ app.post('/api/test-token', requireAuth, async (req, res) => {
 app.get('/api/media-vault', async (req, res) => {
   try {
     const { category } = req.query;
-    const isSuper = req.user?.role === 'superadmin';
-    const ownerFilter = req.user
-      ? (isSuper
-          ? { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }, { ownerId: null }] }
-          : { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] })
-      : {};
+    const mediaOwner = ownedBy(req);
     const filter = category && category !== 'all'
-      ? { ...ownerFilter, category: category.toLowerCase().trim() }
-      : ownerFilter;
+      ? { ...mediaOwner, category: String(category).toLowerCase().trim() }
+      : mediaOwner;
     const items = await MediaVault.find(filter).sort({ createdAt: -1 });
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, items, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1838,13 +1877,15 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
       keywords: parsedKeywords,
       ownerId: req.user?._id || null,
       ownerUsername: req.user?.username || '',
+      // Only files the server saved itself are ever deleted from disk
+      storedFilename: req.file.filename,
     });
 
     console.log(`📸 [Media Vault Upload]: Saved ${mediaType} under category "${cleanCat}": ${fileUrl} for @${req.user?.username || 'user'}`);
     res.json({ success: true, item: newMedia });
   } catch (err) {
     console.error('❌ Media Vault upload error:', err);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1852,17 +1893,20 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
 app.post('/api/media-vault', async (req, res) => {
   try {
     const { url, category = 'joy', name, caption, mediaType = 'gif', keywords } = req.body;
-    if (!url || !url.trim()) {
+    if (typeof url !== 'string' || !url.trim()) {
       return res.status(400).json({ error: 'Media URL is required' });
     }
-    const cleanCat = (category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+    if (!isHttpUrl(url)) {
+      return res.status(400).json({ error: 'Media URL must be an http(s) link' });
+    }
+    const cleanCat = String(category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
 
     const parsedKeywords = Array.isArray(keywords)
-      ? keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
-      : (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+      ? keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean)
+      : String(keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
     const newMedia = await MediaVault.create({
-      name: name && name.trim() ? name.trim() : 'Reaction Media',
+      name: typeof name === 'string' && name.trim() ? name.trim() : 'Reaction Media',
       category: cleanCat,
       url: url.trim(),
       mediaType: mediaType || 'gif',
@@ -1874,7 +1918,7 @@ app.post('/api/media-vault', async (req, res) => {
 
     res.json({ success: true, item: newMedia });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1888,19 +1932,20 @@ app.post('/api/media-vault/batch', async (req, res) => {
 
     const created = [];
     const ownerFilter = req.user ? { ownerId: req.user._id } : {};
-    for (const item of itemsToInsert) {
-      if (!item.url) continue;
-      const cleanCat = (item.category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+    for (const item of itemsToInsert.slice(0, 100)) {
+      // Only http(s) links; anything else is skipped
+      if (!item || typeof item.url !== 'string' || !isHttpUrl(item.url)) continue;
+      const cleanCat = String(item.category || 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
       const parsedKeywords = Array.isArray(item.keywords)
-        ? item.keywords.map(k => k.trim().toLowerCase()).filter(Boolean)
-        : (item.keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+        ? item.keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean)
+        : String(item.keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
 
       // Check if duplicate URL already in user's vault
       const existing = await MediaVault.findOne({ url: item.url.trim(), ...ownerFilter });
       if (existing) continue;
 
       const newMedia = await MediaVault.create({
-        name: item.name && item.name.trim() ? item.name.trim() : 'Reaction GIF',
+        name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : 'Reaction GIF',
         category: cleanCat,
         url: item.url.trim(),
         mediaType: item.mediaType || 'gif',
@@ -1914,7 +1959,7 @@ app.post('/api/media-vault/batch', async (req, res) => {
 
     res.json({ success: true, count: created.length, items: created });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1922,11 +1967,7 @@ app.post('/api/media-vault/batch', async (req, res) => {
 app.put('/api/media-vault/:id', async (req, res) => {
   try {
     const { name, category, keywords, caption } = req.body;
-    const isSuper = req.user?.role === 'superadmin';
-    const query = { _id: req.params.id };
-    if (!isSuper && req.user) {
-      query.$or = [{ ownerId: req.user._id }, { ownerUsername: req.user.username }];
-    }
+    const query = { _id: req.params.id, ...ownedBy(req) };
     const update = {};
     if (name !== undefined) update.name = String(name ?? '').trim();
     if (category !== undefined) update.category = String(category ?? '').toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
@@ -1941,34 +1982,30 @@ app.put('/api/media-vault/:id', async (req, res) => {
     if (!updated) return res.status(404).json({ error: 'Media not found or unauthorized' });
     res.json({ success: true, item: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 // Delete media item
 app.delete('/api/media-vault/:id', async (req, res) => {
   try {
-    const isSuper = req.user?.role === 'superadmin';
-    const query = { _id: req.params.id };
-    if (!isSuper && req.user) {
-      query.$or = [{ ownerId: req.user._id }, { ownerUsername: req.user.username }];
-    }
-    const item = await MediaVault.findOne(query);
+    const item = await MediaVault.findOne({ _id: req.params.id, ...ownedBy(req) });
     if (!item) return res.status(404).json({ error: 'Media not found or unauthorized' });
 
-    // If locally uploaded file, delete from disk
-    if (item.url && item.url.includes('/uploads/')) {
-      const filename = path.basename(item.url);
-      const filePath = path.join(uploadsDir, filename);
-      if (fs.existsSync(filePath)) {
+    // Only a file this server saved for this item (recorded at upload) is removed from disk;
+    // the URL is never trusted, so one account can't delete another's file
+    if (item.storedFilename) {
+      const filePath = resolveInsideDir(uploadsDir, item.storedFilename);
+      const stillUsed = filePath && await MediaVault.exists({ _id: { $ne: item._id }, storedFilename: item.storedFilename });
+      if (filePath && !stillUsed && fs.existsSync(filePath)) {
         try { fs.unlinkSync(filePath); } catch (_) {}
       }
     }
 
-    await MediaVault.findByIdAndDelete(req.params.id);
+    await MediaVault.deleteOne({ _id: item._id });
     res.json({ success: true, deletedId: req.params.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1978,7 +2015,7 @@ app.get('/api/media-vault/predefined', (req, res) => {
     const predefined = stickerService.getPredefinedList();
     res.json({ success: true, predefined });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1988,7 +2025,7 @@ app.post('/api/media-vault/import-predefined', async (req, res) => {
     const results = await stickerService.seedPredefinedIntoVault(ids, req.user);
     res.json({ success: true, results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -1998,7 +2035,7 @@ app.get('/api/media-vault/categories', async (req, res) => {
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2024,7 +2061,7 @@ app.post('/api/media-vault/categories', async (req, res) => {
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2053,7 +2090,7 @@ app.put('/api/media-vault/categories/:name', async (req, res) => {
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2069,7 +2106,7 @@ app.delete('/api/media-vault/categories/:name', async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2100,19 +2137,29 @@ app.get('/privacy', (req, res) => {
 
 // Finds the creator whose Instagram account Meta's signed_request refers to
 async function findCreatorByMetaUserId(metaUserId) {
-  return User.findOne({
-    $or: [{ instagramId: metaUserId }, { instagramAccountId: metaUserId }, { 'businessProfile.instagramId': metaUserId }]
-  });
+  const { user } = await findOwnerByInstagramAccountId(metaUserId);
+  return user;
 }
 
-// Removes a creator's stored Instagram credentials (user record + persona)
+// Removes a creator's stored Instagram credentials: the plaintext legacy token, the encrypted
+// OAuth token (instagram.accessTokenEncrypted / iv / authTag) and the persona copy
 async function clearCreatorInstagramCredentials(creator) {
-  await User.updateOne({ _id: creator._id }, { $set: { instagramPageAccessToken: '', igApprovalStatus: 'none' } });
+  await User.updateOne({ _id: creator._id }, {
+    $set: {
+      instagramPageAccessToken: '',
+      igApprovalStatus: 'none',
+      'instagram.connected': false,
+      'instagram.accessTokenEncrypted': '',
+      'instagram.iv': '',
+      'instagram.authTag': '',
+      'instagram.tokenExpiresAt': null,
+    },
+  });
   await PersonaConfig.updateMany({ ownerId: creator._id }, { $set: { instagramPageAccessToken: '' } });
 }
 
 // Deauthorize Callback for Meta: the creator removed the app, so stop using their token
-app.post('/deauthorize', async (req, res) => {
+app.post('/deauthorize', metaCallbackLimiter, async (req, res) => {
   const data = parseSignedRequest(req.body.signed_request);
   if (!data || !data.user_id) {
     return res.status(400).json({ error: 'Invalid or missing signed_request' });
@@ -2129,7 +2176,7 @@ app.post('/deauthorize', async (req, res) => {
 });
 
 // User Data Deletion Callback for Meta: deletes the Instagram data stored for that user
-app.post('/data-deletion', async (req, res) => {
+app.post('/data-deletion', metaCallbackLimiter, async (req, res) => {
   const data = parseSignedRequest(req.body.signed_request);
   if (!data || !data.user_id) {
     return res.status(400).json({ error: 'Invalid or missing signed_request' });
@@ -2138,18 +2185,18 @@ app.post('/data-deletion', async (req, res) => {
   const metaUserId = String(data.user_id);
   try {
     const creator = await findCreatorByMetaUserId(metaUserId);
-    const accountIds = [metaUserId, creator?.instagramAccountId, creator?.instagramId].filter(Boolean);
+    const accountIds = [metaUserId, creator?.instagram?.accountId, creator?.instagramAccountId, creator?.instagramId].filter(Boolean);
 
     // Conversations to/from the account, plus the user's own contact data if they were a DM contact
-    const ownedBy = creator ? [{ ownerId: creator._id }] : [];
+    const creatorRows = creator ? [{ ownerId: creator._id }] : [];
     const [messages, memories, nodes] = await Promise.all([
-      Message.deleteMany({ $or: [...ownedBy, { senderId: { $in: accountIds } }, { recipientId: { $in: accountIds } }] }),
-      UserMemory.deleteMany({ $or: [...ownedBy, { senderId: { $in: accountIds } }] }),
+      Message.deleteMany({ $or: [...creatorRows, { senderId: { $in: accountIds } }, { recipientId: { $in: accountIds } }] }),
+      UserMemory.deleteMany({ $or: [...creatorRows, { senderId: { $in: accountIds } }] }),
       SocialGraph.deleteMany(creator ? { $or: [{ ownerId: creator._id }, { senderId: { $in: accountIds } }] } : { senderId: { $in: accountIds } })
     ]);
     if (creator) {
       await clearCreatorInstagramCredentials(creator);
-      await User.updateOne({ _id: creator._id }, { $set: { instagramId: '', instagramAccountId: '', instagramUsername: '' } });
+      await User.updateOne({ _id: creator._id }, { $set: { instagramId: '', instagramAccountId: '', instagramUsername: '', 'instagram.accountId': '', 'instagram.pageId': '', 'instagram.username': '' } });
     }
     socialGraphService.clearCache();
 
@@ -2166,7 +2213,7 @@ app.post('/data-deletion', async (req, res) => {
 });
 
 // Status page Meta links users to after a deletion request
-app.get('/data-deletion/status', (req, res) => {
+app.get('/data-deletion/status', publicLimiter, (req, res) => {
   const code = String(req.query.code || '').replace(/[^a-f0-9]/gi, '');
   res.send(`
     <html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 16px;">
@@ -2178,28 +2225,23 @@ app.get('/data-deletion/status', (req, res) => {
 });
 
 // Social Graph Tree Chain Endpoints (auto-discovers newly talked contacts & enriches with live DP & per-person AI settings)
-let lastTrainGraphTime = 0;
+// Graph training runs at most once every 5 minutes per account (not one global timer for everyone)
+const lastTrainGraphTime = new Map();
 app.get('/api/social-graph', async (req, res) => {
   try {
     // Only run trainGraphFromDB at most once every 5 minutes to prevent CPU blocking
     const now = Date.now();
-    if (now - lastTrainGraphTime > 5 * 60 * 1000) {
-      lastTrainGraphTime = now;
-      socialGraphService.trainGraphFromDB(UserMemory, Message).catch(e => console.warn('trainGraph error:', e.message));
+    const trainKey = String(req.user._id);
+    if (now - (lastTrainGraphTime.get(trainKey) || 0) > 5 * 60 * 1000) {
+      lastTrainGraphTime.set(trainKey, now);
+      const trainOwners = isSuperUser(req) ? [req.user._id, null] : [req.user._id];
+      (async () => { for (const ownerId of trainOwners) await socialGraphService.trainGraphFromDB(UserMemory, Message, { ownerId }); })()
+        .catch(e => console.warn('trainGraph error:', e.message));
     }
 
-    // Fetch social graph nodes:
-    // If superadmin: return all nodes
-    // If user: return only their owned nodes
-    const isSuper = req.user?.role === 'superadmin';
-    const query = (!isSuper && req.user)
-      ? {
-          $or: [
-            { ownerId: req.user._id },
-            { ownerUsername: req.user.username }
-          ]
-        }
-      : {};
+    // Only this account's contacts (the superadmin also sees legacy ownerless ones)
+    const isSuper = isSuperUser(req);
+    const query = ownedBy(req);
 
     // Auto-discover contacts for this creator from message history if missing
     if (req.user && !isSuper && req.user.instagramAccountId) {
@@ -2207,8 +2249,8 @@ app.get('/api/social-graph', async (req, res) => {
         const creatorIgId = req.user.instagramAccountId;
         // Distinct ids only: loading every message on each 8s poll made the list take minutes
         const [fromIds, toIds] = await Promise.all([
-          Message.distinct('senderId', { recipientId: creatorIgId }),
-          Message.distinct('recipientId', { senderId: creatorIgId }),
+          Message.distinct('senderId', { ownerId: req.user._id, recipientId: creatorIgId }),
+          Message.distinct('recipientId', { ownerId: req.user._id, senderId: creatorIgId }),
         ]);
         const contactIds = new Set([...fromIds, ...toIds].filter(id => id && id !== creatorIgId));
         const known = new Set(await SocialGraph.distinct('senderId', {
@@ -2218,8 +2260,9 @@ app.get('/api/social-graph', async (req, res) => {
 
         for (const cid of contactIds) {
           if (!known.has(cid)) {
-            const mem = await UserMemory.findOne({ senderId: cid });
+            const mem = await UserMemory.findOne(ownedMemoryQuery(req, cid));
             const chatsCount = await Message.countDocuments({
+              ownerId: req.user._id,
               $or: [
                 { senderId: cid, recipientId: creatorIgId },
                 { senderId: creatorIgId, recipientId: cid }
@@ -2251,7 +2294,7 @@ app.get('/api/social-graph', async (req, res) => {
     // One query for all linked memories instead of one per person
     const linkedIds = [...new Set(nodes.map(n => n.senderId).filter(Boolean))];
     const memoryById = new Map(
-      (linkedIds.length ? await UserMemory.find({ senderId: { $in: linkedIds } }) : []).map(m => [m.senderId, m])
+      (linkedIds.length ? await UserMemory.find(inMemories(req, { senderId: { $in: linkedIds } })) : []).map(m => [m.senderId, m])
     );
 
     // Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
@@ -2261,7 +2304,7 @@ app.get('/api/social-graph', async (req, res) => {
 
       if (!memory && n.instagramHandle) {
         const cleanU = n.instagramHandle.replace(/^@/, '').toLowerCase().trim();
-        memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
+        memory = await UserMemory.findOne(inMemories(req, { username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') }));
         if (memory && !effectiveSenderId) {
           effectiveSenderId = memory.senderId;
           // Persist the discovered senderId to social graph node
@@ -2326,7 +2369,7 @@ app.get('/api/social-graph', async (req, res) => {
 
     res.json({ success: true, nodes: deduplicatedNodes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2336,10 +2379,10 @@ app.post('/api/social-graph/sync', async (req, res) => {
     if (!isSuperUser(req)) return res.status(403).json({ error: 'Superadmin only' });
     await socialGraphService.seedInitialGraph();
     await socialGraphService.trainGraphFromDB(UserMemory, Message);
-    const nodes = await SocialGraph.find({});
+    const nodes = await SocialGraph.find(ownedBy(req));
     res.json({ success: true, message: 'Social knowledge tree synced from DB', count: nodes.length, nodes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2419,7 +2462,7 @@ app.post('/api/social-graph/node', async (req, res) => {
     let finalProfilePic = req.body.profilePic || '';
     if (!finalSenderId && finalHandle) {
       const cleanU = finalHandle.replace(/^@/, '').toLowerCase().trim();
-      const matchedMem = await UserMemory.findOne(await inMemories(req, { username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') }));
+      const matchedMem = await UserMemory.findOne(inMemories(req, { username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') }));
       if (matchedMem) {
         finalSenderId = matchedMem.senderId;
         if (!finalProfilePic) finalProfilePic = matchedMem.profilePic;
@@ -2482,7 +2525,7 @@ app.post('/api/social-graph/node', async (req, res) => {
       if (typeof req.body.chatsCount === 'number') memUpdates.messageCount = req.body.chatsCount;
       if (typeof req.body.reelsCount === 'number') memUpdates.reelsCount = req.body.reelsCount;
       if (Object.keys(memUpdates).length > 0) {
-        UserMemory.updateOne(await ownedMemoryQuery(req, finalSenderId), { $set: memUpdates }).catch(() => {});
+        UserMemory.updateOne(ownedMemoryQuery(req, finalSenderId), { $set: memUpdates }).catch(() => {});
       }
     }
 
@@ -2513,7 +2556,7 @@ app.post('/api/social-graph/node', async (req, res) => {
 
     if (finalSenderId) {
       await UserMemory.findOneAndUpdate(
-        await ownedMemoryQuery(req, finalSenderId),
+        ownedMemoryQuery(req, finalSenderId),
         {
           $set: {
             name: cleanName,
@@ -2527,7 +2570,7 @@ app.post('/api/social-graph/node', async (req, res) => {
     socialGraphService.clearCache();
     res.json({ success: true, node: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2537,7 +2580,7 @@ app.get('/api/contacts/lookup', async (req, res) => {
     const rawQuery = String(req.query.handle || req.query.username || req.query.query || '').replace(/^@/, '').trim();
     if (!rawQuery) return res.json({ found: false });
 
-    const memory = await UserMemory.findOne(await inMemories(req, {
+    const memory = await UserMemory.findOne(inMemories(req, {
       $or: [
         { username: new RegExp(`^${escapeRegex(rawQuery)}$`, 'i') },
         { name: new RegExp(`^${escapeRegex(rawQuery)}$`, 'i') },
@@ -2559,7 +2602,7 @@ app.get('/api/contacts/lookup', async (req, res) => {
 
     res.json({ found: false });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2580,7 +2623,7 @@ app.post('/api/social-graph/extract-from-chat', async (req, res) => {
     res.json({ success: true, extraction });
   } catch (err) {
     console.error('Raw chat extraction error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2588,7 +2631,8 @@ app.post('/api/social-graph/extract-from-chat', async (req, res) => {
 app.delete('/api/social-graph/node/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
-    const clean = decodeURIComponent(identifier).trim();
+    // Express already decodes route params; decoding again broke on names containing '%'
+    const clean = String(identifier || '').trim();
 
     // 1. Find matching node
     const isObjectId = mongoose.Types.ObjectId.isValid(clean);
@@ -2621,9 +2665,9 @@ app.delete('/api/social-graph/node/:identifier', async (req, res) => {
 
     // 4. Delete corresponding UserMemory if exists (safeguard: do not delete if another node still uses this senderId)
     if (targetSenderId && req.query.keepMemory !== 'true') {
-      const remainingNode = await SocialGraph.findOne({ senderId: targetSenderId });
+      const remainingNode = await SocialGraph.findOne(inGraph(req, { senderId: targetSenderId }));
       if (!remainingNode) {
-        await UserMemory.deleteMany(await ownedMemoryQuery(req, targetSenderId));
+        await UserMemory.deleteMany(ownedMemoryQuery(req, targetSenderId));
       }
     }
 
@@ -2632,7 +2676,7 @@ app.delete('/api/social-graph/node/:identifier', async (req, res) => {
     res.json({ success: true, message: `Deleted ${targetName} from database` });
   } catch (err) {
     console.error('Delete node error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2653,13 +2697,13 @@ app.post('/api/social-graph/node/:name/ai-autofill', async (req, res) => {
     let recentMessages = [];
     let memory = null;
     if (node?.senderId) {
-      recentMessages = await Message.find({ $or: [{ senderId: node.senderId }, { recipientId: node.senderId }] }).sort({ timestamp: -1 }).limit(40);
-      memory = await UserMemory.findOne(await ownedMemoryQuery(req, node.senderId));
+      memory = await UserMemory.findOne(ownedMemoryQuery(req, node.senderId));
+      if (memory) recentMessages = await Message.find(conversationMessages(memory.ownerId, node.senderId)).sort({ timestamp: -1 }).limit(40);
     } else if (node?.instagramHandle) {
       const u = node.instagramHandle.replace(/^@/, '').toLowerCase();
-      memory = await UserMemory.findOne(await inMemories(req, { username: new RegExp(`^${escapeRegex(u)}$`, 'i') }));
+      memory = await UserMemory.findOne(inMemories(req, { username: new RegExp(`^${escapeRegex(u)}$`, 'i') }));
       if (memory?.senderId) {
-        recentMessages = await Message.find({ $or: [{ senderId: memory.senderId }, { recipientId: memory.senderId }] }).sort({ timestamp: -1 }).limit(40);
+        recentMessages = await Message.find(conversationMessages(memory.ownerId, memory.senderId)).sort({ timestamp: -1 }).limit(40);
       }
     }
 
@@ -2698,7 +2742,7 @@ Return ONLY raw JSON.`;
     res.json({ success: true, autofill: parsed });
   } catch (err) {
     console.error('AI autofill error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2730,10 +2774,10 @@ app.post('/api/social-graph/link-id', async (req, res) => {
     // 2. Check if a UserMemory exists with this senderId or username
     let memory = null;
     if (senderId) {
-      memory = await UserMemory.findOne(await ownedMemoryQuery(req, senderId));
+      memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     }
     if (!memory && cleanUsername) {
-      memory = await UserMemory.findOne(await inMemories(req, { username: new RegExp(`^${escapeRegex(cleanUsername)}$`, 'i') }));
+      memory = await UserMemory.findOne(inMemories(req, { username: new RegExp(`^${escapeRegex(cleanUsername)}$`, 'i') }));
     }
 
     // 3. Check if there was another node created automatically from UserMemory for this handle/senderId that should be merged
@@ -2788,10 +2832,9 @@ app.post('/api/social-graph/link-id', async (req, res) => {
       await memory.save();
     } else if (cleanUsername && node.senderId) {
       // Only create or update a contact record this account owns
-      const existingMem = await UserMemory.findOne({ senderId: node.senderId }, { ownerId: 1 }).lean();
-      if (!existingMem || isSuperUser(req) || String(existingMem.ownerId) === String(req.user._id)) {
+      {
         await UserMemory.findOneAndUpdate(
-          { senderId: node.senderId },
+          ownedMemoryQuery(req, node.senderId),
           {
             $set: {
               username: cleanUsername,
@@ -2814,14 +2857,14 @@ app.post('/api/social-graph/link-id', async (req, res) => {
       node
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
 // Get recent chatters from UserMemory to suggest when linking handles
 app.get('/api/social-graph/unlinked-chatters', async (req, res) => {
   try {
-    const memories = await UserMemory.find(await inMemories(req, {
+    const memories = await UserMemory.find(inMemories(req, {
       username: { $not: /^(test_|ig_tester_|catovidz$|me$|user_\d+)/i },
       senderId: { $ne: 'me' }
     })).sort({ lastInteraction: -1 }).limit(30);
@@ -2836,7 +2879,7 @@ app.get('/api/social-graph/unlinked-chatters', async (req, res) => {
 
     res.json({ success: true, chatters });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2856,7 +2899,7 @@ app.delete('/api/social-graph/node/:name', async (req, res) => {
     socialGraphService.clearCache();
     res.json({ success: true, message: `Deleted ${rawName} from database` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2892,9 +2935,8 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
     const cleanHandle = cleanId.replace(/^@/, '');
 
     // Only this workspace's contacts (a name match must never pause another account's chat)
-    const isSuper = req.user?.role === 'superadmin';
-    const memoryOwner = isSuper ? {} : await inMemories(req, {});
-    const graphOwner = isSuper ? {} : { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] };
+    const memoryOwner = inMemories(req, {});
+    const graphOwner = ownedBy(req);
     // Turning AI back on also closes an open handoff
     const handoffReset = finalAiEnabled === true ? { handoffRequestedAt: null, handoffReason: null } : {};
 
@@ -2950,7 +2992,7 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
 });
 
@@ -2961,7 +3003,8 @@ app.post('/api/social-graph/ai-interview', async (req, res) => {
     const interviewResult = await azureOpenAI.interviewPersonForSocialTree({
       conversationHistory,
       userInput,
-      existingNode
+      existingNode,
+      ownerId: req.user._id,
     });
 
     // Handle automated duplicate merging in DB
@@ -3004,17 +3047,26 @@ app.post('/api/social-graph/ai-interview', async (req, res) => {
 
     res.json({ success: true, ...interviewResult });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServerError(res, err);
   }
+});
+
+// Last-resort error handler: bad JSON and similar client errors keep their 4xx; nothing else leaks details
+app.use((err, req, res, next) => {
+  const status = Number(err && (err.status || err.statusCode));
+  if (status >= 400 && status < 500) {
+    if (res.headersSent) return next(err);
+    return res.status(status).json({ error: status === 413 ? 'Request is too large' : 'Invalid request' });
+  }
+  sendServerError(res, err, `${req.method} ${req.path}`);
 });
 
 // Start Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(`🚀 Instagram AI Automation Server Running!`);
-  console.log(`🌐 Dashboard: http://localhost:${PORT}`);
   console.log(`📡 Webhook URL: http://localhost:${PORT}/webhook`);
-  console.log(`🔑 Webhook Verify Token: ${VERIFY_TOKEN}`);
+  console.log(`🔑 Webhook Verify Token configured: ${Boolean(VERIFY_TOKEN)}`);
   console.log(`======================================================\n`);
 
   // Seed & train social knowledge tree

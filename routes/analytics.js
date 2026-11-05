@@ -4,6 +4,7 @@ const Message = require('../models/Message');
 const UserMemory = require('../models/UserMemory');
 const Lead = require('../models/Lead');
 const Booking = require('../models/Booking');
+const { parseDateParam } = require('../lib/serverSecurity');
 
 // Mounted behind requireAuth; every query is scoped to the signed-in tenant
 const ownerOf = (req) => req.user._id;
@@ -111,11 +112,16 @@ router.get('/leads', async (req, res) => {
 router.get('/bookings', async (req, res) => {
   try {
     const ownerId = ownerOf(req);
-    const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 864e5);
-    const to = req.query.to ? new Date(req.query.to) : new Date(Date.now() + 60 * 864e5);
+    const from = parseDateParam(req.query.from, new Date(Date.now() - 864e5));
+    const to = parseDateParam(req.query.to, new Date(Date.now() + 60 * 864e5));
+    if (!from.ok || !to.ok) return res.status(400).json({ error: 'from and to must be valid dates' });
+    const statuses = Booking.schema.path('status')?.enumValues || [];
+    if (req.query.status !== undefined && (typeof req.query.status !== 'string' || (statuses.length && !statuses.includes(req.query.status)))) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
     const filter = {
       ownerId,
-      $or: [{ bookingTime: { $gte: from, $lte: to } }, { bookingTime: null }],
+      $or: [{ bookingTime: { $gte: from.date, $lte: to.date } }, { bookingTime: null }],
       ...(req.query.status ? { status: req.query.status } : { status: { $ne: 'cancelled' } }),
     };
     const items = await Booking.find(filter).sort({ bookingTime: 1, createdAt: -1 }).limit(500).lean();

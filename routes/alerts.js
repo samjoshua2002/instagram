@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
     }
     const senderIds = [...bySender.keys()];
     const [memories, olderSenders] = senderIds.length ? await Promise.all([
-      UserMemory.find({ senderId: { $in: senderIds } }).select('senderId name username').lean(),
+      UserMemory.find({ ownerId, senderId: { $in: senderIds } }).select('senderId name username').lean(),
       Message.distinct('senderId', { ownerId, role: 'user', senderId: { $in: senderIds }, createdAt: { $lte: since } }),
     ]) : [[], []];
     const nameOf = new Map(memories.map(m => [m.senderId, m]));
