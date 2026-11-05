@@ -46,6 +46,30 @@ const formatAddress = (addr) => {
   return '';
 };
 
+/** Shrinks an image data URL so its longest side is at most maxSize px, as JPEG. */
+function downscaleImage(dataUrl, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width || 1, img.height || 1));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Could not process that image')); return; }
+      // JPEG has no transparency: paint white behind PNG/WebP see-through areas
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => reject(new Error('Could not read that image'));
+    img.src = dataUrl;
+  });
+}
+
 export default function ProfilePage() {
   const { user, token, API_BASE, updateUserProfile, showToast, updateWorkspaceFeatures } = useApp();
   const confirm = useConfirm();
@@ -147,9 +171,14 @@ export default function ProfilePage() {
 
     setUploadingAvatar(true);
     const reader = new FileReader();
+    reader.onerror = () => {
+      setUploadingAvatar(false);
+      showToast?.('Could not read that image', 'error');
+    };
     reader.onload = async () => {
-      const base64Url = reader.result;
       try {
+        // A 256px JPEG is plenty for an avatar and keeps the saved profile small
+        const base64Url = await downscaleImage(reader.result, 256, 0.85);
         const res = await fetch(`${API_BASE}/api/auth/profile`, {
           method: 'PUT',
           headers: {

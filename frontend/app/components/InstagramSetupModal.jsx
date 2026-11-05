@@ -13,6 +13,7 @@ const stepMotion = {
 };
 import { Instagram, Facebook, RefreshCw, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { isFromApi, openInstagramConnect } from '../lib/utils';
 
 // Guided 30-second fix shown when Meta login finds no Professional Instagram account (PLAN.md §2.3)
 const STEPS = [
@@ -50,6 +51,7 @@ export default function InstagramSetupModal() {
   // Opens from the OAuth popup message, or from ?error=no_instagram_linked after a full-page redirect
   useEffect(() => {
     const onMessage = (event) => {
+      if (!isFromApi(event, API_BASE)) return; // only our OAuth popup may open this guide
       if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR' && event.data?.code === 'no_instagram_linked') {
         setStep(0);
         setOpen(true);
@@ -76,9 +78,8 @@ export default function InstagramSetupModal() {
 
   const refreshConnection = () => {
     const currentToken = token || localStorage.getItem('chatter_jwt_token') || '';
-    const url = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(window.location.origin)}&token=${encodeURIComponent(currentToken)}`;
     setOpen(false);
-    window.open(url, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+    openInstagramConnect(API_BASE, currentToken);
   };
 
   const current = STEPS[step];

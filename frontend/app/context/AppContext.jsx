@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
@@ -13,6 +13,54 @@ const SYNC_COMPARE_FIELDS = [
   'id', 'name', 'handle', 'senderId', 'profilePic', 'category', 'relationship', 'dob', 'age', 'gender', 'personalNotes',
   'chatsCount', 'reelsCount', 'aiEnabled', 'replyToMessages', 'replyToReelsAndPosts', 'roastiness', 'greetingStyle',
 ];
+
+// Auth endpoints that answer 401 for a wrong code/password, not for an expired session
+const AUTH_401_EXEMPT = [
+  '/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/passkey/login-',
+  '/api/auth/oneauth',
+];
+
+/** Full URL string for a fetch() input: string, URL or Request. */
+function fetchInputUrl(input) {
+  if (typeof input === 'string') return input;
+  if (typeof URL !== 'undefined' && input instanceof URL) return input.href;
+  if (input && typeof input.url === 'string') return input.url;
+  return '';
+}
+
+/** Parsed URL when the request goes to our own API server, else null (never send the JWT elsewhere). */
+function apiRequestUrl(input) {
+  try {
+    const target = new URL(fetchInputUrl(input), window.location.href);
+    const base = new URL(API_BASE, window.location.href);
+    if (target.origin !== base.origin) return null;
+    const basePath = base.pathname.replace(/\/+$/, '');
+    if (basePath && target.pathname !== basePath && !target.pathname.startsWith(`${basePath}/`)) return null;
+    return target;
+  } catch {
+    return null;
+  }
+}
+
+function withoutPhoto(record) {
+  if (Array.isArray(record)) return record.map(withoutPhoto);
+  return record && typeof record === 'object' && record.profilePicUrl ? { ...record, profilePicUrl: '' } : record;
+}
+
+/** Saves a user record (or list of them); if storage is full (big photo), saves it without the photo. */
+export function storeUserRecord(key, record) {
+  try {
+    localStorage.setItem(key, JSON.stringify(record));
+    return true;
+  } catch (e) {
+    try {
+      localStorage.setItem(key, JSON.stringify(withoutPhoto(record)));
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
 
 export function getStorageNodesKey(u) {
   const uid = u?._id || u?.id || u?.username;
@@ -123,29 +171,30 @@ export function deduplicateNodes(nodesList) {
 
 const AppContext = createContext(null);
 
+/** Stable function identity that always runs the latest render's version (no stale state). */
+function useLatestCallback(fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  return useCallback((...args) => ref.current(...args), []);
+}
+
 export function AppProvider({ children }) {
   const [nodes, setNodes] = useState(DEFAULT_GRAPH_DATA);
   const [isSyncingInitial, setIsSyncingInitial] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem(STORAGE_NODES_KEY);
+        // Nodes are cached under a per-user key, so read the same key the app writes
+        const cachedUser = JSON.parse(localStorage.getItem('chatter_user_profile') || localStorage.getItem('chatter_remembered_account') || 'null');
+        const cached = localStorage.getItem(getStorageNodesKey(cachedUser));
         if (cached && JSON.parse(cached)?.length > 1) return false;
       } catch (e) { }
     }
     return true;
   });
-  // Track names/ids that were explicitly deleted locally so syncBackend never re-adds them
-  // Seeded from localStorage so deletes persist across page refreshes
-  const deletedNamesRef = useRef((() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_DELETED_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  })());
-  // Helper to persist deleted set to localStorage
-  const persistDeletedNames = (set) => {
-    try { localStorage.setItem(STORAGE_DELETED_KEY, JSON.stringify([...set])); } catch (e) { }
-  };
+  // Old builds kept an ever-growing list of deleted names here that nothing read; clear it once
+  useEffect(() => {
+    try { localStorage.removeItem(STORAGE_DELETED_KEY); } catch (e) { }
+  }, []);
   // Track names that were saved locally but not yet confirmed by server (prevent sync overwrite)
   const pendingSavedNamesRef = useRef(new Set());
   const lastRoutingEditTimeRef = useRef(0);
@@ -250,11 +299,11 @@ export function AppProvider({ children }) {
   }, [dismissToast]);
 
   const login = useCallback((jwtToken, userData) => {
-    localStorage.setItem('chatter_jwt_token', jwtToken);
+    try { localStorage.setItem('chatter_jwt_token', jwtToken); } catch (e) { }
     if (userData) {
       try {
-        localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
-        localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
+        storeUserRecord('chatter_user_profile', userData);
+        storeUserRecord('chatter_remembered_account', userData);
 
         let saved = [];
         try {
@@ -277,12 +326,12 @@ export function AppProvider({ children }) {
           isInstagramConnected: isConnected,
           instagramUsername: userData.instagramUsername || '',
           instagramAccountId: userData.instagramAccountId || userData.instagramId || '',
-          instagramPageAccessToken: userData.instagramPageAccessToken || '',
+          instagramPageAccessToken: undefined, // never keep the Instagram token in browser storage
           lastUsed: Date.now(),
         };
         const filtered = saved.filter(a => a.email !== record.email && a.username !== record.username);
         filtered.unshift(record);
-        localStorage.setItem('chatter_saved_accounts', JSON.stringify(filtered));
+        storeUserRecord('chatter_saved_accounts', filtered);
       } catch (e) { }
     }
     try {
@@ -340,12 +389,15 @@ export function AppProvider({ children }) {
     }
   }, [showToast]);
 
-  const logout = useCallback(() => {
+  // opts.expired: the server said the session is no longer valid (401)
+  const logout = useCallback((opts) => {
+    const expired = opts?.expired === true;
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     localStorage.removeItem('chatter_remembered_account');
     try {
       localStorage.removeItem('chatter_admin_session');
+      localStorage.removeItem(STORAGE_DELETED_KEY);
       sessionStorage.removeItem('chatter_session_active');
       localStorage.removeItem('chatter_show_chooser');
       localStorage.removeItem(STORAGE_NODES_KEY);
@@ -371,11 +423,36 @@ export function AppProvider({ children }) {
       includedContactIds: [],
       globalBotActive: true
     });
-    showToast?.('Signed out successfully.', 'info');
+    if (expired) {
+      showToast?.('Your session expired. Please sign in again.', 'error');
+    } else {
+      showToast?.('Signed out successfully.', 'info');
+    }
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      // The page reload would drop the toast, so show it again after the redirect
+      if (expired) {
+        try { sessionStorage.setItem('chatter_session_expired', '1'); } catch (e) { }
+      }
       window.location.href = '/';
     }
   }, [showToast]);
+
+  // Session-expired note carried over a redirect by logout({ expired: true })
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('chatter_session_expired')) {
+        sessionStorage.removeItem('chatter_session_expired');
+        showToast('Your session expired. Please sign in again.', 'error');
+      }
+    } catch (e) { }
+  }, [showToast]);
+
+  // The fetch interceptor is installed once, so it reads logout through a ref
+  const logoutRef = useRef(logout);
+  useEffect(() => { logoutRef.current = logout; }, [logout]);
+  // Many requests can fail with 401 at once: sign out only once per session
+  const sessionExpiredRef = useRef(false);
+  useEffect(() => { if (token) sessionExpiredRef.current = false; }, [token]);
 
   const enterWorkspace = useCallback((creatorToken, creatorUser) => {
     if (typeof window !== 'undefined') {
@@ -390,7 +467,7 @@ export function AppProvider({ children }) {
       } catch (e) { }
       setNodes([getRootNode(creatorUser)]);
       localStorage.setItem('chatter_jwt_token', creatorToken);
-      localStorage.setItem('chatter_user_profile', JSON.stringify(creatorUser));
+      storeUserRecord('chatter_user_profile', creatorUser);
       setToken(creatorToken);
       setUser(creatorUser);
       showToast?.(`Switched to workspace: @${creatorUser.instagramUsername || creatorUser.username}`, 'success');
@@ -409,7 +486,7 @@ export function AppProvider({ children }) {
       }
       if (savedSession) {
         localStorage.setItem('chatter_jwt_token', savedSession.token);
-        localStorage.setItem('chatter_user_profile', JSON.stringify(savedSession.user));
+        storeUserRecord('chatter_user_profile', savedSession.user);
         localStorage.removeItem('chatter_admin_session');
         setToken(savedSession.token);
         setUser(savedSession.user);
@@ -473,13 +550,16 @@ export function AppProvider({ children }) {
     // can never leave a button spinning forever. Uploads get longer.
     window.fetch = async (url, options = {}) => {
       const storedToken = localStorage.getItem('chatter_jwt_token');
-      let opts = options;
-      if (storedToken && typeof url === 'string') {
-        const headers = new Headers(options.headers || {});
+      let opts = options || {};
+      // Only our own API gets the session token; third parties (Giphy, avatars...) never see it
+      const apiUrl = apiRequestUrl(url);
+      if (storedToken && apiUrl) {
+        const baseHeaders = opts.headers || (typeof Request !== 'undefined' && url instanceof Request ? url.headers : {});
+        const headers = new Headers(baseHeaders);
         if (!headers.has('Authorization')) {
           headers.set('Authorization', `Bearer ${storedToken}`);
         }
-        opts = { ...options, headers };
+        opts = { ...opts, headers };
       }
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         throw new Error('You are offline. Check your internet connection and try again.');
@@ -493,7 +573,16 @@ export function AppProvider({ children }) {
         else opts.signal.addEventListener('abort', () => controller.abort(opts.signal.reason), { once: true });
       }
       try {
-        return await originalFetch(url, { ...opts, signal: controller.signal });
+        const res = await originalFetch(url, { ...opts, signal: controller.signal });
+        if (
+          res.status === 401 && apiUrl && storedToken && !sessionExpiredRef.current &&
+          !AUTH_401_EXEMPT.some(p => apiUrl.pathname.includes(p)) &&
+          localStorage.getItem('chatter_jwt_token') === storedToken
+        ) {
+          sessionExpiredRef.current = true;
+          logoutRef.current?.({ expired: true });
+        }
+        return res;
       } catch (err) {
         if (controller.signal.reason === 'timeout') {
           throw new Error('The server is taking too long to answer. Please try again.');
@@ -532,10 +621,8 @@ export function AppProvider({ children }) {
         .then(userData => {
           if (userData) {
             setUser(userData);
-            try {
-              localStorage.setItem('chatter_user_profile', JSON.stringify(userData));
-              localStorage.setItem('chatter_remembered_account', JSON.stringify(userData));
-            } catch (e) { }
+            storeUserRecord('chatter_user_profile', userData);
+            storeUserRecord('chatter_remembered_account', userData);
           }
           setAuthLoading(false);
         })
@@ -777,13 +864,6 @@ export function AppProvider({ children }) {
 
     // Mark as pending save so syncBackend won't overwrite during the save round-trip
     pendingSavedNamesRef.current.add(cleanName.toLowerCase());
-    if (oldName) {
-      deletedNamesRef.current.add(oldName.toLowerCase());
-      persistDeletedNames(deletedNamesRef.current);
-    }
-    // Make sure new cleanName is NOT marked as deleted
-    deletedNamesRef.current.delete(cleanName.toLowerCase());
-    persistDeletedNames(deletedNamesRef.current);
 
     const formattedNode = {
       id,
@@ -886,12 +966,22 @@ export function AppProvider({ children }) {
       }
       showToast(`Saved ${cleanName} to Knowledge Tree & DB!`, 'success');
 
+      const failedDups = [];
       for (const dup of toDelete) {
         if (dup && dup.trim().toLowerCase() !== cleanName.toLowerCase()) {
-          await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(dup)}?keepMemory=true`, {
-            method: 'DELETE'
-          });
+          try {
+            const dupRes = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(dup)}?keepMemory=true`, {
+              method: 'DELETE'
+            });
+            if (!dupRes.ok) failedDups.push(dup);
+          } catch (e) {
+            failedDups.push(dup);
+          }
         }
+      }
+      if (failedDups.length) {
+        // The sync below brings the duplicates that are still on the server back on screen
+        showToast(`Could not remove old entry: ${failedDups.join(', ')}`, 'error');
       }
       // Pull the saved record (profile pic, Instagram link) right away instead of waiting for the next poll
       syncBackend();
@@ -923,12 +1013,6 @@ export function AppProvider({ children }) {
     const targetName = targetObj?.name || (typeof nodeOrId === 'string' ? nodeOrId : '');
     const targetSenderId = targetObj?.senderId || '';
     const targetId = targetObj?.id || targetObj?._id || '';
-
-    // Register in deletedNames ref so syncBackend never re-adds this person
-    // Persisted to localStorage so it survives page refresh
-    if (targetName) deletedNamesRef.current.add(targetName.toLowerCase());
-    if (targetId) deletedNamesRef.current.add(targetId.toLowerCase());
-    persistDeletedNames(deletedNamesRef.current);
 
     // Optimistically update local nodes state
     setNodes(prev => {
@@ -1125,9 +1209,17 @@ export function AppProvider({ children }) {
     }
   };
 
+  const rollbackRouting = (previousConfig) => {
+    setRoutingConfig(previousConfig);
+    try {
+      localStorage.setItem(getStorageConfigKey(userRef.current || user), JSON.stringify(previousConfig));
+    } catch (e) { }
+  };
+
   // Save Routing Rules
   const saveRouting = async (newConfig) => {
     activeRoutingSavesRef.current += 1;
+    const previousConfig = routingConfig;
     setRoutingConfig(newConfig);
     try {
       const activeUser = userRef.current || user;
@@ -1145,7 +1237,9 @@ export function AppProvider({ children }) {
       await putOperation;
       showToast(`Saved chat routing! Mode: ${newConfig.chatMode.toUpperCase()}`);
     } catch (e) {
-      showToast(`Saved locally! Mode: ${newConfig.chatMode.toUpperCase()}`);
+      // Not saved on the server: put the old rules back so the screen matches what the bot uses
+      rollbackRouting(previousConfig);
+      showToast(`Could not save chat routing: ${e.message}`, 'error');
     } finally {
       activeRoutingSavesRef.current = Math.max(0, activeRoutingSavesRef.current - 1);
     }
@@ -1155,6 +1249,7 @@ export function AppProvider({ children }) {
   const toggleGlobalBot = async () => {
     activeRoutingSavesRef.current += 1;
     const nextState = !routingConfig.globalBotActive;
+    const previousConfig = routingConfig;
     const nextConfig = { ...routingConfig, globalBotActive: nextState };
     setRoutingConfig(nextConfig);
     try {
@@ -1173,7 +1268,8 @@ export function AppProvider({ children }) {
       await putOperation;
       showToast(nextState ? 'Global Bot Activated!' : 'Global Bot Paused!');
     } catch (e) {
-      showToast(`Saved locally (offline): ${nextState ? 'Global Bot Active' : 'Global Bot Paused'}`);
+      rollbackRouting(previousConfig);
+      showToast(`Could not ${nextState ? 'start' : 'pause'} the bot: ${e.message}`, 'error');
     } finally {
       activeRoutingSavesRef.current = Math.max(0, activeRoutingSavesRef.current - 1);
     }
@@ -1207,8 +1303,11 @@ export function AppProvider({ children }) {
     if (!personName) return false;
     const cleanHandle = instagramHandle ? `@${instagramHandle.replace(/^@/, '').trim()}` : '';
 
-    // Optimistically update local nodes state
+    // Optimistically update local nodes state (snapshot kept to undo on failure)
+    let nodesBefore = null;
+    const selectedBefore = selectedNode;
     setNodes(prev => {
+      nodesBefore = prev;
       const targetLower = personName.toLowerCase();
       // Remove any duplicate node that previously had this handle or senderId
       const filtered = prev.filter(n => {
@@ -1243,7 +1342,6 @@ export function AppProvider({ children }) {
       }));
     }
 
-    showToast(`Linked ${personName} with ${cleanHandle || senderId}!`);
     setLinkingTargetPerson(null);
 
     // Call backend to persist merge and link in MongoDB
@@ -1253,16 +1351,26 @@ export function AppProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personName, instagramHandle: cleanHandle, senderId })
       });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`Merged & linked ${personName}! AI will recognize them in DMs.`);
-        syncBackend();
-        return true;
-      } else {
-        showToast(`Link warning: ${data.error || 'Check server connection'}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `server answered ${res.status}`);
       }
+      showToast(`Merged & linked ${personName}! AI will recognize them in DMs.`, 'success');
+      syncBackend();
+      return true;
     } catch (err) {
       console.warn('Backend link error:', err.message);
+      // Undo the optimistic link so the screen matches the server
+      if (nodesBefore) {
+        setNodes(nodesBefore);
+        try {
+          localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(nodesBefore));
+        } catch (e) { }
+      }
+      if (selectedBefore && selectedBefore.name?.toLowerCase() === personName.toLowerCase()) {
+        setSelectedNode(selectedBefore);
+      }
+      showToast(`Could not link ${personName}: ${err.message}`, 'error');
     }
     return false;
   };
@@ -1299,58 +1407,72 @@ export function AppProvider({ children }) {
     return null;
   };
 
+  const saveRoutingStable = useLatestCallback(saveRouting);
+  const toggleGlobalBotStable = useLatestCallback(toggleGlobalBot);
+  const saveNodeStable = useLatestCallback(saveNode);
+  const deleteNodeStable = useLatestCallback(deleteNode);
+  const updateContactPreferencesStable = useLatestCallback(updateContactPreferences);
+  const addFactStable = useLatestCallback(addFact);
+  const startAiInterviewStable = useLatestCallback(startAiInterview);
+  const aiAutofillPersonStable = useLatestCallback(aiAutofillPerson);
+  const linkContactIdStable = useLatestCallback(linkContactId);
+  const lookupContactStable = useLatestCallback(lookupContact);
+  const extractFromRawChatStable = useLatestCallback(extractFromRawChat);
+  const syncBackendStable = useLatestCallback(syncBackend);
+
+  // One object per real change, so pages that read the context do not all re-render on every parent render
+  const contextValue = useMemo(() => ({
+    nodes,
+    selectedNode,
+    setSelectedNode,
+    routingConfig,
+    setRoutingConfig,
+    saveRouting: saveRoutingStable,
+    toggleGlobalBot: toggleGlobalBotStable,
+    saveNode: saveNodeStable,
+    deleteNode: deleteNodeStable,
+    updateContactPreferences: updateContactPreferencesStable,
+    addFact: addFactStable,
+    showToast,
+    dismissToast,
+    toasts,
+    isAiModalOpen,
+    setIsAiModalOpen,
+    editingNode,
+    startAiInterview: startAiInterviewStable,
+    aiAutofillPerson: aiAutofillPersonStable,
+    linkingTargetPerson,
+    setLinkingTargetPerson,
+    linkContactId: linkContactIdStable,
+    lookupContact: lookupContactStable,
+    extractFromRawChat: extractFromRawChatStable,
+    syncBackend: syncBackendStable,
+    isSyncingInitial,
+    API_BASE,
+    user,
+    token,
+    authLoading,
+    login,
+    logout,
+    switchAccount,
+    updateUserProfile,
+    workspaceFeatures,
+    workspaceFeaturesError,
+    reloadWorkspaceFeatures,
+    updateWorkspaceFeatures,
+    isPasskeyModalOpen,
+    setIsPasskeyModalOpen,
+    isOnboardingModalOpen,
+    setIsOnboardingModalOpen,
+    openOnboardingWizard,
+    adminSession,
+    isImpersonating,
+    enterWorkspace,
+    exitWorkspace,
+  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, isSyncingInitial, API_BASE, user, token, authLoading, login, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
+
   return (
-    <AppContext.Provider
-      value={{
-        nodes,
-        selectedNode,
-        setSelectedNode,
-        routingConfig,
-        setRoutingConfig,
-        saveRouting,
-        toggleGlobalBot,
-        saveNode,
-        deleteNode,
-        updateContactPreferences,
-        addFact,
-        showToast,
-        dismissToast,
-        toasts,
-        isAiModalOpen,
-        setIsAiModalOpen,
-        editingNode,
-        startAiInterview,
-        aiAutofillPerson,
-        linkingTargetPerson,
-        setLinkingTargetPerson,
-        linkContactId,
-        lookupContact,
-        extractFromRawChat,
-        syncBackend,
-        isSyncingInitial,
-        API_BASE,
-        user,
-        token,
-        authLoading,
-        login,
-        logout,
-        switchAccount,
-        updateUserProfile,
-        workspaceFeatures,
-        workspaceFeaturesError,
-        reloadWorkspaceFeatures,
-        updateWorkspaceFeatures,
-        isPasskeyModalOpen,
-        setIsPasskeyModalOpen,
-        isOnboardingModalOpen,
-        setIsOnboardingModalOpen,
-        openOnboardingWizard,
-        adminSession,
-        isImpersonating,
-        enterWorkspace,
-        exitWorkspace,
-      }}
-    >
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

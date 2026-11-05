@@ -72,19 +72,26 @@ function MediaVaultPageContent() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const fileInputRef = useRef(null);
+  // Each vault load gets a number; only the newest one may update the screen
+  const vaultRequestRef = useRef(0);
 
   useEffect(() => {
     fetchVaultData();
     fetchPredefined();
+    // Switching category (or leaving) makes any answer still on its way stale
+    return () => { vaultRequestRef.current += 1; };
   }, [activeCategory]);
 
   const fetchVaultData = async () => {
+    const requestId = ++vaultRequestRef.current;
+    const isStale = () => requestId !== vaultRequestRef.current;
     try {
       const url = activeCategory && activeCategory !== 'all'
         ? `${API_BASE}/api/media-vault?category=${activeCategory}`
         : `${API_BASE}/api/media-vault`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       const data = await res.json();
+      if (isStale()) return;
       if (data.success) {
         setItems(data.items || []);
         if (data.categories) {
@@ -92,10 +99,11 @@ function MediaVaultPageContent() {
         }
       }
     } catch (err) {
+      if (isStale()) return;
       console.error('Failed to load media vault:', err);
       showToast('Failed to load media vault', 'error');
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   };
 

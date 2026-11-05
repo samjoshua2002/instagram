@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
+import { storeUserRecord } from '../context/AppContext';
 import {
   Fingerprint,
   Lock,
@@ -62,10 +63,10 @@ export default function LoginPage({ onLoginSuccess }) {
 
   const sanitizeAccountRole = (acc) => {
     if (!acc) return acc;
-    const isSuper = acc.email === 'samjoshuacs2002@gmail.com' || acc.username === 'samjoshua2002';
+    // The role comes from the server's answer (saved at sign-in), never guessed from the email
     return {
       ...acc,
-      role: isSuper ? 'superadmin' : 'user'
+      role: acc.role || 'user'
     };
   };
 
@@ -243,10 +244,14 @@ export default function LoginPage({ onLoginSuccess }) {
     setInstaChecking(true);
     setInstaPreview(null);
 
+    // A newer keystroke cancels this check, so an older (slower) answer can never overwrite it
+    let cancelled = false;
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/auth/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
+        const res = await fetch(`${API_BASE}/api/auth/instagram/check-handle?handle=${encodeURIComponent(handle)}`, { signal: controller.signal });
         const data = await res.json();
+        if (cancelled) return;
         if (data.alreadyRegistered) {
           setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
           setInstaPreview(null);
@@ -284,6 +289,7 @@ export default function LoginPage({ onLoginSuccess }) {
           }
         }
       } catch (err) {
+        if (cancelled) return;
         if (/^[a-zA-Z0-9._]{1,30}$/.test(handle)) {
           setInstaPreview({
             exists: true,
@@ -299,11 +305,15 @@ export default function LoginPage({ onLoginSuccess }) {
           setInstaPreview(null);
         }
       } finally {
-        setInstaChecking(false);
+        if (!cancelled) setInstaChecking(false);
       }
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [regForm.instagramUsername]);
 
   // Forgot Password Modal States
@@ -347,7 +357,7 @@ export default function LoginPage({ onLoginSuccess }) {
       const record = {
         ...userData,
         email: userData.email,
-        role: (userData.email === 'samjoshuacs2002@gmail.com' || userData.username === 'samjoshua2002') ? 'superadmin' : 'user',
+        role: userData.role || 'user',
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
         profilePicUrl: userData.profilePicUrl || '',
@@ -356,11 +366,11 @@ export default function LoginPage({ onLoginSuccess }) {
         isInstagramConnected: isConnected,
         instagramUsername: userData.instagramUsername || '',
         instagramAccountId: userData.instagramAccountId || userData.instagramId || '',
-        instagramPageAccessToken: userData.instagramPageAccessToken || '',
+        instagramPageAccessToken: undefined, // never keep the Instagram token in browser storage
         lastUsed: Date.now(),
       };
-      localStorage.setItem('chatter_remembered_account', JSON.stringify(record));
-      localStorage.setItem('chatter_user_profile', JSON.stringify(record));
+      storeUserRecord('chatter_remembered_account', record);
+      storeUserRecord('chatter_user_profile', record);
       setRememberedAccount(record);
 
       let saved = [];
@@ -372,7 +382,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       const filtered = saved.filter(a => a.email !== record.email && a.username !== record.username);
       filtered.unshift(record);
-      localStorage.setItem('chatter_saved_accounts', JSON.stringify(filtered));
+      storeUserRecord('chatter_saved_accounts', filtered);
       setSavedAccounts(filtered);
     } catch (e) {}
   };
@@ -465,6 +475,8 @@ export default function LoginPage({ onLoginSuccess }) {
         body: JSON.stringify({
           identifier: targetId,
           response: assertion,
+          // Login without a name: the server ties the challenge to this id and needs it back
+          ...(options?.challengeId ? { challengeId: options.challengeId } : {}),
         }),
       });
 

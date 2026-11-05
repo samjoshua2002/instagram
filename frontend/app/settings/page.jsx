@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { isFromApi, onPopupClosed } from '../lib/utils';
+import { isFromApi, onPopupClosed, openInstagramConnect } from '../lib/utils';
 import {
   UserCheck, Save, Sparkles, MessageSquare, AlertCircle,
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
@@ -33,7 +33,8 @@ function SettingsPageContent() {
   const [formData, setFormData] = useState({
     creatorName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.username || ''),
     instagramHandle: user?.instagramUsername ? `@${user.instagramUsername.replace(/^@/, '')}` : '',
-    instagramPageAccessToken: user?.instagramPageAccessToken || '',
+    // Secret boxes start empty: empty means "keep the saved value"; only a newly typed value is sent
+    instagramPageAccessToken: '',
     instagramAccountId: user?.instagramId || user?.instagramAccountId || '',
     personaBio: '',
     aboutMe: '',
@@ -48,6 +49,11 @@ function SettingsPageContent() {
     giphyApiKey: '',
   });
 
+  // Whether a token/key is already stored on the server (the values themselves are never shown)
+  const [secretsSaved, setSecretsSaved] = useState({
+    instagram: Boolean(user?.hasInstagramToken || user?.isInstagramConnected),
+    giphy: false,
+  });
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [oauthConnecting, setOauthConnecting] = useState(false);
@@ -71,14 +77,13 @@ function SettingsPageContent() {
           ...prev,
           ...(igUser ? { instagramHandle: `@${igUser.replace(/^@/, '')}` } : {}),
           ...(igId ? { instagramAccountId: igId } : {}),
-          ...(igToken ? { instagramPageAccessToken: igToken } : {}),
         }));
+        setSecretsSaved(prev => ({ ...prev, instagram: true }));
         setOauthConnecting(false);
         if (updateUserProfile) {
           updateUserProfile({
             hasInstagramToken: true,
             isInstagramConnected: true,
-            instagramPageAccessToken: igToken,
             instagramAccountId: igId,
             instagramUsername: igUser,
           });
@@ -93,14 +98,17 @@ function SettingsPageContent() {
     return () => window.removeEventListener('message', handleOAuthMessage);
   }, [showToast, updateUserProfile]);
 
+  // Stops the "is the popup closed yet?" check when a new popup opens or this screen goes away
+  const popupWatchRef = useRef(null);
+  useEffect(() => () => popupWatchRef.current?.(), []);
+
   const handleLaunchInstagramOAuth = () => {
     setErrorMsg('');
     setOauthConnecting(true);
     try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
-      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
-      onPopupClosed(popup, () => setOauthConnecting(false));
+      const popup = openInstagramConnect(API_BASE, token);
+      popupWatchRef.current?.();
+      popupWatchRef.current = onPopupClosed(popup, () => setOauthConnecting(false));
       if (!popup) {
         setOauthConnecting(false);
         setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
@@ -149,7 +157,12 @@ function SettingsPageContent() {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && (parsed.creatorName || parsed.instagramHandle)) {
-            setFormData(prev => ({ ...prev, ...parsed }));
+            // Older builds cached the token and Giphy key here: drop them and rewrite the cache
+            const safeCached = stripSecrets(parsed);
+            if (parsed.instagramPageAccessToken !== undefined || parsed.giphyApiKey !== undefined) {
+              try { localStorage.setItem(userCacheKey, JSON.stringify(safeCached)); } catch (e) { }
+            }
+            setFormData(prev => ({ ...prev, ...safeCached }));
             setLoading(false);
           }
         }
@@ -169,7 +182,7 @@ function SettingsPageContent() {
         const updated = {
           creatorName: data.creatorName || defaultName,
           instagramHandle: data.instagramHandle || defaultHandle,
-          instagramPageAccessToken: data.instagramPageAccessToken || user?.instagramPageAccessToken || '',
+          instagramPageAccessToken: '',
           instagramAccountId: data.instagramAccountId || user?.instagramId || user?.instagramAccountId || '',
           personaBio: data.personaBio || '',
           aboutMe: data.aboutMe || '',
@@ -181,12 +194,17 @@ function SettingsPageContent() {
           forbiddenWords: Array.isArray(data.forbiddenWords) ? data.forbiddenWords : [],
           sampleConversations: Array.isArray(data.sampleConversations) ? data.sampleConversations : [],
           typingDelaySeconds: data.typingDelaySeconds || 1.5,
-          giphyApiKey: data.giphyApiKey || '',
+          giphyApiKey: '',
         };
+        // New server sends hasInstagramToken / hasGiphyKey; older one sent the values themselves
+        setSecretsSaved({
+          instagram: Boolean(data.hasInstagramToken ?? data.instagramPageAccessToken ?? (user?.hasInstagramToken || user?.isInstagramConnected)),
+          giphy: Boolean(data.hasGiphyKey ?? data.giphyApiKey),
+        });
         setFormData(updated);
         setLoadFailed(false);
         try {
-          localStorage.setItem(userCacheKey, JSON.stringify(updated));
+          localStorage.setItem(userCacheKey, JSON.stringify(stripSecrets(updated)));
         } catch (e) { }
       } else {
         setLoadFailed(true);
@@ -208,7 +226,7 @@ function SettingsPageContent() {
       const keyToTest = formData.giphyApiKey?.trim();
       if (!keyToTest) {
         setGiphyStatus('error');
-        showToast('Enter a GIPHY API key first', 'error');
+        showToast(secretsSaved.giphy ? 'A key is saved. Type it again to test it.' : 'Enter a GIPHY API key first', 'error');
         return;
       }
       const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${keyToTest}&limit=1`);
@@ -236,27 +254,36 @@ function SettingsPageContent() {
     setSaving(true);
     setErrorMsg('');
     try {
+      // Empty secret box = keep what the server has, so the field is left out of the request
+      const pastedToken = (formData.instagramPageAccessToken || '').trim();
+      const typedGiphyKey = (formData.giphyApiKey || '').trim();
+      const payload = stripSecrets(formData);
+      if (pastedToken) payload.instagramPageAccessToken = pastedToken;
+      if (typedGiphyKey) payload.giphyApiKey = typedGiphyKey;
       const res = await fetch(`${API_BASE}/api/persona`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         setSaveSuccess(true);
+        if (pastedToken || typedGiphyKey) {
+          setSecretsSaved(prev => ({ instagram: prev.instagram || !!pastedToken, giphy: prev.giphy || !!typedGiphyKey }));
+          setFormData(prev => ({ ...prev, instagramPageAccessToken: '', giphyApiKey: '' }));
+        }
         if (typeof window !== 'undefined') {
           const userCacheKey = (user?._id || user?.id) ? `chatter_persona_cached_${user._id || user.id}` : 'chatter_persona_cached';
           try {
-            localStorage.setItem(userCacheKey, JSON.stringify(formData));
+            localStorage.setItem(userCacheKey, JSON.stringify(stripSecrets(formData)));
           } catch (e) { }
         }
 
         if (updateUserProfile) {
           // A blank token box means "unchanged" (OAuth tokens are never sent back), so it must not mark Instagram disconnected
-          const pastedToken = (formData.instagramPageAccessToken || '').trim();
           const [firstName, ...rest] = (formData.creatorName || '').trim().split(/\s+/);
           updateUserProfile({
-            ...(pastedToken ? { hasInstagramToken: true, isInstagramConnected: true, instagramPageAccessToken: pastedToken } : {}),
+            ...(pastedToken ? { hasInstagramToken: true, isInstagramConnected: true } : {}),
             instagramAccountId: formData.instagramAccountId,
             instagramUsername: formData.instagramHandle?.replace(/^@/, ''),
             ...(firstName ? { firstName, lastName: rest.join(' ') } : {}),
@@ -681,15 +708,15 @@ function SettingsPageContent() {
               </h3>
               <span style={{
                 fontSize: '0.72rem',
-                background: formData.instagramPageAccessToken ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'color-mix(in srgb, #f59e0b 14%, transparent)',
-                color: formData.instagramPageAccessToken ? '#34d399' : '#fbbf24',
-                border: formData.instagramPageAccessToken ? '1px solid color-mix(in srgb, #22c55e 35%, transparent)' : '1px solid color-mix(in srgb, #f59e0b 35%, transparent)',
+                background: (formData.instagramPageAccessToken || secretsSaved.instagram) ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'color-mix(in srgb, #f59e0b 14%, transparent)',
+                color: (formData.instagramPageAccessToken || secretsSaved.instagram) ? '#34d399' : '#fbbf24',
+                border: (formData.instagramPageAccessToken || secretsSaved.instagram) ? '1px solid color-mix(in srgb, #22c55e 35%, transparent)' : '1px solid color-mix(in srgb, #f59e0b 35%, transparent)',
                 padding: '2px 8px',
                 borderRadius: '6px',
                 fontWeight: '700',
                 fontFamily: "var(--font-label)"
               }}>
-                {formData.instagramPageAccessToken ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
+                {(formData.instagramPageAccessToken || secretsSaved.instagram) ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
               </span>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '20px' }}>
@@ -779,7 +806,7 @@ function SettingsPageContent() {
                     type={showAccessToken ? 'text' : 'password'}
                     value={formData.instagramPageAccessToken}
                     onChange={e => setFormData({ ...formData, instagramPageAccessToken: e.target.value })}
-                    placeholder="EAA... (Meta Page Access Token)"
+                    placeholder={secretsSaved.instagram ? 'Saved. Leave empty to keep it, or paste a new token' : 'EAA... (Meta Page Access Token)'}
                     style={{
                       fontFamily: 'var(--font-code)',
                       fontSize: '0.85rem',
@@ -1283,7 +1310,7 @@ function SettingsPageContent() {
                   </span>
                 ) : (
                   <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700' }}>
-                    Saved in Database
+                    {secretsSaved.giphy ? 'Saved in Database' : 'Not Saved Yet'}
                   </span>
                 )}
               </div>
@@ -1303,7 +1330,7 @@ function SettingsPageContent() {
                   type={showGiphyKey ? 'text' : 'password'}
                   value={formData.giphyApiKey || ''}
                   onChange={e => setFormData({ ...formData, giphyApiKey: e.target.value })}
-                  placeholder="Enter Giphy API Key (from developers.giphy.com)"
+                  placeholder={secretsSaved.giphy ? 'Saved. Leave empty to keep it, or enter a new key' : 'Enter Giphy API Key (from developers.giphy.com)'}
                   style={{
                     fontFamily: "var(--font-label)",
                     fontSize: '0.86rem',
@@ -1486,6 +1513,12 @@ function SettingsPageContent() {
 }
 
 // The superadmin check lives outside the page so the page's hooks always run in the same order
+/** Persona copy without the Instagram token / Giphy key (never cached or re-sent blank). */
+function stripSecrets(data) {
+  const { instagramPageAccessToken, giphyApiKey, ...rest } = data || {};
+  return rest;
+}
+
 export default function SettingsPage() {
   const { user, isImpersonating } = useApp();
   if (user?.role === 'superadmin' && !isImpersonating) {
