@@ -3,6 +3,7 @@ import './spotify.css';
 import './spotlight.css';
 import './spx.css';
 import './motion.css';
+import './banners.css';
 import { AppProvider } from './context/AppContext';
 import AuthGate from './components/AuthGate';
 import AmbientBackground from './components/AmbientBackground';

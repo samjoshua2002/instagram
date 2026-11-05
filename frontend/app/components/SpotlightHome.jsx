@@ -2,12 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, ExternalLink, Sparkles, Shuffle } from 'lucide-react';
+import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
 import { savedPhotoUrl } from '../lib/utils';
+import { abstractArt } from '../lib/banners';
+import UnsplashBanner from './UnsplashBanner';
 
 /**
  * Home after login: "Hello, <name>!" greeting, spotlight cards with abstract
@@ -25,31 +27,8 @@ const CATEGORIES = [
 ];
 const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map(c => [c.id, c.label]));
 
-// Colour sets for the abstract artwork (warm reds, sunset, ocean, violet, peach)
-const PALETTES = [
-  ['#ff3d5a', '#ff9a8b', '#6a8dff'],
-  ['#ff5e3a', '#ffcf6b', '#e8115b'],
-  ['#2f80ed', '#56ccf2', '#ff6b8b'],
-  ['#8e2de2', '#ff6fd8', '#ff9966'],
-  ['#ff4e50', '#f9d423', '#c31432'],
-  ['#ff758c', '#ff7eb3', '#3a1c71'],
-  ['#00c6ff', '#ff3a6e', '#fbd786'],
-];
-
-const hash = s => [...String(s || '?')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-
-/** Deterministic abstract "blurred light" artwork for a name. */
-export function abstractArt(seed) {
-  const h = hash(seed);
-  const [a, b, c] = PALETTES[h % PALETTES.length];
-  const x1 = 15 + (h % 50), y1 = 10 + ((h >> 3) % 50), x2 = 55 + ((h >> 5) % 40), y2 = 45 + ((h >> 7) % 50);
-  return [
-    `radial-gradient(circle at ${x1}% ${y1}%, ${a} 0%, transparent 55%)`,
-    `radial-gradient(circle at ${x2}% ${y2}%, ${b} 0%, transparent 50%)`,
-    `radial-gradient(circle at ${100 - x1}% ${100 - y2 / 2}%, ${c} 0%, transparent 60%)`,
-    `linear-gradient(${(h % 360)}deg, ${c}, ${a})`,
-  ].join(', ');
-}
+// Abstract artwork now lives in lib/banners (shared with every banner); re-exported for older imports
+export { abstractArt };
 
 const personHref = p => `/relationships?person=${encodeURIComponent(p.id)}`;
 const handleOf = p => (p.handle || '').replace(/^@/, '').trim();
@@ -109,6 +88,63 @@ export function StatStrip({ stats }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+// General facts shown next to facts built from the user's own contacts
+const GENERAL_FACTS = [
+  'Instagram launched on 6 October 2010 and was only on the iPhone at first.',
+  'Facebook bought Instagram in 2012 for about 1 billion dollars.',
+  'Instagram Direct, the DM inbox, arrived in December 2013.',
+  'Reels came to Instagram in August 2020.',
+  'Most people can keep about 150 stable friendships at once. This is called Dunbar\'s number.',
+  'People laugh far more often with others than when they are alone.',
+  'A quick reply makes a chat feel warmer: people rate fast responders as more friendly.',
+  'Stories on Instagram started in August 2016 and disappear after 24 hours.',
+];
+
+/** Facts built from real contact numbers; only the ones the data supports are returned. */
+function personalFacts(people) {
+  const facts = [];
+  const byChats = [...people].sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0));
+  const byReels = [...people].sort((a, b) => (b.reelsCount || 0) - (a.reelsCount || 0));
+  const totalChats = people.reduce((s, p) => s + (p.chatsCount || 0), 0);
+  const totalReels = people.reduce((s, p) => s + (p.reelsCount || 0), 0);
+  if (byChats[0]?.chatsCount > 0) facts.push(`You have swapped ${fmt(byChats[0].chatsCount)} DMs with ${byChats[0].name}, more than anyone else.`);
+  if (byReels[0]?.reelsCount > 0) facts.push(`${byReels[0].name} has shared ${fmt(byReels[0].reelsCount)} reels with you, the most in your circle.`);
+  if (totalChats > 0 && people.length > 1) facts.push(`On average you have ${fmt(Math.round(totalChats / people.length))} DMs with each person in your circle.`);
+  if (totalReels > 0) facts.push(`Your circle has shared ${fmt(totalReels)} reels in total.`);
+  const close = people.filter(p => p.category === 'close_friend').length;
+  if (close > 0) facts.push(`${close} ${close === 1 ? 'person is' : 'people are'} in your Close Circle.`);
+  const quiet = people.filter(p => !(p.chatsCount > 0)).length;
+  if (quiet > 0) facts.push(`${quiet} ${quiet === 1 ? 'person has' : 'people have'} no DMs yet. A short hello could start something.`);
+  return facts;
+}
+
+/** "Did you know?" card: looks like a spotlight card, shows a random fact each time Home opens. */
+function FactCard({ people }) {
+  const facts = useMemo(() => [...personalFacts(people), ...GENERAL_FACTS], [people]);
+  const [index, setIndex] = useState(null);
+  // Picked after mount (not during render) so server and browser HTML match
+  useEffect(() => { setIndex(Math.floor(Math.random() * facts.length)); }, [facts.length]);
+  const next = () => setIndex(i => {
+    if (facts.length < 2) return i;
+    let n = i;
+    while (n === i) n = Math.floor(Math.random() * facts.length);
+    return n;
+  });
+  const fact = index === null ? null : facts[index % facts.length];
+  return (
+    <UnsplashBanner as="section" seed={`fact-${index ?? 0}`} topic="colorful" width={1200} credit={false} className="sh-fact">
+      <span className="sh-fact-icon" aria-hidden="true"><Sparkles size={22} /></span>
+      <span className="sh-fact-text">
+        <span className="sh-fact-label">Did you know?</span>
+        <span className="sh-fact-body" aria-live="polite">{fact || '\u00a0'}</span>
+      </span>
+      <button type="button" className="sh-fact-btn" onClick={next} aria-label="Show another fact">
+        <Shuffle size={18} />
+      </button>
+    </UnsplashBanner>
   );
 }
 
@@ -198,64 +234,6 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
   );
 }
 
-// General facts shown next to facts built from the user's own contacts
-const GENERAL_FACTS = [
-  'Instagram launched on 6 October 2010 and was only on the iPhone at first.',
-  'Facebook bought Instagram in 2012 for about 1 billion dollars.',
-  'Instagram Direct, the DM inbox, arrived in December 2013.',
-  'Reels came to Instagram in August 2020.',
-  'Most people can keep about 150 stable friendships at once. This is called Dunbar\'s number.',
-  'People laugh far more often with others than when they are alone.',
-  'A quick reply makes a chat feel warmer: people rate fast responders as more friendly.',
-  'Stories on Instagram started in August 2016 and disappear after 24 hours.',
-];
-
-/** Facts built from real contact numbers; only the ones the data supports are returned. */
-function personalFacts(people) {
-  const facts = [];
-  const byChats = [...people].sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0));
-  const byReels = [...people].sort((a, b) => (b.reelsCount || 0) - (a.reelsCount || 0));
-  const totalChats = people.reduce((s, p) => s + (p.chatsCount || 0), 0);
-  const totalReels = people.reduce((s, p) => s + (p.reelsCount || 0), 0);
-  if (byChats[0]?.chatsCount > 0) facts.push(`You have swapped ${fmt(byChats[0].chatsCount)} DMs with ${byChats[0].name}, more than anyone else.`);
-  if (byReels[0]?.reelsCount > 0) facts.push(`${byReels[0].name} has shared ${fmt(byReels[0].reelsCount)} reels with you, the most in your circle.`);
-  if (totalChats > 0 && people.length > 1) facts.push(`On average you have ${fmt(Math.round(totalChats / people.length))} DMs with each person in your circle.`);
-  if (totalReels > 0) facts.push(`Your circle has shared ${fmt(totalReels)} reels in total.`);
-  const close = people.filter(p => p.category === 'close_friend').length;
-  if (close > 0) facts.push(`${close} ${close === 1 ? 'person is' : 'people are'} in your Close Circle.`);
-  const quiet = people.filter(p => !(p.chatsCount > 0)).length;
-  if (quiet > 0) facts.push(`${quiet} ${quiet === 1 ? 'person has' : 'people have'} no DMs yet. A short hello could start something.`);
-  return facts;
-}
-
-/** "Did you know?" card: looks like a spotlight card, shows a random fact each time Home opens. */
-function FactCard({ people }) {
-  const facts = useMemo(() => [...personalFacts(people), ...GENERAL_FACTS], [people]);
-  const [index, setIndex] = useState(null);
-  // Picked after mount (not during render) so server and browser HTML match
-  useEffect(() => { setIndex(Math.floor(Math.random() * facts.length)); }, [facts.length]);
-  const next = () => setIndex(i => {
-    if (facts.length < 2) return i;
-    let n = i;
-    while (n === i) n = Math.floor(Math.random() * facts.length);
-    return n;
-  });
-  const fact = index === null ? null : facts[index % facts.length];
-  return (
-    <section aria-label="Did you know" className="sh-fact" style={{ backgroundImage: abstractArt(fact || 'fact') }}>
-      <span className="sh-spot-glow" aria-hidden="true" />
-      <span className="sh-fact-icon" aria-hidden="true"><Sparkles size={22} /></span>
-      <span className="sh-fact-text">
-        <span className="sh-fact-label">Did you know?</span>
-        <span className="sh-fact-body" aria-live="polite">{fact || ' '}</span>
-      </span>
-      <button type="button" className="sh-fact-btn" onClick={next} aria-label="Show another fact">
-        <Shuffle size={18} />
-      </button>
-    </section>
-  );
-}
-
 export default function SpotlightHome() {
   const { nodes, user, routingConfig, isSyncingInitial, setFavourite } = useApp();
   const [menu, setMenu] = useState(null); // { person, x, y } while the long-press menu is open
@@ -313,6 +291,8 @@ export default function SpotlightHome() {
     paused.length > 0 && { id: 'paused', icon: PauseCircle, title: `${paused.length} with AI paused`, href: '/controls' },
   ].filter(Boolean);
 
+  // A new banner photo every day
+  const todayKey = new Date().toISOString().slice(0, 10);
   const firstName = (user?.firstName || user?.name || user?.username || '').split(' ')[0];
 
   return (
@@ -363,6 +343,19 @@ export default function SpotlightHome() {
         </div>
       )}
 
+      <UnsplashBanner seed={`home-${todayKey}`} topic="colorful" className="sh-banner">
+        <div className="sh-banner-text">
+          <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <h2 className="sh-banner-title">Your circle today</h2>
+          <span className="sh-banner-sub">
+            {people.length > 0
+              ? `${fmt(people.length)} people · ${fmt(people.reduce((s, p) => s + (p.chatsCount || 0), 0))} DMs · ${alerts.length} alert${alerts.length === 1 ? '' : 's'}`
+              : 'People appear here once Instagram DMs sync.'}
+          </span>
+          <Link href="/relationships" className="sh-banner-btn">Open People</Link>
+        </div>
+      </UnsplashBanner>
+
       {people.length === 0 && isSyncingInitial ? (
         <PageSkeleton variant="home" header={false} bare label="Loading your people" />
       ) : people.length === 0 ? (
@@ -376,7 +369,8 @@ export default function SpotlightHome() {
           <section aria-label="Spotlight">
             <div className="sh-spot-row">
               {spotlight.map(p => (
-                <Link key={p.id} href={personHref(p)} className="sh-spot sh-pressable" {...pressProps(p)} style={{ backgroundImage: abstractArt(p.name) }}>
+                <Link key={p.id} href={personHref(p)} className="sh-spot sh-pressable" {...pressProps(p)}>
+                  <UnsplashBanner as="span" seed={p.name} width={720} credit={false} className="sh-spot-art" />
                   <span className="sh-spot-glow" aria-hidden="true" />
                   <Photo person={p} className="sh-spot-avatar" />
                   <span className="sh-spot-text">

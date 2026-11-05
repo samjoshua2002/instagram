@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import { FileText, Link2, Type, UploadCloud, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 import { IconSwap, SegIndicator } from '../components/ui/motion';
+import UnsplashBanner from '../components/UnsplashBanner';
 
 const ACCEPT = '.pdf,.txt,.md,.csv';
 const TABS = [
@@ -137,7 +138,7 @@ export default function DocumentsPage() {
   return (
     <div className="page-container settings-fullwidth spx-page">
       <header className="spx-hero">
-        <div className="spx-cover" aria-hidden="true"><FileText size={96} strokeWidth={2} /></div>
+        <UnsplashBanner seed="page-documents" credit={false} className="spx-cover"><FileText size={96} strokeWidth={2} /></UnsplashBanner>
         <div className="spx-hero-text">
           <div className="spx-eyebrow">Knowledge base</div>
           <h1 className="spx-title">Document &amp; Service Vault</h1>

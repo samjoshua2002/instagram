@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Send, MessageSquare, RotateCcw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import UnsplashBanner from './UnsplashBanner';
 
 /**
  * Mock Instagram DM sandbox (PLAN.md §13 Phase 4): sends test messages through
@@ -46,7 +47,7 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
 
   return (
     <div className="sandbox">
-      <div className="sandbox-head">
+      <UnsplashBanner seed={senderName} topic="fluid" width={900} className="sandbox-head chat-banner">
         <MessageSquare size={15} />
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           Test chat as <strong>{senderName}</strong>
@@ -54,7 +55,7 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
         <button type="button" className="story-icon-btn" onClick={() => setMessages([])} aria-label="Clear test chat" title="Clear">
           <RotateCcw size={14} />
         </button>
-      </div>
+      </UnsplashBanner>
       <div className="sandbox-list" ref={listRef}>
         {messages.length === 0 && <div className="sandbox-empty">Send a message to see how your bot replies. Nothing is sent to Instagram.</div>}
         {messages.map((m, i) => <div key={i} className={`sandbox-bubble ${m.role}`}>{m.text}</div>)}

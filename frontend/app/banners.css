@@ -1,0 +1,127 @@
+/* ═══════════════════════════════════════════════════════════════
+   Unsplash banners (components/UnsplashBanner.jsx)
+   Abstract gradient first, photo fades in on top, dark shade keeps text readable.
+   ═══════════════════════════════════════════════════════════════ */
+.ub {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-size: cover;
+  background-position: center;
+}
+.ub-img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.ub-img.in { opacity: 1; }
+.ub-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.18) 45%, rgba(0, 0, 0, 0.62) 100%);
+}
+.ub-credit {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  z-index: 1;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ub-credit a { color: #fff !important; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Home: big banner under the greeting ─────────────────────── */
+.sh-banner {
+  display: flex;
+  align-items: flex-end;
+  min-height: 230px;
+  margin: 22px 0 6px;
+  padding: 26px 28px 34px;
+  border-radius: 24px;
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+}
+.sh-banner-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 560px; }
+.sh-banner-eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.9; }
+.sh-banner-title { margin: 0; font-size: clamp(1.6rem, 3.6vw, 2.6rem); font-weight: 900; letter-spacing: -0.5px; line-height: 1.05; }
+.sh-banner-sub { font-size: 0.95rem; opacity: 0.92; }
+.sh-banner-btn {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: #fff;
+  color: #111 !important;
+  font-weight: 800;
+  font-size: 0.9rem;
+  transition: transform 0.2s ease;
+}
+.sh-banner-btn:hover { transform: scale(1.04); }
+
+/* Spotlight cards: the photo fills the whole card behind the text */
+.sh-spot-art { position: absolute !important; inset: 0; z-index: 0; border-radius: inherit; }
+.sh-spot-art .ub-shade { display: none; }
+.sh-spot-glow { z-index: 1; }
+.sh-spot-avatar, .sh-spot-text { z-index: 2; }
+.sh-fact .ub-shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.55)); }
+
+/* ── Profile (person page): wide cover photo behind the hero ─── */
+.person-cover {
+  position: absolute !important;
+  z-index: -1;
+  top: -32px;
+  left: -36px;
+  right: -36px;
+  height: 340px;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+.person-cover .ub-shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.45) 100%); }
+.person-cover .ub-credit { top: 12px; bottom: auto; }
+.person-hero .person-name,
+.person-hero .person-handle,
+.person-hero .person-stat-value,
+.person-hero .person-stat-label { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
+
+/* ── Page headers (.spx-hero cover squares) ──────────────────── */
+.spx-cover.ub { color: #fff; background-color: #333; }
+.spx-cover.ub > svg { filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5)); }
+
+/* ── Chat headers (test chat, DM preview) ────────────────────── */
+.chat-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 12px 14px;
+  color: #fff;
+}
+.chat-banner .ub-shade { background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.15)); }
+.chat-banner .ub-credit { bottom: 4px; right: 8px; font-size: 0.6rem; }
+.chat-banner .story-icon-btn { color: #fff; background: rgba(0, 0, 0, 0.3); }
+.person-chat-banner {
+  margin: -4px -4px 14px;
+  border-radius: 14px;
+  min-height: 84px;
+  align-items: flex-end;
+}
+.person-chat-banner .person-card-eyebrow,
+.person-chat-banner .person-card-title { color: #fff !important; margin: 0 !important; }
+
+@media (max-width: 768px) {
+  .sh-banner { min-height: 200px; padding: 20px 18px 30px; border-radius: 20px; margin-top: 16px; }
+  .person-cover { left: -16px; right: -16px; top: -16px; height: 300px; }
+}

@@ -6,8 +6,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .spx-page {
-  --spx-hero-top: #1e6b3c;
-  --spx-hero-mid: #164d2c;
+  /* Follows the page's banner colours (AmbientBackground), not a fixed green */
+  --spx-hero-top: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 55%, #121212);
+  --spx-hero-mid: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 28%, #121212);
   --spx-raised: #1f1f1f;
   --spx-field: #242424;
   --spx-outline: #727272;
@@ -19,22 +20,14 @@
   color: var(--sp-text);
   font-family: var(--font-sans);
 }
-.spx-page.spx-blue {
-  --spx-hero-top: #1f3f7a;
-  --spx-hero-mid: #182c52;
-}
 :root[data-theme="light"] .spx-page {
-  --spx-hero-top: color-mix(in srgb, #1db954 38%, var(--sp-panel));
-  --spx-hero-mid: color-mix(in srgb, #1db954 18%, var(--sp-panel));
+  --spx-hero-top: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 38%, var(--sp-panel));
+  --spx-hero-mid: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 18%, var(--sp-panel));
   --spx-raised: #f0f0f0;
   --spx-field: #ececec;
   --spx-outline: #9a9a9a;
   --spx-green-text: #138a3e;
   --spx-line: rgba(0, 0, 0, 0.1);
-}
-:root[data-theme="light"] .spx-page.spx-blue {
-  --spx-hero-top: color-mix(in srgb, #509bf5 40%, var(--sp-panel));
-  --spx-hero-mid: color-mix(in srgb, #509bf5 18%, var(--sp-panel));
 }
 
 /* Page-coloured wash behind the hero (covers the panel's default wash) */
