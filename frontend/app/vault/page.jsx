@@ -15,6 +15,7 @@ import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { enterMotion } from '../lib/motion';
 import UnsplashBanner from '../components/UnsplashBanner';
+import PageCover from '../components/PageCover';
 import { SegIndicator } from '../components/ui/motion';
 import './vault.css';
 
@@ -504,6 +505,7 @@ function MediaVaultPageContent() {
 
   return (
     <motion.div {...enterMotion} className="page-container settings-fullwidth spx-page vx-page">
+      <PageCover seed="page-vault" />
       <header className="spx-hero">
         <UnsplashBanner seed="page-vault" credit={false} className="spx-cover"><Film size={96} strokeWidth={2} /></UnsplashBanner>
         <div className="spx-hero-text">

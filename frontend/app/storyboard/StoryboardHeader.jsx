@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
+import PageCover from '../components/PageCover';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import { currentMode } from '../lib/workspaceFeatures';
@@ -26,6 +27,8 @@ export default function StoryboardHeader({ active, code, title, description }) {
   }, [loaded, allowed, mode, router]);
 
   return (
+    <>
+    <PageCover seed={`page-storyboard-${active}`} />
     <div style={{ marginBottom: '18px' }}>
       <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>{code}</div>
       <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '4px 0 6px' }}>{title}</h1>
@@ -37,5 +40,6 @@ export default function StoryboardHeader({ active, code, title, description }) {
         </div>
       )}
     </div>
+    </>
   );
 }

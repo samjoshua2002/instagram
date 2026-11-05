@@ -96,6 +96,32 @@
 .person-hero .person-stat-value,
 .person-hero .person-stat-label { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
 
+/* ── Page cover (components/PageCover.jsx): photo behind every page's top ── */
+.page-container:has(> .page-cover) { position: relative; isolation: isolate; }
+.page-cover {
+  position: absolute !important;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 360px;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 45%, transparent 100%);
+}
+.page-cover .ub-shade {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.5) 60%, rgba(0, 0, 0, 0.7) 100%);
+}
+:root[data-theme="light"] .page-cover .ub-shade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0.85) 100%);
+}
+.page-cover .ub-credit { top: 10px; bottom: auto; pointer-events: auto; }
+:root[data-theme="light"] .page-cover .ub-credit,
+:root[data-theme="light"] .page-cover .ub-credit a { color: rgba(0, 0, 0, 0.7) !important; text-shadow: none; }
+.page-container:has(> .page-cover) h1 { text-shadow: 0 1px 14px rgba(0, 0, 0, 0.35); }
+:root[data-theme="light"] .page-container:has(> .page-cover) h1 { text-shadow: none; }
+@media (max-width: 768px) { .page-cover { height: 300px; } }
+
 /* ── Page headers (.spx-hero cover squares) ──────────────────── */
 .spx-cover.ub { color: #fff; background-color: #333; }
 .spx-cover.ub > svg { filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5)); }
