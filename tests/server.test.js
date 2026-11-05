@@ -7,7 +7,7 @@ const os = require('os');
 
 const {
   checkMetaSignature, resolveInsideDir, isHttpUrl, randomFilename, serializePersona,
-  parseDateParam, validatePersonaUpdate, ownerFilter, contactKey, safeEqual,
+  parseDateParam, validatePersonaUpdate, ownerFilter, contactKey, safeEqual, cleanPhotoIds,
 } = require('../lib/serverSecurity');
 
 const sign = (body, secret) => 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
@@ -144,4 +144,11 @@ test('UserMemory: senderId is not globally unique, { ownerId, senderId } is', ()
 test('MediaVault records the stored upload filename', () => {
   const MediaVault = require('../models/MediaVault');
   assert.ok(MediaVault.schema.path('storedFilename'));
+});
+
+test('cleanPhotoIds keeps real ids only, once each, at most 25', () => {
+  assert.deepStrictEqual(cleanPhotoIds(['17841400000000001', '17841400000000001', 12345, '', '../x', { $gt: '' }, 'a b']), ['17841400000000001', '12345']);
+  assert.deepStrictEqual(cleanPhotoIds('17841400000000001'), []);
+  assert.deepStrictEqual(cleanPhotoIds(undefined), []);
+  assert.strictEqual(cleanPhotoIds(Array.from({ length: 40 }, (_, i) => `id${1000 + i}`)).length, 25);
 });

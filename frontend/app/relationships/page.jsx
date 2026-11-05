@@ -13,7 +13,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
-import { personArtUrl } from '../lib/utils';
+import { personArtUrl, savedPhotoUrl } from '../lib/utils';
 import PageSkeleton, { Sk } from '../components/Skeletons';
 
 // Before paint on the client (no flash of the directory when deep-linking to a person)
@@ -757,7 +757,7 @@ function RelationshipsPageContent() {
   // Work out every contact's colours in the background as soon as the list loads,
   // so opening a person tints the page on the first frame (no wait).
   useEffect(() => {
-    prefetchAmbientImages((nodes || []).filter(n => !n.isRoot).map(personArtUrl));
+    prefetchAmbientImages((nodes || []).filter(n => !n.isRoot).map(savedPhotoUrl));
   }, [nodes]);
 
   // Tint the whole screen from the open contact's photo (Apple Music style, PLAN.md §15.3)

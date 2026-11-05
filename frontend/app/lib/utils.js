@@ -55,10 +55,16 @@ export function openInstagramConnect(apiBase, token) {
   return popup;
 }
 
+/** The contact's saved photo link, or null. */
+export function savedPhotoUrl(person) {
+  const pic = person?.profilePic;
+  return typeof pic === 'string' && pic.startsWith('http') ? pic : null;
+}
+
 /** The photo used to tint a contact's page: saved photo, else their Instagram avatar. */
 export function personArtUrl(person) {
   if (!person) return null;
-  if (typeof person.profilePic === 'string' && person.profilePic.startsWith('http')) return person.profilePic;
+  if (savedPhotoUrl(person)) return person.profilePic;
   const handle = String(person.handle || person.instagramHandle || '').replace(/^@/, '').trim();
   return handle ? `https://unavatar.io/instagram/${handle}?fallback=false` : null;
 }
