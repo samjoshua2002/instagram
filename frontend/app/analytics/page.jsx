@@ -474,7 +474,7 @@ export default function AnalyticsPage() {
   const personalStatCards = [
     { label: 'Total People', value: friendNodes.length, sub: 'Active profiles', icon: <Users size={15} />, href: '/relationships' },
     { label: 'Total DMs', value: breakdown.totalDMs, sub: 'From contacts', icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
-    { label: 'Reels Shared', value: breakdown.totalReels, sub: 'Reels exchanged', icon: <Film size={15} />, href: null },
+    { label: 'Reels Shared', value: breakdown.totalReels, sub: 'Reels exchanged', icon: <Film size={15} />, href: '/relationships' },
     { label: 'AI Active', value: breakdown.aiActive, sub: `${breakdown.aiPaused} paused`, icon: <Bot size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
   ];
 
@@ -1390,7 +1390,7 @@ export default function AnalyticsPage() {
                   <Link href={c.href} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
                     <span>View</span><ArrowRight size={10} />
                   </Link>
-                ) : <div />}
+                ) : <span aria-hidden="true" style={{ visibility: 'hidden', fontSize: '0.7rem', fontWeight: '700' }}>View</span>}
               </motion.div>
             ))}
           </motion.div>

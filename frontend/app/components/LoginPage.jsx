@@ -655,7 +655,7 @@ export default function LoginPage({ onLoginSuccess }) {
           <img src={qrData.qrDataUrl} alt="OneAuth QR" style={{ width: size, height: size, display: 'block', margin: '0 auto 8px', borderRadius: '6px' }} />
           <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>Scan with Zoho OneAuth on your phone</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qrData.secret?.slice(0, 14)}...</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-code)' }}>{qrData.secret?.slice(0, 14)}...</span>
             <button type="button" onClick={copySecret} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600' }}>
               {copiedSecret ? 'Copied' : 'Copy'}
             </button>
@@ -1549,7 +1549,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           <button
                             type="button"
                             onClick={openForgotModal}
-                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '600' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.74rem', cursor: 'pointer', padding: 0, margin: '-14px 0', fontWeight: '600' }}
                           >
                             Forgot password?
                           </button>
@@ -1855,7 +1855,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           <button
                             type="button"
                             onClick={openForgotModal}
-                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.74rem', cursor: 'pointer', padding: 0, fontWeight: '600' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', fontSize: '0.74rem', cursor: 'pointer', padding: 0, margin: '-14px 0', fontWeight: '600' }}
                           >
                             Forgot password?
                           </button>

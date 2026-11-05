@@ -11,7 +11,11 @@ import Toaster from './components/Toast';
 import NetworkStatus from './components/NetworkStatus';
 import { DialogProvider } from './context/DialogContext';
 import { themeBootScript } from './lib/themeBoot';
-import MuiProvider from './components/MuiProvider';
+import { Figtree, JetBrains_Mono } from 'next/font/google';
+
+// Self-hosted and preloaded by Next.js (no render-blocking Google Fonts @import)
+const figtree = Figtree({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800', '900'], display: 'swap', variable: '--font-figtree' });
+const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap', variable: '--font-jetbrains', preload: false });
 
 export const metadata = {
   title: 'Chatter OS // Workspace',
@@ -33,14 +37,13 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${figtree.variable} ${jetbrains.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body style={{ color: 'var(--color-text-primary)', margin: 0, padding: 0 }}>
         <AmbientBackground />
-        <MuiProvider>
-          <AppProvider>
+        <AppProvider>
             <DialogProvider>
               <AuthGate>
                 {children}
@@ -51,7 +54,6 @@ export default function RootLayout({ children }) {
               <Toaster />
             </DialogProvider>
           </AppProvider>
-        </MuiProvider>
       </body>
     </html>
   );

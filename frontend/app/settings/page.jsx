@@ -558,6 +558,7 @@ function SettingsPageContent() {
         display: 'flex',
         gap: '4px',
         overflowX: 'auto',
+        scrollbarWidth: 'none',
         scrollSnapType: 'x mandatory',
         padding: '5px',
         marginBottom: '28px',
@@ -722,8 +723,8 @@ function SettingsPageContent() {
                 onClick={handleLaunchInstagramOAuth}
                 disabled={oauthConnecting}
                 style={{
-                  background: 'linear-gradient(135deg, var(--ambient-dominant) 0%, var(--ambient-dominant) 50%, #db2777 100%)',
-                  color: 'var(--color-surface)',
+                  background: 'var(--ambient-dominant)',
+                  color: '#000',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '9px 16px',
@@ -733,7 +734,7 @@ function SettingsPageContent() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 3px 10px rgba(124, 58, 237, 0.2)',
+                  boxShadow: '0 3px 10px rgba(0, 0, 0, 0.25)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0
                 }}
@@ -762,7 +763,7 @@ function SettingsPageContent() {
                   value={formData.instagramAccountId}
                   onChange={e => setFormData({ ...formData, instagramAccountId: e.target.value })}
                   placeholder="e.g. 17841400000000000"
-                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  style={{ fontFamily: 'var(--font-code)', fontSize: '0.85rem' }}
                 />
                 <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
                   The Meta Graph API Instagram Business Account ID.
@@ -780,7 +781,7 @@ function SettingsPageContent() {
                     onChange={e => setFormData({ ...formData, instagramPageAccessToken: e.target.value })}
                     placeholder="EAA... (Meta Page Access Token)"
                     style={{
-                      fontFamily: 'monospace',
+                      fontFamily: 'var(--font-code)',
                       fontSize: '0.85rem',
                       paddingRight: '80px',
                       width: '100%'
@@ -833,7 +834,7 @@ function SettingsPageContent() {
                   </div>
                 </div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
-                  Click the eye icon to view/edit your token. Click Save Settings in the top right to commit updates.
+                  Click the eye icon to view/edit your token. Click Save Persona at the top to save your changes.
                 </span>
               </div>
             </div>
@@ -878,7 +879,7 @@ function SettingsPageContent() {
               value={formData.customKnowledge}
               onChange={e => setFormData({ ...formData, customKnowledge: e.target.value })}
               placeholder="e.g.&#10;Account: @username&#10;Creator: Full Name&#10;Topics: Creative projects, tech, photography&#10;Location: City / Country&#10;Inquiries: DMs open for collaborations"
-              style={{ lineHeight: '1.5', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.82rem' }}
+              style={{ lineHeight: '1.5', resize: 'vertical', fontFamily: 'var(--font-code)', fontSize: '0.82rem' }}
             />
           </div>
         </div>

@@ -172,7 +172,7 @@ export default function DocumentsPage() {
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInput.current?.click()}
           >
             <div className="spx-drop-icon">
-              {busy ? <Loader2 size={26} className="animate-spin" /> : <UploadCloud size={26} />}
+              {busy ? <Loader2 size={26} className="animate-spin icon-keep" /> : <UploadCloud size={26} className="icon-keep" />}
             </div>
             <div className="spx-drop-title">{busy ? 'Reading document…' : 'Drop files here or click to browse'}</div>
             <div className="spx-drop-sub">PDF, TXT, MD or CSV, up to 10 MB</div>

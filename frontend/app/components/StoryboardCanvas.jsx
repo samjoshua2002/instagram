@@ -56,6 +56,18 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
     return () => { cancelled = true; };
   }, [API_BASE, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Scroll the canvas so the cards sit in the middle of the view (they were drawn off to the right before)
+  const centeredRef = useRef(false);
+  useEffect(() => {
+    const scroller = worldRef.current?.parentElement;
+    if (!board || centeredRef.current || !scroller || !board.nodes.length) return;
+    centeredRef.current = true;
+    const xs = board.nodes.map(n => n.x), ys = board.nodes.map(n => n.y);
+    const midX = (Math.min(...xs) + Math.max(...xs) + NODE_W) / 2;
+    const midY = (Math.min(...ys) + Math.max(...ys) + NODE_H) / 2;
+    scroller.scrollTo({ left: Math.max(0, midX - scroller.clientWidth / 2), top: Math.max(0, midY - scroller.clientHeight / 2) });
+  }, [board]);
+
   const persist = useCallback(next => {
     if (loadFailedRef.current) return;
     clearTimeout(saveTimer.current);
@@ -139,6 +151,7 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
   const resetBoard = async () => {
     if (!(await confirm({ title: 'Reset storyboard?', message: 'Your current cards will be replaced with the starter layout.', confirmLabel: 'Reset', tone: 'danger' }))) return;
     const fresh = seed();
+    centeredRef.current = false;
     setBoard(fresh);
     persist(fresh);
     setSelectedId(null);

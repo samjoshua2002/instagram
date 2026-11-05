@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,9 +9,9 @@
    ═══════════════════════════════════════════ */
 :root {
   /* Spotify-style type: Figtree is the closest free match to Spotify Circular */
-  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: var(--font-figtree, 'Figtree'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-label: var(--font-sans);
-  --font-code: 'JetBrains Mono', ui-monospace, monospace;
+  --font-code: var(--font-jetbrains, 'JetBrains Mono'), ui-monospace, monospace;
   --spotify-green: #1ed760;
   --spotify-green-dark: #1db954;
 
@@ -117,6 +116,15 @@ textarea,
 .stat-card-item {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Browsers give form controls their own font (Arial); use the app font everywhere */
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
 }
 
 html,
@@ -2909,8 +2917,8 @@ body {
 
 .sandbox-bubble.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, #7c3aed, #db2777);
-  color: #fff;
+  background: var(--ambient-dominant);
+  color: #000;
 }
 
 .sandbox-bubble.assistant {

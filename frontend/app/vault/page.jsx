@@ -504,7 +504,7 @@ function MediaVaultPageContent() {
             style={{ fontSize: '0.8rem', padding: '8px 14px' }}
           >
             <Plus size={14} />
-            <span>+ Add Category</span>
+            <span>Add Category</span>
           </button>
           <button
             onClick={fetchVaultData}
@@ -1000,7 +1000,7 @@ function MediaVaultPageContent() {
               ) : (
                 <>
                   <CheckCircle2 size={14} />
-                  <span>Save to [{selectedCategory}] Vault</span>
+                  <span>Save to {categories.find(c => c.id === selectedCategory)?.label || selectedCategory}</span>
                 </>
               )}
             </button>

@@ -3,15 +3,27 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
-import LoginPage from './LoginPage';
-import PasskeyManagerModal from './PasskeyManagerModal';
+import dynamic from 'next/dynamic';
 import Sidebar from './Sidebar';
-import AiInterviewModal from './AiInterviewModal';
-import LinkIdModal from './LinkIdModal';
-import OnboardingWizard from './OnboardingWizard';
-import InstagramConnectFallback from './InstagramConnectFallback';
+
+// Big screens and pop-ups load on demand, so signed-in pages do not download the
+// 3,000-line login page or the onboarding wizard before they can paint.
+const LoginPage = dynamic(() => import('./LoginPage'), { ssr: false, loading: () => <GateSpinner /> });
+const PasskeyManagerModal = dynamic(() => import('./PasskeyManagerModal'), { ssr: false });
+const AiInterviewModal = dynamic(() => import('./AiInterviewModal'), { ssr: false });
+const LinkIdModal = dynamic(() => import('./LinkIdModal'), { ssr: false });
+const OnboardingWizard = dynamic(() => import('./OnboardingWizard'), { ssr: false });
+const InstagramConnectFallback = dynamic(() => import('./InstagramConnectFallback'), { ssr: false });
 import WorkspaceImpersonationBanner from './WorkspaceImpersonationBanner';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
+
+function GateSpinner() {
+  return (
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <RefreshCw size={16} className="animate-spin" style={{ color: 'var(--color-text-secondary)' }} />
+    </div>
+  );
+}
 
 export default function AuthGate({ children }) {
   const router = useRouter();
@@ -124,11 +136,11 @@ export default function AuthGate({ children }) {
       </div>
       <AiInterviewModal />
       <LinkIdModal />
-      <PasskeyManagerModal
+      {isPasskeyModalOpen && <PasskeyManagerModal
         isOpen={isPasskeyModalOpen}
         onClose={() => setIsPasskeyModalOpen(false)}
-      />
-      <OnboardingWizard
+      />}
+      {isOnboardingModalOpen && <OnboardingWizard
         isOpen={isOnboardingModalOpen}
         onClose={() => {
           setWizardDismissed(true);
@@ -137,7 +149,7 @@ export default function AuthGate({ children }) {
             try { sessionStorage.setItem(`chatter_onboarding_dismissed_${user._id || user.id}`, 'true'); } catch (e) {}
           }
         }}
-      />
+      />}
     </>
   );
 }
