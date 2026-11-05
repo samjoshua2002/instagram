@@ -732,7 +732,7 @@ function RelationshipsPageContent() {
     const isFullAi = currentAiMode === 'full_ai';
 
     return (
-      <div className="page-container person-page" style={{ maxWidth: '1400px' }}>
+      <div className="page-container person-page">
         {/* ================= SPOTIFY ARTIST-STYLE HERO (PLAN.md §15.3) ================= */}
         <div className="person-hero">
           <button type="button" className="person-back" onClick={() => setSelectedPerson(null)} aria-label="Back to directory">
@@ -1830,7 +1830,7 @@ function RelationshipsPageContent() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className="page-container"
-      style={{ maxWidth: '1400px' }}
+     
     >
       {/* Top Header */}
       <div className="directory-header-row page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>

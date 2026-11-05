@@ -80,7 +80,7 @@ export default function TokenRadarPage() {
   const counts = rows.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
 
   return (
-    <div className="page-container" style={{ maxWidth: '1100px' }}>
+    <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <div>
           <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>// TOKEN HEALTH RADAR</div>

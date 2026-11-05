@@ -284,7 +284,7 @@ export default function ProfilePage() {
   const isBusiness = ['business', 'agency'].includes(formData.accountType);
 
   return (
-    <div className="page-container settings-fullwidth" style={{ maxWidth: '1400px', width: '100%', margin: '0 auto', padding: '24px 20px 80px' }}>
+    <div className="page-container settings-fullwidth">
       {/* Hidden file input for avatar */}
       <input
         ref={fileInputRef}
