@@ -1,0 +1,179 @@
+/* Spotlight home (SpotlightHome.jsx) + login accent.
+   Palette: deep maroon surfaces, coral/pink accent, green action dot. */
+
+:root {
+  --sh-bg-1: #2a1217;
+  --sh-bg-2: #12080a;
+  --sh-card: rgba(255, 255, 255, 0.06);
+  --sh-card-hover: rgba(255, 255, 255, 0.11);
+  --sh-border: rgba(255, 170, 170, 0.12);
+  --sh-text: #ffffff;
+  --sh-text-2: #d9a7aa;
+  --sh-accent: #ff8f8f;
+  --sh-action: #4cd964;
+}
+:root[data-theme="light"] {
+  --sh-bg-1: #fff1f1;
+  --sh-bg-2: #fbe3e4;
+  --sh-card: rgba(120, 20, 30, 0.06);
+  --sh-card-hover: rgba(120, 20, 30, 0.11);
+  --sh-border: rgba(120, 20, 30, 0.12);
+  --sh-text: #2a1217;
+  --sh-text-2: #8a4a50;
+  --sh-accent: #d6455a;
+  --sh-action: #1db954;
+}
+
+.sh-home {
+  min-height: 100%;
+  padding: 28px 28px 40px;
+  color: var(--sh-text);
+  background:
+    radial-gradient(120% 60% at 100% 0%, rgba(255, 90, 110, 0.18), transparent 60%),
+    linear-gradient(180deg, var(--sh-bg-1), var(--sh-bg-2));
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.sh-home a { color: inherit; text-decoration: none; }
+
+.sh-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sh-hello { margin: 0; font-size: clamp(1.7rem, 3.4vw, 2.4rem); font-weight: 800; letter-spacing: -0.5px; }
+
+.sh-bell-wrap { position: relative; }
+.sh-icon-btn {
+  position: relative; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; border: 0; cursor: pointer;
+  background: var(--sh-card); color: var(--sh-text);
+}
+.sh-icon-btn:hover { background: var(--sh-card-hover); }
+.sh-dot { position: absolute; top: 9px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--sh-action); }
+.sh-alerts {
+  position: absolute; right: 0; top: 50px; z-index: 30; width: min(320px, 86vw);
+  background: #2b151a; border: 1px solid var(--sh-border); border-radius: 14px; padding: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="light"] .sh-alerts { background: #fff; }
+.sh-alerts-empty { padding: 14px; color: var(--sh-text-2); font-size: 0.9rem; }
+.sh-alert { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; font-size: 0.88rem; }
+.sh-alert:hover { background: var(--sh-card-hover); }
+.sh-alert-icon { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--sh-card); color: var(--sh-accent); flex: none; }
+.sh-alert-text { flex: 1; }
+
+.sh-chips { display: flex; gap: 8px; margin: 18px 0 4px; overflow-x: auto; scrollbar-width: none; }
+.sh-chips::-webkit-scrollbar { display: none; }
+.sh-chip {
+  flex: none; border: 1px solid var(--sh-border); background: var(--sh-card); color: var(--sh-text);
+  padding: 7px 14px; border-radius: 999px; font: 600 0.82rem var(--font-sans); cursor: pointer;
+}
+.sh-chip.active { background: var(--sh-accent); border-color: var(--sh-accent); color: #2a1217; }
+
+/* Spotlight cards: abstract light artwork, rounded, horizontally scrolling */
+.sh-spot-row {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 340px);
+  gap: 16px; margin: 20px -28px 0; padding: 4px 28px 8px; scroll-padding-inline: 28px;
+  overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+}
+.sh-spot-row::-webkit-scrollbar { display: none; }
+.sh-spot {
+  position: relative; scroll-snap-align: start; height: 180px; border-radius: 22px; overflow: hidden;
+  background-size: cover; display: flex; align-items: flex-end; gap: 12px; padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+.sh-spot:hover { transform: translateY(-3px); }
+.sh-spot-glow { position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(180deg, transparent 35%, rgba(30, 6, 10, 0.55)); }
+.sh-spot-avatar, .sh-spot-text { position: relative; }
+.sh-spot-avatar { width: 52px; height: 52px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.7); flex: none; }
+.sh-spot-text { display: flex; flex-direction: column; min-width: 0; color: #fff; }
+.sh-spot-name { font-weight: 800; font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-spot-sub { font-size: 0.8rem; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Photos: real picture, else abstract art with initials */
+.sh-photo { position: relative; overflow: hidden; background-size: cover; display: grid; place-items: center; }
+.sh-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sh-photo-initials { color: #fff; font-weight: 800; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+
+.sh-row-head { display: flex; align-items: baseline; justify-content: space-between; margin: 30px 0 12px; }
+.sh-row-head h2 { margin: 0; font-size: 1.25rem; font-weight: 800; }
+.sh-link { font-size: 0.82rem; font-weight: 700; color: var(--sh-text-2) !important; }
+.sh-link:hover { color: var(--sh-accent) !important; }
+
+/* Pulse card (like the "42 bpm" card) */
+.sh-pulse {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  max-width: 520px; padding: 26px 20px; border-radius: 26px;
+  background: var(--sh-card); border: 1px solid var(--sh-border);
+}
+.sh-pulse:hover { background: var(--sh-card-hover); }
+.sh-pulse-num { font-size: 2.6rem; font-weight: 800; line-height: 1; }
+.sh-pulse-num small { font-size: 0.95rem; font-weight: 600; margin-left: 6px; color: var(--sh-text-2); }
+.sh-pulse-sub { color: var(--sh-text-2); font-size: 0.85rem; }
+
+/* Favourite people: rounded-square photos */
+.sh-fav-row {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 16px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;
+}
+.sh-fav-row::-webkit-scrollbar { display: none; }
+.sh-fav { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sh-fav-photo { width: 150px; height: 150px; border-radius: 26px; margin-bottom: 8px; font-size: 2rem; transition: transform 0.2s ease; }
+.sh-fav:hover .sh-fav-photo { transform: scale(1.03); }
+.sh-fav-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-fav-sub { font-size: 0.78rem; color: var(--sh-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Reconnect list (like the song list) */
+.sh-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 18px; }
+.sh-list-item { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; }
+.sh-list-item:hover { background: var(--sh-card-hover); }
+.sh-list-photo { width: 48px; height: 48px; border-radius: 12px; flex: none; font-size: 0.9rem; }
+.sh-list-main { display: flex; flex-direction: column; min-width: 0; }
+.sh-list-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-list-sub { font-size: 0.78rem; color: var(--sh-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Bottom shortcut row (Artist / Album / Liked / Recent style) */
+.sh-quicknav { display: flex; justify-content: center; gap: clamp(18px, 6vw, 56px); margin-top: 36px; }
+.sh-quicknav a { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--sh-text-2) !important; }
+.sh-quicknav a:hover { color: var(--sh-accent) !important; }
+
+.sh-empty { margin-top: 40px; padding: 32px; border-radius: 22px; background: var(--sh-card); text-align: center; }
+.sh-empty-title { font-size: 1.2rem; font-weight: 800; }
+.sh-empty p { color: var(--sh-text-2); }
+.sh-btn { display: inline-block; margin-top: 8px; padding: 10px 22px; border-radius: 999px; background: var(--sh-action); color: #000 !important; font-weight: 800; }
+
+@media (max-width: 640px) {
+  .sh-home { padding: 20px 16px 32px; border-radius: 0; }
+  .sh-spot-row { margin: 16px -16px 0; padding: 4px 16px 8px; scroll-padding-inline: 16px; grid-auto-columns: 82%; }
+  .sh-fav-row { grid-auto-columns: 120px; }
+  .sh-fav-photo { width: 120px; height: 120px; border-radius: 22px; }
+  .sh-list { grid-template-columns: 1fr; }
+}
+
+/* ── Login: same maroon + coral accent (dark theme) ─────────────────── */
+:root:not([data-theme="light"]) .login-split-layout {
+  --color-surface: #1a0b0f;
+  --color-surface-elevated: #261318;
+  --color-surface-hover: #32181e;
+  --color-border: rgba(255, 170, 170, 0.14);
+  --color-border-strong: rgba(255, 170, 170, 0.26);
+  --color-text-secondary: #d9a7aa;
+  --color-text-muted: #a8777b;
+  --ambient-dominant: #ff8f8f;
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(255, 170, 170, 0.18);
+  background: linear-gradient(180deg, #2a1217, #12080a);
+}
+:root:not([data-theme="light"]) .login-form-panel { background: transparent; }
+/* Replace the grey photo with abstract blurred light */
+.login-art-panel > div:first-child {
+  background-image:
+    radial-gradient(circle at 30% 25%, #ff3d5a 0%, transparent 50%),
+    radial-gradient(circle at 70% 60%, #ff9a8b 0%, transparent 45%),
+    radial-gradient(circle at 40% 85%, #6a8dff 0%, transparent 50%),
+    linear-gradient(160deg, #3a1219, #12080a) !important;
+  filter: blur(24px) saturate(1.1) !important;
+  transform: scale(1.15);
+}
+.login-art-panel > div:nth-child(2) {
+  background: linear-gradient(180deg, rgba(26, 11, 15, 0.1) 0%, rgba(26, 11, 15, 0.75) 100%) !important;
+}
