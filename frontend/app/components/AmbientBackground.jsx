@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
-import { loadBanners, cachedBanners, pickBanner, bannerSrc } from '../lib/banners';
 
 /**
  * Spotify-style Dynamic Ambient Background (PLAN.md §15.2)
@@ -10,26 +8,21 @@ import { loadBanners, cachedBanners, pickBanner, bannerSrc } from '../lib/banner
  * Pages call `useAmbientImage(url)` with the active artwork / contact avatar.
  * The image is sampled on a 64x64 offscreen canvas, clustered into a palette,
  * and written straight to CSS variables on :root, so the whole page re-tints
- * without re-rendering React. With no image, the page's own Unsplash banner
- * (picked by its path) gives the colours, so no page is stuck on plain green.
+ * without re-rendering React. Pages with no image of their own use the app's
+ * green theme (THEME), so the UI never drifts to a random banner colour.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 const AMBIENT_EVENT = 'chatter:ambient-image';
-// Only used for a moment before the first banner loads, or when Unsplash is unreachable
-const FALLBACK = {
-  dominant: '#8e5cf6',
-  secondary: '#ff6fd8',
-  accent: '#8e5cf6',
-  background: '#120d1c',
-  washLight: 'hsl(265 60% 90%)',
-  washDark: 'hsl(265 40% 16%)',
+// The app's green theme: used on every page without its own image, and when an image fails
+const THEME = {
+  dominant: '#1ed760',
+  secondary: '#1db954',
+  accent: '#1ed760',
+  background: '#0b1a10',
+  washLight: 'hsl(141 55% 88%)',
+  washDark: 'hsl(141 45% 14%)',
 };
-
-/** Banner image for a page path ("/documents" and "/documents?x" share one). */
-function pageBannerUrl(photos, path) {
-  return bannerSrc(pickBanner(photos, `page-${path || '/'}`), 400);
-}
 
 let currentImage = null;
 
@@ -281,7 +274,7 @@ async function loadPalette(url) {
 
 function applyPalette(palette, imageUrl) {
   const root = document.documentElement.style;
-  const p = palette || FALLBACK;
+  const p = palette || THEME;
   root.setProperty('--ambient-dominant', p.dominant);
   root.setProperty('--ambient-secondary', p.secondary);
   root.setProperty('--ambient-accent', p.accent);
@@ -318,42 +311,21 @@ function AmbientContours() {
 
 export default function AmbientBackground() {
   const requestId = useRef(0);
-  const pathname = usePathname();
-  const pathRef = useRef(pathname);
-  const updateRef = useRef(null);
 
   useEffect(() => {
     const update = async url => {
       const id = ++requestId.current;
-      let src = url;
-      if (!src) {
-        // No page image: use this page's banner (cached list = same frame, no flash)
-        const cachedList = cachedBanners('abstract');
-        if (cachedList) {
-          const p = getCachedPalette(pageBannerUrl(cachedList, pathRef.current));
-          if (p) applyPalette(p, null);
-        }
-        src = pageBannerUrl(cachedList || await loadBanners('abstract'), pathRef.current);
-        if (id !== requestId.current) return;
-        if (!src) return applyPalette(null, null);
-      }
-      const palette = await ensurePalette(src);
-      // A page banner only lends its colours; the blurred artwork layer stays for real photos
-      if (id === requestId.current) applyPalette(palette, url ? url : null);
+      // No page image: the green theme, straight away
+      if (!url) return applyPalette(null, null);
+      const palette = await ensurePalette(url);
+      if (id === requestId.current) applyPalette(palette, url);
     };
-    updateRef.current = update;
 
     const onChange = e => update(e.detail);
     window.addEventListener(AMBIENT_EVENT, onChange);
     update(currentImage);
     return () => window.removeEventListener(AMBIENT_EVENT, onChange);
   }, []);
-
-  // New page without its own image: switch to that page's banner colours
-  useEffect(() => {
-    pathRef.current = pathname;
-    if (!currentImage) updateRef.current?.(null);
-  }, [pathname]);
 
   return (
     <div className="ambient-background" aria-hidden="true">

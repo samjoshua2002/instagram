@@ -30,10 +30,10 @@
   --color-border-strong: rgba(255, 255, 255, 0.2);
 
   /* Dynamic Ambient Palette (overwritten by AmbientBackground from the active image) */
-  --ambient-dominant: #8e5cf6;
-  --ambient-secondary: #ff6fd8;
-  --ambient-accent: #8e5cf6;
-  --ambient-background: #120d1c;
+  --ambient-dominant: #1ed760;
+  --ambient-secondary: #1db954;
+  --ambient-accent: #1ed760;
+  --ambient-background: #0b1a10;
   --ambient-image: none;
 
   /* Frosted Glass System */
@@ -1590,25 +1590,25 @@ select:focus {
 @property --ambient-dominant {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8e5cf6;
+  initial-value: #1ed760;
 }
 
 @property --ambient-secondary {
   syntax: '<color>';
   inherits: true;
-  initial-value: #ff6fd8;
+  initial-value: #1db954;
 }
 
 @property --ambient-accent {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8e5cf6;
+  initial-value: #1ed760;
 }
 
 @property --ambient-background {
   syntax: '<color>';
   inherits: true;
-  initial-value: #120d1c;
+  initial-value: #0b1a10;
 }
 
 .ambient-background {

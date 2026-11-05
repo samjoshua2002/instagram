@@ -371,7 +371,7 @@ export default function ProfilePage() {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
+            boxShadow: '0 4px 14px rgba(30, 215, 96, 0.3)',
             transition: 'all 0.15s ease'
           }}
         >

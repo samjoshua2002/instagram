@@ -6,9 +6,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .spx-page {
-  /* Follows the page's banner colours (AmbientBackground), not a fixed green */
-  --spx-hero-top: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 55%, #121212);
-  --spx-hero-mid: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 28%, #121212);
+  /* Follows --ambient-dominant: theme green, or a contact's photo colour */
+  --spx-hero-top: color-mix(in srgb, var(--ambient-dominant, #1ed760) 55%, #121212);
+  --spx-hero-mid: color-mix(in srgb, var(--ambient-dominant, #1ed760) 28%, #121212);
   --spx-raised: #1f1f1f;
   --spx-field: #242424;
   --spx-outline: #727272;
@@ -21,8 +21,8 @@
   font-family: var(--font-sans);
 }
 :root[data-theme="light"] .spx-page {
-  --spx-hero-top: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 38%, var(--sp-panel));
-  --spx-hero-mid: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 18%, var(--sp-panel));
+  --spx-hero-top: color-mix(in srgb, var(--ambient-dominant, #1ed760) 38%, var(--sp-panel));
+  --spx-hero-mid: color-mix(in srgb, var(--ambient-dominant, #1ed760) 18%, var(--sp-panel));
   --spx-raised: #f0f0f0;
   --spx-field: #ececec;
   --spx-outline: #9a9a9a;
