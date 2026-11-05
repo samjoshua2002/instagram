@@ -24,6 +24,25 @@ const SourceIcon = ({ type, size = 18 }) =>
  */
 export default function DocumentsPage() {
   const { API_BASE, token, showToast } = useApp();
+
+  // Uploaded documents are private now: fetch them with the login header and open the file locally
+  const openDoc = async (fileUrl) => {
+    const name = String(fileUrl || '').match(/\/(?:api\/knowledge\/files|uploads)\/([^/?#]+)$/)?.[1];
+    if (!name) { window.open(fileUrl, '_blank', 'noopener'); return; }
+    const win = window.open('', '_blank');
+    try {
+      const res = await fetch(`${API_BASE}/api/knowledge/files/${encodeURIComponent(name)}`, {
+        headers: { Authorization: `Bearer ${token || localStorage.getItem('chatter_jwt_token') || ''}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blobUrl = URL.createObjectURL(await res.blob());
+      if (win) win.location.href = blobUrl; else window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      try { win?.close(); } catch { }
+      showToast?.('Could not open this document.', 'error');
+    }
+  };
   const confirm = useConfirm();
   const [items, setItems] = useState(null);
   const [tab, setTab] = useState('file');
@@ -227,7 +246,7 @@ export default function DocumentsPage() {
           </div>
           <div className="spx-doc-actions">
             {item.fileUrl && (
-              <a className="spx-icon-btn" href={item.fileUrl} target="_blank" rel="noreferrer" title="Open" aria-label="Open"><ExternalLink size={15} /></a>
+              <button type="button" className="spx-icon-btn" onClick={() => openDoc(item.fileUrl)} title="Open" aria-label="Open"><ExternalLink size={15} /></button>
             )}
             <button type="button" className="spx-icon-btn" onClick={() => remove(item)} title="Remove" aria-label="Remove"><Trash2 size={16} /></button>
           </div>

@@ -660,17 +660,28 @@ function RelationshipsPageContent() {
       facts: filtered,
       lore: filtered
     };
+    const original = selectedPerson;
     await saveNode(updated);
     setSelectedPerson(updated);
 
     if (selectedPerson.senderId) {
       try {
-        await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/facts`, {
+        const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/facts`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fact: factToRemove })
         });
-      } catch (e) {}
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `server answered ${res.status}`);
+        }
+      } catch (e) {
+        // The AI memory still has the fact: put it back on the profile too
+        setSelectedPerson(original);
+        await saveNode(original);
+        showToast(`Could not remove the fact: ${e.message}`, 'error');
+        return;
+      }
     }
     showToast('Fact removed from memory');
   };

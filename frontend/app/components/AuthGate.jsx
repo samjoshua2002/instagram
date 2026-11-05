@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import dynamic from 'next/dynamic';
 import Sidebar from './Sidebar';
@@ -27,7 +27,6 @@ function GateSpinner() {
 }
 
 export default function AuthGate({ children }) {
-  const router = useRouter();
   const pathname = usePathname();
   const {
     user,
@@ -65,20 +64,16 @@ export default function AuthGate({ children }) {
     }
   }, [user?._id, user?.id]);
 
-  // Fresh launch detector: when user closes tab/window and opens fresh,
-  // sessionStorage is cleared. We automatically redirect them to start on Dashboard (/)!
+  // Mark this tab's session as active. No redirect: a new tab or a shared deep link
+  // (e.g. /vault) must open the page that was asked for, not bounce to the Dashboard.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const isSessionActive = sessionStorage.getItem('chatter_session_active');
-      if (!isSessionActive) {
+      if (!sessionStorage.getItem('chatter_session_active')) {
         sessionStorage.setItem('chatter_session_active', 'true');
-        if (pathname && pathname !== '/') {
-          router.replace('/');
-        }
       }
     } catch (e) {}
-  }, [pathname, router]);
+  }, []);
 
   // Handler for login from LoginPage to ensure immediate navigation to dashboard
   const handleLogin = (jwtToken, userData) => {

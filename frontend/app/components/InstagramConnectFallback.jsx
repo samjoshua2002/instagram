@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { isFromApi, onPopupClosed } from '../lib/utils';
+import { isFromApi, onPopupClosed, openInstagramConnect } from '../lib/utils';
 import {
   Instagram,
   Sparkles,
@@ -165,19 +165,20 @@ export default function InstagramConnectFallback({ onConnect, user }) {
     return () => window.removeEventListener('message', handleOAuthMessage);
   }, [showToast, updateUserProfile]);
 
+  // Stops the "is the popup closed yet?" check when a new popup opens or this screen goes away
+  const popupWatchRef = useRef(null);
+  useEffect(() => () => popupWatchRef.current?.(), []);
+
   const handleLaunchInstagramOAuth = () => {
     setErrorMsg('');
     setOauthConnecting(true);
     try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://instagram-ebon-zeta.vercel.app';
       const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : '') || '';
-
       const backendUrl = (API_BASE || 'https://instagram-ai-bot-64tf.onrender.com').replace(/\/+$/, '');
       // The server builds the Instagram Login URL and a single-use state, same as the other connect buttons
-      const directOAuthUrl = `${backendUrl}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(currentToken)}`;
-
-      const popup = window.open(directOAuthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
-      onPopupClosed(popup, () => setOauthConnecting(false));
+      const popup = openInstagramConnect(backendUrl, currentToken);
+      popupWatchRef.current?.();
+      popupWatchRef.current = onPopupClosed(popup, () => setOauthConnecting(false));
       if (!popup) {
         setOauthConnecting(false);
         setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');

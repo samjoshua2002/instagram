@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { T, backdropMotion, popFromTrigger, revealMotion } from '../lib/motion';
-import { isFromApi, onPopupClosed } from '../lib/utils';
+import { isFromApi, onPopupClosed, openInstagramConnect } from '../lib/utils';
 import {
   Briefcase, User, Sparkles, Bot, ShieldCheck, Check,
   ArrowRight, ArrowLeft, RefreshCw, Sliders, CheckCircle2,
@@ -82,16 +82,19 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
     return () => window.removeEventListener('message', handleOAuthMessage);
   }, [showToast]);
 
+  // Stops the "is the popup closed yet?" check when a new popup opens or this screen goes away
+  const popupWatchRef = useRef(null);
+  useEffect(() => () => popupWatchRef.current?.(), []);
+
   if (!isOpen) return null;
 
   const handleLaunchInstagramOAuth = () => {
     setError('');
     setOauthConnecting(true);
     try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
-      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
-      onPopupClosed(popup, () => setOauthConnecting(false));
+      const popup = openInstagramConnect(API_BASE, token);
+      popupWatchRef.current?.();
+      popupWatchRef.current = onPopupClosed(popup, () => setOauthConnecting(false));
       if (!popup) {
         setOauthConnecting(false);
         setError('Popup was blocked by your browser. Please allow popups for this site or enter your token below.');

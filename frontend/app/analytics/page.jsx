@@ -282,7 +282,11 @@ export default function AnalyticsPage() {
       }
     };
     load();
-    const timer = setInterval(load, 30000);
+    // Skipped while the tab is hidden or offline, like the other pollers
+    const timer = setInterval(() => {
+      if (document.hidden || navigator.onLine === false) return;
+      load();
+    }, 30000);
     return () => clearInterval(timer);
   }, [isBusinessWorkspace, token, API_BASE]);
 
