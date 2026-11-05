@@ -2332,13 +2332,36 @@ body {
 
 /* ═══ Feature Store + mode switch (PLAN.md §4, §13 Phase 3) ═══ */
 .mode-segment {
-  grid-template-columns: repeat(3, 1fr);
+  /* Each column is at least as wide as its label so the active pill never clips. */
+  grid-template-columns: repeat(3, minmax(max-content, 1fr));
+  max-width: 100%;
+}
+
+.mode-segment button {
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.mode-segment button svg {
+  flex-shrink: 0;
+}
+
+.mode-segment.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .mode-segment.compact button {
   min-height: 30px;
   gap: 4px;
+  padding: 0 6px;
   font-size: 0.7rem;
+}
+
+/* Slim sidebar (small laptops): text only, so all three labels fit */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .mode-segment.compact button svg {
+    display: none;
+  }
 }
 
 .feature-back {
