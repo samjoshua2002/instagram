@@ -20,7 +20,7 @@ function sanitize({ nodes, edges }) {
     .map(n => ({
       id: str(n.id, 64), type: str(n.type, 24) || 'note', label: str(n.label, 120),
       notes: str(n.notes, 2000), contactId: str(n.contactId, 64), senderId: str(n.senderId, 64),
-      circle: CIRCLES.includes(n.circle) ? n.circle : '', x: num(n.x), y: num(n.y),
+      circle: CIRCLES.includes(n.circle) ? n.circle : '', x: num(n.x), y: num(n.y), collapsed: n.collapsed === true,
     }));
   const ids = new Set(cleanNodes.map(n => n.id));
   const cleanEdges = (Array.isArray(edges) ? edges : []).slice(0, MAX_EDGES)

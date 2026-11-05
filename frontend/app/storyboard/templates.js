@@ -8,10 +8,10 @@ const node = (id, type, label, notes = '', x = 0, y = 0, extra = {}) => ({ id, t
 
 /** Main steps left to right (zig-zag); side cards sit in a row below, linked to a main step. */
 function flow(main, side = []) {
-  const nodes = main.map(([type, label, notes], i) => node(`s${i}`, type, label, notes, 60 + i * 230, 200 + (i % 2) * 90));
+  const nodes = main.map(([type, label, notes], i) => node(`s${i}`, type, label, notes, 80 + i * 300, 140 + (i % 2) * 80));
   const edges = main.slice(1).map((_, i) => ({ id: `e${i}`, from: `s${i}`, to: `s${i + 1}`, label: '' }));
   side.forEach(([type, label, notes, from, edgeLabel = ''], i) => {
-    nodes.push(node(`x${i}`, type, label, notes, 140 + i * 260, 480));
+    nodes.push(node(`x${i}`, type, label, notes, 160 + i * 340, 520));
     if (from !== null && from !== undefined) edges.push({ id: `ex${i}`, from: `s${from}`, to: `x${i}`, label: edgeLabel });
   });
   return { nodes, edges };
@@ -19,11 +19,12 @@ function flow(main, side = []) {
 
 /** "You" in the middle, cards in a ring around you, each linked to you. */
 function ring(youLabel, items) {
-  const cx = 640, cy = 380, r = 280;
+  // Spaced for the node-editor cards (about 240 wide, up to ~200 tall when open)
+  const cx = 1000, cy = 640, rx = 600, ry = 440;
   const you = node('you', 'you', youLabel || 'You', '', cx, cy);
   const nodes = items.map(([type, label, notes, extra = {}], i) => {
     const a = (i / Math.max(items.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    return node(`t${i}`, type, label, notes, Math.round(cx + r * Math.cos(a)), Math.round(cy + r * 0.75 * Math.sin(a)), extra);
+    return node(`t${i}`, type, label, notes, Math.round(cx + rx * Math.cos(a)), Math.round(cy + ry * Math.sin(a)), extra);
   });
   const edges = nodes.map((n, i) => ({ id: `et${i}`, from: 'you', to: n.id, label: items[i][3]?.edge || '' }));
   nodes.forEach(n => { delete n.edge; });
@@ -104,7 +105,7 @@ export const PERSONAL_TEMPLATES = [
     id: 'blank',
     name: 'Blank',
     description: 'Just you. Add your own people and lore.',
-    build: ({ user } = {}) => ({ nodes: [node('you', 'you', user?.firstName || 'You', '', 640, 380)], edges: [] }),
+    build: ({ user } = {}) => ({ nodes: [node('you', 'you', user?.firstName || 'You', '', 1000, 640)], edges: [] }),
   },
 ];
 
@@ -172,6 +173,6 @@ export const BUSINESS_TEMPLATES = [
     id: 'blank',
     name: 'Blank',
     description: 'A single starting card. Build your own journey.',
-    build: () => ({ nodes: [node('s0', 'trigger', 'New DM', 'Where customers come from.', 200, 260)], edges: [] }),
+    build: () => ({ nodes: [node('s0', 'trigger', 'New DM', 'Where customers come from.', 200, 300)], edges: [] }),
   },
 ];

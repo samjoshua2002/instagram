@@ -14,6 +14,8 @@ const nodeSchema = new mongoose.Schema({
   circle: { type: String, enum: ['', 'close', 'online', 'offline', 'family', 'professional'], default: '' },
   x: { type: Number, default: 0 },
   y: { type: Number, default: 0 },
+  // Folded to just its header in the node editor
+  collapsed: { type: Boolean, default: false },
 }, { _id: false });
 
 const edgeSchema = new mongoose.Schema({
