@@ -25,6 +25,12 @@ const INTENT_CATEGORIES = [
 ];
 const ALL_CATEGORIES = ['pricing', 'policy', 'faq', 'hours_location', 'services', 'general'];
 
+// Contact questions ("ur number?", "mail id", "where do u live") rarely share words with the
+// answer (a resume header like "+91 98... | me@gmail.com | Chennai"), so they match by pattern
+const CONTACT_INTENT = /\b(phone|mobile|cell|number|contact|whatsapp|e-?mail|mail|gmail|mail ?id|address|where (do|d|r|are)? ?(you|u) (live|stay|from)|(you|u)r? from where|which (city|place|area)|location|reach (you|u))\b/i;
+const PHONE_RE = /\+?\d[\d\s-]{8,}\d/;
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]+/;
+
 /**
  * Lowercase content words, most frequent first.
  */
@@ -138,25 +144,51 @@ async function retrieve({ ownerId, incomingText, limit = 4 }) {
 
   const keywords = extractKeywords(incomingText, 12);
   const intent = INTENT_CATEGORIES.find(i => i.re.test(incomingText));
-  const allowedCategories = intent ? intent.categories : ALL_CATEGORIES;
+  const wantsContact = CONTACT_INTENT.test(incomingText);
+  const allowedCategories = intent && !wantsContact ? intent.categories : ALL_CATEGORIES;
   const wantsDocument = /\b(brochure|pdf|catalog(ue)?|price ?list|menu|document|docs|link|details|send (me|it|the))\b/i.test(incomingText);
-  if (!keywords.length && !wantsDocument) return empty;
+  if (!keywords.length && !wantsDocument && !wantsContact) return empty;
 
-  const candidates = await KnowledgeDoc.find({
-    ownerId,
-    category: { $in: allowedCategories },
-    ...(keywords.length ? { keywords: { $in: keywords } } : {}),
-  }).limit(60).lean();
+  const [byKeyword, byContact] = await Promise.all([
+    keywords.length || wantsDocument
+      ? KnowledgeDoc.find({
+          ownerId,
+          category: { $in: allowedCategories },
+          ...(keywords.length ? { keywords: { $in: keywords } } : {}),
+        }).limit(60).lean()
+      : [],
+    // Chunks holding a phone number or email (the owner's contact details)
+    wantsContact
+      ? KnowledgeDoc.find({ ownerId, textContent: { $regex: '(\\+?\\d[\\d\\s-]{8,}\\d)|([\\w.+-]+@[\\w-]+\\.[\\w.]+)' } }).limit(20).lean()
+      : [],
+  ]);
 
-  const scored = candidates.map(doc => {
+  const byId = new Map();
+  for (const doc of [...byContact, ...byKeyword]) byId.set(String(doc._id), doc);
+
+  const scored = [...byId.values()].map(doc => {
     const kw = new Set(doc.keywords || []);
     const titleWords = new Set(extractKeywords(doc.title, 10));
-    const score = keywords.reduce((s, k) => s + (kw.has(k) ? 1 : 0) + (titleWords.has(k) ? 1.5 : 0), 0)
+    let score = keywords.reduce((s, k) => s + (kw.has(k) ? 1 : 0) + (titleWords.has(k) ? 1.5 : 0), 0)
       + (intent && intent.categories[0] === doc.category ? 1 : 0);
+    if (wantsContact) {
+      // Both a phone and an email in one chunk = the owner's own contact header (e.g. resume top)
+      const hits = (PHONE_RE.test(doc.textContent) ? 1 : 0) + (EMAIL_RE.test(doc.textContent) ? 1 : 0);
+      score += hits * 5;
+    }
     return { doc, score };
-  }).filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
+  }).filter(s => s.score > 0).sort((a, b) => b.score - a.score);
 
-  const chunks = scored.map(s => s.doc);
+  // The same text uploaded twice (duplicate docs) must not fill several slots
+  const seen = new Set();
+  const chunks = [];
+  for (const { doc } of scored) {
+    const sig = doc.textContent.replace(/\s+/g, ' ').trim().slice(0, 200).toLowerCase();
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    chunks.push(doc);
+    if (chunks.length >= limit) break;
+  }
   const context = chunks.map((c, i) =>
     `[${i + 1}] ${c.title} (${c.category})\n${c.textContent}${c.fileUrl ? `\nVerified link: ${c.fileUrl}` : ''}`
   ).join('\n\n');
