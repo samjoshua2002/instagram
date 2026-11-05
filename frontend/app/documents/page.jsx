@@ -12,6 +12,9 @@ const TABS = [
   { id: 'text', label: 'Paste text', icon: Type },
 ];
 
+// Cover colours for document cards (Figma), picked by position
+const ART = ['#1db954', '#509bf5', '#e8115b', '#f59b23', '#af2896', '#148a08'];
+
 const SourceIcon = ({ type, size = 18 }) =>
   type === 'link' ? <Link2 size={size} /> : type === 'text' ? <Type size={size} /> : <FileText size={size} />;
 
@@ -105,29 +108,51 @@ export default function DocumentsPage() {
     if (!busy) uploadFiles(e.dataTransfer.files);
   };
 
+  const sections = (items || []).reduce((sum, i) => sum + (i.chunks || 0), 0);
+  const openTab = (id) => {
+    setTab(id);
+    if (id === 'file' && !busy) fileInput.current?.click();
+  };
+
   return (
-    <div className="page-container settings-fullwidth">
-      <div style={{ marginBottom: '24px' }}>
-        <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
-          // KNOWLEDGE BASE
+    <div className="page-container settings-fullwidth spx-page">
+      <header className="spx-hero">
+        <div className="spx-cover" aria-hidden="true"><FileText size={96} strokeWidth={2} /></div>
+        <div className="spx-hero-text">
+          <div className="spx-eyebrow">Knowledge base</div>
+          <h1 className="spx-title">Document &amp; Service Vault</h1>
+          <p className="spx-desc">
+            Add price lists, menus, FAQs and brochure links. The AI reads the matching parts before replying to customers.
+          </p>
+          <div className="spx-meta">
+            Chatter OS <span>· {items?.length || 0} document{items?.length === 1 ? '' : 's'} · {sections} section{sections === 1 ? '' : 's'} indexed</span>
+          </div>
         </div>
-        <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '4px 0 6px' }}>
-          Document & Service Vault
-        </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', margin: 0, lineHeight: 1.5 }}>
-          Add price lists, menus, FAQs and brochure links. The AI reads the matching parts before replying to customers.
-        </p>
+      </header>
+
+      <div className="spx-actions">
+        <button type="button" className="spx-play" disabled={busy} onClick={() => openTab('file')}>
+          {busy ? <Loader2 size={20} className="animate-spin" /> : <UploadCloud size={20} />} Upload file
+        </button>
+        <button type="button" className="spx-outline" aria-pressed={tab === 'link'} onClick={() => setTab('link')}>
+          <Link2 size={14} /> Add link
+        </button>
+        <button type="button" className="spx-outline" aria-pressed={tab === 'text'} onClick={() => setTab('text')}>
+          <Type size={14} /> Paste text
+        </button>
       </div>
 
-      <div className="download-card">
-        <div className="docs-tabs" role="tablist">
+      <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
+
+      <div className="spx-panel">
+        <div className="spx-pills" role="tablist">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
               role="tab"
               aria-selected={tab === id}
-              className={`docs-tab${tab === id ? ' active' : ''}`}
+              className={`spx-pill${tab === id ? ' active' : ''}`}
               onClick={() => setTab(id)}
             >
               <Icon size={15} /> {label}
@@ -137,7 +162,7 @@ export default function DocumentsPage() {
 
         {tab === 'file' && (
           <div
-            className={`docs-dropzone${dragging ? ' dragging' : ''}`}
+            className={`spx-drop${dragging ? ' dragging' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
@@ -146,64 +171,63 @@ export default function DocumentsPage() {
             tabIndex={0}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInput.current?.click()}
           >
-            {busy ? <Loader2 size={28} className="animate-spin icon-keep" /> : <UploadCloud className="icon-keep" size={28} />}
-            <div style={{ fontWeight: 700, marginTop: '8px' }}>
-              {busy ? 'Reading document…' : 'Drop files here or click to browse'}
+            <div className="spx-drop-icon">
+              {busy ? <Loader2 size={26} className="animate-spin" /> : <UploadCloud size={26} />}
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>PDF, TXT, MD or CSV, up to 10 MB</div>
-            <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
+            <div className="spx-drop-title">{busy ? 'Reading document…' : 'Drop files here or click to browse'}</div>
+            <div className="spx-drop-sub">PDF, TXT, MD or CSV, up to 10 MB</div>
           </div>
         )}
 
         {tab === 'link' && (
-          <form className="docs-form" onSubmit={(e) => { e.preventDefault(); postJson('link', form, 'Link added'); }}>
+          <form className="spx-form" onSubmit={(e) => { e.preventDefault(); postJson('link', form, 'Link added'); }}>
             <input placeholder="Title, e.g. Spring brochure" value={form.title} onChange={setField('title')} required />
             <input type="url" placeholder="https://…" value={form.url} onChange={setField('url')} required />
             <textarea rows={3} placeholder="What is in this link? (helps the AI decide when to share it)" value={form.text} onChange={setField('text')} />
-            <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Add link'}</button>
+            <button className="spx-play" disabled={busy}>{busy ? 'Saving…' : 'Add link'}</button>
           </form>
         )}
 
         {tab === 'text' && (
-          <form className="docs-form" onSubmit={(e) => { e.preventDefault(); postJson('text', form, 'Text added'); }}>
+          <form className="spx-form" onSubmit={(e) => { e.preventDefault(); postJson('text', form, 'Text added'); }}>
             <input placeholder="Title, e.g. Opening hours & FAQ" value={form.title} onChange={setField('title')} required />
             <textarea rows={6} placeholder="Paste your prices, policies or FAQ here" value={form.text} onChange={setField('text')} required />
-            <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Add text'}</button>
+            <button className="spx-play" disabled={busy}>{busy ? 'Saving…' : 'Add text'}</button>
           </form>
         )}
       </div>
 
-      <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: '24px 0 12px' }}>
-        Your documents {items?.length ? `(${items.length})` : ''}
-      </h2>
+      <div className="spx-section-head">
+        <h2 className="spx-section-title">Your documents {items?.length ? `(${items.length})` : ''}</h2>
+      </div>
 
-      {!items && <div className="skeleton" style={{ height: '120px', borderRadius: '16px' }} />}
+      {!items && <div className="skeleton" style={{ height: '120px', borderRadius: '8px', marginTop: '16px' }} />}
 
       {items?.length === 0 && (
-        <div className="download-card" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          Nothing here yet. Add your first price list or FAQ above.
-        </div>
+        <div className="spx-empty-card">Nothing here yet. Add your first price list or FAQ above.</div>
       )}
 
-      {items?.length > 0 && <div className="docs-grid">{items.map(item => (
-        <div key={item._id} className="download-card docs-item">
-          <div className="download-icon"><SourceIcon type={item.sourceType} /></div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-            <div className="docs-chips">
-              {((item.categories || []).filter(Boolean).length ? item.categories.filter(Boolean) : ['general']).map(c => (
-                <span key={c} className="docs-chip">{c}</span>
-              ))}
-              <span className="docs-chip docs-chip-indexed">{item.chunks} section{item.chunks === 1 ? '' : 's'} indexed</span>
-              {item.createdAt && <span className="docs-chip-date">{new Date(item.createdAt).toLocaleDateString()}</span>}
-            </div>
-            <div className="docs-preview">{item.preview}</div>
+      {items?.length > 0 && <div className="spx-doc-grid">{items.map((item, idx) => (
+        <div key={item._id} className="spx-doc">
+          <div className="spx-doc-art" style={{ background: `linear-gradient(135deg, ${ART[idx % ART.length]} 0%, #121212 140%)` }}>
+            <SourceIcon type={item.sourceType} size={28} />
           </div>
-          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          <div className="spx-doc-body">
+            <div className="spx-doc-title" title={item.title}>{item.title}</div>
+            <div className="spx-doc-chips">
+              {((item.categories || []).filter(Boolean).length ? item.categories.filter(Boolean) : ['general']).map(c => (
+                <span key={c} className="spx-chip">{c}</span>
+              ))}
+              <span className="spx-chip spx-chip-green">{item.chunks} section{item.chunks === 1 ? '' : 's'} indexed</span>
+              {item.createdAt && <span className="spx-doc-date">· {new Date(item.createdAt).toLocaleDateString()}</span>}
+            </div>
+            <div className="spx-doc-preview">{item.preview}</div>
+          </div>
+          <div className="spx-doc-actions">
             {item.fileUrl && (
-              <a className="btn" href={item.fileUrl} target="_blank" rel="noreferrer" title="Open" aria-label="Open"><ExternalLink size={15} /></a>
+              <a className="spx-icon-btn" href={item.fileUrl} target="_blank" rel="noreferrer" title="Open" aria-label="Open"><ExternalLink size={15} /></a>
             )}
-            <button type="button" className="btn" onClick={() => remove(item)} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
+            <button type="button" className="spx-icon-btn" onClick={() => remove(item)} title="Remove" aria-label="Remove"><Trash2 size={16} /></button>
           </div>
         </div>
       ))}</div>}
