@@ -1707,59 +1707,15 @@ app.get('/api/giphy/trending', async (req, res) => {
   }
 });
 
-// Unsplash banner artwork (home, profile and chat headers). The key stays on the server;
-// each topic is fetched at most once every 6 hours, so the 50-calls-per-hour demo limit is never reached.
-const UNSPLASH_TOPICS = {
-  abstract: 'abstract gradient',
-  colorful: 'colorful abstract',
-  fluid: 'fluid art',
-};
-const UNSPLASH_TTL = 6 * 60 * 60 * 1000;
-const unsplashCache = new Map(); // topic -> { at, photos, job }
-
-async function loadUnsplashTopic(topic) {
-  const key = process.env.UNSPLASH_ACCESS_KEY;
-  if (!key) return [];
-  const hit = unsplashCache.get(topic);
-  if (hit && hit.photos.length && Date.now() - hit.at < UNSPLASH_TTL) return hit.photos;
-  if (hit?.job) return hit.job;
-  const params = new URLSearchParams({
-    query: UNSPLASH_TOPICS[topic], per_page: '30', orientation: 'landscape', content_filter: 'high',
-  });
-  const job = fetch(`https://api.unsplash.com/search/photos?${params}`, {
-    headers: { Authorization: `Client-ID ${key}`, 'Accept-Version': 'v1' },
-    signal: AbortSignal.timeout(8000),
-  })
-    .then(r => (r.ok ? r.json() : Promise.reject(new Error(`Unsplash ${r.status}`))))
-    .then(data => {
-      const photos = (data.results || [])
-        .filter(p => p?.urls?.raw && /^https:\/\/images\.unsplash\.com\//.test(p.urls.raw))
-        .map(p => ({
-          id: p.id,
-          raw: p.urls.raw,
-          color: p.color || null,
-          alt: p.alt_description || '',
-          author: p.user?.name || 'Unsplash',
-          authorUrl: p.user?.links?.html || 'https://unsplash.com',
-          link: p.links?.html || 'https://unsplash.com',
-        }));
-      unsplashCache.set(topic, { at: Date.now(), photos });
-      return photos;
-    })
-    .catch(err => {
-      console.warn('[unsplash]', err.message);
-      // Keep serving the old list if there is one; try again in 10 minutes
-      const old = hit?.photos || [];
-      unsplashCache.set(topic, { at: Date.now() - UNSPLASH_TTL + 10 * 60 * 1000, photos: old });
-      return old;
-    });
-  unsplashCache.set(topic, { ...(hit || { at: 0, photos: [] }), job });
-  return job;
-}
+// Unsplash banner artwork (home, profile and chat headers). The key stays on the server.
+// Photo links are saved in MongoDB and reused for a week, so restarts don't spend the 50-calls-per-hour quota
+// (see services/unsplashService.js for the fallback order).
+const { createUnsplashCache, TOPICS: UNSPLASH_TOPICS } = require('./services/unsplashService');
+const unsplashCache = createUnsplashCache();
 
 app.get('/api/banners', async (req, res) => {
   const topic = Object.hasOwn(UNSPLASH_TOPICS, req.query.topic) ? req.query.topic : 'abstract';
-  const photos = await loadUnsplashTopic(topic);
+  const photos = await unsplashCache.getPhotos(topic);
   // Never let browsers keep an empty list (missing key / Unsplash down), or banners stay plain for an hour
   res.set('Cache-Control', photos.length ? 'public, max-age=3600' : 'no-store');
   if (!photos.length && !process.env.UNSPLASH_ACCESS_KEY) console.warn('[unsplash] UNSPLASH_ACCESS_KEY is not set; banners use gradients');
