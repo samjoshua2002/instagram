@@ -147,3 +147,53 @@ html.theme-vt::view-transition-new(root) { z-index: 2; }
   .toast-success .toast-icon { animation: none; }
   .feature-switch .feature-switch-thumb { transition: background 0.15s linear; }
 }
+
+/* ── Collapsing hero + sticky toolbar (lib/scrollMotion.js) ──
+   JS makes the hero sticky and scrubs transforms; without JS or with reduced motion it is a plain block. */
+.spx-page,
+.person-page { --page-pad-x: clamp(14px, 2.2vw, 28px); }
+.spx-hero { position: relative; }
+
+.hero-surface {
+  position: absolute;
+  z-index: -1;
+  inset: -40px calc(-1 * var(--page-pad-x)) 0;
+  opacity: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 22%, var(--sp-panel, #121212)) 90%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 10px 24px -18px rgba(0, 0, 0, 0.6);
+}
+
+/* Toolbar stays under the compact band on screens tall and wide enough for both */
+@media (min-width: 641px) and (min-height: 600px) {
+  .spx-page .people-filters {
+    position: sticky;
+    top: var(--hero-band, 0px);
+    z-index: 20;
+    margin-inline: calc(-1 * var(--page-pad-x));
+    padding: 0 var(--page-pad-x) 12px;
+    margin-bottom: -12px;
+    border-bottom: 1px solid transparent;
+    transition: background-color var(--dur-enter) var(--ease-out), border-color var(--dur-enter) var(--ease-out);
+  }
+  .spx-page .people-filters.is-stuck {
+    background: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 10%, var(--sp-panel, #121212));
+    border-bottom-color: var(--glass-border, rgba(255, 255, 255, 0.08));
+  }
+}
+
+@media (max-width: 768px) {
+  .spx-page,
+  .person-page { --page-pad-x: 14px; }
+}
+
+@media (max-width: 400px) {
+  .spx-page,
+  .person-page { --page-pad-x: 12px; }
+  /* overflow-x: hidden would turn the page into its own scroll box and break sticky */
+  .page-container.spx-page,
+  .page-container.person-page { overflow-x: clip !important; }
+}

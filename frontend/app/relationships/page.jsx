@@ -14,6 +14,7 @@ import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
 import UnsplashBanner from '../components/UnsplashBanner';
+import '../split.css';
 import { useBanner, bannerSrc } from '../lib/banners';
 import { personArtUrl, savedPhotoUrl } from '../lib/utils';
 import PageSkeleton, { Sk } from '../components/Skeletons';
@@ -1881,67 +1882,42 @@ function RelationshipsPageContent() {
     <motion.div
       ref={pageRef}
       {...enterMotion}
-      className="page-container spx-page spx-blue"
+      className="page-container split-page spx-page spx-blue people-split"
     >
-      {/* Top Header (Spotify hero) */}
-      <header className="spx-hero">
-        <span className="hero-surface" aria-hidden="true" />
-        <UnsplashBanner seed="page-people" credit={false} className="spx-cover spx-cover-people"><Users size={84} strokeWidth={1.75} /></UnsplashBanner>
-        <div className="spx-hero-text">
-          <div className="spx-eyebrow">People directory &amp; intelligence</div>
-          <h1 className="spx-title">All People</h1>
-          <p className="spx-desc">Unified directory showing profiles, interaction statistics, and automated intelligence rules.</p>
-          <div className="spx-meta">
-            Chatter OS <span>· {dashboardStats.totalPeople.toLocaleString()} people · {dashboardStats.totalDMs.toLocaleString()} chats</span>
-          </div>
+      <header className="split-top">
+        <div className="split-top-text">
+          <h1>All People</h1>
+          <p>{dashboardStats.totalPeople.toLocaleString()} people · {dashboardStats.totalDMs.toLocaleString()} chats. Click someone to open their profile.</p>
         </div>
       </header>
 
-      {/* ================= DASHBOARD METRICS SUMMARY ================= */}
-      <div className="spx-stats">
-        {[
-          { icon: <Users size={22} />, label: 'Total People', value: dashboardStats.totalPeople, color: '#1db954' },
-          { icon: <MessageSquare size={22} />, label: 'Total Chats', value: dashboardStats.totalDMs, color: '#509bf5' },
-          { icon: <Film size={22} />, label: 'Reels Shared', value: dashboardStats.totalReels, color: '#e8115b' },
-          { icon: <Bot size={22} />, label: 'AI Active', value: dashboardStats.activeAi, color: '#f59b23' },
-        ].map(({ icon, label, value, color }) => (
-          <div key={label} className="spx-stat">
-            <div className="spx-stat-icon" style={{ background: color }}>{icon}</div>
-            <div style={{ minWidth: 0 }}>
-              <div className="spx-stat-label">{label}</div>
-              <div className="spx-stat-value"><CountUp value={value} /></div>
+      <div className="split-body">
+      <aside className="split-side">
+      {/* Overview numbers */}
+      <section className="split-card">
+        <h2>Overview</h2>
+        <div className="spx-stats people-stats">
+          {[
+            { icon: <Users size={16} />, label: 'People', value: dashboardStats.totalPeople, color: '#1db954' },
+            { icon: <MessageSquare size={16} />, label: 'Chats', value: dashboardStats.totalDMs, color: '#509bf5' },
+            { icon: <Film size={16} />, label: 'Reels', value: dashboardStats.totalReels, color: '#e8115b' },
+            { icon: <Bot size={16} />, label: 'AI on', value: dashboardStats.activeAi, color: '#f59b23' },
+          ].map(({ icon, label, value, color }) => (
+            <div key={label} className="spx-stat">
+              <div className="spx-stat-icon" style={{ background: color }}>{icon}</div>
+              <div style={{ minWidth: 0 }}>
+                <div className="spx-stat-value"><CountUp value={value} /></div>
+                <div className="spx-stat-label">{label}</div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Action Required Banner for missing Instagram IDs */}
-      {unlinkedFriends.length > 0 && (
-        <div className="spx-banner">
-          <AlertCircle size={22} />
-          <div className="spx-banner-text">
-            <div className="spx-banner-title">
-              Action Required: {unlinkedFriends.length} Contact{unlinkedFriends.length > 1 ? 's' : ''} Missing Instagram ID
-            </div>
-            <div className="spx-banner-sub">
-              Link their Instagram handle so Chatter OS merges memories and answers appropriately in direct messages.
-            </div>
-          </div>
-          <div className="spx-banner-actions">
-            {unlinkedFriends.map(friend => (
-              <button key={friend.id} type="button" className="spx-outline" onClick={() => setLinkingTargetPerson(friend)}>
-                <Link2 size={13} />
-                <span>Link ID: {friend.name}</span>
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
-      )}
+      </section>
 
-      {/* Filter Tabs & Search Bar */}
-      <div className="people-filters">
-        {/* Category Pills */}
-        <div className="people-pills spx-pills">
+      {/* Groups (were tabs across the top) */}
+      <section className="split-card split-grow">
+        <h2>Groups</h2>
+        <div className="people-pills spx-pills people-groups" role="tablist" aria-label="Filter people by group">
           {[
             { id: 'all', label: 'All People', count: categoryCounts.all },
             { id: 'close_friend', label: 'Close Circle / Family', count: categoryCounts.close_friend },
@@ -1954,6 +1930,8 @@ function RelationshipsPageContent() {
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={activeCategory === tab.id}
               onClick={() => setActiveCategory(tab.id)}
               className={`people-pill spx-pill${activeCategory === tab.id ? ' active' : ''}`}
             >
@@ -1963,14 +1941,37 @@ function RelationshipsPageContent() {
             </button>
           ))}
         </div>
+      </section>
 
-        {/* Search Input & Layout Mode Switcher */}
+      {/* People without an Instagram ID */}
+      {unlinkedFriends.length > 0 && (
+        <section className="split-card people-unlinked">
+          <div className="people-unlinked-head">
+            <AlertCircle size={16} />
+            <h2>{unlinkedFriends.length} need an Instagram ID</h2>
+          </div>
+          <p className="split-card-sub">Link their handle so the AI can match their DMs and memories.</p>
+          <div className="people-unlinked-list">
+            {unlinkedFriends.map(friend => (
+              <button key={friend.id} type="button" className="spx-outline" onClick={() => setLinkingTargetPerson(friend)}>
+                <Link2 size={13} />
+                <span>{friend.name}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      </aside>
+
+      <section className="split-card split-panel split-main people-panel">
+        {/* Search, sort and layout switch */}
         <div className="people-toolbar spx-toolbar">
           <div className="people-search">
             <Search size={16} />
             <input
               type="text"
-              placeholder="Filter people by name, @username, birth date, relation, or lore..."
+              placeholder="Search name, @username, birthday or relation"
+              aria-label="Search people"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -2001,7 +2002,7 @@ function RelationshipsPageContent() {
                 type="button"
                 onClick={() => handleSetLayout(id)}
                 className={`people-layout-btn${layoutMode === id ? ' active' : ''}`}
-                title={`${label} Layout View`}
+                title={`${label} view`}
                 aria-pressed={layoutMode === id}
               >
                 <Icon size={14} />
@@ -2010,7 +2011,8 @@ function RelationshipsPageContent() {
             ))}
           </div>
         </div>
-      </div>
+
+        <div className="split-scroll">
 
       {/* ================= SHADCN LIGHT MONOCHROME TABLE ================= */}
       <div
@@ -2689,6 +2691,9 @@ function RelationshipsPageContent() {
             </div>
           </div>
         )}
+      </div>
+        </div>
+      </section>
       </div>
     </motion.div>
   );

@@ -1,0 +1,342 @@
+/* Shared page layout for Chat Rules, People Directory and Persona & AI Studio.
+   Desktop: compact header, 300px left column, main panel that fills the rest of the screen
+   (no side or bottom gaps; long lists scroll inside their panel).
+   Tablet/phone (<= 1024px): one column, the page scrolls normally. */
+
+.page-container.split-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px !important; /* beats .settings-fullwidth in globals.css */
+  max-width: none;
+  width: 100%;
+  font-family: var(--font-sans);
+}
+
+.split-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  flex: none;
+}
+
+.split-top-text { min-width: 0; }
+
+.split-top h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.4px;
+  color: var(--color-text-primary);
+}
+
+.split-top p {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.split-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.split-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill-standard);
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.split-badge i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+.split-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.split-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-card {
+  background: var(--glass-fill-standard);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card, 14px);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  padding: 16px;
+  min-width: 0;
+}
+
+.split-card > h2,
+.split-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--color-text-primary);
+}
+
+.split-card-sub {
+  margin: 3px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+/* The big right panel: header row, then a body that scrolls inside on desktop */
+.split-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 0;
+}
+
+.split-scroll {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 16px;
+}
+
+/* Small stat tiles in the left column */
+.split-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.split-stat {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--color-surface-hover);
+  min-width: 0;
+}
+
+.split-stat b {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+}
+
+.split-stat span {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.split-bar {
+  display: flex;
+  height: 6px;
+  margin-top: 12px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--color-surface-hover);
+}
+
+.split-bar i { display: block; height: 100%; transition: width 0.3s ease; }
+
+.split-tip {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.split-tip b { color: var(--color-text-primary); }
+
+/* Vertical nav list (Settings tabs) */
+.split-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+.split-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: 600 0.84rem var(--font-sans);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.split-nav button:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+
+.split-nav button.is-on {
+  background: var(--color-text-primary);
+  color: var(--color-surface);
+  font-weight: 700;
+}
+
+.split-nav button svg { flex-shrink: 0; }
+.split-nav button .split-nav-arrow { margin-left: auto; opacity: 0.6; }
+
+.split-nav button:focus-visible {
+  outline: 2px solid var(--ambient-dominant);
+  outline-offset: 2px;
+}
+
+/* Desktop: the page is exactly one screen tall; panels scroll inside */
+@media (min-width: 1025px) and (min-height: 600px) {
+  .page-container.split-page {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .split-side { overflow-y: auto; scrollbar-width: thin; }
+  .split-scroll { overflow-y: auto; scrollbar-width: thin; }
+  .split-side > .split-grow { flex: 1; }
+  .settings-split .settings-main { overflow-y: auto; scrollbar-width: thin; padding-right: 2px; }
+}
+
+/* Tablet and phone: one column */
+@media (max-width: 1024px) {
+  .split-body { grid-template-columns: minmax(0, 1fr); }
+  .split-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 6px;
+  }
+  .split-nav::-webkit-scrollbar { display: none; }
+  .split-nav button { width: auto; flex-shrink: 0; }
+  .split-nav button .split-nav-arrow { display: none; }
+  .split-hide-mobile { display: none; }
+}
+
+@media (max-width: 768px) {
+  .page-container.split-page { padding: 14px 14px 80px !important; }
+  .split-top h1 { font-size: 1.35rem; }
+}
+
+@media (max-width: 480px) {
+  .split-top { flex-wrap: wrap; }
+  .split-actions { width: 100%; }
+  .split-actions > * { flex: 1; justify-content: center; }
+}
+
+@media (max-width: 400px) {
+  .page-container.split-page { padding: 12px 12px 84px !important; }
+}
+
+/* ── People Directory (/relationships) inside the split layout ── */
+.people-split .split-card {
+  background: var(--sp-card, var(--glass-fill-standard));
+  border-color: var(--spx-line, var(--glass-border));
+}
+.people-split .people-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.people-split .spx-stat {
+  gap: 10px;
+  padding: 10px;
+  background: var(--spx-raised);
+}
+.people-split .spx-stat-icon { width: 32px; height: 32px; border-radius: 8px; }
+.people-split .spx-stat-value { font-size: 20px; letter-spacing: -0.5px; }
+.people-split .spx-stat-label { font-size: 11px; font-weight: 600; }
+
+/* Groups: a vertical list on desktop */
+.people-split .people-groups {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 0;
+}
+.people-split .people-groups .spx-pill {
+  justify-content: space-between;
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 13px;
+}
+.people-split .people-groups .spx-pill:hover { background: var(--sp-tile-hover); }
+.people-split .people-groups .seg-indicator { border-radius: 9px; }
+
+.people-unlinked-head { display: flex; align-items: center; gap: 8px; color: #1db954; }
+.people-unlinked-head h2 { margin: 0; font-size: 0.9rem; font-weight: 800; color: var(--color-text-primary); }
+.people-unlinked-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.people-unlinked-list .spx-outline { height: 30px; min-height: 30px; padding: 0 12px; font-size: 12px; max-width: 100%; }
+.people-unlinked-list .spx-outline span { overflow: hidden; text-overflow: ellipsis; }
+
+.people-split .people-toolbar { padding-top: 0; flex: none; padding-bottom: 12px; }
+.people-split .people-results { margin-top: 0 !important; }
+.people-split .spx-table-wrap { padding-top: 0; }
+
+@media (max-width: 1024px) {
+  .people-split .people-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .people-split .people-groups {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .people-split .people-groups::-webkit-scrollbar { display: none; }
+  .people-split .people-groups .spx-pill { width: auto; flex-shrink: 0; border-radius: 9999px; background: var(--sp-tile); }
+  .people-split .people-groups .seg-indicator { border-radius: 9999px; }
+}
+@media (max-width: 640px) {
+  .people-split .people-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .people-split .people-groups { margin: 10px 0 0; padding: 0; }
+}
+
+/* ── Persona & AI Studio (/settings) ── */
+.settings-split .split-top h1 { font-weight: 800; }
+.settings-split .split-actions .btn { height: 38px; }
+.settings-split .split-nav { flex: none; }
+.settings-split .settings-main > div { gap: 12px !important; }

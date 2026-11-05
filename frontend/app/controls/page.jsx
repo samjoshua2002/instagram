@@ -9,6 +9,7 @@ import BusinessPolicyCard from '../components/BusinessPolicyCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
 import { Search, Bot, Pause, X } from 'lucide-react';
+import '../split.css';
 import './controls.css';
 
 // Who the AI answers. Short words so each option fits one line on a phone.
@@ -295,15 +296,22 @@ function ControlsPageContent() {
   }
 
   return (
-    <motion.div {...enterMotion} className="page-container ctl-page">
-      <header className="ctl-head">
-        <h1>AI Reply Rules</h1>
-        <p>Choose who the AI replies to on Instagram. Changes save automatically.</p>
+    <motion.div {...enterMotion} className="page-container split-page ctl-page">
+      <header className="split-top">
+        <div className="split-top-text">
+          <h1>AI Reply Rules</h1>
+          <p>Choose who the AI replies to on Instagram.</p>
+        </div>
+        <div className="split-actions">
+          <span className="split-badge"><i aria-hidden="true" />Changes save automatically</span>
+        </div>
       </header>
 
+      <div className="split-body">
+      <aside className="split-side">
       {['business', 'agency'].includes(user?.accountType) && <BusinessPolicyCard />}
 
-      <section className="ctl-card">
+      <section className="split-card">
         <h2 className="ctl-title">Who gets AI replies</h2>
         <div className="ctl-modes" role="radiogroup" aria-label="Who gets AI replies">
           {CHAT_MODES.map(mode => {
@@ -326,13 +334,27 @@ function ControlsPageContent() {
             );
           })}
         </div>
-        <div className="ctl-status">
-          <span className="ctl-dot" aria-hidden="true" />
-          AI is on for <b>{aiOnCount}</b> of {friendNodes.length} contacts
+      </section>
+
+      <section className="split-card">
+        <h2>Overview</h2>
+        <p className="split-card-sub">AI is on for {aiOnCount} of {friendNodes.length} contacts</p>
+        <div className="split-stats">
+          <div className="split-stat"><b className="ctl-num-on">{aiOnCount}</b><span>AI on</span></div>
+          <div className="split-stat"><b>{friendNodes.length - aiOnCount}</b><span>Off</span></div>
+          <div className="split-stat"><b>{friendNodes.length}</b><span>Total</span></div>
+        </div>
+        <div className="split-bar" aria-hidden="true">
+          <i style={{ width: `${friendNodes.length ? (aiOnCount / friendNodes.length) * 100 : 0}%`, background: '#16a34a' }} />
         </div>
       </section>
 
-      <section className="ctl-card">
+      <section className="split-card split-grow split-hide-mobile">
+        <p className="split-tip"><b>AI</b> means the AI answers that person's DMs for you. <b>Off</b> means you reply to them yourself.</p>
+      </section>
+      </aside>
+
+      <section className="split-card split-panel split-main">
         <div className="ctl-list-head">
           <div>
             <h2 className="ctl-title">Contacts</h2>
@@ -344,6 +366,7 @@ function ControlsPageContent() {
           </div>
         </div>
 
+        <div className="ctl-tools">
         <div className="ctl-search">
           <Search size={15} aria-hidden="true" />
           <input
@@ -374,7 +397,9 @@ function ControlsPageContent() {
             </button>
           ))}
         </div>
+        </div>
 
+        <div className="split-scroll">
         {visible.length > 0 ? (
           <ul className="ctl-list">{visible.map(renderRow)}</ul>
         ) : (
@@ -382,7 +407,9 @@ function ControlsPageContent() {
             {search ? `No contacts match "${search}".` : 'No contacts here yet.'}
           </div>
         )}
+        </div>
       </section>
+      </div>
     </motion.div>
   );
 }
