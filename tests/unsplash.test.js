@@ -180,3 +180,11 @@ test('plain gradient / blur photos are dropped, wave textures kept', () => {
   // Too few textured photos: keep them all rather than an almost empty list
   assert.equal(toPhotos([mk('a', 'gradient'), mk('b', 'waves')]).length, 2);
 });
+
+test('grey one-colour textures are dropped unless a real colour is named', () => {
+  const { isPlain } = require('../services/unsplashService');
+  assert.equal(isPlain({ color: '#737373', alt_description: 'Abstract clear wavy textured background' }), true);
+  assert.equal(isPlain({ color: '#262626', alt_description: 'a black and white photo of a pattern' }), true);
+  assert.equal(isPlain({ color: '#f3f3f3', alt_description: 'Dynamic blue and white abstract wave pattern' }), false);
+  assert.equal(isPlain({ color: '#0c2626', alt_description: 'Abstract teal and black wavy background' }), false);
+});
