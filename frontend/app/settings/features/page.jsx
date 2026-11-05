@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import PageCover from '../../components/PageCover';
-import { ArrowLeft } from 'lucide-react';
+import PageHero from '../../components/PageHero';
+import { ArrowLeft, Layers } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import SuperadminWorkspacePrompt from '../../components/SuperadminWorkspacePrompt';
 import WorkspaceModeSwitch from '../../components/WorkspaceModeSwitch';
@@ -42,22 +42,17 @@ export default function FeatureStorePage() {
   };
 
   return (
-    <div className="page-container settings-fullwidth">
-      <PageCover seed="page-features" />
-      <div style={{ marginBottom: '24px' }}>
-        <Link href="/settings" className="feature-back">
-          <ArrowLeft size={14} /> Settings
-        </Link>
-        <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
-          // FEATURE STORE {enabled ? `· ${enabledCount}/${Object.keys(enabled).length} ON` : ''}
-        </div>
-        <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '4px 0 6px' }}>
-          Workspace features
-        </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', margin: 0, lineHeight: 1.5 }}>
-          Choose a mode for sensible defaults, then turn single capabilities on or off. Nothing is deleted when you switch.
-        </p>
-      </div>
+    <div className="page-container settings-fullwidth spx-page">
+      <PageHero
+        seed="page-features"
+        icon={<Layers size={96} strokeWidth={2} />}
+        eyebrow="Feature store"
+        title="Workspace features"
+        desc="Choose a mode for sensible defaults, then turn single capabilities on or off. Nothing is deleted when you switch."
+        meta={enabled ? `${enabledCount} of ${Object.keys(enabled).length} features on` : 'Loading features'}
+      >
+        <Link href="/settings" className="spx-outline"><ArrowLeft size={14} /> Back to settings</Link>
+      </PageHero>
 
       <section className="download-card">
         <div className="sheet-label">Mode</div>

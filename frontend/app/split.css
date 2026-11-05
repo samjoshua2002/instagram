@@ -340,3 +340,19 @@
 .settings-split .split-actions .btn { height: 38px; }
 .settings-split .split-nav { flex: none; }
 .settings-split .settings-main > div { gap: 12px !important; }
+
+/* Split pages with the big photo header (PageHero): on desktop the page scrolls past the
+   header, then the two columns fill one screen and scroll inside (same as before). */
+@media (min-width: 1025px) and (min-height: 600px) {
+  .page-container.split-page.has-hero {
+    height: auto;
+    overflow: visible;
+    gap: 0;
+  }
+  .split-page.has-hero .split-body {
+    flex: none;
+    height: calc(100dvh - var(--hero-band, 0px) - 16px);
+    margin-bottom: 0;
+  }
+}
+.split-page.has-hero .spx-actions { padding-bottom: 16px; }

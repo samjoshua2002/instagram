@@ -2,7 +2,8 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import PageCover from '../components/PageCover';
+import PageHero from '../components/PageHero';
+import { Network, Route } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import { currentMode } from '../lib/workspaceFeatures';
@@ -27,19 +28,19 @@ export default function StoryboardHeader({ active, code, title, description }) {
   }, [loaded, allowed, mode, router]);
 
   return (
-    <>
-    <PageCover seed={`page-storyboard-${active}`} />
-    <div style={{ marginBottom: '18px' }}>
-      <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>{code}</div>
-      <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '4px 0 6px' }}>{title}</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', margin: '0 0 14px', lineHeight: 1.5 }}>{description}</p>
+    <PageHero
+      seed={`page-storyboard-${active}`}
+      icon={active === 'business' ? <Route size={96} strokeWidth={2} /> : <Network size={96} strokeWidth={2} />}
+      eyebrow={code.replace(/^\/\/\s*/, '')}
+      title={title}
+      desc={description}
+    >
       {mode === 'hybrid' && (
-        <div className="sheet-segment" style={{ maxWidth: '320px' }} role="tablist" aria-label="Storyboard">
-          <Link href="/storyboard/personal" role="tab" aria-selected={active === 'personal'} className={`story-tab${active === 'personal' ? ' active' : ''}`}>Personal</Link>
-          <Link href="/storyboard/business" role="tab" aria-selected={active === 'business'} className={`story-tab${active === 'business' ? ' active' : ''}`}>Business</Link>
-        </div>
+        <>
+          <Link href="/storyboard/personal" className="spx-outline" aria-pressed={active === 'personal'}>Personal</Link>
+          <Link href="/storyboard/business" className="spx-outline" aria-pressed={active === 'business'}>Business</Link>
+        </>
       )}
-    </div>
-    </>
+    </PageHero>
   );
 }

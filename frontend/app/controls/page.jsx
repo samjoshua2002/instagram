@@ -8,8 +8,8 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import BusinessPolicyCard from '../components/BusinessPolicyCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
-import PageCover from '../components/PageCover';
-import { Search, Bot, Pause, X } from 'lucide-react';
+import PageHero from '../components/PageHero';
+import { Search, Bot, Pause, X, SlidersHorizontal } from 'lucide-react';
 import '../split.css';
 import './controls.css';
 
@@ -297,17 +297,17 @@ function ControlsPageContent() {
   }
 
   return (
-    <motion.div {...enterMotion} className="page-container split-page ctl-page">
-      <PageCover seed="page-controls" />
-      <header className="split-top">
-        <div className="split-top-text">
-          <h1>AI Reply Rules</h1>
-          <p>Choose who the AI replies to on Instagram.</p>
-        </div>
-        <div className="split-actions">
-          <span className="split-badge"><i aria-hidden="true" />Changes save automatically</span>
-        </div>
-      </header>
+    <motion.div {...enterMotion} className="page-container split-page spx-page has-hero ctl-page">
+      <PageHero
+        seed="page-controls"
+        icon={<SlidersHorizontal size={96} strokeWidth={2} />}
+        eyebrow="Chat rules"
+        title="AI Reply Rules"
+        desc="Choose who the AI replies to on Instagram. Turn it on or off for each contact, or pause it for everyone."
+        meta={`AI on for ${aiOnCount} of ${friendNodes.length} contact${friendNodes.length === 1 ? '' : 's'}`}
+      >
+        <span className="split-badge"><i aria-hidden="true" />Changes save automatically</span>
+      </PageHero>
 
       <div className="split-body">
       <aside className="split-side">

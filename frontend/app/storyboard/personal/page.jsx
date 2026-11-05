@@ -47,7 +47,7 @@ export default function PersonalStoryboardPage() {
   const contact = chatWith?.contactId ? people.find(p => String(p.id) === chatWith.contactId) : null;
 
   return (
-    <div className="page-container story-page">
+    <div className="page-container story-page spx-page">
       <StoryboardHeader
         active="personal"
         code="// PERSONAL STORYBOARD"
