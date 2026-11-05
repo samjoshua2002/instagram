@@ -179,7 +179,7 @@ export default function Sidebar() {
     ]
     : [
       ...workspaceNav[mode],
-      { href: isBusiness ? '/storyboard/business' : '/storyboard/personal', label: 'Storyboard', icon: Workflow },
+      { href: '/storyboard/business', label: 'Storyboard', icon: Workflow },
       { href: '/settings/features', label: 'Feature Store', icon: Layers },
       isSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
     ])
