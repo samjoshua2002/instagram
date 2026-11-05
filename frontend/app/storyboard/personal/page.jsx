@@ -1,0 +1,66 @@
+'use client';
+
+import React, { useState } from 'react';
+import { User, Heart, BookOpen, MapPin, CalendarDays, Lock } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import StoryboardCanvas from '../../components/StoryboardCanvas';
+import SandboxChat from '../../components/SandboxChat';
+import StoryboardHeader from '../StoryboardHeader';
+import { PERSONAL_TEMPLATES } from '../templates';
+
+const NODE_TYPES = [
+  { key: 'you', label: 'You', color: '#a78bfa', icon: User, hideAdd: true, placeholder: 'How you talk, what you are into' },
+  { key: 'person', label: 'Person', color: '#38bdf8', icon: Heart, circles: true, placeholder: 'Inside jokes, how you know them, how you talk to them' },
+  { key: 'lore', label: 'Lore', color: '#f59e0b', icon: BookOpen, placeholder: 'A fact or story about you the AI can bring up' },
+  { key: 'place', label: 'Place', color: '#34d399', icon: MapPin, placeholder: 'Where it is and why it matters' },
+  { key: 'event', label: 'Event', color: '#f472b6', icon: CalendarDays, placeholder: 'What happened and when' },
+  { key: 'secret', label: 'Secret', color: '#94a3b8', icon: Lock, placeholder: 'Something the bot must never share; it will dodge the topic naturally' },
+];
+
+/** Personal Storyboard: relationship map + character lore (PLAN.md §13 Phase 4). */
+export default function PersonalStoryboardPage() {
+  const { nodes: contacts, user } = useApp();
+  const [chatWith, setChatWith] = useState(null);
+  const people = contacts.filter(c => !c.isRoot);
+
+  // Lets you drop any saved contact onto the board
+  const addContact = (addNode, board) => {
+    const onBoard = new Set(board.nodes.map(n => n.contactId).filter(Boolean));
+    const free = people.filter(p => !onBoard.has(String(p.id)));
+    if (!free.length) return null;
+    return (
+      <select
+        className="story-chip"
+        value=""
+        aria-label="Add a contact"
+        onChange={e => {
+          const p = free.find(x => String(x.id) === e.target.value);
+          if (p) addNode('person', { label: p.name, notes: p.relationship || '', contactId: String(p.id), senderId: p.senderId || '' });
+        }}
+      >
+        <option value="">+ From contacts…</option>
+        {free.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+    );
+  };
+
+  const contact = chatWith?.contactId ? people.find(p => String(p.id) === chatWith.contactId) : null;
+
+  return (
+    <div className="page-container story-page">
+      <StoryboardHeader
+        active="personal"
+        code="// PERSONAL STORYBOARD"
+        title="Your world, mapped"
+        description="Drag people, lore, places, events and secrets around, link them, and add notes. Put people in circles and click one to test how the bot talks to them."
+      />
+      <div className="story-layout">
+        <StoryboardCanvas kind="personal" nodeTypes={NODE_TYPES} templates={PERSONAL_TEMPLATES} templateContext={{ people, user }} onSelect={setChatWith} extraAdd={addContact} />
+        <SandboxChat
+          senderId={contact?.senderId || `sandbox_${contact?.id || 'friend'}`}
+          senderName={contact?.name || 'a new friend'}
+        />
+      </div>
+    </div>
+  );
+}

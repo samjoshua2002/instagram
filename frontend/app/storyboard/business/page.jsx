@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Zap, GitBranch, BookOpen, Tag, CalendarCheck, UserCog, Trophy, Lock } from 'lucide-react';
 import StoryboardCanvas from '../../components/StoryboardCanvas';
 import SandboxChat from '../../components/SandboxChat';
 import StoryboardHeader from '../StoryboardHeader';
+import { BUSINESS_TEMPLATES } from '../templates';
 
 // Card types from PLAN.md §13; boards saved with the old entry/question/booking keys still show
 const NODE_TYPES = [
@@ -21,25 +22,8 @@ const NODE_TYPES = [
   { key: 'booking', label: 'Action', color: '#34d399', icon: CalendarCheck, hideAdd: true },
 ];
 
-// Starter customer journey, left to right
-const STEPS = [
-  ['trigger', 'New DM', 'Someone messages from an ad, story or post.'],
-  ['condition', 'Understand the need', 'Ask what they are looking for and their budget.'],
-  ['offer', 'Share the offer', 'Send the matching product or service with price.'],
-  ['action', 'Book a slot', 'Offer open times and confirm the booking.'],
-  ['won', 'Customer won', 'Booking confirmed or order placed.'],
-];
-
 /** Business Storyboard: customer journey flow (PLAN.md §13 Phase 4). */
 export default function BusinessStoryboardPage() {
-  const seed = useCallback(() => {
-    const nodes = STEPS.map(([type, label, notes], i) => ({ id: `s${i}`, type, label, notes, contactId: '', x: 60 + i * 230, y: 200 + (i % 2) * 90 }));
-    nodes.push({ id: 'h', type: 'handoff', label: 'Hand to a person', notes: 'Complaints, custom orders or anything the bot is unsure about.', contactId: '', x: 520, y: 470 });
-    const edges = STEPS.slice(1).map((_, i) => ({ id: `e${i}`, from: `s${i}`, to: `s${i + 1}`, label: '' }));
-    edges.push({ id: 'eh', from: 's1', to: 'h', label: 'unsure' });
-    return { nodes, edges };
-  }, []);
-
   return (
     <div className="page-container story-page">
       <StoryboardHeader
@@ -49,7 +33,7 @@ export default function BusinessStoryboardPage() {
         description="Lay out how a DM turns into a customer: entry, questions, offers, bookings and handoffs. Test it as a new customer on the right."
       />
       <div className="story-layout">
-        <StoryboardCanvas kind="business" nodeTypes={NODE_TYPES} seed={seed} />
+        <StoryboardCanvas kind="business" nodeTypes={NODE_TYPES} templates={BUSINESS_TEMPLATES} />
         <SandboxChat senderId="sandbox_customer" senderName="a new customer" placeholder="Hi, what are your prices?" />
       </div>
     </div>
