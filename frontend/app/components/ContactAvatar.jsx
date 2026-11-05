@@ -6,7 +6,7 @@ import React, { useState } from 'react';
  * High-performance Monochrome Avatar Component (Light Theme)
  * - Fetches Instagram DP / Profile picture
  * - Robust multi-tier fallback (Instagram -> Unavatar -> Clean Initials)
- * - Monochrome AI indicator dot: Full AI (solid black), Only Reels (ring), Paused (dim dot)
+ * - Monochrome AI indicator dot: Full AI (solid black), Paused (dim dot)
  */
 export default function ContactAvatar({ contact, size = 40, showStatus = true, style = {} }) {
   const [imgError, setImgError] = useState(false);
@@ -37,9 +37,8 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
   }
 
   // Monochrome status indicator
-  const isPaused = contact.aiEnabled === false;
-  const isReelsOnly = !isPaused && contact.replyToMessages === false && contact.replyToReelsAndPosts !== false;
-  const statusTitle = isPaused ? 'AI Paused (Manual)' : (isReelsOnly ? 'AI Only Reacts to Reels' : 'Full AI Active');
+  const isPaused = contact.aiEnabled === false || contact.replyToMessages === false;
+  const statusTitle = isPaused ? 'AI Paused (Manual)' : 'Full AI Active';
 
   const handleImgError = () => {
     if (!imgError && contact.profilePic) {
@@ -123,7 +122,7 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
             height: `${Math.max(8, Math.floor(size * 0.22))}px`,
             borderRadius: '50%',
             background: isPaused ? 'var(--color-surface)' : 'var(--color-text-primary)',
-            border: isPaused ? '2px solid var(--color-text-muted)' : (isReelsOnly ? '2px solid var(--color-text-primary)' : '2px solid var(--color-surface)'),
+            border: isPaused ? '2px solid var(--color-text-muted)' : '2px solid var(--color-surface)',
             boxShadow: '0 0 0 1px var(--color-border)',
             display: 'block'
           }}

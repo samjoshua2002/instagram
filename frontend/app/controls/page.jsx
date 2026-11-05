@@ -8,7 +8,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import BusinessPolicyCard from '../components/BusinessPolicyCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
-import { Search, Bot, Film, Pause, X } from 'lucide-react';
+import { Search, Bot, Pause, X } from 'lucide-react';
 import './controls.css';
 
 // Who the AI answers. Short words so each option fits one line on a phone.
@@ -20,8 +20,7 @@ const CHAT_MODES = [
 
 // One switch per contact
 const CONTACT_MODES = [
-  { id: 'full_ai', label: 'AI', icon: Bot, hint: 'AI replies to messages and reels' },
-  { id: 'reels_only', label: 'Reels', icon: Film, hint: 'AI only reacts to shared reels' },
+  { id: 'full_ai', label: 'AI', icon: Bot, hint: 'AI replies to messages' },
   { id: 'paused', label: 'Off', icon: Pause, hint: 'You reply yourself' },
 ];
 
@@ -38,7 +37,7 @@ function ControlsPageContent() {
   } = useApp();
 
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'manual'
 
   const friendNodes = useMemo(() => {
     const list = nodes.filter(n => !n.isRoot);
@@ -118,23 +117,20 @@ function ControlsPageContent() {
     const chatMode = routingConfig.chatMode;
     if (chatMode === 'only_selected') {
       const included = isIncluded(contact);
-      if (!included || contact.aiEnabled === false) return 'manual';
-      if (contact.replyToMessages === false && contact.replyToReelsAndPosts !== false) return 'reels_only';
+      if (!included || contact.aiEnabled === false || contact.replyToMessages === false) return 'manual';
       return 'full_ai';
     } else if (chatMode === 'everyone_except') {
       const excluded = isExcluded(contact);
-      if (excluded || contact.aiEnabled === false) return 'manual';
-      if (contact.replyToMessages === false && contact.replyToReelsAndPosts !== false) return 'reels_only';
+      if (excluded || contact.aiEnabled === false || contact.replyToMessages === false) return 'manual';
       return 'full_ai';
     } else {
       // everyone
-      if (contact.aiEnabled === false) return 'manual';
-      if (contact.replyToMessages === false && contact.replyToReelsAndPosts !== false) return 'reels_only';
+      if (contact.aiEnabled === false || contact.replyToMessages === false) return 'manual';
       return 'full_ai';
     }
   }, [routingConfig.chatMode, isIncluded, isExcluded]);
 
-  // Direct Button Switcher: Full AI, Reels Only, Stop AI (Instant Two-Way Sync)
+  // Direct Button Switcher: Full AI, Stop AI (Instant Two-Way Sync)
   const handleSetMode = useCallback((contact, mode) => {
     const key = getContactKey(contact);
     const targetKeys = getTargetKeys(contact);
@@ -148,7 +144,7 @@ function ControlsPageContent() {
     let updated = { ...baseConfig };
     if (chatMode === 'only_selected') {
       const current = (baseConfig.includedContactIds || []).filter(Boolean);
-      if (mode === 'full_ai' || mode === 'reels_only') {
+      if (mode === 'full_ai') {
         // Must be in whitelist
         if (!current.some(id => targetKeys.includes(id))) {
           updated.includedContactIds = [...current, key];
@@ -165,7 +161,7 @@ function ControlsPageContent() {
           updated.excludedContactIds = [...current, key];
         }
       } else {
-        // Full AI or Reels Only -> remove from excluded blacklist
+        // Full AI -> remove from excluded blacklist
         updated.excludedContactIds = current.filter(id => !targetKeys.includes(id));
       }
     }
@@ -228,10 +224,6 @@ function ControlsPageContent() {
     return filteredFriends.filter(c => getContactMode(c) === 'full_ai');
   }, [filteredFriends, getContactMode]);
 
-  const reelsOnlyContacts = useMemo(() => {
-    return filteredFriends.filter(c => getContactMode(c) === 'reels_only');
-  }, [filteredFriends, getContactMode]);
-
   const manualContacts = useMemo(() => {
     return filteredFriends.filter(c => getContactMode(c) === 'manual');
   }, [filteredFriends, getContactMode]);
@@ -254,7 +246,6 @@ function ControlsPageContent() {
   const tabs = [
     { id: 'all', label: 'All', list: filteredFriends },
     { id: 'full_ai', label: 'AI', list: fullAiContacts },
-    { id: 'reels_only', label: 'Reels', list: reelsOnlyContacts },
     { id: 'manual', label: 'Off', list: manualContacts },
   ];
   const visible = (tabs.find(t => t.id === activeTab) || tabs[0]).list;
@@ -262,7 +253,7 @@ function ControlsPageContent() {
   const listHint = chatMode === 'everyone_except'
     ? 'Set someone to Off to reply to them yourself.'
     : chatMode === 'only_selected'
-      ? 'Set people to AI or Reels to turn replies on for them.'
+      ? 'Set people to AI to turn replies on for them.'
       : 'Set someone to Off to stop AI for just that person.';
 
   const renderRow = (contact) => {

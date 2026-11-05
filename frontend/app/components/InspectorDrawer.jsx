@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import ContactAvatar from './ContactAvatar';
 import {
-  X, Sparkles, Clock, Check, Film, PauseCircle, Trash2, Link2,
+  X, Sparkles, Clock, Check, PauseCircle, Trash2, Link2,
   AlertTriangle, Save, UserCheck, Plus, RefreshCw, MessageSquare
 } from 'lucide-react';
 
@@ -63,9 +63,8 @@ export default function InspectorDrawer() {
 
   if (!selectedNode) return null;
 
-  const isPaused = selectedNode.aiEnabled === false;
-  const isReelsOnly = !isPaused && selectedNode.replyToMessages === false && selectedNode.replyToReelsAndPosts !== false;
-  const isFullAi = !isPaused && !isReelsOnly;
+  const isPaused = selectedNode.aiEnabled === false || selectedNode.replyToMessages === false;
+  const isFullAi = !isPaused;
   const hasInstagramId = Boolean(selectedNode.handle || selectedNode.senderId);
 
   const handleSaveForm = async (e) => {
@@ -293,13 +292,13 @@ export default function InspectorDrawer() {
               borderRadius: '4px',
               fontFamily: "var(--font-label)",
               fontWeight: '700',
-              background: isPaused ? 'rgba(239, 68, 68, 0.15)' : (isReelsOnly ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
-              color: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981'),
+              background: isPaused ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              color: isPaused ? '#ef4444' : '#10b981',
               border: '1px solid',
-              borderColor: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981')
+              borderColor: isPaused ? '#ef4444' : '#10b981'
             }}
           >
-            {isPaused ? 'SAM MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
+            {isPaused ? 'SAM MANUAL' : 'FULL AI'}
           </span>
         </div>
 
@@ -324,28 +323,6 @@ export default function InspectorDrawer() {
           >
             <Sparkles size={12} />
             <span>Full AI</span>
-          </button>
-
-          <button
-            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'reels_only' })}
-            style={{
-              flex: 1,
-              padding: '8px 6px',
-              borderRadius: '6px',
-              fontSize: '0.74rem',
-              fontWeight: isReelsOnly ? '800' : '500',
-              cursor: 'pointer',
-              background: isReelsOnly ? '#f59e0b' : 'var(--color-text-primary)',
-              color: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-              border: isReelsOnly ? '1px solid #f59e0b' : '1px solid var(--color-text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px'
-            }}
-          >
-            <Film size={12} />
-            <span>Only Reels</span>
           </button>
 
           <button

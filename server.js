@@ -25,6 +25,7 @@ const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
+const { shouldSendAiTextReply, preferencesForMode } = require('./lib/replyPolicy');
 const workspaceFeatureService = require('./services/workspaceFeatureService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
@@ -806,24 +807,24 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     return;
   }
 
-  // Check per-person reply toggles
-  if (isReelOrShare && userMemory.replyToReelsAndPosts === false) {
-    console.log(`⏸️ Reel/Post reply disabled for @${userMemory.username}. Skipping.`);
-    return;
-  }
-  if (!isReelOrShare && userMemory.replyToMessages === false) {
-    console.log(`⏸️ Message reply disabled for @${userMemory.username}. Skipping.`);
-    return;
+  // 5. Shared Reel/Post: never send an AI text reply. The AI only sees the caption, not the
+  // video, so its replies were guesses. Only the optional emoji reaction is sent (personal accounts).
+  if (isReelOrShare) {
+    const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
+    const workspaceFeatures = await workspaceFeatureService.getFeaturesSafe(ownerUser);
+    if (!isBusinessTenant && workspaceFeatures.enabledFeatures.reelEmojiReactions && mid && mid !== 'random_mid') {
+      SocialGraph.findOne({ senderId, ...graphOwnerFilter(ownerUser) }, { roastiness: 1 }).lean()
+        .catch(() => null)
+        .then(node => instagramService.sendMessageReaction(senderId, mid, reelReactionEmoji(node?.roastiness), creatorAccessToken))
+        .catch(() => {});
+    }
   }
 
-  // 5. If user shared a Reel/Post or media, react with an emoji first (personal accounts only)
-  const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
-  const workspaceFeatures = await workspaceFeatureService.getFeaturesSafe(ownerUser);
-  if (!isBusinessTenant && workspaceFeatures.enabledFeatures.reelEmojiReactions && isReelOrShare && mid && mid !== 'random_mid') {
-    SocialGraph.findOne({ senderId, ...graphOwnerFilter(ownerUser) }, { roastiness: 1 }).lean()
-      .catch(() => null)
-      .then(node => instagramService.sendMessageReaction(senderId, mid, reelReactionEmoji(node?.roastiness), creatorAccessToken))
-      .catch(() => {});
+  if (!shouldSendAiTextReply({ aiEnabled: userMemory.aiEnabled, replyToMessages: userMemory.replyToMessages, isReelOrShare })) {
+    console.log(isReelOrShare
+      ? `⏭️ Reel/Post from @${userMemory.username}: no AI text reply.`
+      : `⏸️ Message reply disabled for @${userMemory.username}. Skipping.`);
+    return;
   }
 
   // 6. Anti-Spam / Debounce Logic:
@@ -835,7 +836,6 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     clearTimeout(existing.timer);
     existing.messages.push({ text: messageText, mid });
     existing.lastMid = mid;
-    existing.isReelOrShare = existing.isReelOrShare || isReelOrShare;
 
     console.log(`⏳ [Anti-Spam / Debounce]: User ${senderId} sent another message (${existing.messages.length} queued). Holding on for ${DEBOUNCE_WAIT_MS / 1000}s...`);
 
@@ -860,7 +860,6 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     config,
     messages: [{ text: messageText, mid }],
     lastMid: mid,
-    isReelOrShare,
     timer: null,
   };
 
@@ -889,7 +888,7 @@ async function dispatchDebouncedReply(queueEntry) {
 }
 
 async function writeAndSendReply(queueEntry, flight) {
-  const { key: mediaKey, senderId, recipientId, targetAccountId, creatorAccessToken, ownerUser, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
+  const { key: mediaKey, senderId, recipientId, targetAccountId, creatorAccessToken, ownerUser, userMemory, config, messages, lastMid } = queueEntry;
 
   // Combine multiple messages if user sent a cluster
   const combinedText = messages.map(m => m.text).join('\n');
@@ -934,7 +933,7 @@ async function writeAndSendReply(queueEntry, flight) {
     : null;
   const fallbackReply = isBusinessTenant
     ? 'Thanks for your message! Our team will get back to you shortly.'
-    : (isReelOrShare ? '😂😂😂' : 'yoo wassup!');
+    : 'yoo wassup!';
 
   try {
     // Turn on typing indicator while generating (fire-and-forget so a slow Graph call never delays the reply)
@@ -1032,13 +1031,13 @@ async function writeAndSendReply(queueEntry, flight) {
     let humanTypingDelayMs;
     if (!enabledFeatures.antiAiHumanMimicry) {
       humanTypingDelayMs = 0;
-    } else if (isUltraShort || (isReelOrShare && charLength <= 8)) {
+    } else if (isUltraShort) {
       humanTypingDelayMs = 300;
     } else {
       humanTypingDelayMs = Math.min(300 + charLength * 4, 1200);
     }
 
-    console.log(`⏳ [Realistic Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
+    console.log(`⏳ [Realistic Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort})...`);
 
     // Keep typing indicator actively pulsing on Instagram every 3.5 seconds so it NEVER drops while typing
     instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
@@ -2996,7 +2995,7 @@ app.delete('/api/social-graph/node/:name', async (req, res) => {
   }
 });
 
-// Update per-person AI reply policy (Full AI, Only Reels, Stop AI / Sam Manual)
+// Update per-person AI reply policy (Full AI, Stop AI / Sam Manual)
 app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -3006,22 +3005,11 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
     let finalReplyMessages = replyToMessages;
     let finalReplyReels = replyToReelsAndPosts;
 
-    if (aiMode === 'full_ai') {
-      finalAiEnabled = true;
-      finalReplyMessages = true;
-      finalReplyReels = true;
-    } else if (aiMode === 'reels_only') {
-      finalAiEnabled = true;
-      finalReplyMessages = false;
-      finalReplyReels = true;
-    } else if (aiMode === 'messages_only') {
-      finalAiEnabled = true;
-      finalReplyMessages = true;
-      finalReplyReels = false;
-    } else if (aiMode === 'paused' || aiMode === 'manual') {
-      finalAiEnabled = false;
-      finalReplyMessages = false;
-      finalReplyReels = false;
+    const modePrefs = preferencesForMode(aiMode);
+    if (modePrefs) {
+      finalAiEnabled = modePrefs.aiEnabled;
+      finalReplyMessages = modePrefs.replyToMessages;
+      finalReplyReels = modePrefs.replyToReelsAndPosts;
     }
 
     const cleanId = (identifier || '').trim();
