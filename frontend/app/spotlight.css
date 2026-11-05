@@ -10,7 +10,7 @@
   --sh-text: #ffffff;
   --sh-text-2: #d9a7aa;
   --sh-accent: #ff8f8f;
-  --sh-action: #4cd964;
+  --sh-action: var(--ambient-accent, #4cd964); /* follows the banner colour */
 }
 :root[data-theme="light"] {
   --sh-bg-1: #fff1f1;
@@ -21,7 +21,7 @@
   --sh-text: #2a1217;
   --sh-text-2: #8a4a50;
   --sh-accent: #d6455a;
-  --sh-action: var(--sp-green-press, #1db954);
+  --sh-action: var(--ambient-accent, var(--sp-green-press, #1db954));
 }
 
 .sh-home {

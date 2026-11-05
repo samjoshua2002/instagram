@@ -16,7 +16,7 @@ const TOPICS = {
 const TONES = ['black_and_white', 'black', 'white', 'yellow', 'orange', 'red', 'purple', 'magenta', 'green', 'teal', 'blue'];
 for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: 'wavy lines', color: tone };
 
-const STORE_VERSION = 'waves1';
+const STORE_VERSION = 'waves2';
 const REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // ask Unsplash for a new list at most once a week per topic
 const RETRY_MS = 10 * 60 * 1000; // after a network/server error
 const LIMIT_MS = 60 * 60 * 1000; // after 429/403 or when the hourly quota is nearly used up
@@ -30,9 +30,20 @@ const PLAIN = /\b(gradients?|blur|blurred|blurry|bokeh|plain|solid colou?r)\b/i;
 const TEXTURED = /\b(waves?|wavy|patterns?|textures?|lines?|stripes?|swirls?|curves?|ripples?|folds?|silk)\b/i;
 // Real-world scenes the colour searches sometimes return (a beach is not a wave texture)
 const SCENE = /\b(sand|beach|sea|ocean|shore|water|fur|trees?|forest|mountains?|sky|person|woman|man)\b/i;
+// Grey / black-and-white textures (sand, metal fins) are one colour and give the page a dull
+// grey accent: drop them unless the text names a real colour.
+const HUE = /\b(red|orange|yellow|gold(en)?|green|teal|turquoise|cyan|blue|navy|purple|violet|pink|magenta|multicolou?red|colou?rful|vibrant)\b/i;
+const isGrey = hex => {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return false;
+  const [r, g, b] = m.slice(1).map(x => parseInt(x, 16));
+  return Math.max(r, g, b) - Math.min(r, g, b) < 24;
+};
 const isPlain = p => {
   const text = `${p.alt_description || ''} ${p.description || ''}`;
-  return SCENE.test(text) || (PLAIN.test(text) && !TEXTURED.test(text));
+  if (SCENE.test(text) || /black and white|monochrome|grayscale|greyscale/i.test(text)) return true;
+  if (isGrey(p.color) && !HUE.test(text)) return true;
+  return PLAIN.test(text) && !TEXTURED.test(text);
 };
 
 function toPhotos(results) {
