@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import PageSkeleton from '../components/Skeletons';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import {
@@ -185,7 +186,7 @@ const statCardVariants = {
 };
 
 export default function AnalyticsPage() {
-  const { nodes, routingConfig, user, token, enterWorkspace, API_BASE, showToast, workspaceFeatures } = useApp();
+  const { nodes, routingConfig, user, token, enterWorkspace, API_BASE, showToast, workspaceFeatures, isSyncingInitial } = useApp();
   const confirm = useConfirm();
   const isSuperadmin = user?.role === 'superadmin';
 
@@ -263,6 +264,7 @@ export default function AnalyticsPage() {
   // KPIs + 14-day trends (and the newest leads for business), refreshed every 30s so they show up live
   const isBusinessWorkspace = ['business', 'agency'].includes(user?.accountType);
   const [bizStats, setBizStats] = useState(null);
+  const [bizLoaded, setBizLoaded] = useState(false);
   const [latestLeads, setLatestLeads] = useState([]);
   useEffect(() => {
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
@@ -272,7 +274,8 @@ export default function AnalyticsPage() {
       fetch(`${API_BASE}/api/analytics/overview`, { headers })
         .then(r => (r.ok ? r.json() : null))
         .then(data => { if (data) setBizStats(data); })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setBizLoaded(true));
       if (isBusinessWorkspace) {
         fetch(`${API_BASE}/api/analytics/leads?limit=4`, { headers })
           .then(r => (r.ok ? r.json() : null))
@@ -481,6 +484,14 @@ export default function AnalyticsPage() {
     { label: 'Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null, trend: bizStats?.trends?.bookings },
     { label: 'Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
   ];
+
+  // First load: show the dashboard skeleton until the numbers arrive (no empty zeros flash)
+  const firstLoad = isSuperadmin
+    ? !adminData && !adminError
+    : isBusinessWorkspace
+      ? !bizLoaded
+      : isSyncingInitial && !(nodes || []).some(n => !n.isRoot);
+  if (firstLoad) return <PageSkeleton variant="dashboard" label="Loading analytics" />;
 
   return (
     <motion.div
