@@ -13,6 +13,8 @@ import { useRouter } from 'next/navigation';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
+import { enterMotion } from '../lib/motion';
+import { IconSwap } from '../components/ui/motion';
 
 function SettingsPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating, updateUserProfile } = useApp();
@@ -460,9 +462,7 @@ function SettingsPageContent() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      {...enterMotion}
       className="page-container settings-fullwidth"
      
     >
@@ -803,7 +803,7 @@ function SettingsPageContent() {
                       }}
                       title={showAccessToken ? 'Hide Token' : 'Show Token'}
                     >
-                      {showAccessToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                      <IconSwap k={showAccessToken ? 'eyeoff' : 'eye'}>{showAccessToken ? <EyeOff size={15} /> : <Eye size={15} />}</IconSwap>
                     </button>
                     {formData.instagramPageAccessToken && (
                       <button
@@ -828,7 +828,7 @@ function SettingsPageContent() {
                         }}
                         title="Copy Token"
                       >
-                        {copiedToken ? <Check size={15} /> : <Copy size={15} />}
+                        <IconSwap k={copiedToken ? 'check' : 'copy'}>{copiedToken ? <Check size={15} /> : <Copy size={15} />}</IconSwap>
                       </button>
                     )}
                   </div>
@@ -1328,7 +1328,7 @@ function SettingsPageContent() {
                   }}
                   title={showGiphyKey ? 'Hide Key' : 'Show Key'}
                 >
-                  {showGiphyKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <IconSwap k={showGiphyKey ? 'eyeoff' : 'eye'}>{showGiphyKey ? <EyeOff size={16} /> : <Eye size={16} />}</IconSwap>
                 </button>
               </div>
             </div>

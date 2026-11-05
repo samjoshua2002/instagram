@@ -1,0 +1,149 @@
+/* ═══════════════════════════════════════════
+   Motion system (CSS side). Same numbers as app/lib/motion.js.
+   Entrances ease-out · moves ease-in-out · exits ease-in, 20% shorter.
+   ═══════════════════════════════════════════ */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-press: 100ms;
+  --dur-dropdown: 200ms;
+  --dur-dropdown-exit: 160ms;
+  --dur-enter: 240ms;
+  --dur-exit: 192ms;
+  --dur-move: 300ms;
+  --stagger: 30ms;
+
+  /* Older tokens now follow the system */
+  --duration-fast: 160ms;
+  --duration-normal: var(--dur-dropdown);
+}
+
+/* ── Sliding indicator (segments / pill tabs) ──
+   The active item keeps its text colour but drops its own background;
+   the shared .seg-indicator paints it and morphs between items. */
+:where(.sheet-segment, .mode-segment) { --seg-bg: var(--color-text-primary); }
+:where(.spx-pills, .people-pills) { --seg-bg: #1db954; }
+:where(.sp-chips) { --seg-bg: var(--sp-green); }
+:where(.sh-chips) { --seg-bg: var(--sh-accent); }
+
+:is(button, a, [role='tab']):has(> .seg-indicator) {
+  position: relative;
+  isolation: isolate;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.seg-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 9999px;
+  background: var(--seg-bg, var(--color-text-primary));
+  pointer-events: none;
+}
+
+/* Underline tabs: the indicator is the 3px bar */
+.person-tab:has(> .seg-indicator) { border-bottom-color: transparent !important; }
+.seg-indicator.seg-underline {
+  inset: auto 0 -1px 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--ambient-dominant);
+}
+
+/* Colour of text in segments follows the moving pill (ease-in-out, same timing) */
+.sheet-segment button,
+.story-tab,
+.spx-pill,
+.sp-chip,
+.sh-chip,
+.person-tab {
+  transition: color var(--dur-move) var(--ease-in-out), background var(--duration-fast) ease;
+}
+
+/* ── Icon crossfade + blur ── */
+.icon-swap {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.icon-swap-item {
+  display: inline-flex;
+  grid-area: 1 / 1;
+}
+/* Sheet rows give their first <span> (the label) flex:1; the icon wrapper must not take it */
+.sheet-list button span.icon-swap,
+.sheet-list button span.icon-swap-item { flex: 0 0 auto; }
+.sheet-list button > span.icon-swap + span { flex: 1; }
+
+/* ── Switch knob: framer moves it; CSS only animates colour and the hold-stretch ── */
+.feature-switch {
+  transition: background var(--dur-move) var(--ease-in-out), border-color var(--dur-move) var(--ease-in-out);
+}
+.feature-switch .feature-switch-thumb {
+  transition: background var(--dur-move) var(--ease-in-out), width 140ms var(--ease-out), margin 140ms var(--ease-out);
+}
+/* Held: knob stretches 12%+ toward the side it will travel to */
+.feature-switch:not(:disabled):active .feature-switch-thumb { width: 24px; }
+.feature-switch[data-state='checked']:not(:disabled):active .feature-switch-thumb { margin-left: -4px; }
+
+/* ── Waterfall for plain (non-framer) lists: rows rise in 30ms apart ── */
+/* Uses `translate` + fill "backwards" so it never overrides an element's own transform/hover lift */
+@keyframes motion-rise {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+.stagger-in > * { animation: motion-rise var(--dur-enter) var(--ease-out) backwards; }
+.stagger-in > :nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
+.stagger-in > :nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
+.stagger-in > :nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
+.stagger-in > :nth-child(5) { animation-delay: calc(var(--stagger) * 4); }
+.stagger-in > :nth-child(6) { animation-delay: calc(var(--stagger) * 5); }
+.stagger-in > :nth-child(7) { animation-delay: calc(var(--stagger) * 6); }
+.stagger-in > :nth-child(8) { animation-delay: calc(var(--stagger) * 7); }
+.stagger-in > :nth-child(9) { animation-delay: calc(var(--stagger) * 8); }
+.stagger-in > :nth-child(10) { animation-delay: calc(var(--stagger) * 9); }
+.stagger-in > :nth-child(11) { animation-delay: calc(var(--stagger) * 10); }
+.stagger-in > :nth-child(n + 12) { animation-delay: calc(var(--stagger) * 11); }
+
+/* ── Settle: the card lands first, then its details arrive 30ms apart ──
+   Base delay grows with the card's place in its grid (cards themselves stagger 30ms). */
+.settle { --settle-base: 150ms; }
+.settle > * {
+  animation: motion-rise 200ms var(--ease-out) backwards;
+  animation-delay: calc(var(--settle-base) + var(--k, 0) * var(--stagger));
+}
+.settle > :nth-child(2) { --k: 1; }
+.settle > :nth-child(3) { --k: 2; }
+.settle > :nth-child(n + 4) { --k: 3; }
+.stats-grid > .settle:nth-child(2) { --settle-base: 180ms; }
+.stats-grid > .settle:nth-child(3) { --settle-base: 210ms; }
+.stats-grid > .settle:nth-child(n + 4) { --settle-base: 240ms; }
+
+/* ── Success pulse: gentle outward wave ── */
+@keyframes motion-pulse {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse-color, var(--color-success, #1db954)) 55%, transparent); }
+  to { box-shadow: 0 0 0 10px color-mix(in srgb, var(--pulse-color, var(--color-success, #1db954)) 0%, transparent); }
+}
+.motion-pulse { animation: motion-pulse 600ms var(--ease-out); }
+.toast-success .toast-icon {
+  border-radius: 50%;
+  animation: motion-pulse 600ms var(--ease-out) 120ms;
+}
+
+/* ── Theme change: circular mask grows out of the button that was pressed ── */
+html.theme-vt::view-transition-old(root),
+html.theme-vt::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html.theme-vt::view-transition-new(root) { z-index: 2; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-in > *,
+  .settle > *,
+  .motion-pulse,
+  .toast-success .toast-icon { animation: none; }
+  .feature-switch .feature-switch-thumb { transition: background 0.15s linear; }
+}

@@ -33,6 +33,7 @@ import {
   LogOut,
   X
 } from 'lucide-react';
+import { IconSwap } from './ui/motion';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
@@ -1588,7 +1589,7 @@ export default function LoginPage({ onLoginSuccess }) {
                               padding: 0
                             }}
                           >
-                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            <IconSwap k={showPassword ? 'eyeoff' : 'eye'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</IconSwap>
                           </button>
                         </div>
                       </div>
@@ -1884,7 +1885,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             onClick={() => setShowPassword(!showPassword)}
                             style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
                           >
-                            {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                            <IconSwap k={showPassword ? 'eyeoff' : 'eye'}>{showPassword ? <EyeOff size={15} /> : <Eye size={15} />}</IconSwap>
                           </button>
                         </div>
                       </div>
@@ -2397,7 +2398,7 @@ export default function LoginPage({ onLoginSuccess }) {
                         onClick={() => setShowRegPassword(!showRegPassword)}
                         style={{ position: 'absolute', right: '11px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
                       >
-                        {showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        <IconSwap k={showRegPassword ? 'eyeoff' : 'eye'}>{showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}</IconSwap>
                       </button>
                     </div>
                   </div>

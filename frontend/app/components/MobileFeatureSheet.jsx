@@ -17,6 +17,12 @@ import {
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../lib/theme';
 import WorkspaceModeSwitch from './WorkspaceModeSwitch';
+import { SegIndicator, IconSwap, useSegId } from './ui/motion';
+import { EASE_IN, EASE_OUT, STAGGER, backdropMotion, exitOf, listItem } from '../lib/motion';
+
+const SHEET_IN = 0.32;
+const tilesContainer = { hidden: {}, show: { transition: { delayChildren: 0.12, staggerChildren: STAGGER } } };
+const MotionLink = motion.create ? motion.create(Link) : motion(Link);
 
 /**
  * Mobile Bottom Sheet Drawer (PLAN.md §15.5.3)
@@ -38,6 +44,7 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
   // Drag-to-close starts only from the grabber/header so the sheet body can scroll on touch screens.
   const dragControls = useDragControls();
   const startDrag = e => dragControls.start(e);
+  const themeSeg = useSegId();
 
   const isPureSuperadmin = user?.role === 'superadmin' && !isImpersonating;
 
@@ -64,10 +71,7 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
         <>
           <motion.div
             className="sheet-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            {...backdropMotion}
             onClick={onClose}
           />
           <motion.div
@@ -75,15 +79,20 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
             role="dialog"
             aria-modal="true"
             aria-label="All features"
+            // No spring bounce: ease-out in, ease-in out (20% shorter)
             initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+            animate={{ y: 0, transition: { duration: SHEET_IN, ease: EASE_OUT } }}
+            exit={{ y: '100%', transition: { duration: exitOf(SHEET_IN), ease: EASE_IN } }}
+            // Held: follows the finger 1:1. Past the top it rubber-bands, then snaps back.
             drag="y"
             dragListener={false}
             dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.6 }}
+            // bottom: 1 = exactly under the finger; top: 0.08 = resistance past the top edge.
+            // Release snaps back overdamped (no bounce) unless it was pulled far / fast enough to close.
+            dragElastic={{ top: 0.08, bottom: 1 }}
+            dragMomentum={false}
+            dragTransition={{ bounceStiffness: 500, bounceDamping: 50 }}
             onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}
           >
             <div className="sheet-drag-zone" onPointerDown={startDrag}>
@@ -118,9 +127,11 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
               <div className="sheet-label">Theme</div>
               <div className="sheet-segment">
                 <button type="button" className={theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}>
+                  {theme === 'dark' && <SegIndicator id={themeSeg} />}
                   <Moon size={16} /> Dark
                 </button>
                 <button type="button" className={theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}>
+                  {theme === 'light' && <SegIndicator id={themeSeg} />}
                   <Sun size={16} /> Light
                 </button>
               </div>
@@ -129,21 +140,24 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
             {/* Every platform route */}
             <div className="sheet-section">
               <div className="sheet-label">All features</div>
-              <div className="sheet-grid">
+              {/* Sheet lands first, then the tiles settle in a 30ms waterfall */}
+              <motion.div className="sheet-grid" variants={tilesContainer} initial="hidden" animate="show">
                 {items.map(({ href, label, icon: Icon }) => (
-                  <Link key={href} href={href} onClick={onClose} className={`sheet-tile${pathname === href ? ' active' : ''}`}>
+                  <MotionLink variants={listItem} key={href} href={href} onClick={onClose} className={`sheet-tile${pathname === href ? ' active' : ''}`}>
                     <Icon className="icon-keep" size={20} />
                     <span>{label}</span>
-                  </Link>
+                  </MotionLink>
                 ))}
-              </div>
+              </motion.div>
             </div>
 
             {/* Account actions */}
             <div className="sheet-section sheet-list">
               {!isPureSuperadmin && (
                 <button type="button" onClick={toggleGlobalBot}>
-                  {routingConfig?.globalBotActive ? <Pause size={18} /> : <Play size={18} />}
+                  <IconSwap k={routingConfig?.globalBotActive ? 'pause' : 'play'}>
+                    {routingConfig?.globalBotActive ? <Pause size={18} /> : <Play size={18} />}
+                  </IconSwap>
                   <span>{routingConfig?.globalBotActive ? 'Pause automation' : 'Resume automation'}</span>
                   <span className={`sheet-dot${routingConfig?.globalBotActive ? ' on' : ''}`} />
                 </button>

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
+import { enterMotion } from '../lib/motion';
 
 function MediaVaultPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating } = useApp();
@@ -473,9 +474,7 @@ function MediaVaultPageContent() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      {...enterMotion}
       className="page-container settings-fullwidth"
      
     >
@@ -1222,7 +1221,7 @@ function MediaVaultPageContent() {
 
       {/* GALLERY GRID */}
       {galleryView === 'predefined' ? (
-        <div style={{
+        <div className="stagger-in" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
           gap: '14px'
@@ -1375,7 +1374,7 @@ function MediaVaultPageContent() {
           </button>
         </div>
       ) : (
-        <div style={{
+        <div className="stagger-in" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
           gap: '14px'

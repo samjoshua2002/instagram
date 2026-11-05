@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Cpu, Save, PlugZap, CheckCircle2, XCircle, Sparkles, Terminal, Globe, Server, Bot, Zap, Cloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { enterMotion, revealMotion } from '../lib/motion';
 
 // Field hints per provider; must match services/llmAdapter.js
 const PROVIDERS = [
@@ -187,7 +188,6 @@ export default function AiProviderCard() {
             <motion.div
               key={p.id}
               whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
               onClick={() => set('provider', p.id)}
               style={{
                 display: 'flex',
@@ -277,9 +277,7 @@ export default function AiProviderCard() {
       {/* Dynamic Endpoint, Model, and Key Fields */}
       {form.provider !== 'azure' && (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          {...enterMotion}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -357,9 +355,7 @@ export default function AiProviderCard() {
       <AnimatePresence>
         {testResult && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            {...revealMotion}
             style={{
               display: 'flex',
               alignItems: 'center',

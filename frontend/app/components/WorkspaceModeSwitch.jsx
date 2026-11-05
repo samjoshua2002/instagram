@@ -5,6 +5,7 @@ import { User, Briefcase, Layers } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { WORKSPACE_MODES, currentMode } from '../lib/workspaceFeatures';
+import { SegIndicator, useSegId } from './ui/motion';
 
 const MODE_ICONS = { personal: User, business: Briefcase, hybrid: Layers };
 
@@ -16,12 +17,18 @@ const MODE_ICONS = { personal: User, business: Briefcase, hybrid: Layers };
 export default function WorkspaceModeSwitch({ compact = false }) {
   const { user, workspaceFeatures, updateWorkspaceFeatures, showToast } = useApp();
   const [switching, setSwitching] = useState(false);
-  const mode = currentMode(workspaceFeatures, user);
+  // The pill slides the moment you tap (optimistic); it slides back if saving fails
+  const [pending, setPending] = useState(null);
+  const saved = currentMode(workspaceFeatures, user);
+  const mode = pending || saved;
+  const seg = useSegId();
 
   const switchMode = async next => {
     if (next === mode || switching) return;
     setSwitching(true);
+    setPending(next);
     const ok = await updateWorkspaceFeatures({ activeMode: next });
+    setPending(null);
     setSwitching(false);
     if (ok) showToast?.(`Switched to ${WORKSPACE_MODES.find(m => m.key === next).label} mode`, 'success');
   };
@@ -39,6 +46,7 @@ export default function WorkspaceModeSwitch({ compact = false }) {
         const Icon = MODE_ICONS[key];
         return (
           <ToggleGroupItem key={key} value={key} title={hint} className={mode === key ? 'active' : ''}>
+            {mode === key && <SegIndicator id={seg} />}
             <Icon size={compact ? 13 : 16} /> {label}
           </ToggleGroupItem>
         );

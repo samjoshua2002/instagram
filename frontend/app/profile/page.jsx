@@ -31,8 +31,10 @@ import {
   UploadCloud
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { dropMotion, maskCircleMotion } from '../lib/motion';
 import { startRegistration } from '@simplewebauthn/browser';
 import ChangePasswordCard from '../components/ChangePasswordCard';
+import { IconSwap } from '../components/ui/motion';
 
 const formatAddress = (addr) => {
   if (!addr) return '';
@@ -353,9 +355,7 @@ export default function ProfilePage() {
       <AnimatePresence>
         {errorMsg && (
           <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            {...dropMotion}
             style={{
               background: 'color-mix(in srgb, #ef4444 12%, transparent)',
               border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
@@ -377,9 +377,7 @@ export default function ProfilePage() {
 
         {successMsg && (
           <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            {...dropMotion}
             style={{
               background: 'color-mix(in srgb, #22c55e 12%, transparent)',
               border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
@@ -466,9 +464,7 @@ export default function ProfilePage() {
             <AnimatePresence>
               {(avatarHover || uploadingAvatar) && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  {...maskCircleMotion}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -847,7 +843,7 @@ export default function ProfilePage() {
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted, var(--color-text-secondary))' }}
                       title="Copy ID"
                     >
-                      {copiedId ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}
+                      <IconSwap k={copiedId ? 'check' : 'copy'}>{copiedId ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}</IconSwap>
                     </button>
                   )}
                 </div>

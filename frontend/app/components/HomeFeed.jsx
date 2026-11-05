@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Bell, ChevronRight, MessageCircle, Film, Cake, PauseCircle, BotOff, Play } from 'lucide-react';
+import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from './ContactAvatar';
 
@@ -67,7 +68,7 @@ function Shelf({ title, subtitle, href, children }) {
         </div>
         {href && <Link href={href} className="sp-show-all">Show all</Link>}
       </div>
-      <div className="sp-shelf-row">{children}</div>
+      <div className="sp-shelf-row stagger-in">{children}</div>
     </section>
   );
 }
@@ -204,6 +205,7 @@ export default function HomeFeed() {
             className={`sp-chip${category === c.id ? ' active' : ''}`}
             onClick={() => setCategory(c.id)}
           >
+            {category === c.id && <SegIndicator id="seg-home-feed" />}
             {c.label}
           </button>
         ))}
@@ -220,7 +222,7 @@ export default function HomeFeed() {
       ) : (
         <>
           {quick.length > 0 && (
-            <div className="sp-quick">
+            <div className="sp-quick stagger-in">
               {quick.map(p => (
                 <Link key={p.id} href={personHref(p)} className="sp-quick-tile">
                   <PersonArt person={p} />
@@ -259,7 +261,7 @@ export default function HomeFeed() {
               <h2 className="sp-shelf-title">Most chatted all time</h2>
               <Link href="/analytics" className="sp-show-all">Analytics</Link>
             </div>
-            <ol className="sp-tracklist">
+            <ol className="sp-tracklist stagger-in">
               {byChats.slice(0, 10).map((p, i) => (
                 <li key={p.id}>
                   <Link href={personHref(p)} className="sp-track">

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import { FileText, Link2, Type, UploadCloud, Trash2, ExternalLink, Loader2 } from 'lucide-react';
+import { IconSwap, SegIndicator } from '../components/ui/motion';
 
 const ACCEPT = '.pdf,.txt,.md,.csv';
 const TABS = [
@@ -132,7 +133,7 @@ export default function DocumentsPage() {
 
       <div className="spx-actions">
         <button type="button" className="spx-play" disabled={busy} onClick={() => openTab('file')}>
-          {busy ? <Loader2 size={20} className="animate-spin" /> : <UploadCloud size={20} />} Upload file
+          <IconSwap k={busy ? 'loader2' : 'uploadcloud'}>{busy ? <Loader2 size={20} className="animate-spin" /> : <UploadCloud size={20} />}</IconSwap> Upload file
         </button>
         <button type="button" className="spx-outline" aria-pressed={tab === 'link'} onClick={() => setTab('link')}>
           <Link2 size={14} /> Add link
@@ -155,6 +156,7 @@ export default function DocumentsPage() {
               className={`spx-pill${tab === id ? ' active' : ''}`}
               onClick={() => setTab(id)}
             >
+              {tab === id && <SegIndicator id="seg-documents" />}
               <Icon size={15} /> {label}
             </button>
           ))}
@@ -172,7 +174,7 @@ export default function DocumentsPage() {
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInput.current?.click()}
           >
             <div className="spx-drop-icon">
-              {busy ? <Loader2 size={26} className="animate-spin icon-keep" /> : <UploadCloud size={26} className="icon-keep" />}
+              <IconSwap k={busy ? 'loader2' : 'uploadcloud'}>{busy ? <Loader2 size={26} className="animate-spin icon-keep" /> : <UploadCloud size={26} className="icon-keep" />}</IconSwap>
             </div>
             <div className="spx-drop-title">{busy ? 'Reading document…' : 'Drop files here or click to browse'}</div>
             <div className="spx-drop-sub">PDF, TXT, MD or CSV, up to 10 MB</div>
@@ -207,7 +209,7 @@ export default function DocumentsPage() {
         <div className="spx-empty-card">Nothing here yet. Add your first price list or FAQ above.</div>
       )}
 
-      {items?.length > 0 && <div className="spx-doc-grid">{items.map((item, idx) => (
+      {items?.length > 0 && <div className="spx-doc-grid stagger-in">{items.map((item, idx) => (
         <div key={item._id} className="spx-doc">
           <div className="spx-doc-art" style={{ background: `linear-gradient(135deg, ${ART[idx % ART.length]} 0%, #121212 140%)` }}>
             <SourceIcon type={item.sourceType} size={28} />

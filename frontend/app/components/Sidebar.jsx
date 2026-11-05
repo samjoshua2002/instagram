@@ -38,6 +38,8 @@ import {
 import { motion } from 'framer-motion';
 import MobileFeatureSheet from './MobileFeatureSheet';
 import { useTheme } from '../lib/theme';
+import { DUR, EASE_OUT, STAGGER } from '../lib/motion';
+import { IconSwap } from './ui/motion';
 
 // Framer Motion Variants for Staggered Fade-in Animation
 const navContainerVariants = {
@@ -45,8 +47,8 @@ const navContainerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.12
+      staggerChildren: STAGGER,
+      delayChildren: 0.1
     }
   }
 };
@@ -57,8 +59,8 @@ const navItemVariants = {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.45,
-      ease: [0.16, 1, 0.3, 1]
+      duration: DUR.enter,
+      ease: EASE_OUT
     }
   }
 };
@@ -68,8 +70,8 @@ const footerContainerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.55
+      staggerChildren: STAGGER,
+      delayChildren: 0.32
     }
   }
 };
@@ -80,8 +82,8 @@ const footerItemVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.45,
-      ease: [0.16, 1, 0.3, 1]
+      duration: DUR.enter,
+      ease: EASE_OUT
     }
   }
 };
@@ -91,8 +93,8 @@ const mobileTabsContainer = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.06,
-      delayChildren: 0.1
+      staggerChildren: STAGGER,
+      delayChildren: 0.08
     }
   }
 };
@@ -103,8 +105,8 @@ const mobileTabVariant = {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.35,
-      ease: [0.16, 1, 0.3, 1]
+      duration: DUR.enter,
+      ease: EASE_OUT
     }
   }
 };
@@ -230,7 +232,7 @@ export default function Sidebar() {
       <motion.header
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: DUR.page, ease: EASE_OUT }}
         className="mobile-header"
       >
         <Link href="/" className="mobile-brand" aria-label="Dashboard">
@@ -257,7 +259,7 @@ export default function Sidebar() {
           )}
 
           <button type="button" onClick={toggleTheme} className="mobile-icon-btn" aria-label="Toggle light or dark theme">
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            <IconSwap k={theme}>{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</IconSwap>
           </button>
 
           <button type="button" onClick={() => setSheetOpen(true)} className="mobile-icon-btn" aria-label="Open all features">
@@ -317,7 +319,7 @@ export default function Sidebar() {
       <motion.aside
         initial={{ opacity: 0, x: -14 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: DUR.page, ease: EASE_OUT }}
         className="floating-sidebar"
       >
         <div>
@@ -325,7 +327,7 @@ export default function Sidebar() {
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: DUR.enter, delay: 0.06, ease: EASE_OUT }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -403,7 +405,7 @@ export default function Sidebar() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.35, delay: 0.1 }}
+              transition={{ duration: DUR.enter, delay: 0.08, ease: EASE_OUT }}
               style={{
                 fontSize: '0.68rem',
                 fontWeight: '700',
@@ -479,7 +481,6 @@ export default function Sidebar() {
             <motion.button
               variants={footerItemVariants}
               whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={openOnboardingWizard}
               style={{
@@ -507,7 +508,6 @@ export default function Sidebar() {
             <motion.button
               variants={footerItemVariants}
               whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={() => startAiInterview(null)}
               style={{
@@ -537,7 +537,6 @@ export default function Sidebar() {
             <motion.button
               variants={footerItemVariants}
               whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={toggleGlobalBot}
               style={{
@@ -557,17 +556,10 @@ export default function Sidebar() {
                 gap: '6px'
               }}
             >
-              {routingConfig.globalBotActive ? (
-                <>
-                  <Pause size={12} />
-                  <span>PAUSE AUTOMATION</span>
-                </>
-              ) : (
-                <>
-                  <Play size={12} />
-                  <span>RESUME AUTOMATION</span>
-                </>
-              )}
+              <IconSwap k={routingConfig.globalBotActive ? 'pause' : 'play'}>
+                {routingConfig.globalBotActive ? <Pause size={12} /> : <Play size={12} />}
+              </IconSwap>
+              <span>{routingConfig.globalBotActive ? 'PAUSE AUTOMATION' : 'RESUME AUTOMATION'}</span>
             </motion.button>
           )}
 
@@ -810,7 +802,7 @@ export default function Sidebar() {
                 aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
                 style={{ borderRadius: '7px', padding: '6px 9px', minHeight: 0 }}
               >
-                {theme === 'light' ? <Moon size={13} /> : <Sun size={13} />}
+                <IconSwap k={theme}>{theme === 'light' ? <Moon size={13} /> : <Sun size={13} />}</IconSwap>
               </button>
 
               <button

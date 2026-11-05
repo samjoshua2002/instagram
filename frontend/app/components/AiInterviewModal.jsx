@@ -1,11 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { backdropMotion, popFromTrigger } from '../lib/motion';
 import { Sparkles, X, Send, Check, User, Link2, Calendar, FileText } from 'lucide-react';
 import ContactAvatar from './ContactAvatar';
 
 export default function AiInterviewModal() {
+  // Pops out of the button that opened it and shrinks back into it on close
+  const reduce = useReducedMotion();
+  const [pop] = useState(() => popFromTrigger({ reduce }));
   const { isAiModalOpen, setIsAiModalOpen, editingNode, saveNode, API_BASE, lookupContact, showToast } = useApp();
 
   const [aiChat, setAiChat] = useState([]);
@@ -57,7 +62,6 @@ export default function AiInterviewModal() {
     }
   }, [accumulatedNode?.instagramHandle, accumulatedNode?.senderId, lookupContact]);
 
-  if (!isAiModalOpen) return null;
 
   const handleSendAiMessage = async (e) => {
     e?.preventDefault();
@@ -139,7 +143,8 @@ export default function AiInterviewModal() {
   };
 
   return (
-    <div
+    <motion.div
+      {...backdropMotion}
       style={{
         position: 'fixed',
         inset: 0,
@@ -152,9 +157,11 @@ export default function AiInterviewModal() {
         padding: '16px'
       }}
     >
-      <div
+      <motion.div
+        {...pop}
         className="interview-modal-container"
         style={{
+          ...pop.style,
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '14px',
@@ -332,7 +339,7 @@ export default function AiInterviewModal() {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

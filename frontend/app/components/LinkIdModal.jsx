@@ -1,12 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { backdropMotion, popFromTrigger } from '../lib/motion';
 import { X, Link2, Search, UserCheck } from 'lucide-react';
 import ContactAvatar from './ContactAvatar';
 
 export default function LinkIdModal() {
-  const { linkingTargetPerson, setLinkingTargetPerson, linkContactId, API_BASE, showToast } = useApp();
+  // Pops out of the button that opened it and shrinks back into it on close
+  const reduce = useReducedMotion();
+  const [pop] = useState(() => popFromTrigger({ reduce }));
+  const { linkingTargetPerson: livePerson, setLinkingTargetPerson, linkContactId, API_BASE, showToast } = useApp();
+  // Keep showing the last person while the close animation plays
+  const lastPerson = useRef(livePerson);
+  if (livePerson) lastPerson.current = livePerson;
+  const linkingTargetPerson = lastPerson.current;
 
   const [handleInput, setHandleInput] = useState('');
   const [senderIdInput, setSenderIdInput] = useState('');
@@ -83,7 +92,8 @@ export default function LinkIdModal() {
   });
 
   return (
-    <div
+    <motion.div
+      {...backdropMotion}
       style={{
         position: 'fixed',
         inset: 0,
@@ -96,8 +106,10 @@ export default function LinkIdModal() {
         padding: '20px'
       }}
     >
-      <div
+      <motion.div
+        {...pop}
         style={{
+          ...pop.style,
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '12px',
@@ -379,7 +391,7 @@ export default function LinkIdModal() {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

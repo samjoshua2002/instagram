@@ -2,6 +2,7 @@ import './globals.css';
 import './spotify.css';
 import './spotlight.css';
 import './spx.css';
+import './motion.css';
 import { AppProvider } from './context/AppContext';
 import AuthGate from './components/AuthGate';
 import AmbientBackground from './components/AmbientBackground';
@@ -10,6 +11,7 @@ import BrowserAlerts from './components/BrowserAlerts';
 import Toaster from './components/Toast';
 import NetworkStatus from './components/NetworkStatus';
 import { DialogProvider } from './context/DialogContext';
+import MotionProvider from './components/MotionProvider';
 import { themeBootScript } from './lib/themeBoot';
 import { Figtree, JetBrains_Mono } from 'next/font/google';
 
@@ -43,7 +45,8 @@ export default function RootLayout({ children }) {
       </head>
       <body style={{ color: 'var(--color-text-primary)', margin: 0, padding: 0 }}>
         <AmbientBackground />
-        <AppProvider>
+        <MotionProvider>
+          <AppProvider>
             <DialogProvider>
               <AuthGate>
                 {children}
@@ -54,6 +57,7 @@ export default function RootLayout({ children }) {
               <Toaster />
             </DialogProvider>
           </AppProvider>
+        </MotionProvider>
       </body>
     </html>
   );

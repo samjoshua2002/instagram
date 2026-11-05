@@ -7,6 +7,7 @@ import ContactAvatar from '../components/ContactAvatar';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import BusinessPolicyCard from '../components/BusinessPolicyCard';
 import { motion, AnimatePresence } from 'framer-motion';
+import { enterMotion, rowMotion } from '../lib/motion';
 import {
   Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle,
   LayoutGrid, List, AlignJustify
@@ -304,7 +305,7 @@ function ControlsPageContent() {
     : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
 
   // Render an Ultra-Compact Mobile-Friendly Contact Row (~42px slim height)
-  const renderDenseContactRow = (contact) => {
+  const renderDenseContactRow = (contact, index = 0) => {
     const isEveryoneMode = routingConfig.chatMode === 'everyone';
     const isChecked = isEveryoneMode
       ? true
@@ -320,10 +321,7 @@ function ControlsPageContent() {
         layout
         key={contact._id || contact.senderId || contact.id || contact.name}
         className="control-contact-dense-row"
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.18 }}
+        {...rowMotion(index)}
         style={{
           background: isChecked && !isEveryoneMode ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
           border: '1px solid',
@@ -458,7 +456,7 @@ function ControlsPageContent() {
   };
 
   // Render a Single Contact Card
-  const renderContactCard = (contact) => {
+  const renderContactCard = (contact, index = 0) => {
     const isEveryoneMode = routingConfig.chatMode === 'everyone';
     const isChecked = isEveryoneMode
       ? true
@@ -474,10 +472,7 @@ function ControlsPageContent() {
         layout
         key={contact.id || contact.name}
         className="control-contact-card"
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.18 }}
+        {...rowMotion(index)}
         style={{
           background: isChecked && !isEveryoneMode ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
           border: '1px solid',
@@ -645,11 +640,11 @@ function ControlsPageContent() {
   };
 
   // Render by layout mode
-  const renderContactItem = (contact) => {
+  const renderContactItem = (contact, index = 0) => {
     if (controlsLayout === 'dense' || controlsLayout === 'list') {
-      return renderDenseContactRow(contact);
+      return renderDenseContactRow(contact, index);
     }
-    return renderContactCard(contact);
+    return renderContactCard(contact, index);
   };
 
   if (isSyncingInitial && !(nodes || []).some(n => !n.isRoot)) {
@@ -658,9 +653,7 @@ function ControlsPageContent() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      {...enterMotion}
       className="page-container"
      
     >
