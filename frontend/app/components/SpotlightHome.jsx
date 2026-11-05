@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, ExternalLink } from 'lucide-react';
+import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, ExternalLink, Sparkles, Shuffle } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
@@ -198,6 +198,64 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
   );
 }
 
+// General facts shown next to facts built from the user's own contacts
+const GENERAL_FACTS = [
+  'Instagram launched on 6 October 2010 and was only on the iPhone at first.',
+  'Facebook bought Instagram in 2012 for about 1 billion dollars.',
+  'Instagram Direct, the DM inbox, arrived in December 2013.',
+  'Reels came to Instagram in August 2020.',
+  'Most people can keep about 150 stable friendships at once. This is called Dunbar\'s number.',
+  'People laugh far more often with others than when they are alone.',
+  'A quick reply makes a chat feel warmer: people rate fast responders as more friendly.',
+  'Stories on Instagram started in August 2016 and disappear after 24 hours.',
+];
+
+/** Facts built from real contact numbers; only the ones the data supports are returned. */
+function personalFacts(people) {
+  const facts = [];
+  const byChats = [...people].sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0));
+  const byReels = [...people].sort((a, b) => (b.reelsCount || 0) - (a.reelsCount || 0));
+  const totalChats = people.reduce((s, p) => s + (p.chatsCount || 0), 0);
+  const totalReels = people.reduce((s, p) => s + (p.reelsCount || 0), 0);
+  if (byChats[0]?.chatsCount > 0) facts.push(`You have swapped ${fmt(byChats[0].chatsCount)} DMs with ${byChats[0].name}, more than anyone else.`);
+  if (byReels[0]?.reelsCount > 0) facts.push(`${byReels[0].name} has shared ${fmt(byReels[0].reelsCount)} reels with you, the most in your circle.`);
+  if (totalChats > 0 && people.length > 1) facts.push(`On average you have ${fmt(Math.round(totalChats / people.length))} DMs with each person in your circle.`);
+  if (totalReels > 0) facts.push(`Your circle has shared ${fmt(totalReels)} reels in total.`);
+  const close = people.filter(p => p.category === 'close_friend').length;
+  if (close > 0) facts.push(`${close} ${close === 1 ? 'person is' : 'people are'} in your Close Circle.`);
+  const quiet = people.filter(p => !(p.chatsCount > 0)).length;
+  if (quiet > 0) facts.push(`${quiet} ${quiet === 1 ? 'person has' : 'people have'} no DMs yet. A short hello could start something.`);
+  return facts;
+}
+
+/** "Did you know?" card: looks like a spotlight card, shows a random fact each time Home opens. */
+function FactCard({ people }) {
+  const facts = useMemo(() => [...personalFacts(people), ...GENERAL_FACTS], [people]);
+  const [index, setIndex] = useState(null);
+  // Picked after mount (not during render) so server and browser HTML match
+  useEffect(() => { setIndex(Math.floor(Math.random() * facts.length)); }, [facts.length]);
+  const next = () => setIndex(i => {
+    if (facts.length < 2) return i;
+    let n = i;
+    while (n === i) n = Math.floor(Math.random() * facts.length);
+    return n;
+  });
+  const fact = index === null ? null : facts[index % facts.length];
+  return (
+    <section aria-label="Did you know" className="sh-fact" style={{ backgroundImage: abstractArt(fact || 'fact') }}>
+      <span className="sh-spot-glow" aria-hidden="true" />
+      <span className="sh-fact-icon" aria-hidden="true"><Sparkles size={22} /></span>
+      <span className="sh-fact-text">
+        <span className="sh-fact-label">Did you know?</span>
+        <span className="sh-fact-body" aria-live="polite">{fact || ' '}</span>
+      </span>
+      <button type="button" className="sh-fact-btn" onClick={next} aria-label="Show another fact">
+        <Shuffle size={18} />
+      </button>
+    </section>
+  );
+}
+
 export default function SpotlightHome() {
   const { nodes, user, routingConfig, isSyncingInitial, setFavourite } = useApp();
   const [menu, setMenu] = useState(null); // { person, x, y } while the long-press menu is open
@@ -331,6 +389,8 @@ export default function SpotlightHome() {
               ))}
             </div>
           </section>
+
+          <FactCard people={people} />
 
           <div className="sh-row-head">
             <h2>At a glance</h2>
