@@ -180,6 +180,26 @@ a.btn svg.lucide:not(.icon-keep) {
   flex-shrink: 0;
 }
 
+
+/* One shared icon size for every button (plain, .btn, shadcn Button, MUI).
+   Big nav, tile and drop-zone icons opt out with className="icon-keep". */
+:root {
+  --btn-icon-size: 16px;
+}
+@media (max-width: 768px) {
+  :root { --btn-icon-size: 15px; }
+}
+@media (max-width: 420px) {
+  :root { --btn-icon-size: 14px; }
+}
+button svg.lucide:not(.icon-keep),
+[role="button"] svg.lucide:not(.icon-keep),
+a.btn svg.lucide:not(.icon-keep) {
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  flex-shrink: 0;
+}
+
 /* Shadcn-Style Button Utilities */
 .btn {
   background: var(--color-surface);

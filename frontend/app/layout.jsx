@@ -5,6 +5,7 @@ import AmbientBackground from './components/AmbientBackground';
 import InstagramSetupModal from './components/InstagramSetupModal';
 import DesktopAlerts from './components/DesktopAlerts';
 import { themeBootScript } from './lib/themeBoot';
+import MuiProvider from './components/MuiProvider';
 
 export const metadata = {
   title: 'Chatter OS // Workspace',
@@ -32,13 +33,15 @@ export default function RootLayout({ children }) {
       </head>
       <body style={{ color: 'var(--color-text-primary)', margin: 0, padding: 0 }}>
         <AmbientBackground />
-        <AppProvider>
-          <AuthGate>
-            {children}
-          </AuthGate>
-          <InstagramSetupModal />
-          <DesktopAlerts />
-        </AppProvider>
+        <MuiProvider>
+          <AppProvider>
+            <AuthGate>
+              {children}
+            </AuthGate>
+            <InstagramSetupModal />
+            <DesktopAlerts />
+          </AppProvider>
+        </MuiProvider>
       </body>
     </html>
   );

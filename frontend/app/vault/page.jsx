@@ -735,12 +735,12 @@ function MediaVaultPageContent() {
             {/* RESULTS MULTI-SELECT GRID */}
             {searchingGiphy ? (
               <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--color-text-secondary)' }}>
-                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px auto' }} />
+                <RefreshCw size={24} className="animate-spin icon-keep" style={{ margin: '0 auto 10px auto' }} />
                 <div style={{ fontSize: '0.84rem' }}>Searching GIPHY live...</div>
               </div>
             ) : giphyResults.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--color-text-muted)' }}>
-                <Film size={28} style={{ margin: '0 auto 8px auto' }} />
+                <Film className="icon-keep" size={28} style={{ margin: '0 auto 8px auto' }} />
                 <div style={{ fontSize: '0.84rem' }}>Type a search query or click a popular tag above to preview and pick GIFs!</div>
               </div>
             ) : (
@@ -938,7 +938,7 @@ function MediaVaultPageContent() {
                   </div>
                 ) : (
                   <div>
-                    <Upload size={28} style={{ color: 'var(--color-text-muted)', margin: '0 auto 8px auto' }} />
+                    <Upload className="icon-keep" size={28} style={{ color: 'var(--color-text-muted)', margin: '0 auto 8px auto' }} />
                     <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
                       Click to choose an image or GIF file
                     </div>
@@ -1343,12 +1343,12 @@ function MediaVaultPageContent() {
         </div>
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--color-text-secondary)' }}>
-          <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px auto' }} />
+          <RefreshCw size={24} className="animate-spin icon-keep" style={{ margin: '0 auto 12px auto' }} />
           <div>Loading reaction vault media...</div>
         </div>
       ) : items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--color-surface-elevated)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-          <ImageIcon size={36} style={{ color: 'var(--color-text-muted)', margin: '0 auto 12px auto' }} />
+          <ImageIcon className="icon-keep" size={36} style={{ color: 'var(--color-text-muted)', margin: '0 auto 12px auto' }} />
           <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: 0 }}>
             No uploads in [{activeCategory}] yet
           </h4>
