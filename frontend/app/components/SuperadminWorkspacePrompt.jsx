@@ -116,7 +116,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span style={{
                   fontSize: '0.65rem',
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "var(--font-label)",
                   fontWeight: '800',
                   background: 'var(--color-surface-hover)',
                   color: 'var(--color-text-primary)',
@@ -127,7 +127,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                 </span>
                 <span style={{
                   fontSize: '0.65rem',
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "var(--font-label)",
                   color: 'var(--color-text-secondary)'
                 }}>
                   [{sectionCode || 'TENANT CONFIG'}]
@@ -144,7 +144,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
           </div>
 
           <Link
-            href="/"
+            href="/analytics"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -260,7 +260,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                       <div style={{ fontSize: '0.84rem', fontWeight: '700', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {name}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                         @{handle}
                       </div>
                     </div>
@@ -269,7 +269,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--color-surface-hover)' }}>
                     <span style={{
                       fontSize: '0.62rem',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "var(--font-label)",
                       fontWeight: '700',
                       textTransform: 'uppercase',
                       color: acc.accountType === 'business' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'

@@ -26,13 +26,14 @@ import {
   ArrowLeftRight,
   Zap,
   Activity,
-  Download,
   FileText,
   Inbox,
   Workflow,
   Sun,
   Moon,
-  LayoutGrid
+  LayoutGrid,
+  Home as HomeIcon,
+  BarChart3
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import MobileFeatureSheet from './MobileFeatureSheet';
@@ -142,14 +143,16 @@ export default function Sidebar() {
 
   const workspaceNav = {
     business: [
-      { href: '/', label: 'Business Dashboard', icon: LayoutDashboard },
+      { href: '/', label: 'Home', icon: HomeIcon },
+      { href: '/analytics', label: 'Business Analytics', icon: BarChart3 },
       on('ragKnowledgeBase') && { href: '/documents', label: 'Document & Service Vault', icon: FileText },
       { href: '/controls', label: 'Business Policy & Hours', icon: Sliders },
       { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck },
       { href: '/relationships', label: on('humanHandoffInbox') ? 'Customer Inbox & Handoff' : 'Customer Inbox', icon: Inbox },
     ],
     personal: [
-      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/', label: 'Home', icon: HomeIcon },
+      { href: '/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/relationships', label: 'People Directory', icon: Users },
       { href: '/controls', label: 'Chat Rules', icon: Sliders },
       { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
@@ -158,7 +161,8 @@ export default function Sidebar() {
     ],
     // Hybrid: personal voice, business tools alongside
     hybrid: [
-      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/', label: 'Home', icon: HomeIcon },
+      { href: '/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/relationships', label: 'People & Customers', icon: Users },
       { href: '/controls', label: 'Chat Rules & Hours', icon: Sliders },
       { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
@@ -169,16 +173,14 @@ export default function Sidebar() {
 
   const navItems = (isPureSuperadmin
     ? [
-      { href: '/', label: 'Platform Console', icon: LayoutDashboard },
+      { href: '/analytics', label: 'Platform Console', icon: LayoutDashboard },
       { href: '/admin', label: 'User Workspaces', icon: Users },
       { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity },
-      { href: '/download', label: 'Desktop Releases', icon: Download },
     ]
     : [
       ...workspaceNav[mode],
       { href: isBusiness ? '/storyboard/business' : '/storyboard/personal', label: 'Storyboard', icon: Workflow },
       { href: '/settings/features', label: 'Feature Store', icon: Layers },
-      { href: '/download', label: 'Desktop App', icon: Download },
       isSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
     ])
     .filter(Boolean)
@@ -201,13 +203,13 @@ export default function Sidebar() {
 
   const mobileTabs = isPureSuperadmin
     ? [
-      { href: '/', label: 'Platform', icon: LayoutDashboard },
+      { href: '/analytics', label: 'Platform', icon: LayoutDashboard },
       { href: '/admin', label: 'Workspaces', icon: Users },
       { href: '/admin/tokens', label: 'Tokens', icon: Activity },
       { label: 'More', icon: LayoutGrid },
     ]
     : [
-      { href: '/', label: 'Home', icon: LayoutDashboard },
+      { href: '/', label: 'Home', icon: HomeIcon },
       { href: '/relationships', label: isBusiness ? 'Inbox' : 'People', icon: isBusiness ? Inbox : Users },
       { action: 'add' },
       { href: '/controls', label: isBusiness ? 'Policy' : 'Rules', icon: Sliders },
@@ -354,7 +356,7 @@ export default function Sidebar() {
                 <div style={{ fontWeight: '800', fontSize: '0.92rem', letterSpacing: '-0.4px', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
                   CHATTER OS
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                   v2.6 // WORKSPACE
                 </div>
               </div>
@@ -384,7 +386,7 @@ export default function Sidebar() {
               <span style={{
                 fontSize: '0.62rem',
                 fontWeight: '700',
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "var(--font-label)",
                 color: routingConfig.globalBotActive ? '#4ade80' : 'var(--color-text-secondary)'
               }}>
                 {routingConfig.globalBotActive ? 'LIVE' : 'OFF'}
@@ -432,11 +434,10 @@ export default function Sidebar() {
                     <Link
                       href={item.href}
                       style={{
-                        background: isActive ? 'var(--color-text-primary)' : 'transparent',
-                        color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                        border: '1px solid',
-                        borderColor: isActive ? 'var(--color-text-primary)' : 'transparent',
-                        borderRadius: '9px',
+                        background: isActive ? 'var(--sp-card-hover)' : 'transparent',
+                        color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                        border: 'none',
+                        borderRadius: '6px',
                         padding: '9px 12px',
                         display: 'flex',
                         alignItems: 'center',
@@ -445,8 +446,9 @@ export default function Sidebar() {
                         transition: 'all 0.15s ease',
                         fontWeight: isActive ? '700' : '500',
                         fontSize: '0.82rem',
-                        boxShadow: isActive ? '0 3px 10px rgba(9, 9, 11, 0.1)' : 'none'
+                        boxShadow: 'none'
                       }}
+                      className={`sp-nav-link${isActive ? ' active' : ''}`}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -454,7 +456,7 @@ export default function Sidebar() {
                       </div>
                       <span style={{
                         fontSize: '0.65rem',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "var(--font-label)",
                         opacity: isActive ? 0.8 : 0.4
                       }}>
                         [{item.code}]
@@ -512,11 +514,11 @@ export default function Sidebar() {
               onClick={() => startAiInterview(null)}
               style={{
                 width: '100%',
-                background: 'var(--color-text-primary)',
-                color: 'var(--color-surface)',
+                background: 'var(--sp-green)',
+                color: '#000000',
                 border: 'none',
                 padding: '10px 14px',
-                borderRadius: '9px',
+                borderRadius: '9999px',
                 fontWeight: '700',
                 fontSize: '0.82rem',
                 display: 'flex',
@@ -527,7 +529,7 @@ export default function Sidebar() {
                 boxShadow: '0 3px 10px rgba(9, 9, 11, 0.1)'
               }}
             >
-              <Sparkles size={14} color="var(--color-surface)" />
+              <Sparkles size={14} color="#000000" />
               <span>+ Add Person</span>
             </motion.button>
           )}
@@ -549,7 +551,7 @@ export default function Sidebar() {
                 borderRadius: '9px',
                 fontWeight: '600',
                 fontSize: '0.76rem',
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "var(--font-label)",
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -673,7 +675,7 @@ export default function Sidebar() {
                   {isPureSuperadmin ? (
                     <span style={{
                       fontSize: '0.58rem',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "var(--font-label)",
                       fontWeight: '800',
                       background: 'var(--color-text-primary)',
                       color: '#22c55e',
@@ -687,7 +689,7 @@ export default function Sidebar() {
                   ) : isImpersonating ? (
                     <span style={{
                       fontSize: '0.58rem',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "var(--font-label)",
                       fontWeight: '800',
                       background: 'color-mix(in srgb, #f59e0b 35%, transparent)',
                       color: '#fbbf24',
@@ -701,7 +703,7 @@ export default function Sidebar() {
                   ) : isSuperadmin ? (
                     <span style={{
                       fontSize: '0.58rem',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "var(--font-label)",
                       fontWeight: '800',
                       background: 'var(--color-text-primary)',
                       color: 'var(--color-surface)',
@@ -798,6 +800,17 @@ export default function Sidebar() {
               >
                 <ArrowLeftRight size={12} />
                 <span className="sidebar-switch-label">Switch</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="sp-theme-btn"
+                title={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+                aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+                style={{ borderRadius: '7px', padding: '6px 9px', minHeight: 0 }}
+              >
+                {theme === 'light' ? <Moon size={13} /> : <Sun size={13} />}
               </button>
 
               <button
