@@ -1063,7 +1063,7 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Update Per-Person AI Reply Mode (Full AI, Reels Only, Paused / Sam Manual)
+  // Update Per-Person AI Reply Mode (Full AI, Paused / Sam Manual). Reels never get an AI text reply.
   // silent: bulk callers show one summary toast themselves; a failure is then thrown to them
   const updateContactPreferences = async (contactIdOrSenderId, prefs, { silent = false } = {}) => {
     if (!contactIdOrSenderId) return;
@@ -1072,19 +1072,11 @@ export function AppProvider({ children }) {
     let finalReplyMessages;
     let finalReplyReels;
 
-    if (aiMode === 'full_ai') {
-      finalAiEnabled = true;
-      finalReplyMessages = true;
-      finalReplyReels = true;
-    } else if (aiMode === 'reels_only') {
-      finalAiEnabled = true;
-      finalReplyMessages = false;
-      finalReplyReels = true;
-    } else if (aiMode === 'messages_only') {
+    if (aiMode === 'full_ai' || aiMode === 'messages_only') {
       finalAiEnabled = true;
       finalReplyMessages = true;
       finalReplyReels = false;
-    } else if (aiMode === 'paused' || aiMode === 'manual') {
+    } else if (aiMode === 'paused' || aiMode === 'manual' || aiMode === 'reels_only') {
       finalAiEnabled = false;
       finalReplyMessages = false;
       finalReplyReels = false;
@@ -1152,9 +1144,7 @@ export function AppProvider({ children }) {
       if (silent) return;
       if (typeof autoSendReels === 'boolean') {
         showToast(autoSendReels ? `Auto-Reels ENABLED for ${nameStr}!` : `Auto-Reels PAUSED for ${nameStr}!`);
-      } else if (aiMode === 'reels_only') {
-        showToast(`${nameStr}: AI will ONLY react to shared Reels!`);
-      } else if (aiMode === 'paused' || aiMode === 'manual') {
+      } else if (aiMode === 'paused' || aiMode === 'manual' || aiMode === 'reels_only') {
         showToast(`Stopped AI for ${nameStr}. Manual chat active!`);
       } else if (aiMode) {
         showToast(`Full AI auto-reply enabled for ${nameStr}!`);

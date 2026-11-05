@@ -51,6 +51,7 @@ function formatLastContact(ts) {
 import { motion, AnimatePresence } from 'framer-motion';
 import { enterMotion, swapMotion } from '../lib/motion';
 import { SegIndicator } from '../components/ui/motion';
+import { useHeroCollapse, useRevealOnce } from '../lib/scrollMotion';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -447,8 +448,7 @@ function RelationshipsPageContent() {
   // Direct Message Automation mode for selectedPerson
   const currentAiMode = useMemo(() => {
     if (!selectedPerson) return 'full_ai';
-    if (selectedPerson.aiEnabled === false) return 'paused';
-    if (selectedPerson.replyToMessages === false && selectedPerson.replyToReelsAndPosts !== false) return 'reels_only';
+    if (selectedPerson.aiEnabled === false || selectedPerson.replyToMessages === false) return 'paused';
     return 'full_ai';
   }, [selectedPerson]);
 
@@ -457,14 +457,13 @@ function RelationshipsPageContent() {
     if (!selectedPerson) return;
     const targetKey = selectedPerson.senderId || selectedPerson.id || selectedPerson.name;
     const isPaused = mode === 'paused';
-    const isReelsOnly = mode === 'reels_only';
     const isFullAi = mode === 'full_ai';
 
     setSelectedPerson(prev => ({
       ...prev,
       aiEnabled: !isPaused,
       replyToMessages: isFullAi,
-      replyToReelsAndPosts: isFullAi || isReelsOnly
+      replyToReelsAndPosts: false
     }));
 
     updateContactPreferences(targetKey, { aiMode: mode });
@@ -774,6 +773,24 @@ function RelationshipsPageContent() {
     lastMessage?.timestamp || lastMessage?.createdAt || selectedPerson?.lastInteraction || selectedPerson?.updatedAt
   );
 
+  // Scroll motion: the hero shrinks into a sticky band; sections rise in once (lib/scrollMotion.js)
+  const pageRef = useRef(null);
+  const motionView = selectedPerson
+    ? `person:${selectedPerson.id || selectedPerson.senderId || selectedPerson.name}`
+    : deepLinkPending ? 'loading' : `people:${unlinkedFriends.length > 0}`;
+  useHeroCollapse(
+    pageRef,
+    selectedPerson
+      ? { hero: '.person-hero', media: '.person-hero-avatar', title: '.person-name', fade: '.person-tag, .person-handle, .person-stats', pin: '.person-back' }
+      : { hero: '.spx-hero', media: '.spx-cover', title: '.spx-title', fade: '.spx-eyebrow, .spx-desc, .spx-meta', stack: '.people-filters' },
+    [motionView]
+  );
+  useRevealOnce(
+    pageRef,
+    selectedPerson ? [{ sel: '.person-actionbar' }] : [{ sel: '.spx-stats', children: true }, { sel: '.people-results' }],
+    [motionView]
+  );
+
   // =========================================================================
   // VIEW 1: FULL INNER PERSON PAGE (When a person is clicked/opened)
   // =========================================================================
@@ -783,14 +800,14 @@ function RelationshipsPageContent() {
 
   if (selectedPerson) {
     const isPaused = currentAiMode === 'paused';
-    const isReelsOnly = currentAiMode === 'reels_only';
     const isFullAi = currentAiMode === 'full_ai';
 
     return (
-      <div className="page-container person-page">
+      <div ref={pageRef} className="page-container person-page">
         {/* ================= SPOTIFY ARTIST-STYLE HERO (PLAN.md §15.3) ================= */}
         <div className="person-hero">
           <UnsplashBanner seed={selectedPerson.name || selectedPerson.id} className="person-cover" />
+          <span className="hero-surface" aria-hidden="true" />
           <button type="button" className="person-back" onClick={() => setSelectedPerson(null)} aria-label="Back to directory">
             <ArrowLeft size={22} />
           </button>
@@ -1167,7 +1184,7 @@ function RelationshipsPageContent() {
               </div>
             </div>
             <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-              CURRENT: {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
+              CURRENT: {isPaused ? 'MANUAL' : 'FULL AI'}
             </span>
           </div>
 
@@ -1193,32 +1210,7 @@ function RelationshipsPageContent() {
               <Bot size={18} />
               <div>
                 <div style={{ fontSize: '0.82rem', fontWeight: '800' }}>Full AI Auto-Reply</div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '1px' }}>AI handles messages & reels</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSetAiMode('reels_only')}
-              style={{
-                padding: '12px 14px',
-                borderRadius: '8px',
-                border: '1px solid',
-                borderColor: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-border)',
-                background: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                color: isReelsOnly ? 'var(--color-surface)' : 'var(--color-text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                textAlign: 'left',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Film size={18} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: '800' }}>Only React to Reels</div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '1px' }}>Ignores text, reacts to reels</div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '1px' }}>AI replies to messages</div>
               </div>
             </button>
 
@@ -1887,11 +1879,13 @@ function RelationshipsPageContent() {
   // =========================================================================
   return (
     <motion.div
+      ref={pageRef}
       {...enterMotion}
       className="page-container spx-page spx-blue"
     >
       {/* Top Header (Spotify hero) */}
       <header className="spx-hero">
+        <span className="hero-surface" aria-hidden="true" />
         <UnsplashBanner seed="page-people" credit={false} className="spx-cover spx-cover-people"><Users size={84} strokeWidth={1.75} /></UnsplashBanner>
         <div className="spx-hero-text">
           <div className="spx-eyebrow">People directory &amp; intelligence</div>
@@ -1915,7 +1909,7 @@ function RelationshipsPageContent() {
             <div className="spx-stat-icon" style={{ background: color }}>{icon}</div>
             <div style={{ minWidth: 0 }}>
               <div className="spx-stat-label">{label}</div>
-              <div className="spx-stat-value">{value.toLocaleString?.() ?? value}</div>
+              <div className="spx-stat-value"><CountUp value={value} /></div>
             </div>
           </div>
         ))}
@@ -2020,6 +2014,7 @@ function RelationshipsPageContent() {
 
       {/* ================= SHADCN LIGHT MONOCHROME TABLE ================= */}
       <div
+        className="people-results"
         style={layoutMode !== 'dense' ? { background: 'transparent', marginTop: '8px' } : {
           marginTop: '20px',
           background: 'var(--color-surface)',
