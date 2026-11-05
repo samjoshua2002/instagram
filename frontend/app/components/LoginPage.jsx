@@ -2541,7 +2541,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     justifyContent: 'center',
                     margin: '0 auto 14px'
                   }}>
-                    <Fingerprint size={28} />
+                    <Fingerprint className="icon-keep" size={28} />
                   </div>
 
                   <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: '0 0 6px' }}>

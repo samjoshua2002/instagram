@@ -144,7 +144,7 @@ export default function DocumentsPage() {
             tabIndex={0}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInput.current?.click()}
           >
-            {busy ? <Loader2 size={28} className="animate-spin" /> : <UploadCloud size={28} />}
+            {busy ? <Loader2 size={28} className="animate-spin icon-keep" /> : <UploadCloud className="icon-keep" size={28} />}
             <div style={{ fontWeight: 700, marginTop: '8px' }}>
               {busy ? 'Reading document…' : 'Drop files here or click to browse'}
             </div>

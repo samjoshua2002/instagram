@@ -284,7 +284,7 @@ export default function Sidebar() {
             return (
               <motion.div key="add" variants={mobileTabVariant} className="mobile-tab-slot">
                 <button type="button" onClick={() => startAiInterview(null)} className="mobile-add-btn" aria-label="Add Person">
-                  <Plus size={22} strokeWidth={2.5} />
+                  <Plus className="icon-keep" size={22} strokeWidth={2.5} />
                 </button>
               </motion.div>
             );
@@ -293,7 +293,7 @@ export default function Sidebar() {
           const isActive = tab.href ? pathname === tab.href : sheetOpen;
           const content = (
             <>
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+              <Icon className="icon-keep" size={20} strokeWidth={isActive ? 2.5 : 1.8} />
               <span>{tab.label}</span>
             </>
           );

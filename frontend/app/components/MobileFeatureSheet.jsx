@@ -125,7 +125,7 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
               <div className="sheet-grid">
                 {items.map(({ href, label, icon: Icon }) => (
                   <Link key={href} href={href} onClick={onClose} className={`sheet-tile${pathname === href ? ' active' : ''}`}>
-                    <Icon size={20} />
+                    <Icon className="icon-keep" size={20} />
                     <span>{label}</span>
                   </Link>
                 ))}
