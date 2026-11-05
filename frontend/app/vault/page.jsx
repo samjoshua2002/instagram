@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 import {
   Image as ImageIcon, Upload, Plus, Trash2, CheckCircle2,
   AlertCircle, RefreshCw, Link as LinkIcon, Film, Sparkles,
@@ -13,6 +14,7 @@ import { motion } from 'framer-motion';
 
 function MediaVaultPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating } = useApp();
+  const confirm = useConfirm();
 
   const getAuthHeaders = (extraHeaders = {}) => {
     const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
@@ -316,7 +318,7 @@ function MediaVaultPageContent() {
   };
 
   const handleDeleteMedia = async (id, name) => {
-    if (!window.confirm(`Delete "${name || 'this media'}" from vault?`)) return;
+    if (!(await confirm({ title: 'Delete from vault?', message: `"${name || 'This media'}" will be removed from your vault.`, confirmLabel: 'Delete', tone: 'danger' }))) return;
 
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/${id}`, {
@@ -435,7 +437,7 @@ function MediaVaultPageContent() {
 
   const handleDeleteCustomCategory = async (catName, e) => {
     e.stopPropagation();
-    if (!window.confirm(`Delete custom category "${catName}"? Media items will remain in the vault.`)) return;
+    if (!(await confirm({ title: `Delete "${catName}"?`, message: 'The category is removed. Media items stay in the vault.', confirmLabel: 'Delete category', tone: 'danger' }))) return;
 
     try {
       const res = await fetch(`${API_BASE}/api/media-vault/categories/${catName}`, {
@@ -1066,7 +1068,7 @@ function MediaVaultPageContent() {
       {/* CATEGORY FILTER PILLS */}
       <div style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
             FILTER BY EMOTION CATEGORY
           </span>
           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
@@ -1258,7 +1260,7 @@ function MediaVaultPageContent() {
                       padding: '2px 7px',
                       borderRadius: '4px',
                       textTransform: 'uppercase',
-                      fontFamily: "'JetBrains Mono', monospace"
+                      fontFamily: "var(--font-label)"
                     }}
                   >
                     {pred.category}
@@ -1406,7 +1408,7 @@ function MediaVaultPageContent() {
                     padding: '2px 7px',
                     borderRadius: '4px',
                     textTransform: 'uppercase',
-                    fontFamily: "'JetBrains Mono', monospace"
+                    fontFamily: "var(--font-label)"
                   }}
                 >
                   {item.category}
@@ -1436,7 +1438,7 @@ function MediaVaultPageContent() {
                   <div style={{ fontWeight: '700', fontSize: '0.86rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                     {item.name}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', marginTop: '2px', fontFamily: "var(--font-label)" }}>
                     Added {new Date(item.createdAt).toLocaleDateString()}
                   </div>
 

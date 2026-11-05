@@ -24,6 +24,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
@@ -50,6 +51,7 @@ function detectCurrentDevice() {
 
 export default function PasskeyManagerModal({ isOpen, onClose }) {
   const { user, token, updateUserProfile, showToast } = useApp();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('passkeys'); // 'passkeys' | 'profile' | 'oneauth'
 
   // Passkey state
@@ -182,7 +184,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
   };
 
   const handleDeletePasskey = async (credentialId) => {
-    if (!confirm('Are you sure you want to remove this passkey?')) return;
+    if (!(await confirm({ title: 'Remove this passkey?', message: 'You will no longer be able to sign in with this device.', confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
@@ -354,7 +356,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       justifyContent: 'center',
       zIndex: 9998,
       padding: '20px',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: "var(--font-sans)",
     }}>
       <div style={{
         background: 'var(--color-surface)',

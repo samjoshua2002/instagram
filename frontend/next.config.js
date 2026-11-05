@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Desktop (Tauri) build: static files in out/ that src-tauri bundles
-  ...(process.env.DESKTOP_EXPORT === '1' ? { output: 'export', images: { unoptimized: true } } : {}),
+  // Optional separate build folder, so a check build never clashes with a running dev server
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
 };
 
 module.exports = nextConfig;

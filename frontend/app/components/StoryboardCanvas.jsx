@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link2, Trash2, Plus, X, RotateCcw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 
 const NODE_W = 172;
 const NODE_H = 64;
@@ -28,6 +29,7 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
  */
 export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extraAdd }) {
   const { API_BASE, token, showToast } = useApp();
+  const confirm = useConfirm();
   const [board, setBoard] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [linkFrom, setLinkFrom] = useState(null);
@@ -134,8 +136,8 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
   const patchEdge = (id, patch) => update(prev => ({ ...prev, edges: prev.edges.map(e => (e.id === id ? { ...e, ...patch } : e)) }));
   const removeEdge = id => update(prev => ({ ...prev, edges: prev.edges.filter(e => e.id !== id) }));
 
-  const resetBoard = () => {
-    if (!window.confirm('Replace this storyboard with the starter layout? Your current cards will be removed.')) return;
+  const resetBoard = async () => {
+    if (!(await confirm({ title: 'Reset storyboard?', message: 'Your current cards will be replaced with the starter layout.', confirmLabel: 'Reset', tone: 'danger' }))) return;
     const fresh = seed();
     setBoard(fresh);
     persist(fresh);

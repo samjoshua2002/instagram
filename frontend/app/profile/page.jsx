@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 import {
   User,
   Shield,
@@ -44,6 +45,7 @@ const formatAddress = (addr) => {
 
 export default function ProfilePage() {
   const { user, token, API_BASE, updateUserProfile, showToast, updateWorkspaceFeatures } = useApp();
+  const confirm = useConfirm();
 
   const [saving, setSaving] = useState(false);
   const [switchingTier, setSwitchingTier] = useState(false);
@@ -257,7 +259,7 @@ export default function ProfilePage() {
   };
 
   const handleDeletePasskey = async (credentialId) => {
-    if (!confirm('Are you sure you want to remove this biometric passkey?')) return;
+    if (!(await confirm({ title: 'Remove this passkey?', message: 'You will no longer be able to sign in with this fingerprint or face ID device.', confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
@@ -300,7 +302,7 @@ export default function ProfilePage() {
           <div style={{
             fontSize: '0.7rem',
             fontWeight: 800,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "var(--font-label)",
             color: 'var(--color-text-secondary)',
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
@@ -516,7 +518,7 @@ export default function ProfilePage() {
               <span style={{
                 fontSize: '0.68rem',
                 fontWeight: 800,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "var(--font-label)",
                 background: isBusiness ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
                 color: isBusiness ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                 padding: '3px 10px',
@@ -540,7 +542,7 @@ export default function ProfilePage() {
 
         {/* Workspace Mode Switcher (Instant 1-Click Toggle) */}
         <div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", marginBottom: '6px', textAlign: 'right' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", marginBottom: '6px', textAlign: 'right' }}>
             WORKSPACE ENVIRONMENT
           </div>
           <div style={{
@@ -804,7 +806,7 @@ export default function ProfilePage() {
 
               <span style={{
                 fontSize: '0.68rem',
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "var(--font-label)",
                 fontWeight: 800,
                 background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success-container, color-mix(in srgb, #22c55e 12%, transparent))' : 'var(--danger-container, color-mix(in srgb, #ef4444 14%, transparent))',
                 color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success, #4ade80)' : 'var(--danger, #f87171)',
@@ -834,7 +836,7 @@ export default function ProfilePage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, var(--color-text-secondary))', fontWeight: 700 }}>Page Account ID</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '0.78rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text, var(--color-text-secondary))' }}>
+                  <span style={{ fontSize: '0.78rem', fontFamily: "var(--font-label)", color: 'var(--text, var(--color-text-secondary))' }}>
                     {user?.instagramId || user?.instagramAccountId || 'Unlinked'}
                   </span>
                   {(user?.instagramId || user?.instagramAccountId) && (

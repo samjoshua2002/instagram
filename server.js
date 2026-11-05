@@ -188,16 +188,6 @@ app.use('/uploads', express.static(uploadsDir, {
 // Authentication & Passkey Endpoints
 app.use('/api/auth', authRouter);
 
-// Desktop installers for the /download portal; update config/desktopReleases.json on each release
-app.get('/api/desktop/releases', (req, res) => {
-  try {
-    const releases = JSON.parse(require('fs').readFileSync(path.join(__dirname, 'config', 'desktopReleases.json'), 'utf8'));
-    res.json(releases);
-  } catch (err) {
-    res.status(500).json({ error: 'Desktop releases are not available right now' });
-  }
-});
-
 // Aliases for Instagram handle check and Admin accounts
 app.use('/api/instagram/check-handle', (req, res, next) => {
   const queryIndex = req.url.indexOf('?');
@@ -238,8 +228,8 @@ app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
 app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
 app.use('/api/workspace', requireAuth, require('./routes/workspace'));
 app.use('/api/storyboard', requireAuth, require('./routes/storyboard'));
-// Public /api/desktop/releases is registered above, so it stays open
-app.use('/api/desktop', requireAuth, require('./routes/desktop'));
+// Browser notification feed (new DMs, leads, bookings, handoffs)
+app.use('/api/alerts', requireAuth, require('./routes/alerts'));
 
 // Contact and graph queries only see the signed-in account's records (superadmin sees all)
 const isSuperUser = (req) => req.user?.role === 'superadmin';

@@ -28,8 +28,7 @@ function safeClientOrigin(raw) {
   try {
     const { origin, hostname, protocol } = new URL(String(raw || ''));
     if (allowed.includes(origin)) return origin;
-    if (protocol === 'tauri:') return `tauri://${hostname}`; // URL.origin is "null" for custom schemes
-    const isLocal = ['localhost', '127.0.0.1', 'tauri.localhost'].includes(hostname);
+    const isLocal = ['localhost', '127.0.0.1'].includes(hostname);
     if (isLocal && (protocol === 'http:' || protocol === 'https:')) return origin;
   } catch { /* fall through */ }
   return DEFAULT_CLIENT_ORIGIN;

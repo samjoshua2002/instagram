@@ -8,6 +8,4 @@ scratch/
 .next/
 frontend/.next/
 .env*.local
-frontend/out/
-src-tauri/target/
-src-tauri/gen/
+frontend/.next-*/

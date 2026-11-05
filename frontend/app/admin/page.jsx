@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 import {
   Shield, Users, UserCheck, RefreshCw, Search,
   CheckCircle2, AlertCircle, Fingerprint, Mail,
@@ -12,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SuperadminPage() {
   const { user, API_BASE, token, enterWorkspace, showToast } = useApp();
+  const confirm = useConfirm();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,9 +78,12 @@ export default function SuperadminPage() {
 
   const handleDeleteAccount = async (targetUser) => {
     const handle = targetUser.instagramUsername || targetUser.username;
-    const confirmed = window.confirm(
-      `Are you sure you want to permanently delete account @${handle} (${targetUser.email}) and all their workspace data? This cannot be undone.`
-    );
+    const confirmed = await confirm({
+      title: `Delete @${handle}?`,
+      message: `This permanently deletes ${targetUser.email} and all their workspace data. This cannot be undone.`,
+      confirmLabel: 'Delete account',
+      tone: 'danger',
+    });
     if (!confirmed) return;
 
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
@@ -105,11 +110,9 @@ export default function SuperadminPage() {
   const handleToggleBan = async (targetUser) => {
     const handle = targetUser.instagramUsername || targetUser.username;
     const banning = !targetUser.isBanned;
-    const confirmed = window.confirm(
-      banning
-        ? `Suspend @${handle}? They will be logged out, their bot stops, and their Instagram token is revoked.`
-        : `Lift the suspension for @${handle}? They will need to reconnect Instagram.`
-    );
+    const confirmed = await confirm(banning
+      ? { title: `Suspend @${handle}?`, message: 'They will be logged out, their bot stops, and their Instagram token is revoked.', confirmLabel: 'Suspend', tone: 'danger' }
+      : { title: `Lift suspension for @${handle}?`, message: 'They will need to reconnect Instagram.', confirmLabel: 'Lift suspension' });
     if (!confirmed) return;
 
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
@@ -226,13 +229,13 @@ export default function SuperadminPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
               PLATFORM GOVERNANCE
             </span>
             <span style={{
               fontSize: '0.62rem',
               fontWeight: '800',
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-label)",
               background: 'var(--color-text-primary)',
               color: 'var(--color-surface)',
               padding: '2px 6px',
@@ -301,7 +304,7 @@ export default function SuperadminPage() {
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             REGISTERED ACCOUNTS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '6px' }}>
@@ -319,7 +322,7 @@ export default function SuperadminPage() {
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             TOTAL CIRCLE MEMBERS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '6px' }}>
@@ -337,7 +340,7 @@ export default function SuperadminPage() {
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             CLOSE FRIENDS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#16a34a', marginTop: '6px' }}>
@@ -355,7 +358,7 @@ export default function SuperadminPage() {
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             ONLINE & DM NETWORK
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--ambient-dominant)', marginTop: '6px' }}>
@@ -500,7 +503,7 @@ export default function SuperadminPage() {
                           {isSuper ? (
                             <span style={{
                               fontSize: '0.62rem',
-                              fontFamily: "'JetBrains Mono', monospace",
+                              fontFamily: "var(--font-label)",
                               fontWeight: '800',
                               background: 'var(--color-text-primary)',
                               color: 'var(--color-surface)',
@@ -512,7 +515,7 @@ export default function SuperadminPage() {
                           ) : (
                             <span style={{
                               fontSize: '0.62rem',
-                              fontFamily: "'JetBrains Mono', monospace",
+                              fontFamily: "var(--font-label)",
                               fontWeight: '700',
                               background: 'var(--color-surface-hover)',
                               color: 'var(--color-text-secondary)',
@@ -524,7 +527,7 @@ export default function SuperadminPage() {
                           )}
                         </div>
 
-                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                           {account.email} • @{account.username}
                         </div>
                       </div>
@@ -532,17 +535,17 @@ export default function SuperadminPage() {
 
                     {/* Instagram Handle & Permanent ID */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '160px' }}>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                         INSTAGRAM IDENTITY
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <Instagram size={13} color="#e1306c" />
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--color-text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--color-text-primary)', fontFamily: "var(--font-label)" }}>
                           {account.instagramUsername ? `@${account.instagramUsername}` : 'Not connected'}
                         </span>
                       </div>
                       {account.instagramId && (
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontFamily: "var(--font-label)", fontWeight: '700' }}>
                           Permanent ID: {account.instagramId}
                         </span>
                       )}
@@ -672,7 +675,7 @@ export default function SuperadminPage() {
                         <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
                           MOBILE NUMBER
                         </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--color-text-primary)' }}>
+                        <span style={{ fontFamily: "var(--font-label)", color: 'var(--color-text-primary)' }}>
                           {account.mobileNumber || 'Not provided'}
                         </span>
                       </div>
@@ -681,7 +684,7 @@ export default function SuperadminPage() {
                         <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
                           LAST ACTIVITY
                         </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--color-text-primary)' }}>
+                        <span style={{ fontFamily: "var(--font-label)", color: 'var(--color-text-primary)' }}>
                           {account.lastLogin ? new Date(account.lastLogin).toLocaleString() : 'Recent'}
                         </span>
                       </div>
@@ -690,7 +693,7 @@ export default function SuperadminPage() {
                         <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
                           INTERNAL DATABASE ID
                         </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--color-text-secondary)', fontSize: '0.72rem' }}>
+                        <span style={{ fontFamily: "var(--font-label)", color: 'var(--color-text-secondary)', fontSize: '0.72rem' }}>
                           {account.id}
                         </span>
                       </div>
@@ -714,19 +717,19 @@ export default function SuperadminPage() {
             <table className="card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                     PERSON
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                     INSTAGRAM HANDLE
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                     CATEGORY
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                     RELATIONSHIP
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textAlign: 'right' }}>
                     LORE FACTS
                   </th>
                 </tr>
@@ -760,7 +763,7 @@ export default function SuperadminPage() {
                       </div>
                     </td>
 
-                    <td data-label="Instagram" style={{ padding: '12px 14px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+                    <td data-label="Instagram" style={{ padding: '12px 14px', fontFamily: "var(--font-label)", fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
                       {member.handle ? `@${member.handle}` : <span style={{ color: 'var(--color-border-strong)' }}>None</span>}
                     </td>
 
@@ -768,7 +771,7 @@ export default function SuperadminPage() {
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: '700',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "var(--font-label)",
                         padding: '3px 8px',
                         borderRadius: '4px',
                         background: member.category === 'close_friend' ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'var(--color-surface-hover)',
@@ -782,7 +785,7 @@ export default function SuperadminPage() {
                       {member.relationship || 'Friend'}
                     </td>
 
-                    <td data-label="Lore facts" style={{ padding: '12px 14px', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', fontSize: '0.8rem' }}>
+                    <td data-label="Lore facts" style={{ padding: '12px 14px', textAlign: 'right', fontFamily: "var(--font-label)", fontWeight: '700', fontSize: '0.8rem' }}>
                       {member.factsCount || 0}
                     </td>
                   </tr>
