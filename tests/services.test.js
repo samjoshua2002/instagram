@@ -257,3 +257,24 @@ test('reminder window: delays above 10h now fire; window closes after the grace 
   assert.equal(isWithinReminderWindow(new Date(now - 6 * HOUR_MS), now, 5), true);
   assert.equal(isWithinReminderWindow(new Date(now - 18 * HOUR_MS), now, 5), false);
 });
+
+// ── Storyboard save sanitizer (node editor) ──────────────────────────────────
+test('storyboard sanitize keeps the folded flag and drops bad links', () => {
+  const { sanitize } = require('../routes/storyboard');
+  const out = sanitize({
+    nodes: [
+      { id: 'a', type: 'you', label: 'Me', x: 10.4, y: 20, collapsed: true },
+      { id: 'b', type: 'person', label: 'Sam', collapsed: 'yes', circle: 'bogus' },
+    ],
+    edges: [
+      { id: 'e1', from: 'a', to: 'b', label: 'friend' },
+      { id: 'e2', from: 'a', to: 'missing' },
+      { id: 'e3', from: 'b', to: 'b' },
+    ],
+  });
+  assert.equal(out.nodes[0].collapsed, true);
+  assert.equal(out.nodes[1].collapsed, false);
+  assert.equal(out.nodes[1].circle, '');
+  assert.equal(out.nodes[0].x, 10);
+  assert.deepEqual(out.edges.map(e => e.id), ['e1']);
+});
