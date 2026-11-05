@@ -276,7 +276,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             padding: '3px 12px',
             fontSize: '0.68rem',
             fontWeight: '800',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "var(--font-label)",
             color: 'var(--color-text-secondary)',
             letterSpacing: '0.6px',
             textTransform: 'uppercase',
@@ -397,7 +397,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
           <span style={{
             fontSize: '0.68rem',
             fontWeight: '800',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "var(--font-label)",
             background: approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 14%, transparent)' : (approvalStatus === 'approved' ? 'color-mix(in srgb, var(--ambient-dominant) 12%, transparent)' : 'var(--color-surface-hover)'),
             color: approvalStatus === 'pending' ? '#fbbf24' : (approvalStatus === 'approved' ? 'var(--ambient-dominant)' : 'var(--color-text-secondary)'),
             border: `1px solid ${approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 35%, transparent)' : (approvalStatus === 'approved' ? 'color-mix(in srgb, var(--ambient-dominant) 35%, transparent)' : 'var(--color-border)')}`,

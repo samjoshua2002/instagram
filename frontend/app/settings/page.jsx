@@ -470,7 +470,7 @@ function SettingsPageContent() {
             <span style={{
               fontSize: '0.7rem',
               fontWeight: 800,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-label)",
               color: 'var(--color-text-secondary)',
               letterSpacing: '0.08em',
               textTransform: 'uppercase'
@@ -683,7 +683,7 @@ function SettingsPageContent() {
                 padding: '2px 8px',
                 borderRadius: '6px',
                 fontWeight: '700',
-                fontFamily: "'JetBrains Mono', monospace"
+                fontFamily: "var(--font-label)"
               }}>
                 {formData.instagramPageAccessToken ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
               </span>
@@ -1301,7 +1301,7 @@ function SettingsPageContent() {
                   onChange={e => setFormData({ ...formData, giphyApiKey: e.target.value })}
                   placeholder="Enter Giphy API Key (from developers.giphy.com)"
                   style={{
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "var(--font-label)",
                     fontSize: '0.86rem',
                     letterSpacing: showGiphyKey ? '0.02em' : '0.12em',
                     paddingRight: '40px'

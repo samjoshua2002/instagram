@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { Target, Calendar, Download, Phone, Mail } from 'lucide-react';
 
 const cardStyle = { background: 'var(--glass-fill-standard)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-card)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)', boxShadow: 'inset 0 1px 0 var(--glass-highlight)', padding: '20px', minWidth: 0 };
-const kicker = { fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' };
+const kicker = { fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' };
 const STATUS = {
   confirmed: { bg: 'color-mix(in srgb, #22c55e 14%, transparent)', fg: '#4ade80' },
   pending: { bg: 'color-mix(in srgb, #f59e0b 14%, transparent)', fg: '#fbbf24' },

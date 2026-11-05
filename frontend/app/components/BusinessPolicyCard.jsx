@@ -95,7 +95,7 @@ export default function BusinessPolicyCard() {
     <div className="controls-card-container" style={{ marginBottom: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
         <div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>BUSINESS POLICY & HOURS</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: 700 }}>BUSINESS POLICY & HOURS</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>The AI follows these rules for every customer DM.</div>
         </div>
         <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
@@ -158,7 +158,7 @@ export default function BusinessPolicyCard() {
       </div>
       {policy.customRules.map((rule, i) => (
         <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-          <input style={{ ...inputStyle, flex: '1 1 200px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem' }} value={rule.when}
+          <input style={{ ...inputStyle, flex: '1 1 200px', fontFamily: "var(--font-label)", fontSize: '0.8rem' }} value={rule.when}
             onChange={e => updateRule(i, 'when', e.target.value)} placeholder="message.asksForDiscount" />
           <input style={{ ...inputStyle, flex: '2 1 240px' }} value={rule.directive}
             onChange={e => updateRule(i, 'directive', e.target.value)} placeholder="Mention our loyalty program." />
