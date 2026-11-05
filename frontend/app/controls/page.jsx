@@ -6,12 +6,24 @@ import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import BusinessPolicyCard from '../components/BusinessPolicyCard';
-import { motion, AnimatePresence } from 'framer-motion';
-import { enterMotion, rowMotion } from '../lib/motion';
-import {
-  Sliders, Search, Check, RefreshCw, Users, Bot, Film, Pause, ShieldCheck, CheckCircle2, AlertCircle,
-  LayoutGrid, List, AlignJustify
-} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { enterMotion } from '../lib/motion';
+import { Search, Bot, Film, Pause, X } from 'lucide-react';
+import './controls.css';
+
+// Who the AI answers. Short words so each option fits one line on a phone.
+const CHAT_MODES = [
+  { id: 'everyone', title: 'Everyone', desc: 'AI replies to every DM' },
+  { id: 'everyone_except', title: 'Everyone except…', desc: 'Pick people you reply to yourself' },
+  { id: 'only_selected', title: 'Only people I pick', desc: 'AI stays quiet for everyone else' },
+];
+
+// One switch per contact
+const CONTACT_MODES = [
+  { id: 'full_ai', label: 'AI', icon: Bot, hint: 'AI replies to messages and reels' },
+  { id: 'reels_only', label: 'Reels', icon: Film, hint: 'AI only reacts to shared reels' },
+  { id: 'paused', label: 'Off', icon: Pause, hint: 'You reply yourself' },
+];
 
 function ControlsPageContent() {
   const {
@@ -26,27 +38,7 @@ function ControlsPageContent() {
   } = useApp();
 
   const [search, setSearch] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'
-
-  // Layout switcher state: 'dense' (ultra-compact mobile default) | 'grid' | 'list'
-  const [controlsLayout, setControlsLayout] = useState(() => {
-    if (typeof window === 'undefined') return 'dense';
-    try {
-      const saved = localStorage.getItem('chatter_controls_layout');
-      if (saved) return saved;
-      return window.innerWidth <= 768 ? 'dense' : 'grid';
-    } catch {
-      return 'dense';
-    }
-  });
-
-  const handleSetControlsLayout = (mode) => {
-    setControlsLayout(mode);
-    try {
-      localStorage.setItem('chatter_controls_layout', mode);
-    } catch { }
-  };
 
   const friendNodes = useMemo(() => {
     const list = nodes.filter(n => !n.isRoot);
@@ -142,50 +134,6 @@ function ControlsPageContent() {
     }
   }, [routingConfig.chatMode, isIncluded, isExcluded]);
 
-  // Synchronized Checkbox Toggle
-  const handleToggleContact = useCallback((contact) => {
-    const key = getContactKey(contact);
-    const targetKeys = getTargetKeys(contact);
-    const baseConfig = currentConfigRef.current || routingConfig;
-    const chatMode = baseConfig.chatMode;
-
-    if (chatMode === 'only_selected') {
-      const currentlyIncluded = isIncluded(contact);
-      const currentList = (baseConfig.includedContactIds || []).filter(Boolean);
-
-      if (currentlyIncluded) {
-        // UNCHECKING: Immediately remove from whitelist AND set AI mode to 'paused'
-        const next = currentList.filter(id => !targetKeys.includes(id));
-        const updated = { ...baseConfig, includedContactIds: next };
-        queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' });
-      } else {
-        // CHECKING: Immediately add to whitelist AND set AI mode to 'full_ai'
-        const next = [...currentList.filter(id => !targetKeys.includes(id)), key];
-        const updated = { ...baseConfig, includedContactIds: next };
-        queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
-      }
-    } else if (chatMode === 'everyone_except') {
-      const currentlyExcluded = isExcluded(contact);
-      const currentList = (baseConfig.excludedContactIds || []).filter(Boolean);
-
-      if (currentlyExcluded) {
-        // UNCHECKING: Remove from blacklist AND set AI mode to 'full_ai'
-        const next = currentList.filter(id => !targetKeys.includes(id));
-        const updated = { ...baseConfig, excludedContactIds: next };
-        queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
-      } else {
-        // CHECKING: Add to blacklist AND set AI mode to 'paused'
-        const next = [...currentList.filter(id => !targetKeys.includes(id)), key];
-        const updated = { ...baseConfig, excludedContactIds: next };
-        queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' });
-      }
-    }
-  }, [routingConfig, getContactKey, getTargetKeys, isIncluded, isExcluded, queueSave, updateContactPreferences]);
-
   // Direct Button Switcher: Full AI, Reels Only, Stop AI (Instant Two-Way Sync)
   const handleSetMode = useCallback((contact, mode) => {
     const key = getContactKey(contact);
@@ -264,18 +212,6 @@ function ControlsPageContent() {
     if (updated) queueSave(updated);
   }, [friendNodes, routingConfig, queueSave, bulkSetMode]);
 
-  const onSave = async () => {
-    setIsSaving(true);
-    try {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      await queueSave(currentConfigRef.current || routingConfig, true);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Filtered Friends
   const filteredFriends = useMemo(() => {
     if (!search.trim()) return friendNodes;
@@ -300,351 +236,67 @@ function ControlsPageContent() {
     return filteredFriends.filter(c => getContactMode(c) === 'manual');
   }, [filteredFriends, getContactMode]);
 
-  const activeCount = routingConfig.chatMode === 'everyone_except'
-    ? friendNodes.filter(n => isExcluded(n)).length
-    : (routingConfig.chatMode === 'only_selected' ? friendNodes.filter(n => isIncluded(n)).length : friendNodes.length);
+  const chatMode = routingConfig.chatMode || 'everyone';
+  const aiOnCount = friendNodes.filter(n => getContactMode(n) !== 'manual').length;
 
-  // Render an Ultra-Compact Mobile-Friendly Contact Row (~42px slim height)
-  const renderDenseContactRow = (contact, index = 0) => {
-    const isEveryoneMode = routingConfig.chatMode === 'everyone';
-    const isChecked = isEveryoneMode
-      ? true
-      : (routingConfig.chatMode === 'everyone_except' ? isExcluded(contact) : isIncluded(contact));
-
-    const currentMode = getContactMode(contact);
-    const isFullAi = currentMode === 'full_ai';
-    const isReelsOnly = currentMode === 'reels_only';
-    const isPaused = currentMode === 'manual';
-
-    return (
-      <motion.div
-        layout
-        key={contact._id || contact.senderId || contact.id || contact.name}
-        className="control-contact-dense-row"
-        {...rowMotion(index)}
-        style={{
-          background: isChecked && !isEveryoneMode ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
-          border: '1px solid',
-          borderColor: isChecked && !isEveryoneMode ? 'var(--color-text-primary)' : 'var(--color-border)',
-          borderRadius: '8px',
-          padding: controlsLayout === 'list' ? '10px 14px' : '6px 10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px',
-          transition: 'border-color 0.15s ease, background-color 0.15s ease',
-        }}
-      >
-        {/* Left: Checkbox + Avatar + Name/Handle */}
-        <div
-          onClick={() => handleToggleContact(contact)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: isEveryoneMode ? 'default' : 'pointer',
-            flex: 1,
-            minWidth: 0,
-            touchAction: 'manipulation'
-          }}
-        >
-          <div
-            style={{
-              width: '16px',
-              height: '16px',
-              minWidth: '16px',
-              borderRadius: '4px',
-              background: isChecked ? 'var(--color-text-primary)' : 'var(--color-surface)',
-              border: '1px solid',
-              borderColor: isChecked ? 'var(--color-text-primary)' : 'var(--color-border-strong)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-surface)',
-              flexShrink: 0
-            }}
-          >
-            {isChecked && <Check size={11} strokeWidth={3} />}
-          </div>
-          <ContactAvatar contact={contact} size={28} showStatus={true} />
-          <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              {contact.name}
-            </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              {contact.handle || contact.relationship || 'Friend'}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Quick Action Pill Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-          <button
-            type="button"
-            onClick={() => handleSetMode(contact, 'full_ai')}
-            title="Full AI"
-            style={{
-              padding: '4px 8px',
-              borderRadius: '5px',
-              fontSize: '0.67rem',
-              fontWeight: isFullAi ? '700' : '500',
-              cursor: 'pointer',
-              background: isFullAi ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
-              color: isFullAi ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid',
-              borderColor: isFullAi ? 'var(--color-text-primary)' : 'var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Bot size={11} />
-            <span>AI</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSetMode(contact, 'reels_only')}
-            title="Reels Only"
-            style={{
-              padding: '4px 8px',
-              borderRadius: '5px',
-              fontSize: '0.67rem',
-              fontWeight: isReelsOnly ? '700' : '500',
-              cursor: 'pointer',
-              background: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
-              color: isReelsOnly ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid',
-              borderColor: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Film size={11} />
-            <span>Reels</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSetMode(contact, 'paused')}
-            title="Manual Chat / Off"
-            style={{
-              padding: '4px 8px',
-              borderRadius: '5px',
-              fontSize: '0.67rem',
-              fontWeight: isPaused ? '700' : '500',
-              cursor: 'pointer',
-              background: isPaused ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
-              color: isPaused ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid',
-              borderColor: isPaused ? 'var(--color-text-primary)' : 'var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Pause size={11} />
-            <span>Off</span>
-          </button>
-        </div>
-      </motion.div>
-    );
+  // "All on" / "All off": the same routing lists the old Select All / Clear buttons wrote
+  const setEveryoneTo = (on) => {
+    const total = friendNodes.length;
+    if (!total) return;
+    if (!window.confirm(on ? `Turn AI on for all ${total} contacts?` : `Turn AI off for all ${total} contacts? You will reply to them yourself.`)) return;
+    if (chatMode === 'everyone_except') return on ? handleClearAll() : handleSelectAll();
+    if (chatMode === 'only_selected') return on ? handleSelectAll() : handleClearAll();
+    bulkSetMode(friendNodes, on ? 'full_ai' : 'paused');
   };
 
-  // Render a Single Contact Card
-  const renderContactCard = (contact, index = 0) => {
-    const isEveryoneMode = routingConfig.chatMode === 'everyone';
-    const isChecked = isEveryoneMode
-      ? true
-      : (routingConfig.chatMode === 'everyone_except' ? isExcluded(contact) : isIncluded(contact));
+  const setChatMode = (id) => queueSave({ ...(currentConfigRef.current || routingConfig), chatMode: id });
 
-    const currentMode = getContactMode(contact);
-    const isFullAi = currentMode === 'full_ai';
-    const isReelsOnly = currentMode === 'reels_only';
-    const isPaused = currentMode === 'manual';
+  const tabs = [
+    { id: 'all', label: 'All', list: filteredFriends },
+    { id: 'full_ai', label: 'AI', list: fullAiContacts },
+    { id: 'reels_only', label: 'Reels', list: reelsOnlyContacts },
+    { id: 'manual', label: 'Off', list: manualContacts },
+  ];
+  const visible = (tabs.find(t => t.id === activeTab) || tabs[0]).list;
 
+  const listHint = chatMode === 'everyone_except'
+    ? 'Set someone to Off to reply to them yourself.'
+    : chatMode === 'only_selected'
+      ? 'Set people to AI or Reels to turn replies on for them.'
+      : 'Set someone to Off to stop AI for just that person.';
+
+  const renderRow = (contact) => {
+    const current = getContactMode(contact);
+    const activeId = current === 'manual' ? 'paused' : current;
     return (
-      <motion.div
-        layout
-        key={contact.id || contact.name}
-        className="control-contact-card"
-        {...rowMotion(index)}
-        style={{
-          background: isChecked && !isEveryoneMode ? 'var(--color-surface-elevated)' : 'var(--color-surface)',
-          border: '1px solid',
-          borderColor: isChecked && !isEveryoneMode ? 'var(--color-text-primary)' : 'var(--color-border)',
-          borderRadius: '10px',
-          padding: '14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          transition: 'border-color 0.15s ease, background-color 0.15s ease',
-          touchAction: 'manipulation'
-        }}
-      >
-        {/* Top Row: Checkbox + Avatar + Info + Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0, width: '100%' }}>
-          <div
-            onClick={() => handleToggleContact(contact)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              cursor: isEveryoneMode ? 'default' : 'pointer',
-              flex: 1,
-              minWidth: 0,
-              opacity: isEveryoneMode ? 0.75 : 1,
-              touchAction: 'manipulation'
-            }}
-          >
-            {/* Checkbox */}
-            <div
-              style={{
-                width: '18px',
-                height: '18px',
-                minWidth: '18px',
-                borderRadius: '4px',
-                background: isChecked ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                border: '1px solid',
-                borderColor: isChecked ? 'var(--color-text-primary)' : 'var(--color-border-strong)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--color-surface)',
-                flexShrink: 0
-              }}
-            >
-              {isChecked && <Check size={12} strokeWidth={3} />}
-            </div>
-
-            <ContactAvatar contact={contact} size={36} showStatus={true} />
-
-            <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-              <div style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                {contact.name}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                {contact.handle || contact.relationship || 'Friend'}
-              </div>
-            </div>
-          </div>
-
-          {/* Mode Pill */}
-          <span
-            style={{
-              fontSize: '0.64rem',
-              padding: '2px 7px',
-              borderRadius: '4px',
-              fontFamily: "var(--font-label)",
-              fontWeight: '700',
-              background: isFullAi ? 'var(--color-text-primary)' : (isReelsOnly ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)'),
-              color: (isFullAi || isReelsOnly) ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-          >
-            {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
-          </span>
+      <li key={contact._id || contact.senderId || contact.id || contact.name} className={`ctl-row is-${activeId}`}>
+        <ContactAvatar contact={contact} size={36} showStatus={false} />
+        <div className="ctl-row-text">
+          <div className="ctl-row-name">{contact.name}</div>
+          <div className="ctl-row-sub">{contact.handle || contact.relationship || 'Friend'}</div>
         </div>
-
-        {/* Bottom Row: AI Mode Selector Buttons (Touch-optimized) */}
-        <div style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--color-surface-hover)', width: '100%' }}>
-          <button
-            type="button"
-            onClick={() => handleSetMode(contact, 'full_ai')}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: '7px 4px',
-              borderRadius: '6px',
-              fontSize: '0.7rem',
-              fontWeight: isFullAi ? '700' : '500',
-              cursor: 'pointer',
-              background: isFullAi ? 'var(--color-text-primary)' : 'var(--color-surface)',
-              color: isFullAi ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid',
-              borderColor: isFullAi ? 'var(--color-text-primary)' : 'var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              overflow: 'hidden',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Bot size={11} style={{ flexShrink: 0 }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Full AI</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSetMode(contact, 'reels_only')}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: '7px 4px',
-              borderRadius: '6px',
-              fontSize: '0.7rem',
-              fontWeight: isReelsOnly ? '700' : '500',
-              cursor: 'pointer',
-              background: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-surface)',
-              color: isReelsOnly ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid',
-              borderColor: isReelsOnly ? 'var(--color-text-primary)' : 'var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              overflow: 'hidden',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Film size={11} style={{ flexShrink: 0 }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Reels Only</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSetMode(contact, 'paused')}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: '7px 4px',
-              borderRadius: '6px',
-              fontSize: '0.7rem',
-              fontWeight: isPaused ? '700' : '500',
-              cursor: 'pointer',
-              background: isPaused ? 'var(--color-text-primary)' : 'var(--color-surface)',
-              color: isPaused ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-              border: '1px solid',
-              borderColor: isPaused ? 'var(--color-text-primary)' : 'var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              overflow: 'hidden',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Pause size={11} style={{ flexShrink: 0 }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Stop AI</span>
-          </button>
+        <div className="ctl-seg" role="radiogroup" aria-label={`AI for ${contact.name}`}>
+          {CONTACT_MODES.map(({ id, label, icon: Icon, hint }) => {
+            const on = activeId === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={label}
+                title={hint}
+                className={on ? 'is-on' : ''}
+                onClick={() => { if (!on) handleSetMode(contact, id); }}
+              >
+                <Icon size={13} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </div>
-      </motion.div>
+      </li>
     );
-  };
-
-  // Render by layout mode
-  const renderContactItem = (contact, index = 0) => {
-    if (controlsLayout === 'dense' || controlsLayout === 'list') {
-      return renderDenseContactRow(contact, index);
-    }
-    return renderContactCard(contact, index);
   };
 
   if (isSyncingInitial && !(nodes || []).some(n => !n.isRoot)) {
@@ -652,425 +304,94 @@ function ControlsPageContent() {
   }
 
   return (
-    <motion.div
-      {...enterMotion}
-      className="page-container"
-     
-    >
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-          AUTOMATION POLICY
-        </div>
-        <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: 'var(--color-text-primary)' }}>
-          Chat Control Rules
-        </h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-          Configure automated Instagram AI routing: handle everyone, exclude selected contacts for manual chatting, or whitelist specific friends.
-        </p>
-      </div>
+    <motion.div {...enterMotion} className="page-container ctl-page">
+      <header className="ctl-head">
+        <h1>AI Reply Rules</h1>
+        <p>Choose who the AI replies to on Instagram. Changes save automatically.</p>
+      </header>
 
       {['business', 'agency'].includes(user?.accountType) && <BusinessPolicyCard />}
 
-      {/* 3 Main Mode Selector Cards */}
-      <div className="responsive-grid-3" role="radiogroup" aria-label="AI reply mode" style={{ marginBottom: '24px' }}>
-        {[
-          {
-            id: 'everyone',
-            title: 'Open with Everyone',
-            desc: 'AI handles direct messages from everyone automatically (followers, strangers, friends).',
-            badge: 'GLOBAL'
-          },
-          {
-            id: 'everyone_except',
-            title: 'Everyone EXCEPT...',
-            desc: 'AI replies to everyone EXCEPT the contacts you checkbox below (reserved for your manual chat).',
-            badge: 'RECOMMENDED'
-          },
-          {
-            id: 'only_selected',
-            title: 'ONLY Selected',
-            desc: 'AI ONLY replies to checked contacts. All other incoming direct messages will be ignored.',
-            badge: 'WHITELIST'
-          }
-        ].map(mode => {
-          const isSelected = routingConfig.chatMode === mode.id;
-          return (
-            <div
-              key={mode.id}
-              role="radio"
-              aria-checked={isSelected}
-              tabIndex={0}
-              className={`mode-card${isSelected ? ' is-selected' : ''}`}
-              onClick={() => {
-                const updated = { ...(currentConfigRef.current || routingConfig), chatMode: mode.id };
-                queueSave(updated);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  queueSave({ ...(currentConfigRef.current || routingConfig), chatMode: mode.id });
-                }
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span
-                    style={{
-                      fontSize: '0.66rem',
-                      background: isSelected ? 'color-mix(in srgb, var(--ambient-dominant) 25%, transparent)' : 'var(--color-surface-hover)',
-                      color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                      padding: '2px 7px',
-                      borderRadius: '4px',
-                      fontFamily: "var(--font-label)",
-                      fontWeight: '700'
-                    }}
-                  >
-                    {mode.badge}
-                  </span>
-                  <div
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      border: isSelected ? '5px solid var(--ambient-dominant)' : '1.5px solid var(--color-text-muted)'
-                    }}
-                  />
-                </div>
-                <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: 0 }}>
-                  {mode.title}
-                </h3>
-                <p style={{ fontSize: '0.8rem', opacity: isSelected ? 0.85 : 0.6, marginTop: '6px', lineHeight: '1.4' }}>
-                  {mode.desc}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <section className="ctl-card">
+        <h2 className="ctl-title">Who gets AI replies</h2>
+        <div className="ctl-modes" role="radiogroup" aria-label="Who gets AI replies">
+          {CHAT_MODES.map(mode => {
+            const on = chatMode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={`ctl-mode${on ? ' is-on' : ''}`}
+                onClick={() => { if (!on) setChatMode(mode.id); }}
+              >
+                <span className="ctl-radio" aria-hidden="true" />
+                <span className="ctl-mode-text">
+                  <strong>{mode.title}</strong>
+                  <small>{mode.desc}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="ctl-status">
+          <span className="ctl-dot" aria-hidden="true" />
+          AI is on for <b>{aiOnCount}</b> of {friendNodes.length} contacts
+        </div>
+      </section>
 
-      {/* Active System Policy Bar */}
-      <div
-        style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '10px',
-          padding: '16px 20px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}
-      >
-        <div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-            ACTIVE SYSTEM POLICY
-          </span>
-          <div style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--color-text-primary)', marginTop: '2px', fontFamily: "var(--font-label)" }}>
-            {routingConfig.chatMode === 'everyone' && 'AI RESPONDS TO EVERYONE AUTOMATICALLY'}
-            {routingConfig.chatMode === 'everyone_except' && `AI RESPONDS TO EVERYONE EXCEPT ${activeCount} CHECKED FRIENDS`}
-            {routingConfig.chatMode === 'only_selected' && `AI ONLY RESPONDS TO ${activeCount} CHECKED CONTACTS`}
+      <section className="ctl-card">
+        <div className="ctl-list-head">
+          <div>
+            <h2 className="ctl-title">Contacts</h2>
+            <p className="ctl-hint">{listHint}</p>
+          </div>
+          <div className="ctl-bulk">
+            <button type="button" onClick={() => setEveryoneTo(true)}>All on</button>
+            <button type="button" onClick={() => setEveryoneTo(false)}>All off</button>
           </div>
         </div>
 
-        <button
-          onClick={onSave}
-          disabled={isSaving}
-          style={{
-            background: 'var(--color-text-primary)',
-            color: 'var(--color-surface)',
-            border: 'none',
-            padding: '9px 20px',
-            borderRadius: '6px',
-            fontWeight: '700',
-            fontSize: '0.82rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            touchAction: 'manipulation'
-          }}
-        >
-          {isSaving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={14} />}
-          <span>Save Routing Rules</span>
-        </button>
-      </div>
-
-      {/* Contacts List & Policy Controls */}
-      <div className="controls-card-container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
-              {routingConfig.chatMode === 'everyone_except' ? 'Checkbox Contacts to Exclude' : (routingConfig.chatMode === 'only_selected' ? 'Checkbox Contacts to Include' : 'All Contacts (Active)')}
-            </h3>
-            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              {routingConfig.chatMode === 'only_selected'
-                ? 'Only checked contacts will receive AI replies. Contacts in the Manual Chat section are silenced.'
-                : (routingConfig.chatMode === 'everyone_except'
-                  ? 'Checked contacts are excluded from AI (manual chat). Unchecked contacts receive automated AI replies.'
-                  : 'All contacts receive automated AI replies. Switch mode above to exclude anyone.')}
-            </p>
-          </div>
-
-          {routingConfig.chatMode !== 'everyone' && (
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button
-                onClick={handleSelectAll}
-                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
-              >
-                Select All
-              </button>
-              <button
-                onClick={handleClearAll}
-                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation' }}
-              >
-                Clear
-              </button>
-            </div>
+        <div className="ctl-search">
+          <Search size={15} aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Search name or @handle"
+            aria-label="Search contacts"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
+              <X size={14} />
+            </button>
           )}
         </div>
 
-        {/* Search Bar + Layout Switcher + 4 Filter Tabs */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
-              <input
-                type="text"
-                placeholder="Search contacts by name or handle..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  paddingLeft: '34px',
-                  height: '38px',
-                  fontSize: '0.82rem',
-                  width: '100%'
-                }}
-              />
-            </div>
-
-            {/* Layout View Switcher */}
-            <div style={{
-              display: 'flex',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              padding: '3px',
-              borderRadius: '8px',
-              flexShrink: 0
-            }}>
-              {[
-                { id: 'dense', label: 'Compact', icon: AlignJustify },
-                { id: 'grid', label: 'Cards', icon: LayoutGrid },
-                { id: 'list', label: 'List', icon: List }
-              ].map(({ id, label, icon: Icon }) => {
-                const isActive = controlsLayout === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => handleSetControlsLayout(id)}
-                    title={`${label} View`}
-                    style={{
-                      background: isActive ? 'var(--color-text-primary)' : 'transparent',
-                      color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                      border: 'none',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '0.74rem',
-                      fontWeight: isActive ? '700' : '500',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Icon size={13} />
-                    <span className="hidden-on-mobile">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Segment Filter Tabs */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {[
-              { id: 'all', label: 'All Contacts', count: filteredFriends.length },
-              { id: 'full_ai', label: 'Full AI', count: fullAiContacts.length },
-              { id: 'reels_only', label: 'Reels Only', count: reelsOnlyContacts.length },
-              { id: 'manual', label: 'Manual Chat', count: manualContacts.length }
-            ].map(tab => {
-              const isTabActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    background: isTabActive ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                    color: isTabActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                    border: '1px solid',
-                    borderColor: isTabActive ? 'var(--color-text-primary)' : 'var(--color-border)',
-                    borderRadius: '7px',
-                    padding: '6px 12px',
-                    fontSize: '0.75rem',
-                    fontWeight: isTabActive ? '700' : '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    touchAction: 'manipulation'
-                  }}
-                >
-                  <span>{tab.label}</span>
-                  <span style={{
-                    fontSize: '0.65rem',
-                    padding: '1px 5px',
-                    borderRadius: '4px',
-                    background: isTabActive ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)',
-                    color: isTabActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                    fontFamily: "var(--font-label)",
-                    fontWeight: '700'
-                  }}>
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        <div className="ctl-tabs" role="tablist" aria-label="Filter contacts">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={activeTab === tab.id ? 'is-on' : ''}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label} <span>{tab.list.length}</span>
+            </button>
+          ))}
         </div>
 
-        {/* 3 CORE SECTIONS FOR 'ONLY_SELECTED' & STRUCTURED VIEW */}
-        {routingConfig.chatMode === 'only_selected' && activeTab === 'all' ? (
-          <motion.div layout style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-            {/* SECTION 1: FULL AI ACTIVE */}
-            <motion.div layout>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} />
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
-                    1. Full AI Active (Auto-Replies to Messages & Reels)
-                  </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
-                    {fullAiContacts.length}
-                  </span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', margin: '0 0 12px 16px' }}>
-                AI responds automatically to all text messages and shared reels from these selected contacts.
-              </p>
-              {fullAiContacts.length > 0 ? (
-                <motion.div
-                  layout
-                  className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
-                  style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
-                >
-                  <AnimatePresence>
-                    {fullAiContacts.map(renderContactItem)}
-                  </AnimatePresence>
-                </motion.div>
-              ) : (
-                <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                  No contacts currently selected for Full AI. Check a contact below to activate Full AI.
-                </div>
-              )}
-            </motion.div>
-
-            {/* SECTION 2: REELS ONLY */}
-            <motion.div layout>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--ambient-dominant)' }} />
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
-                    2. Reels Only (Reacts Exclusively to Shared Reels)
-                  </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
-                    {reelsOnlyContacts.length}
-                  </span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', margin: '0 0 12px 16px' }}>
-                AI only reacts with witty quips or reactions when these contacts share an Instagram Reel or Meme. Direct text chats stay manual.
-              </p>
-              {reelsOnlyContacts.length > 0 ? (
-                <motion.div
-                  layout
-                  className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
-                  style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
-                >
-                  <AnimatePresence>
-                    {reelsOnlyContacts.map(renderContactItem)}
-                  </AnimatePresence>
-                </motion.div>
-              ) : (
-                <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                  No contacts in Reels Only mode.
-                </div>
-              )}
-            </motion.div>
-
-            {/* SECTION 3: MANUAL CHAT / PAUSED (UNSELECTED) */}
-            <motion.div layout>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-border-strong)' }} />
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
-                    3. Manual Chat / Paused (Not Selected)
-                  </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
-                    {manualContacts.length}
-                  </span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', margin: '0 0 12px 16px' }}>
-                AI is completely silenced for these unselected contacts. You chat with them manually on Instagram.
-              </p>
-              {manualContacts.length > 0 ? (
-                <motion.div
-                  layout
-                  className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
-                  style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
-                >
-                  <AnimatePresence>
-                    {manualContacts.map(renderContactItem)}
-                  </AnimatePresence>
-                </motion.div>
-              ) : (
-                <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                  All contacts are currently selected for AI.
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
+        {visible.length > 0 ? (
+          <ul className="ctl-list">{visible.map(renderRow)}</ul>
         ) : (
-          /* TAB FILTERED OR STANDARD VIEW */
-          <motion.div
-            layout
-            className={controlsLayout === 'grid' ? "responsive-contacts-grid" : ""}
-            style={controlsLayout === 'dense' ? { display: 'flex', flexDirection: 'column', gap: '6px' } : (controlsLayout === 'list' ? { display: 'flex', flexDirection: 'column', gap: '10px' } : undefined)}
-          >
-            <AnimatePresence>
-              {activeTab === 'full_ai' && fullAiContacts.map(renderContactItem)}
-              {activeTab === 'reels_only' && reelsOnlyContacts.map(renderContactItem)}
-              {activeTab === 'manual' && manualContacts.map(renderContactItem)}
-              {activeTab === 'all' && filteredFriends.map(renderContactItem)}
-            </AnimatePresence>
-            {((activeTab === 'full_ai' && fullAiContacts.length === 0) ||
-              (activeTab === 'reels_only' && reelsOnlyContacts.length === 0) ||
-              (activeTab === 'manual' && manualContacts.length === 0) ||
-              (activeTab === 'all' && filteredFriends.length === 0)) && (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                  No contacts found matching this view.
-                </div>
-              )}
-          </motion.div>
+          <div className="ctl-empty">
+            {search ? `No contacts match "${search}".` : 'No contacts here yet.'}
+          </div>
         )}
-      </div>
+      </section>
     </motion.div>
   );
 }

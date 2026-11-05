@@ -13,6 +13,9 @@ import {
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
+import UnsplashBanner from '../components/UnsplashBanner';
+import { SegIndicator } from '../components/ui/motion';
+import './vault.css';
 
 function MediaVaultPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating } = useApp();
@@ -480,1315 +483,474 @@ function MediaVaultPageContent() {
     }
   };
 
-  return (
-    <motion.div
-      {...enterMotion}
-      className="page-container settings-fullwidth"
-     
-    >
+  const POPULAR_TAGS = [
+    { label: 'Side eye', q: 'side eye sus' },
+    { label: 'LOL', q: 'laughing dying' },
+    { label: 'Mind blown', q: 'mind blown' },
+    { label: 'Confused', q: 'travolta confused' },
+    { label: 'Crying', q: 'crying meme' },
+    { label: 'Hype dance', q: 'happy dance celebrate' },
+    { label: 'Popcat', q: 'popcat' },
+    { label: 'The Rock', q: 'the rock eyebrow' },
+  ];
+  const MODES = [
+    { id: 'file', label: 'Upload file', icon: Upload },
+    { id: 'giphy', label: 'Search GIPHY', icon: Search },
+    { id: 'url', label: 'Paste URL', icon: LinkIcon },
+  ];
+  const categoryLabel = (id) => categories.find(c => c.id === id)?.label || id;
+  const shownPredefined = activeCategory === 'all' ? predefinedList : predefinedList.filter(p => p.category === activeCategory);
+  const addPanelRef = useRef(null);
 
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-           
-            <span style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', fontWeight: '600' }}>
-              REACTION VAULT & EMOTION ATTACHMENTS (50% PRIORITY)
-            </span>
+  const openMode = (mode) => {
+    setUploadMode(mode);
+    addPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (mode === 'file') fileInputRef.current?.click();
+  };
+
+  const renderCard = ({ key, url, name, category, badge, keywords, date, footer }) => (
+    <div key={key} className="vx-card">
+      <a className="vx-card-art" href={url} target="_blank" rel="noreferrer" title="Open full size">
+        <img src={url} alt={name} loading="lazy" />
+        <span className="vx-badge vx-badge-cat">{getCategoryIcon(category)}{categoryLabel(category)}</span>
+        <span className="vx-badge vx-badge-type">{badge}</span>
+      </a>
+      <div className="vx-card-body">
+        <div className="vx-card-title" title={name}>{name}</div>
+        {date && <div className="vx-card-date">Added {new Date(date).toLocaleDateString()}</div>}
+        {keywords?.length > 0 && (
+          <div className="vx-tags">
+            {keywords.slice(0, 5).map(kw => <span key={kw} className="spx-chip">#{kw}</span>)}
+            {keywords.length > 5 && <span className="spx-chip" title={keywords.slice(5).join(', ')}>+{keywords.length - 5}</span>}
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--color-text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
-            Media & Reaction Vault
-          </h1>
-          <p style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', marginTop: '4px', maxWidth: '720px' }}>
-            Upload images and GIFs with labels & keywords across emotion categories (Joy, LOL, Wonder, Sad, Side Eye, etc.). The AI intelligently detects emotions and keywords in chat to pick your best matching GIF.
-          </p>
-        </div>
+        )}
+      </div>
+      <div className="vx-card-foot">{footer}</div>
+    </div>
+  );
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => setShowNewCategoryModal(true)}
-            className="btn"
-            style={{ fontSize: '0.8rem', padding: '8px 14px' }}
-          >
-            <Plus size={14} />
-            <span>Add Category</span>
-          </button>
-          <button
-            onClick={fetchVaultData}
-            className="btn"
-            style={{ fontSize: '0.8rem', padding: '8px 14px' }}
-            title="Refresh vault"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
+  const renderModal = (open, onClose, title, children) => open && (
+    <div className="vx-modal-back" onClick={onClose}>
+      <div className="vx-modal spx-page" role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()}>
+        <div className="vx-modal-head">
+          <h3>{title}</h3>
+          <button type="button" className="spx-icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <motion.div {...enterMotion} className="page-container settings-fullwidth spx-page vx-page">
+      <header className="spx-hero">
+        <UnsplashBanner seed="page-vault" credit={false} className="spx-cover"><Film size={96} strokeWidth={2} /></UnsplashBanner>
+        <div className="spx-hero-text">
+          <div className="spx-eyebrow">Reaction vault</div>
+          <h1 className="spx-title">Media &amp; Reaction Vault</h1>
+          <p className="spx-desc">
+            Add GIFs and images with an emotion and a few keywords. When a chat matches, the AI sends your best matching reaction.
+          </p>
+          <div className="spx-meta">
+            Chatter OS <span>· {items.length} item{items.length === 1 ? '' : 's'} · {categories.length} categor{categories.length === 1 ? 'y' : 'ies'}</span>
+          </div>
+        </div>
+      </header>
+
+      <div className="spx-actions">
+        <button type="button" className="spx-play" onClick={() => openMode('file')}>
+          <Upload size={18} /> Upload media
+        </button>
+        <button type="button" className="spx-outline" aria-pressed={uploadMode === 'giphy'} onClick={() => openMode('giphy')}>
+          <Search size={14} /> Search GIPHY
+        </button>
+        <button type="button" className="spx-outline" onClick={() => setShowNewCategoryModal(true)}>
+          <Plus size={14} /> Add category
+        </button>
+        <button type="button" className="spx-icon-btn vx-refresh" onClick={fetchVaultData} title="Refresh vault" aria-label="Refresh vault">
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+        </button>
       </div>
 
-      {/* TOP SECTION: UPLOAD / ADD FORM */}
-      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '22px', marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Upload size={18} style={{ color: 'var(--color-text-primary)' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: 0 }}>
-              Add Media with Keywords & Emotions
-            </h3>
-          </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/gif,image/jpeg,image/png,image/webp"
+        hidden
+      />
 
-          {/* Mode Switcher */}
-          <div style={{ display: 'flex', background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '3px' }}>
+      {/* Add media */}
+      <div className="spx-panel vx-add" ref={addPanelRef}>
+        <div className="spx-pills vx-scroll" role="tablist">
+          {MODES.map(({ id, label, icon: Icon }) => (
             <button
+              key={id}
               type="button"
-              onClick={() => setUploadMode('file')}
-              style={{
-                background: uploadMode === 'file' ? 'var(--color-surface)' : 'transparent',
-                color: uploadMode === 'file' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                border: 'none',
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: uploadMode === 'file' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-              }}
+              role="tab"
+              aria-selected={uploadMode === id}
+              className={`spx-pill${uploadMode === id ? ' active' : ''}`}
+              onClick={() => setUploadMode(id)}
             >
-              Upload Device File
+              {uploadMode === id && <SegIndicator id="seg-vault" />}
+              <Icon size={15} /> {label}
             </button>
-            <button
-              type="button"
-              onClick={() => setUploadMode('giphy')}
-              style={{
-                background: uploadMode === 'giphy' ? 'var(--color-surface)' : 'transparent',
-                color: uploadMode === 'giphy' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                border: 'none',
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: uploadMode === 'giphy' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-              }}
-            >
-              Search GIPHY API
-            </button>
-            <button
-              type="button"
-              onClick={() => setUploadMode('url')}
-              style={{
-                background: uploadMode === 'url' ? 'var(--color-surface)' : 'transparent',
-                color: uploadMode === 'url' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                border: 'none',
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: uploadMode === 'url' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-              }}
-            >
-              Paste Direct URL
-            </button>
-          </div>
+          ))}
         </div>
 
-        {/* GIPHY MULTI-SELECT STUDIO */}
-        {uploadMode === 'giphy' && (
-          <div style={{ padding: '18px', background: 'var(--color-surface-elevated)', borderRadius: '10px', border: '1px solid var(--color-border)', marginBottom: '8px' }}>
-            {/* Search Input Bar */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+        {uploadMode === 'giphy' ? (
+          <div className="vx-giphy">
+            <form className="vx-search" onSubmit={handleSearchGiphy}>
+              <Search size={16} />
               <input
-                type="text"
-                placeholder="Search GIPHY live (e.g. sus, side eye, laugh, travolta, cat, dance)..."
+                type="search"
+                placeholder="Search GIPHY, e.g. side eye, laugh, cat, dance"
                 value={giphyQuery}
                 onChange={e => setGiphyQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSearchGiphy(e); }}
-                style={{ flex: 1, height: '40px', fontSize: '0.86rem' }}
+                aria-label="Search GIPHY"
               />
-              <button
-                type="button"
-                onClick={handleSearchGiphy}
-                disabled={searchingGiphy || !giphyQuery.trim()}
-                className="btn btn-primary"
-                style={{ fontSize: '0.82rem', padding: '0 18px', height: '40px' }}
-              >
-                {searchingGiphy ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
-                <span>Search</span>
+              <button type="submit" className="spx-play vx-play-sm" disabled={searchingGiphy || !giphyQuery.trim()}>
+                {searchingGiphy ? <RefreshCw size={14} className="animate-spin" /> : 'Search'}
               </button>
-            </div>
+            </form>
 
-            {/* Quick Keyword Suggestion Pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>
-                Popular:
-              </span>
-              {[
-                { label: 'Side Eye / Sus', q: 'side eye sus' },
-                { label: 'Laugh / LOL', q: 'laughing dying' },
-                { label: 'Shock / Mind Blown', q: 'mind blown' },
-                { label: 'Confused / Travolta', q: 'travolta confused' },
-                { label: 'Crying / Tears', q: 'crying meme' },
-                { label: 'Hype / Dance', q: 'happy dance celebrate' },
-                { label: 'Popcat / Cats', q: 'popcat' },
-                { label: 'The Rock', q: 'the rock eyebrow' },
-              ].map(tag => (
-                <button
-                  key={tag.label}
-                  type="button"
-                  onClick={() => handleSearchGiphy(null, tag.q)}
-                  style={{
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '14px',
-                    padding: '3px 10px',
-                    fontSize: '0.72rem',
-                    fontWeight: '600',
-                    color: 'var(--color-text-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
+            <div className="vx-popular vx-scroll">
+              <span className="vx-label">Popular</span>
+              {POPULAR_TAGS.map(tag => (
+                <button key={tag.label} type="button" className="spx-pill vx-pill-sm" onClick={() => handleSearchGiphy(null, tag.q)}>
                   #{tag.label}
                 </button>
               ))}
             </div>
 
-            {/* BATCH ACTION TOOLBAR (when GIFs are loaded) */}
             {giphyResults.length > 0 && (
-              <div style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px'
-              }}>
-                {/* Selection Count & Select All */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{
-                    fontSize: '0.76rem',
-                    fontWeight: '800',
-                    padding: '3px 9px',
-                    borderRadius: '4px',
-                    background: selectedGiphyGifs.length > 0 ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
-                    color: selectedGiphyGifs.length > 0 ? 'var(--color-surface)' : 'var(--color-text-secondary)'
-                  }}>
-                    {selectedGiphyGifs.length} Selected
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={handleSelectAllGiphy}
-                    className="btn"
-                    style={{ fontSize: '0.74rem', padding: '4px 10px' }}
-                  >
-                    <Check size={12} />
-                    <span>{selectedGiphyGifs.length === giphyResults.length ? 'Deselect All' : 'Select All'}</span>
+              <div className="vx-batch">
+                <div className="vx-batch-count">
+                  <span className={`spx-chip${selectedGiphyGifs.length ? ' spx-chip-green' : ''}`}>{selectedGiphyGifs.length} selected</span>
+                  <button type="button" className="spx-outline" onClick={handleSelectAllGiphy}>
+                    <Check size={13} /> {selectedGiphyGifs.length === giphyResults.length ? 'Clear all' : 'Select all'}
                   </button>
                 </div>
-
-                {/* Target Category & Keywords & Add Button */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-secondary)' }}>Category:</span>
-                    <select
-                      value={batchCategory}
-                      onChange={e => setBatchCategory(e.target.value)}
-                      style={{ height: '32px', fontSize: '0.78rem', width: 'auto', padding: '4px 8px' }}
-                    >
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.label || cat.id}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
+                <div className="vx-batch-form">
+                  <select value={batchCategory} onChange={e => setBatchCategory(e.target.value)} aria-label="Category for selected GIFs">
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label || cat.id}</option>)}
+                  </select>
                   <input
                     type="text"
-                    placeholder="Keywords (e.g. sus, ai, doubt)"
+                    placeholder="Keywords, e.g. sus, doubt"
                     value={batchKeywords}
                     onChange={e => setBatchKeywords(e.target.value)}
-                    style={{ height: '32px', fontSize: '0.78rem', width: '180px', padding: '4px 8px' }}
+                    aria-label="Keywords for selected GIFs"
                   />
-
                   <button
                     type="button"
+                    className="spx-play vx-play-sm"
                     onClick={handleAddBatchToVault}
                     disabled={addingBatch || selectedGiphyGifs.length === 0}
-                    className="btn btn-primary"
-                    style={{
-                      fontSize: '0.78rem',
-                      padding: '5px 14px',
-                      opacity: selectedGiphyGifs.length === 0 ? 0.5 : 1,
-                      cursor: selectedGiphyGifs.length === 0 ? 'not-allowed' : 'pointer'
-                    }}
                   >
-                    {addingBatch ? (
-                      <>
-                        <RefreshCw size={12} className="animate-spin" />
-                        <span>Adding {selectedGiphyGifs.length}...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={13} />
-                        <span>Add {selectedGiphyGifs.length > 0 ? selectedGiphyGifs.length : ''} to [{batchCategory}] Vault</span>
-                      </>
-                    )}
+                    {addingBatch
+                      ? <><RefreshCw size={14} className="animate-spin" /> Adding…</>
+                      : <><Plus size={14} /> Add {selectedGiphyGifs.length || ''} to {categoryLabel(batchCategory)}</>}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* RESULTS MULTI-SELECT GRID */}
             {searchingGiphy ? (
-              <div className="sk-grid" role="status" aria-busy="true" aria-label="Searching GIPHY">
-                {Array.from({ length: 8 }, (_, i) => <Sk key={i} h={0} r={10} style={{ paddingBottom: '100%' }} />)}
+              <div className="vx-pick-grid" role="status" aria-busy="true" aria-label="Searching GIPHY">
+                {Array.from({ length: 8 }, (_, i) => <Sk key={i} h={0} r={8} style={{ paddingBottom: '100%' }} />)}
               </div>
             ) : giphyResults.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--color-text-muted)' }}>
-                <Film className="icon-keep" size={28} style={{ margin: '0 auto 8px auto' }} />
-                <div style={{ fontSize: '0.84rem' }}>Type a search query or click a popular tag above to preview and pick GIFs!</div>
+              <div className="vx-hint">
+                <Film className="icon-keep" size={28} />
+                <div>Search, or tap a popular tag, then pick the GIFs you want.</div>
               </div>
             ) : (
-              <div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
-                  Click to select multiple GIFs for batch import:
-                </span>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-                  gap: '10px',
-                  maxHeight: '440px',
-                  overflowY: 'auto',
-                  padding: '4px'
-                }}>
-                  {giphyResults.map(gif => {
-                    const previewUrl = gif.images?.fixed_height_small?.url || gif.images?.downsized?.url || gif.images?.original?.url;
-                    const isSelected = selectedGiphyGifs.some(g => g.id === gif.id);
-                    const alreadyInVault = items.some(i => i.url === (gif.images?.original?.url || gif.images?.downsized?.url));
-
-                    return (
-                      <div
-                        key={gif.id}
-                        onClick={() => handleToggleSelectGiphy(gif)}
-                        style={{
-                          height: '140px',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          border: isSelected ? '3px solid var(--color-text-primary)' : '1px solid var(--color-border)',
-                          position: 'relative',
-                          background: 'var(--color-surface)',
-                          boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.12)' : 'none',
-                          transition: 'transform 0.12s ease, border-color 0.12s ease'
-                        }}
-                      >
-                        <img
-                          src={previewUrl}
-                          alt={gif.title || 'GIF'}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          loading="lazy"
-                        />
-
-                        {/* Top Selection Pill */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '6px',
-                          right: '6px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: isSelected ? 'var(--color-text-primary)' : 'var(--glass-fill-strong)',
-                          color: isSelected ? 'var(--color-surface)' : 'var(--color-text-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                          border: isSelected ? 'none' : '1px solid var(--color-border-strong)'
-                        }}>
-                          {isSelected ? <Check size={14} /> : null}
-                        </div>
-
-                        {/* Status if already in vault */}
-                        {alreadyInVault && (
-                          <span style={{
-                            position: 'absolute',
-                            top: '6px',
-                            left: '6px',
-                            background: 'rgba(22, 163, 74, 0.9)',
-                            color: 'var(--color-surface)',
-                            fontSize: '0.6rem',
-                            fontWeight: '700',
-                            padding: '2px 6px',
-                            borderRadius: '4px'
-                          }}>
-                            In Vault
-                          </span>
-                        )}
-
-                        {/* Title Caption overlay */}
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                          padding: '16px 8px 6px 8px',
-                          color: 'var(--color-surface)',
-                          fontSize: '0.68rem',
-                          fontWeight: '600',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {gif.title || 'Reaction GIF'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="vx-pick-grid">
+                {giphyResults.map(gif => {
+                  const previewUrl = gif.images?.fixed_height_small?.url || gif.images?.downsized?.url || gif.images?.original?.url;
+                  const isSelected = selectedGiphyGifs.some(g => g.id === gif.id);
+                  const alreadyInVault = items.some(i => i.url === (gif.images?.original?.url || gif.images?.downsized?.url));
+                  return (
+                    <button
+                      key={gif.id}
+                      type="button"
+                      className={`vx-pick${isSelected ? ' selected' : ''}`}
+                      onClick={() => handleToggleSelectGiphy(gif)}
+                      aria-pressed={isSelected}
+                      title={gif.title || 'Reaction GIF'}
+                    >
+                      <img src={previewUrl} alt={gif.title || 'GIF'} loading="lazy" />
+                      <span className="vx-pick-check">{isSelected && <Check size={14} />}</span>
+                      {alreadyInVault && <span className="vx-badge vx-badge-in">In vault</span>}
+                      <span className="vx-pick-title">{gif.title || 'Reaction GIF'}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
-        )}
-
-        {/* MANUAL UPLOAD FORM (Shown when in 'file' or 'url' mode) */}
-        {uploadMode !== 'giphy' && (
-        <form onSubmit={handleUploadSubmit}>
-          <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
-            {/* Category Select */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                Emotion Category
+        ) : (
+          <form className="vx-form" onSubmit={handleUploadSubmit}>
+            <div className="vx-form-grid">
+              <label className="vx-field">
+                <span className="vx-label">Emotion</span>
+                <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.label || cat.id}{cat.isCustom ? ' (custom)' : ''}</option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={selectedCategory}
-                onChange={e => setSelectedCategory(e.target.value)}
-                style={{ height: '40px', fontWeight: '600' }}
-              >
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.label || cat.id} {cat.isCustom ? '(Custom)' : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="vx-field">
+                <span className="vx-label">Title</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Side eye dog, Popcat"
+                  value={mediaName}
+                  onChange={e => setMediaName(e.target.value)}
+                />
+              </label>
             </div>
 
-            {/* Media Name */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                Media Title / Label (Used by AI to understand the humor)
-              </label>
+            <label className="vx-field">
+              <span className="vx-label"><Tag size={12} /> Keywords (comma separated)</span>
               <input
                 type="text"
-                placeholder="e.g. Bombastic side eye dog, Leonardo cheer, Popcat"
-                value={mediaName}
-                onChange={e => setMediaName(e.target.value)}
-                style={{ height: '40px' }}
+                placeholder="e.g. sus, judging, doubt, bombastic"
+                value={mediaKeywords}
+                onChange={e => setMediaKeywords(e.target.value)}
               />
-            </div>
-          </div>
-
-          {/* Keywords / Tags Row */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-              <Tag size={13} />
-              <span>Keywords & Humour Triggers (Comma separated)</span>
+              <span className="vx-help">When a friend texts one of these words, the AI picks this reaction first.</span>
             </label>
-            <input
-              type="text"
-              placeholder="e.g. sus, judging, ai, robot, fake, bombastic, dog, doubt (Add multiple keywords so 1 GIF triggers across diverse chats!)"
-              value={mediaKeywords}
-              onChange={e => setMediaKeywords(e.target.value)}
-              style={{ height: '40px' }}
-            />
-            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'block' }}>
-              When friends text any of these words (e.g. &quot;u sus&quot;, &quot;why chatting like ai&quot;), the AI prioritizes this exact reaction!
-            </span>
-          </div>
 
-          {/* Upload Input Area */}
-          {uploadMode === 'file' ? (
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                Select File (GIF, JPG, PNG, WebP)
-              </label>
+            {uploadMode === 'file' ? (
               <div
-                style={{
-                  border: '2px dashed var(--color-border)',
-                  borderRadius: '10px',
-                  padding: '24px',
-                  textAlign: 'center',
-                  background: 'var(--color-surface-elevated)',
-                  cursor: 'pointer'
-                }}
+                className={`spx-drop vx-drop${filePreview ? ' has-file' : ''}`}
                 onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInputRef.current?.click()}
               >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="image/gif,image/jpeg,image/png,image/webp"
-                  style={{ display: 'none' }}
-                />
                 {filePreview ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <img
-                      src={filePreview}
-                      alt="Preview"
-                      style={{ maxHeight: '140px', maxWidth: '240px', borderRadius: '8px', objectFit: 'contain' }}
-                    />
-                    <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: '700' }}>
-                      File selected: {selectedFile?.name} ({((selectedFile?.size || 0) / 1024).toFixed(0)} KB) — Click to change
-                    </span>
-                  </div>
+                  <>
+                    <img className="vx-drop-preview" src={filePreview} alt="Selected file preview" />
+                    <div className="spx-drop-sub">
+                      <strong>{selectedFile?.name}</strong> · {((selectedFile?.size || 0) / 1024).toFixed(0)} KB · tap to change
+                    </div>
+                  </>
                 ) : (
-                  <div>
-                    <Upload className="icon-keep" size={28} style={{ color: 'var(--color-text-muted)', margin: '0 auto 8px auto' }} />
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
-                      Click to choose an image or GIF file
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                      Supports animated GIFs, JPG, PNG, and WebP up to 15MB
-                    </div>
-                  </div>
+                  <>
+                    <div className="spx-drop-icon"><Upload size={26} className="icon-keep" /></div>
+                    <div className="spx-drop-title">Choose an image or GIF</div>
+                    <div className="spx-drop-sub">GIF, JPG, PNG or WebP, up to 15 MB</div>
+                  </>
                 )}
               </div>
-            </div>
-          ) : uploadMode === 'giphy' ? (
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                Selected GIPHY URL
-              </label>
-              <input
-                type="url"
-                placeholder="Select a GIF from search above or paste URL"
-                value={mediaUrl}
-                onChange={e => { setMediaUrl(e.target.value); setFilePreview(e.target.value); }}
-                style={{ height: '40px' }}
-              />
-              {filePreview && (
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <img src={filePreview} alt="Selected" style={{ maxHeight: '90px', borderRadius: '6px' }} />
-                  <span style={{ fontSize: '0.76rem', color: '#16a34a', fontWeight: '700' }}>Ready to save to vault</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                Direct GIF or Image URL (Tenor / Giphy / Imgur / CDN)
-              </label>
-              <input
-                type="url"
-                placeholder="https://media.giphy.com/media/.../giphy.gif"
-                value={mediaUrl}
-                onChange={e => setMediaUrl(e.target.value)}
-                style={{ height: '40px' }}
-              />
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="submit"
-              disabled={uploading}
-              className="btn btn-primary"
-              style={{ padding: '9px 24px', fontSize: '0.84rem' }}
-            >
-              {uploading ? (
-                <>
-                  <RefreshCw size={14} className="animate-spin" />
-                  <span>Uploading to Vault...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={14} />
-                  <span>Save to {categories.find(c => c.id === selectedCategory)?.label || selectedCategory}</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-        )}
-      </div>
-
-      {/* QUICK IMPORT BANNER FOR PREDEFINED GIFS */}
-      <div style={{
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '16px 20px',
-        marginBottom: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '14px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--color-text-primary)', color: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Sparkles size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>
-              Curated Reaction GIF Library ({predefinedList.length} Memes Ready)
-            </div>
-            <div style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              Pre-configured with viral memes (Chloe side eye, Travolta, Popcat, Risitas, Mind blown) with full keyword tagging for instant 50% chat attachments.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => setGalleryView(galleryView === 'predefined' ? 'vault' : 'predefined')}
-            className="btn"
-            style={{ fontSize: '0.8rem', padding: '7px 14px' }}
-          >
-            <span>{galleryView === 'predefined' ? '← Back to My Vault' : 'Browse Predefined List'}</span>
-          </button>
-          <button
-            onClick={() => handleImportPredefined()}
-            disabled={importingPredefined}
-            className="btn btn-primary"
-            style={{ fontSize: '0.8rem', padding: '7px 16px' }}
-          >
-            {importingPredefined ? (
-              <>
-                <RefreshCw size={13} className="animate-spin" />
-                <span>Importing All...</span>
-              </>
             ) : (
-              <>
-                <Download size={13} />
-                <span>Import All to My Vault</span>
-              </>
+              <label className="vx-field">
+                <span className="vx-label">Image or GIF link</span>
+                <input
+                  type="url"
+                  placeholder="https://media.giphy.com/media/…/giphy.gif"
+                  value={mediaUrl}
+                  onChange={e => setMediaUrl(e.target.value)}
+                />
+                <span className="vx-help">Works with GIPHY, Tenor, Imgur or any direct image link.</span>
+              </label>
             )}
-          </button>
-        </div>
-      </div>
 
-      {/* CATEGORY FILTER PILLS */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
-            FILTER BY EMOTION CATEGORY
-          </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
-            Total Items: {items.length}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px' }}>
-          <button
-            onClick={() => setActiveCategory('all')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: '1px solid',
-              borderColor: activeCategory === 'all' ? 'var(--color-text-primary)' : 'var(--color-border)',
-              background: activeCategory === 'all' ? 'var(--color-text-primary)' : 'var(--color-surface)',
-              color: activeCategory === 'all' ? 'var(--color-surface)' : 'var(--color-text-primary)',
-              fontSize: '0.78rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <span>All Categories</span>
-          </button>
-
-          {categories.map(cat => {
-            const isSelected = activeCategory === cat.id;
-            return (
-              <div
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  border: '1px solid',
-                  borderColor: isSelected ? 'var(--color-text-primary)' : 'var(--color-border)',
-                  background: isSelected ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                  color: isSelected ? 'var(--color-surface)' : 'var(--color-text-primary)',
-                  fontSize: '0.78rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {getCategoryIcon(cat.id)}
-                <span>{cat.label || cat.id}</span>
-
-                {/* Edit / Rename Button for custom categories */}
-                {cat.isCustom && (
-                  <button
-                    onClick={(e) => openRenameModal(cat, e)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: isSelected ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                      cursor: 'pointer',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      marginLeft: '4px'
-                    }}
-                    title="Rename category"
-                  >
-                    <Pencil size={11} />
-                  </button>
-                )}
-
-                {/* Delete Button for custom categories */}
-                {cat.isCustom && (
-                  <button
-                    onClick={(e) => handleDeleteCustomCategory(cat.id, e)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: isSelected ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                      cursor: 'pointer',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      marginLeft: '2px'
-                    }}
-                    title="Delete category"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* GALLERY VIEW TOGGLE & FILTER BAR */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '3px' }}>
-          <button
-            type="button"
-            onClick={() => setGalleryView('vault')}
-            style={{
-              background: galleryView === 'vault' ? 'var(--color-surface)' : 'transparent',
-              color: galleryView === 'vault' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              border: 'none',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              boxShadow: galleryView === 'vault' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}
-          >
-            My Active Vault ({items.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setGalleryView('predefined')}
-            style={{
-              background: galleryView === 'predefined' ? 'var(--color-surface)' : 'transparent',
-              color: galleryView === 'predefined' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              border: 'none',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              boxShadow: galleryView === 'predefined' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}
-          >
-            Curated Predefined GIFs ({predefinedList.length})
-          </button>
-        </div>
-
-        {galleryView === 'predefined' && (
-          <button
-            onClick={() => handleImportPredefined()}
-            disabled={importingPredefined}
-            className="btn btn-primary"
-            style={{ fontSize: '0.78rem', padding: '6px 14px' }}
-          >
-            <Download size={13} />
-            <span>Import All Curated into My Vault</span>
-          </button>
+            <button type="submit" className="spx-play" disabled={uploading}>
+              {uploading
+                ? <><RefreshCw size={16} className="animate-spin" /> Saving…</>
+                : <><CheckCircle2 size={16} /> Save to {categoryLabel(selectedCategory)}</>}
+            </button>
+          </form>
         )}
       </div>
 
-      {/* GALLERY GRID */}
-      {galleryView === 'predefined' ? (
-        <div className="stagger-in" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: '14px'
-        }}>
-          {(activeCategory === 'all' ? predefinedList : predefinedList.filter(p => p.category === activeCategory)).map(pred => {
-            const alreadyInVault = items.some(i => i.url === pred.url);
-            return (
-              <div
-                key={pred.id}
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}
-              >
-                <div style={{ height: '170px', background: 'var(--color-surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
-                  <img
-                    src={pred.url}
-                    alt={pred.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    loading="lazy"
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      background: 'rgba(9, 9, 11, 0.85)',
-                      color: '#ffffff',
-                      fontSize: '0.62rem',
-                      fontWeight: '700',
-                      padding: '2px 7px',
-                      borderRadius: '4px',
-                      textTransform: 'uppercase',
-                      fontFamily: "var(--font-label)"
-                    }}
-                  >
-                    {pred.category}
-                  </span>
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      background: 'var(--color-surface)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '0.62rem',
-                      fontWeight: '700',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--color-border)'
-                    }}
-                  >
-                    PREDEFINED
-                  </span>
-                </div>
-
-                <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ fontWeight: '700', fontSize: '0.86rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                      {pred.name}
-                    </div>
-
-                    {pred.keywords && pred.keywords.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                        {pred.keywords.map(kw => (
-                          <span
-                            key={kw}
-                            style={{
-                              fontSize: '0.66rem',
-                              background: 'var(--color-surface-hover)',
-                              color: 'var(--color-text-primary)',
-                              padding: '1px 6px',
-                              borderRadius: '4px',
-                              fontWeight: '600'
-                            }}
-                          >
-                            #{kw}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--color-surface-hover)' }}>
-                    <a
-                      href={pred.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: 'var(--color-text-secondary)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
-                    >
-                      <ExternalLink size={12} />
-                      <span>Preview</span>
-                    </a>
-
-                    {alreadyInVault ? (
-                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <CheckCircle2 size={13} />
-                        <span>In My Vault</span>
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleImportPredefined([pred.id])}
-                        disabled={importingPredefined}
-                        className="btn btn-primary"
-                        style={{ fontSize: '0.72rem', padding: '4px 10px' }}
-                      >
-                        <Plus size={12} />
-                        <span>Add to Vault</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      {/* Curated library */}
+      <div className="spx-banner">
+        <Sparkles size={22} />
+        <div className="spx-banner-text">
+          <div className="spx-banner-title">Curated reaction library · {predefinedList.length} GIFs ready</div>
+          <div className="spx-banner-sub">Popular memes already tagged with keywords. Add them all in one tap.</div>
         </div>
+        <div className="spx-banner-actions">
+          <button type="button" className="spx-outline" onClick={() => setGalleryView(galleryView === 'predefined' ? 'vault' : 'predefined')}>
+            {galleryView === 'predefined' ? 'Back to my vault' : 'Browse library'}
+          </button>
+          <button type="button" className="spx-outline vx-outline-green" onClick={() => handleImportPredefined()} disabled={importingPredefined}>
+            {importingPredefined ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
+            {importingPredefined ? 'Importing…' : 'Import all'}
+          </button>
+        </div>
+      </div>
+
+      {/* Gallery */}
+      <div className="spx-section-head vx-gallery-head">
+        <h2 className="spx-section-title">{galleryView === 'predefined' ? 'Curated library' : 'Your reactions'}</h2>
+        <div className="vx-switch" role="tablist" aria-label="Gallery">
+          <button type="button" role="tab" aria-selected={galleryView === 'vault'} className={galleryView === 'vault' ? 'active' : ''} onClick={() => setGalleryView('vault')}>
+            My vault <span>{items.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={galleryView === 'predefined'} className={galleryView === 'predefined' ? 'active' : ''} onClick={() => setGalleryView('predefined')}>
+            Curated <span>{predefinedList.length}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="spx-pills vx-scroll vx-cats" aria-label="Filter by emotion">
+        <button type="button" className={`spx-pill${activeCategory === 'all' ? ' active' : ''}`} onClick={() => setActiveCategory('all')}>
+          All
+        </button>
+        {categories.map(cat => {
+          const isSelected = activeCategory === cat.id;
+          return (
+            <div
+              key={cat.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              className={`spx-pill${isSelected ? ' active' : ''}`}
+              onClick={() => setActiveCategory(cat.id)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setActiveCategory(cat.id)}
+            >
+              {getCategoryIcon(cat.id)}
+              <span>{cat.label || cat.id}</span>
+              {cat.isCustom && (
+                <>
+                  <button type="button" className="vx-pill-act" onClick={(e) => openRenameModal(cat, e)} title="Rename category" aria-label={`Rename ${cat.id}`}>
+                    <Pencil size={12} />
+                  </button>
+                  <button type="button" className="vx-pill-act" onClick={(e) => handleDeleteCustomCategory(cat.id, e)} title="Delete category" aria-label={`Delete ${cat.id}`}>
+                    <X size={13} />
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {galleryView === 'predefined' ? (
+        shownPredefined.length === 0 ? (
+          <div className="spx-empty-card">No curated GIFs in this category.</div>
+        ) : (
+          <div className="vx-grid stagger-in">
+            {shownPredefined.map(pred => renderCard({
+              key: pred.id,
+              url: pred.url,
+              name: pred.name,
+              category: pred.category,
+              badge: 'Curated',
+              keywords: pred.keywords,
+              footer: items.some(i => i.url === pred.url) ? (
+                <span className="vx-in"><CheckCircle2 size={14} /> In my vault</span>
+              ) : (
+                <button type="button" className="spx-outline vx-outline-green" onClick={() => handleImportPredefined([pred.id])} disabled={importingPredefined}>
+                  <Plus size={13} /> Add to vault
+                </button>
+              ),
+            }))}
+          </div>
+        )
       ) : loading ? (
-        <div className="sk-grid" role="status" aria-busy="true" aria-label="Loading reaction vault media">
+        <div className="vx-grid" role="status" aria-busy="true" aria-label="Loading reaction vault media">
           {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} className="sk-card sk-col" style={{ gap: 10 }}>
-              <Sk h={0} r={12} style={{ paddingBottom: '100%' }} />
-              <Sk w="65%" h={13} />
-              <Sk w="40%" h={11} />
+            <div key={i} className="vx-card vx-card-sk">
+              <Sk h={0} r={0} style={{ paddingBottom: '75%' }} />
+              <div className="vx-card-body"><Sk w="65%" h={13} /><Sk w="40%" h={11} /></div>
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--color-surface-elevated)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-          <ImageIcon className="icon-keep" size={36} style={{ color: 'var(--color-text-muted)', margin: '0 auto 12px auto' }} />
-          <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: 0 }}>
-            No uploads in [{activeCategory}] yet
-          </h4>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '6px', maxWidth: '480px', margin: '6px auto 16px auto' }}>
-            Whenever this category is triggered in chats, the AI will use our curated smart GIF fallback until you upload your own images or GIFs above.
-          </p>
+        <div className="spx-empty-card vx-empty">
+          <ImageIcon className="icon-keep" size={32} />
+          <div className="vx-empty-title">No reactions in {activeCategory === 'all' ? 'your vault' : categoryLabel(activeCategory)} yet</div>
+          <p>Until you add your own, the AI uses the curated GIFs when this emotion comes up in a chat.</p>
           <button
+            type="button"
+            className="spx-play vx-play-sm"
             onClick={() => {
               if (activeCategory !== 'all') setSelectedCategory(activeCategory);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              openMode('file');
             }}
-            className="btn btn-primary"
-            style={{ fontSize: '0.8rem' }}
           >
-            <Upload size={14} />
-            <span>Upload Media for [{activeCategory}]</span>
+            <Upload size={14} /> Upload media
           </button>
         </div>
       ) : (
-        <div className="stagger-in" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: '14px'
-        }}>
-          {items.map(item => (
-            <div
-              key={item._id}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-              }}
-            >
-              {/* Thumbnail Container */}
-              <div style={{ height: '170px', background: 'var(--color-surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
-                <img
-                  src={item.url}
-                  alt={item.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                  loading="lazy"
-                />
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '8px',
-                    background: 'rgba(9, 9, 11, 0.85)',
-                    color: '#ffffff',
-                    fontSize: '0.62rem',
-                    fontWeight: '700',
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    textTransform: 'uppercase',
-                    fontFamily: "var(--font-label)"
-                  }}
-                >
-                  {item.category}
-                </span>
-
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: '0.62rem',
-                    fontWeight: '700',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid var(--color-border)'
-                  }}
-                >
-                  {item.mediaType?.toUpperCase() || 'GIF'}
-                </span>
-              </div>
-
-              {/* Card Meta & Actions */}
-              <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '0.86rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                    {item.name}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', marginTop: '2px', fontFamily: "var(--font-label)" }}>
-                    Added {new Date(item.createdAt).toLocaleDateString()}
-                  </div>
-
-                  {/* Keywords tags */}
-                  {item.keywords && item.keywords.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                      {item.keywords.map(kw => (
-                        <span
-                          key={kw}
-                          style={{
-                            fontSize: '0.66rem',
-                            background: 'var(--color-surface-hover)',
-                            color: 'var(--color-text-primary)',
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            fontWeight: '600'
-                          }}
-                        >
-                          #{kw}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--color-surface-hover)' }}>
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: 'var(--color-text-secondary)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
-                  >
-                    <ExternalLink size={12} />
-                    <span>View Full</span>
-                  </a>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
-                      onClick={() => openEditModal(item)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--color-text-primary)',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600'
-                      }}
-                      title="Edit title & keywords"
-                    >
-                      <Pencil size={12} />
-                      <span>Edit</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteMedia(item._id, item.name)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600'
-                      }}
-                      title="Delete media"
-                    >
-                      <Trash2 size={12} />
-                      <span>Delete</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="vx-grid stagger-in">
+          {items.map(item => renderCard({
+            key: item._id,
+            url: item.url,
+            name: item.name,
+            category: item.category,
+            badge: item.mediaType?.toUpperCase() || 'GIF',
+            keywords: item.keywords,
+            date: item.createdAt,
+            footer: (
+              <>
+                <a className="spx-icon-btn" href={item.url} target="_blank" rel="noreferrer" title="Open full size" aria-label="Open full size"><ExternalLink size={15} /></a>
+                <span className="vx-foot-gap" />
+                <button type="button" className="spx-icon-btn" onClick={() => openEditModal(item)} title="Edit title and keywords" aria-label="Edit"><Pencil size={15} /></button>
+                <button type="button" className="spx-icon-btn vx-danger" onClick={() => handleDeleteMedia(item._id, item.name)} title="Delete" aria-label="Delete"><Trash2 size={15} /></button>
+              </>
+            ),
+          }))}
         </div>
       )}
 
-      {/* EDIT MEDIA MODAL */}
-      {editingItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '480px',
-            width: '100%',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: 'var(--color-text-primary)' }}>
-                Edit Media & Keywords
-              </h3>
-              <button
-                onClick={() => setEditingItem(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEditItem}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                  Media Label / Title
-                </label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                  style={{ height: '38px' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                  Category
-                </label>
-                <select
-                  value={editForm.category}
-                  onChange={e => setEditForm({ ...editForm, category: e.target.value })}
-                  style={{ height: '38px', fontWeight: '600' }}
-                >
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.label || cat.id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                  Keywords / Humour Triggers (Comma separated)
-                </label>
-                <input
-                  type="text"
-                  value={editForm.keywords}
-                  onChange={e => setEditForm({ ...editForm, keywords: e.target.value })}
-                  placeholder="e.g. sus, judging, ai, bombastic, dog"
-                  style={{ height: '38px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setEditingItem(null)}
-                  className="btn"
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEdit}
-                  className="btn btn-primary"
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  {savingEdit ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+      {renderModal(!!editingItem, () => setEditingItem(null), 'Edit reaction', (
+        <form className="vx-form" onSubmit={handleSaveEditItem}>
+          <label className="vx-field">
+            <span className="vx-label">Title</span>
+            <input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+          </label>
+          <label className="vx-field">
+            <span className="vx-label">Emotion</span>
+            <select value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })}>
+              {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label || cat.id}</option>)}
+            </select>
+          </label>
+          <label className="vx-field">
+            <span className="vx-label">Keywords (comma separated)</span>
+            <input type="text" value={editForm.keywords} onChange={e => setEditForm({ ...editForm, keywords: e.target.value })} placeholder="e.g. sus, judging, doubt" />
+          </label>
+          <div className="vx-modal-actions">
+            <button type="button" className="spx-outline" onClick={() => setEditingItem(null)}>Cancel</button>
+            <button type="submit" className="spx-play vx-play-sm" disabled={savingEdit}>{savingEdit ? 'Saving…' : 'Save changes'}</button>
           </div>
-        </div>
-      )}
+        </form>
+      ))}
 
-      {/* CREATE NEW CATEGORY MODAL */}
-      {showNewCategoryModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '440px',
-            width: '100%',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: 'var(--color-text-primary)' }}>
-                Add Custom Category
-              </h3>
-              <button
-                onClick={() => setShowNewCategoryModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-              Create a custom emotion or reaction category (e.g. <code>savage</code>, <code>flirty</code>, <code>gaming</code>, <code>food</code>). Your AI will understand this tag and attach your media when appropriate.
-            </p>
-
-            <form onSubmit={handleCreateCategory}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                  Category Tag / Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. savage, flirty, food"
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  autoFocus
-                  style={{ height: '40px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowNewCategoryModal(false)}
-                  className="btn"
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingCategory || !newCategoryName.trim()}
-                  className="btn btn-primary"
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  {creatingCategory ? 'Creating...' : 'Create Category'}
-                </button>
-              </div>
-            </form>
+      {renderModal(showNewCategoryModal, () => setShowNewCategoryModal(false), 'New category', (
+        <form className="vx-form" onSubmit={handleCreateCategory}>
+          <p className="vx-help">A custom emotion such as savage, flirty, gaming or food. The AI uses your media when this mood comes up.</p>
+          <label className="vx-field">
+            <span className="vx-label">Name</span>
+            <input type="text" placeholder="e.g. savage" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} autoFocus />
+          </label>
+          <div className="vx-modal-actions">
+            <button type="button" className="spx-outline" onClick={() => setShowNewCategoryModal(false)}>Cancel</button>
+            <button type="submit" className="spx-play vx-play-sm" disabled={creatingCategory || !newCategoryName.trim()}>{creatingCategory ? 'Creating…' : 'Create category'}</button>
           </div>
-        </div>
-      )}
+        </form>
+      ))}
 
-      {/* RENAME CATEGORY MODAL */}
-      {renameModalCategory && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '440px',
-            width: '100%',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: 'var(--color-text-primary)' }}>
-                Rename Category &quot;{renameModalCategory.id}&quot;
-              </h3>
-              <button
-                onClick={() => setRenameModalCategory(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
-              Renaming will automatically update all media items currently in this category to the new name.
-            </p>
-
-            <form onSubmit={handleRenameCategorySubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
-                  New Category Name
-                </label>
-                <input
-                  type="text"
-                  value={renameTargetName}
-                  onChange={e => setRenameTargetName(e.target.value)}
-                  autoFocus
-                  style={{ height: '40px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setRenameModalCategory(null)}
-                  className="btn"
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={renamingCategory || !renameTargetName.trim()}
-                  className="btn btn-primary"
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  {renamingCategory ? 'Saving...' : 'Rename Category'}
-                </button>
-              </div>
-            </form>
+      {renderModal(!!renameModalCategory, () => setRenameModalCategory(null), `Rename "${renameModalCategory?.id || ''}"`, (
+        <form className="vx-form" onSubmit={handleRenameCategorySubmit}>
+          <p className="vx-help">Every reaction in this category moves to the new name.</p>
+          <label className="vx-field">
+            <span className="vx-label">New name</span>
+            <input type="text" value={renameTargetName} onChange={e => setRenameTargetName(e.target.value)} autoFocus />
+          </label>
+          <div className="vx-modal-actions">
+            <button type="button" className="spx-outline" onClick={() => setRenameModalCategory(null)}>Cancel</button>
+            <button type="submit" className="spx-play vx-play-sm" disabled={renamingCategory || !renameTargetName.trim()}>{renamingCategory ? 'Saving…' : 'Rename'}</button>
           </div>
-        </div>
-      )}
-
+        </form>
+      ))}
     </motion.div>
   );
 }
