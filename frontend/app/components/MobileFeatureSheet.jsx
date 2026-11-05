@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import {
   X,
   Sun,
@@ -35,6 +35,9 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
     isImpersonating,
   } = useApp();
   const { theme, setTheme } = useTheme();
+  // Drag-to-close starts only from the grabber/header so the sheet body can scroll on touch screens.
+  const dragControls = useDragControls();
+  const startDrag = e => dragControls.start(e);
 
   const isPureSuperadmin = user?.role === 'superadmin' && !isImpersonating;
 
@@ -77,14 +80,18 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 32, stiffness: 320 }}
             drag="y"
+            dragListener={false}
+            dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}
           >
-            <div className="sheet-grabber" />
+            <div className="sheet-drag-zone" onPointerDown={startDrag}>
+              <div className="sheet-grabber" />
+            </div>
 
             {/* Identity row */}
-            <div className="sheet-identity">
+            <div className="sheet-identity" onPointerDown={startDrag}>
               <Link href="/profile" className="sheet-avatar" onClick={onClose}>
                 {user?.profilePicUrl
                   ? <img src={user.profilePicUrl} alt="" />
