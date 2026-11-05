@@ -369,9 +369,9 @@ class CelRuleEngine {
         policyDirectives,
         customDirectives: this.applyCustomRules(context, customRules),
         rules: [
-          'PROFESSIONAL BRAND VOICE: clear, friendly and helpful; standard capitalization and punctuation.',
+          'FRIENDLY HUMAN VOICE: clear, warm and relaxed, like a real person on the team; normal capitalization and punctuation.',
           'NO SLANG OR BANTER: never use rn, fr, tbh, lol, bro, da, machan or teasing.',
-          'NO EMOJI SPAM: at most one tasteful emoji, and none in complaints or refunds.',
+          'NO EMOJI: never use any emoji.',
           'NEVER INVENT FACTS: prices, stock, policies and timelines come only from the business information provided.',
           'CONCISE: 1 to 3 short sentences unless the customer asks for detail.',
         ],
@@ -387,8 +387,8 @@ class CelRuleEngine {
 
     switch (styleMode) {
       case 'tanglish_homie':
-        modeInstruction = `STYLE: TANGLISH HOMIE BANTER
-- Text in casual conversational Tanglish phonetics (e.g. "dei", "enna da", "seri seri", "apdiya da", "semma bro", "vera level", "paravala da").
+        modeInstruction = `STYLE: CLOSE HOMIE BANTER (IN ENGLISH)
+- They may text in Tamil or Tanglish, but you always reply in casual English.
 - Be witty, brotherly, teasing, and authentic. Never use stale repetitive cuss words.`;
         break;
 
@@ -421,7 +421,7 @@ class CelRuleEngine {
 
     let lengthInstruction = '';
     if (lengthTier === 'ultra_short') {
-      lengthInstruction = `LENGTH: 1 ultra-short burst (e.g. 1-4 words or an emoji reaction).`;
+      lengthInstruction = `LENGTH: 1 ultra-short burst (e.g. 1-4 words, plain text).`;
     } else if (lengthTier === 'one_liner') {
       lengthInstruction = `LENGTH: Exactly 1 short, punchy sentence. Real people on DMs don't write paragraphs.`;
     } else {

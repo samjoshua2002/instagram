@@ -1156,7 +1156,15 @@ router.post('/instagram/connect-ticket', oauthIpLimit, requireAuth, async (req, 
  */
 router.get('/instagram/connect', oauthIpLimit, async (req, res) => {
   try {
-    const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
+    // Instagram Login needs the Instagram App ID (Meta dashboard > Instagram > API setup with
+    // Instagram login), NOT the Facebook/Meta App ID; the Meta ID gives "Invalid platform app"
+    const metaAppId = (process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '').trim();
+    if (!metaAppId) {
+      return res.status(500).send('Instagram connection is not configured (INSTAGRAM_APP_ID is missing).');
+    }
+    if (process.env.META_APP_ID && metaAppId === process.env.META_APP_ID.trim()) {
+      console.warn('⚠️ INSTAGRAM_APP_ID equals META_APP_ID. Instagram Login will fail with "Invalid platform app"; set INSTAGRAM_APP_ID to the Instagram App ID from Meta dashboard > Instagram > API setup with Instagram login.');
+    }
     const clientOrigin = safeClientOrigin(asString(req.query.origin));
 
     // Preferred: a single-use ticket from POST /instagram/connect-ticket (no JWT in the URL)
@@ -1279,8 +1287,10 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
 
     // Strip URL fragment #_ from code
     const cleanCode = (code || '').split('#')[0].trim();
-    const instagramAppId = savedAppId || process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
-    const metaAppId = process.env.META_APP_ID || '28946827981672606';
+    const instagramAppId = savedAppId || process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '';
+    const metaAppId = process.env.META_APP_ID || '';
+    // Instagram Login codes are exchanged with the Instagram App Secret (falls back to the Meta secret)
+    const igAppSecret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || '';
     const metaAppSecret = process.env.META_APP_SECRET || process.env.INSTAGRAM_APP_SECRET || '';
 
     let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
@@ -1298,13 +1308,12 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
       `${normalizedNoSlash.replace(/^https:/i, 'http:')}/`,
     ]));
 
-    // Candidate App IDs (prioritize active configured App 28946827981672606)
+    // Candidate App IDs: the one the login was started with first, then the configured ones
     const appIdCandidates = Array.from(new Set([
-      '28946827981672606',
-      metaAppId,
       instagramAppId,
-      '1082976137966604'
-    ])).filter(Boolean);
+      process.env.INSTAGRAM_APP_ID,
+      metaAppId,
+    ].map(v => (v || '').trim()))).filter(Boolean);
 
     let shortLivedToken = '';
     let instagramAccountId = '';
@@ -1322,7 +1331,7 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
           try {
             const igFormData = new URLSearchParams();
             igFormData.append('client_id', testAppId);
-            igFormData.append('client_secret', metaAppSecret);
+            igFormData.append('client_secret', igAppSecret);
             igFormData.append('grant_type', 'authorization_code');
             igFormData.append('redirect_uri', uri);
             igFormData.append('code', cleanCode);
@@ -1382,7 +1391,7 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
       const longLivedRes = await axios.get('https://graph.instagram.com/access_token', {
         params: {
           grant_type: 'ig_exchange_token',
-          client_secret: metaAppSecret,
+          client_secret: igAppSecret,
           access_token: shortLivedToken
         }
       });
