@@ -106,6 +106,7 @@ function RelationshipsPageContent() {
   // Filters State
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
 
   // Inner Page Form State
   const [formData, setFormData] = useState({
@@ -286,6 +287,13 @@ function RelationshipsPageContent() {
 
   // Filtered contacts for table
   const filteredPeople = useMemo(() => {
+    const timeOf = n => new Date(n.lastInteraction || n.updatedAt || n.createdAt || 0).getTime() || 0;
+    const sorters = {
+      newest: (a, b) => timeOf(b) - timeOf(a),
+      oldest: (a, b) => timeOf(a) - timeOf(b),
+      most: (a, b) => (b.chatsCount || b.messageCount || 0) - (a.chatsCount || a.messageCount || 0),
+      az: (a, b) => (a.name || '').localeCompare(b.name || ''),
+    };
     return nodes.filter(n => {
       if (n.isRoot) return false;
 
@@ -317,11 +325,11 @@ function RelationshipsPageContent() {
         (n.personalNotes || '').toLowerCase().includes(q) ||
         (n.facts || []).some(f => f.toLowerCase().includes(q))
       );
-    });
-  }, [nodes, activeCategory, searchQuery]);
+    }).sort(sorters[sortOrder] || sorters.newest);
+  }, [nodes, activeCategory, searchQuery, sortOrder]);
 
-  // Reset table page when filter/search changes
-  useEffect(() => { setTablePage(1); }, [activeCategory, searchQuery]);
+  // Reset table page when filter/search/sort changes
+  useEffect(() => { setTablePage(1); }, [activeCategory, searchQuery, sortOrder]);
   // Reset facts page when selected person changes
   useEffect(() => { setFactsPage(1); }, [selectedPerson?.id]);
 
@@ -1945,6 +1953,19 @@ function RelationshipsPageContent() {
               }}
             />
           </div>
+
+          {/* Sort order */}
+          <select
+            aria-label="Sort people"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ height: '38px', fontSize: '0.82rem', padding: '0 10px', borderRadius: '8px', flexShrink: 0, cursor: 'pointer' }}
+          >
+            <option value="newest">Newest messages</option>
+            <option value="oldest">Oldest messages</option>
+            <option value="most">Most messages</option>
+            <option value="az">Name A–Z</option>
+          </select>
 
           {/* Layout Switcher Icons (Table / Grid / Dense) */}
           <div style={{

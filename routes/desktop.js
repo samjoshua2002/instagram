@@ -4,6 +4,7 @@ const DesktopDevice = require('../models/DesktopDevice');
 const Lead = require('../models/Lead');
 const Booking = require('../models/Booking');
 const UserMemory = require('../models/UserMemory');
+const Message = require('../models/Message');
 const workspaceFeatureService = require('../services/workspaceFeatureService');
 
 // Mounted behind requireAuth at /api/desktop (PLAN.md §13 Phase 8).
@@ -46,11 +47,28 @@ router.get('/alerts', async (req, res) => {
     const ownerId = req.user._id;
     const f = features.enabledFeatures;
 
-    const [leads, bookings, handoffs] = await Promise.all([
+    const [leads, bookings, handoffs, messages] = await Promise.all([
       f.leadExtraction ? Lead.find({ ownerId, createdAt: { $gt: since } }).sort({ createdAt: 1 }).limit(20).lean() : [],
       f.bookingScheduler ? Booking.find({ ownerId, createdAt: { $gt: since } }).sort({ createdAt: 1 }).limit(20).lean() : [],
       f.humanHandoffInbox ? UserMemory.find({ ownerId, handoffRequestedAt: { $gt: since } }).sort({ handoffRequestedAt: 1 }).limit(20).lean() : [],
+      Message.find({ ownerId, role: 'user', createdAt: { $gt: since } }).sort({ createdAt: 1 }).limit(100).lean(),
     ]);
+
+    // New DMs: one alert per person (latest text + count), flagged when it is their first ever message
+    const bySender = new Map();
+    for (const m of messages) {
+      const g = bySender.get(m.senderId) || { count: 0, first: m };
+      g.count += 1; g.last = m;
+      bySender.set(m.senderId, g);
+    }
+    const senderIds = [...bySender.keys()];
+    const [memories, olderSenders] = senderIds.length ? await Promise.all([
+      UserMemory.find({ senderId: { $in: senderIds } }).select('senderId name username').lean(),
+      Message.distinct('senderId', { ownerId, role: 'user', senderId: { $in: senderIds }, createdAt: { $lte: since } }),
+    ]) : [[], []];
+    const nameOf = new Map(memories.map(m => [m.senderId, m]));
+    const seenBefore = new Set(olderSenders);
+    const clip = t => (String(t || '').length > 120 ? `${String(t).slice(0, 117)}...` : String(t || ''));
 
     const who = d => (d.handle ? `@${String(d.handle).replace(/^@/, '')}` : d.name || d.username || 'A customer');
     const alerts = [
@@ -61,6 +79,17 @@ router.get('/alerts', async (req, res) => {
         at: b.createdAt,
       })),
       ...handoffs.map(h => ({ id: `handoff-${h._id}-${+h.handoffRequestedAt}`, kind: 'handoff', title: 'Needs you', body: `${who(h)}${h.handoffReason ? `: ${h.handoffReason}` : ' asked for a person'}`, at: h.handoffRequestedAt })),
+      ...[...bySender].map(([senderId, g]) => {
+        const mem = nameOf.get(senderId);
+        const name = mem?.username ? `@${String(mem.username).replace(/^@/, '')}` : mem?.name || 'Someone';
+        const isNew = !seenBefore.has(senderId);
+        return {
+          id: `msg-${g.last._id}`, kind: isNew ? 'new_contact' : 'message', senderId,
+          title: isNew ? `New person: ${name}` : `New message from ${name}`,
+          body: g.count > 1 ? `${g.count} new messages · ${clip(g.last.text)}` : clip(g.last.text),
+          at: g.last.createdAt,
+        };
+      }),
     ].sort((a, b) => new Date(a.at) - new Date(b.at));
 
     res.json({ success: true, alerts, now, enabled: true });
