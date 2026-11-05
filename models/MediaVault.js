@@ -45,6 +45,11 @@ const mediaVaultSchema = new mongoose.Schema({
     default: '',
     index: true,
   },
+  // File name in public/uploads saved by the upload route; only this file is ever deleted from disk
+  storedFilename: {
+    type: String,
+    default: '',
+  },
   isDefault: {
     type: Boolean,
     default: false

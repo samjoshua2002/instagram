@@ -9,3 +9,6 @@ scratch/
 frontend/.next/
 .env*.local
 frontend/.next-*/
+
+# Private uploaded knowledge documents (served only through /api/knowledge/files)
+storage/

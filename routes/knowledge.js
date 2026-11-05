@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const ragService = require('../services/ragService');
+const KnowledgeDoc = require('../models/KnowledgeDoc');
+const { randomFilename, resolveInsideDir } = require('../lib/serverSecurity');
 const workspaceFeatureService = require('../services/workspaceFeatureService');
 
 // A new document should be used straight away, so make sure document search is on
@@ -10,13 +12,19 @@ const afterIngest = (user) => workspaceFeatureService.enableDocumentSearch(user)
 
 const router = express.Router();
 
-const uploadsDir = path.join(__dirname, '..', 'public', 'uploads');
+// Business documents are private: kept outside public/ and served only to their owner
+const storageDir = path.join(__dirname, '..', 'storage', 'knowledge');
+fs.mkdirSync(storageDir, { recursive: true });
+// Documents uploaded before this change still sit in public/uploads (no longer served statically)
+const legacyUploadsDir = path.join(__dirname, '..', 'public', 'uploads');
 const ALLOWED_EXT = ['.pdf', '.txt', '.md', '.csv'];
+const CONTENT_TYPES = { '.pdf': 'application/pdf', '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.csv': 'text/csv; charset=utf-8' };
+const DOC_NAME = /^doc-[A-Za-z0-9-]+\.(pdf|txt|md|csv)$/i;
 
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => cb(null, `doc-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname).toLowerCase()}`),
+    destination: (req, file, cb) => cb(null, storageDir),
+    filename: (req, file, cb) => cb(null, randomFilename('doc-', path.extname(file.originalname))),
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
@@ -25,8 +33,10 @@ const upload = multer({
   },
 });
 
-const publicUrl = (filename) =>
-  `${(process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/+$/, '')}/uploads/${filename}`;
+// Owner-checked download link (needs the signed-in user's Authorization header)
+const fileUrlFor = (filename) =>
+  `${(process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/+$/, '')}/api/knowledge/files/${filename}`;
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 async function readText(filePath, ext) {
   if (ext === '.pdf') {
@@ -63,7 +73,7 @@ router.post('/upload', (req, res) => {
         ownerId: req.user._id,
         title: (req.body.title || req.file.originalname.replace(/\.[^.]+$/, '')).trim(),
         text,
-        fileUrl: publicUrl(req.file.filename),
+        fileUrl: fileUrlFor(req.file.filename),
         category: (req.body.category || '').trim(),
         sourceType: 'file',
       });
@@ -73,6 +83,31 @@ router.post('/upload', (req, res) => {
       res.status(400).json({ error: err.message || 'Could not read this file.' });
     }
   });
+});
+
+/** GET /api/knowledge/files/:filename: an uploaded document, only for the account that uploaded it */
+router.get('/files/:filename', async (req, res) => {
+  try {
+    const filename = String(req.params.filename || '');
+    if (!DOC_NAME.test(filename)) return res.status(404).json({ error: 'Document not found.' });
+    // New links end in /api/knowledge/files/<name>, old ones in /uploads/<name>
+    const owned = await KnowledgeDoc.exists({
+      ownerId: req.user._id,
+      fileUrl: new RegExp(`/(api/knowledge/files|uploads)/${escapeRegex(filename)}$`),
+    });
+    if (!owned) return res.status(404).json({ error: 'Document not found.' });
+    const filePath = [storageDir, legacyUploadsDir]
+      .map(dir => resolveInsideDir(dir, filename))
+      .find(p => p && fs.existsSync(p));
+    if (!filePath) return res.status(404).json({ error: 'Document not found.' });
+    res.setHeader('Content-Type', CONTENT_TYPES[path.extname(filename).toLowerCase()] || 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    fs.createReadStream(filePath).on('error', () => res.destroy()).pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not load document' });
+  }
 });
 
 /** POST /api/knowledge/link { title, url, description?, category? } */
