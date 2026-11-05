@@ -1017,16 +1017,14 @@ router.get('/instagram/connect', async (req, res) => {
       appId: metaAppId,
     }, OAUTH_STATE_TTL_SECONDS);
 
+    // The Meta app uses "Instagram API with Instagram Login" (IGAA tokens); the old Facebook Login
+    // scopes (instagram_basic, pages_*) are rejected by this app as "Invalid Scopes"
     const scopes = [
-      'instagram_basic',
-      'instagram_manage_messages',
-      'pages_show_list',
-      'pages_read_engagement',
-      'pages_manage_metadata'
+      'instagram_business_basic',
+      'instagram_business_manage_messages'
     ].join(',');
 
-    // Direct Meta / Facebook Login for Business Authorization URL
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
+    const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_reauth=true&client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
 
     res.redirect(authUrl);
   } catch (err) {
@@ -1125,34 +1123,8 @@ router.get('/instagram/callback', async (req, res) => {
     let needsProfessional = false;
     let lastExchangeError = '';
 
-    // Step 1: Facebook Graph API token exchange (Primary for Facebook Login for Business)
-    for (const testAppId of appIdCandidates) {
-      if (shortLivedToken) break;
-      for (const uri of redirectUriCandidates) {
-        if (shortLivedToken) break;
-        try {
-          const fbRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-            params: {
-              client_id: testAppId,
-              client_secret: metaAppSecret,
-              redirect_uri: uri,
-              code: cleanCode
-            }
-          });
-          if (fbRes.data?.access_token) {
-            shortLivedToken = fbRes.data.access_token;
-            console.log(`✅ [Facebook Graph API] Token exchange succeeded with App ID ${testAppId} and URI ${uri}`);
-            break;
-          }
-        } catch (fbErr) {
-          lastExchangeError = fbErr.response?.data?.error?.message || fbErr.message;
-          console.warn(`⚠️ [Facebook Graph API] Attempt failed (AppId=${testAppId}, URI=${uri}):`, fbErr.response?.data?.error || fbErr.message);
-        }
-      }
-    }
-
-    // Step 1 Fallback: Direct Instagram API token exchange (https://api.instagram.com/oauth/access_token)
-    if (!shortLivedToken) {
+    // Step 1: Instagram Login token exchange (primary; this app uses Instagram API with Instagram Login)
+    {
       for (const testAppId of appIdCandidates) {
         if (shortLivedToken) break;
         for (const uri of redirectUriCandidates) {
@@ -1179,6 +1151,32 @@ router.get('/instagram/callback', async (req, res) => {
             lastExchangeError = igErr.response?.data?.error_message || igErr.response?.data?.error?.message || igErr.message;
             console.warn(`⚠️ [Instagram API] Attempt failed (AppId=${testAppId}, URI=${uri}):`, igErr.response?.data || igErr.message);
           }
+        }
+      }
+    }
+
+    // Step 1 Fallback: Facebook Graph API token exchange (older Facebook Login codes)
+    if (!shortLivedToken) for (const testAppId of appIdCandidates) {
+      if (shortLivedToken) break;
+      for (const uri of redirectUriCandidates) {
+        if (shortLivedToken) break;
+        try {
+          const fbRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+            params: {
+              client_id: testAppId,
+              client_secret: metaAppSecret,
+              redirect_uri: uri,
+              code: cleanCode
+            }
+          });
+          if (fbRes.data?.access_token) {
+            shortLivedToken = fbRes.data.access_token;
+            console.log(`✅ [Facebook Graph API] Token exchange succeeded with App ID ${testAppId} and URI ${uri}`);
+            break;
+          }
+        } catch (fbErr) {
+          lastExchangeError = fbErr.response?.data?.error?.message || fbErr.message;
+          console.warn(`⚠️ [Facebook Graph API] Attempt failed (AppId=${testAppId}, URI=${uri}):`, fbErr.response?.data?.error || fbErr.message);
         }
       }
     }
@@ -1223,7 +1221,7 @@ router.get('/instagram/callback', async (req, res) => {
     try {
       const profileRes = await axios.get('https://graph.instagram.com/v21.0/me', {
         params: {
-          fields: 'id,username,name,account_type',
+          fields: 'id,user_id,username,name,account_type',
           access_token: longLivedToken
         }
       });
@@ -1231,7 +1229,8 @@ router.get('/instagram/callback', async (req, res) => {
         needsProfessional = true;
       } else if (profileRes.data?.username) {
         instagramUsername = profileRes.data.username;
-        instagramAccountId = profileRes.data.id || instagramAccountId;
+        // user_id is the Instagram professional account ID (1784...) that webhooks use; id is app-scoped
+        instagramAccountId = String(profileRes.data.user_id || profileRes.data.id || instagramAccountId);
       }
     } catch (profileErr) {
       // Fallback via Facebook Pages
@@ -1308,6 +1307,16 @@ router.get('/instagram/callback', async (req, res) => {
         console.log(`✅ [Meta OAuth] Page ${facebookPageId} subscribed to webhooks`);
       } catch (subErr) {
         console.warn(`⚠️ [Meta OAuth] Webhook subscription failed for Page ${facebookPageId}:`, subErr.response?.data?.error?.message || subErr.message);
+      }
+    } else if (linkedPageToken.startsWith('IG')) {
+      // Instagram Login tokens subscribe the Instagram account itself (no Facebook Page involved)
+      try {
+        await axios.post('https://graph.instagram.com/v21.0/me/subscribed_apps', null, {
+          params: { subscribed_fields: 'messages,messaging_postbacks', access_token: linkedPageToken }
+        });
+        console.log(`✅ [Instagram Login] @${instagramUsername} subscribed to webhooks`);
+      } catch (subErr) {
+        console.warn('⚠️ [Instagram Login] Webhook subscription failed:', subErr.response?.data?.error?.message || subErr.message);
       }
     }
 
