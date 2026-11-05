@@ -2915,3 +2915,74 @@ body {
   .people-layout-switch { flex: 1.6 1 0; }
   .people-layout-btn { flex: 1; justify-content: center; }
 }
+
+/* ═══ Card tables: on phones every table row becomes a compact card ═══
+   Used by Dashboard (user directory), People directory, Superadmin members.
+   Cells: .ct-avatar / .ct-title (top line), .ct-aside (top-right action),
+   .ct-actions (full-width button row), .ct-full (colSpan rows),
+   anything else shows its data-label above its value, two per line. */
+@media (max-width: 640px) {
+  table.card-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    display: block;
+    font-size: 0.8rem !important;
+  }
+  table.card-table thead { display: none; }
+  table.card-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+  table.card-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border) !important;
+    border-radius: 10px;
+    background: var(--color-surface);
+    min-width: 0;
+  }
+  table.card-table td {
+    display: block;
+    flex: 0 0 calc(50% - 5px);
+    min-width: 0;
+    padding: 0 !important;
+    text-align: left !important;
+    overflow-wrap: break-word;
+  }
+  table.card-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    font-family: var(--font-label);
+  }
+  table.card-table td.ct-avatar { flex: 0 0 auto; order: -3; align-self: center; }
+  /* 30% basis keeps the first labelled field from joining the name line on wider phones */
+  table.card-table td.ct-title { flex: 1 1 30%; order: -2; align-self: center; min-width: 0; }
+  table.card-table tr > td.ct-title:first-child { flex-basis: 100%; }
+  table.card-table td.ct-aside { flex: 0 0 auto; order: -1; align-self: center; }
+  table.card-table td.ct-actions,
+  table.card-table td.ct-full { flex: 1 1 100%; }
+  table.card-table td.ct-actions > div {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px !important;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-surface-hover);
+  }
+  /* Rows that only hold one wide cell (empty state, expanded details) */
+  table.card-table tr:has(> td.ct-full:only-child) { padding: 12px; }
+  table.card-table tr.ct-detail-row {
+    margin-top: -6px;
+    background: var(--color-surface-elevated);
+  }
+}
