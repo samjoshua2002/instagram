@@ -1761,7 +1761,9 @@ async function loadUnsplashTopic(topic) {
 app.get('/api/banners', async (req, res) => {
   const topic = Object.hasOwn(UNSPLASH_TOPICS, req.query.topic) ? req.query.topic : 'abstract';
   const photos = await loadUnsplashTopic(topic);
-  res.set('Cache-Control', 'public, max-age=3600');
+  // Never let browsers keep an empty list (missing key / Unsplash down), or banners stay plain for an hour
+  res.set('Cache-Control', photos.length ? 'public, max-age=3600' : 'no-store');
+  if (!photos.length && !process.env.UNSPLASH_ACCESS_KEY) console.warn('[unsplash] UNSPLASH_ACCESS_KEY is not set; banners use gradients');
   res.json({ success: true, topic, photos });
 });
 
