@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Sk } from '../components/Skeletons';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import {
@@ -736,9 +737,8 @@ function MediaVaultPageContent() {
 
             {/* RESULTS MULTI-SELECT GRID */}
             {searchingGiphy ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--color-text-secondary)' }}>
-                <RefreshCw size={24} className="animate-spin icon-keep" style={{ margin: '0 auto 10px auto' }} />
-                <div style={{ fontSize: '0.84rem' }}>Searching GIPHY live...</div>
+              <div className="sk-grid" role="status" aria-busy="true" aria-label="Searching GIPHY">
+                {Array.from({ length: 8 }, (_, i) => <Sk key={i} h={0} r={10} style={{ paddingBottom: '100%' }} />)}
               </div>
             ) : giphyResults.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--color-text-muted)' }}>
@@ -1344,9 +1344,14 @@ function MediaVaultPageContent() {
           })}
         </div>
       ) : loading ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--color-text-secondary)' }}>
-          <RefreshCw size={24} className="animate-spin icon-keep" style={{ margin: '0 auto 12px auto' }} />
-          <div>Loading reaction vault media...</div>
+        <div className="sk-grid" role="status" aria-busy="true" aria-label="Loading reaction vault media">
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i} className="sk-card sk-col" style={{ gap: 10 }}>
+              <Sk h={0} r={12} style={{ paddingBottom: '100%' }} />
+              <Sk w="65%" h={13} />
+              <Sk w="40%" h={11} />
+            </div>
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--color-surface-elevated)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>

@@ -25,3 +25,11 @@ export function onPopupClosed(popup, onClosed) {
     }
   }, 800);
 }
+
+/** The photo used to tint a contact's page: saved photo, else their Instagram avatar. */
+export function personArtUrl(person) {
+  if (!person) return null;
+  if (typeof person.profilePic === 'string' && person.profilePic.startsWith('http')) return person.profilePic;
+  const handle = String(person.handle || person.instagramHandle || '').replace(/^@/, '').trim();
+  return handle ? `https://unavatar.io/instagram/${handle}?fallback=false` : null;
+}

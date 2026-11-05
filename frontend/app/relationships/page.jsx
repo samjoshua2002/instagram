@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import {
@@ -12,7 +12,12 @@ import {
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
-import { useAmbientImage } from '../components/AmbientBackground';
+import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
+import { personArtUrl } from '../lib/utils';
+import PageSkeleton, { Sk } from '../components/Skeletons';
+
+// Before paint on the client (no flash of the directory when deep-linking to a person)
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 // Next birthday from a stored DOB ("2002-05-14", "14 May", "May 14, 2002")
 function getNextBirthday(dob) {
@@ -115,16 +120,21 @@ function RelationshipsPageContent() {
 
   // Deep link from Home: /relationships?person=<node id> opens that person's page once people load
   const deepLinkDoneRef = useRef(false);
-  useEffect(() => {
+  // True while a linked person is still on its way from the first sync: show their page skeleton
+  const [deepLinkPending, setDeepLinkPending] = useState(false);
+  useIsoLayoutEffect(() => {
     if (deepLinkDoneRef.current || typeof window === 'undefined') return;
     const wanted = new URLSearchParams(window.location.search).get('person');
     if (!wanted) { deepLinkDoneRef.current = true; return; }
     const match = (nodes || []).find(n => !n.isRoot && (n.id === wanted || n._id === wanted || n.senderId === wanted));
     if (match) {
       deepLinkDoneRef.current = true;
+      setDeepLinkPending(false);
       setSelectedPerson(match);
+    } else {
+      setDeepLinkPending(Boolean(isSyncingInitial));
     }
-  }, [nodes]);
+  }, [nodes, isSyncingInitial]);
 
   // Filters State
   const [activeCategory, setActiveCategory] = useState('all');
@@ -731,14 +741,15 @@ function RelationshipsPageContent() {
     return () => { cancelled = true; };
   }, [selectedPerson?.senderId, API_BASE]);
 
-  // Tint the whole page from the open contact's photo (PLAN.md §15.3)
-  const personRawHandle = (selectedPerson?.handle || selectedPerson?.instagramHandle || '').replace(/^@/, '').trim();
-  const personArt = selectedPerson
-    ? (selectedPerson.profilePic?.startsWith('http')
-      ? selectedPerson.profilePic
-      : (personRawHandle ? `https://unavatar.io/instagram/${personRawHandle}?fallback=false` : null))
-    : null;
-  useAmbientImage(personArt);
+  // Work out every contact's colours in the background as soon as the list loads,
+  // so opening a person tints the page on the first frame (no wait).
+  useEffect(() => {
+    prefetchAmbientImages((nodes || []).filter(n => !n.isRoot).map(personArtUrl));
+  }, [nodes]);
+
+  // Tint the whole screen from the open contact's photo (Apple Music style, PLAN.md §15.3)
+  const personArt = personArtUrl(selectedPerson);
+  useAmbientImage(personArt, { strong: Boolean(selectedPerson) });
 
   const birthday = useMemo(() => getNextBirthday(formData.dob), [formData.dob]);
   const lastMessage = dmPreview.messages[dmPreview.messages.length - 1];
@@ -749,6 +760,10 @@ function RelationshipsPageContent() {
   // =========================================================================
   // VIEW 1: FULL INNER PERSON PAGE (When a person is clicked/opened)
   // =========================================================================
+  if (!selectedPerson && deepLinkPending) {
+    return <PageSkeleton variant="person" label="Opening profile" />;
+  }
+
   if (selectedPerson) {
     const isPaused = currentAiMode === 'paused';
     const isReelsOnly = currentAiMode === 'reels_only';
@@ -2382,7 +2397,18 @@ function RelationshipsPageContent() {
             padding: 0
           }}
         >
-          {pagedPeople.length === 0 ? (
+          {isSyncingInitial && pagedPeople.length === 0 ? (
+            Array.from({ length: 6 }, (_, i) => (
+              <div key={`g-skel-${i}`} className="sk-card sk-row" style={{ gap: 14 }}>
+                <Sk w={56} h={56} r={999} />
+                <div className="sk-col" style={{ gap: 8, flex: 1 }}>
+                  <Sk w={`${55 + (i % 3) * 10}%`} h={15} />
+                  <Sk w="40%" h={11} />
+                  <Sk w={70} h={20} r={999} />
+                </div>
+              </div>
+            ))
+          ) : pagedPeople.length === 0 ? (
             <div style={{ gridColumn: '1 / -1', padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
               {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
             </div>
@@ -2506,7 +2532,15 @@ function RelationshipsPageContent() {
             gap: '6px'
           }}
         >
-          {pagedPeople.length === 0 ? (
+          {isSyncingInitial && pagedPeople.length === 0 ? (
+            Array.from({ length: 8 }, (_, i) => (
+              <div key={`d-skel-${i}`} className="sk-row" style={{ gap: 12, padding: '8px 6px' }}>
+                <Sk w={32} h={32} r={999} />
+                <Sk w={`${30 + (i % 4) * 8}%`} h={13} />
+                <Sk w={60} h={18} r={999} style={{ marginLeft: 'auto' }} />
+              </div>
+            ))
+          ) : pagedPeople.length === 0 ? (
             <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
               {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
             </div>

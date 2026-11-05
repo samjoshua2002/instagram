@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import { currentMode } from '../lib/workspaceFeatures';
+import PageSkeleton from '../components/Skeletons';
 
 /** /storyboard opens the board that fits the current mode. */
 export default function StoryboardIndex() {
@@ -13,5 +14,5 @@ export default function StoryboardIndex() {
   useEffect(() => {
     router.replace(mode === 'business' ? '/storyboard/business' : '/storyboard/personal');
   }, [mode, router]);
-  return null;
+  return <PageSkeleton variant="cards" label="Opening storyboard" />;
 }

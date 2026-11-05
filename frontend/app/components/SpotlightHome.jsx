@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, Clock, User } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import PageSkeleton from './Skeletons';
+import { prefetchAmbientImages } from './AmbientBackground';
+import { personArtUrl } from '../lib/utils';
 
 /**
  * Home after login: "Hello, <name>!" greeting, spotlight cards with abstract
@@ -97,11 +100,14 @@ export function StatStrip({ stats }) {
 }
 
 export default function SpotlightHome() {
-  const { nodes, user, routingConfig } = useApp();
+  const { nodes, user, routingConfig, isSyncingInitial } = useApp();
   const [category, setCategory] = useState('all');
   const [showAlerts, setShowAlerts] = useState(false);
 
   const people = useMemo(() => (nodes || []).filter(n => !n.isRoot && n.name), [nodes]);
+
+  // Pre-compute each contact's page colours so tapping a card opens an already-tinted page
+  useEffect(() => { prefetchAmbientImages(people.map(personArtUrl)); }, [people]);
   const chips = useMemo(
     () => CATEGORIES.filter(c => c.id === 'all' || people.some(p => (p.category || 'online_friend') === c.id)),
     [people]
@@ -189,7 +195,9 @@ export default function SpotlightHome() {
         </div>
       )}
 
-      {people.length === 0 ? (
+      {people.length === 0 && isSyncingInitial ? (
+        <PageSkeleton variant="home" header={false} bare label="Loading your people" />
+      ) : people.length === 0 ? (
         <div className="sh-empty">
           <div className="sh-empty-title">Your circle is empty</div>
           <p>People appear here once Instagram DMs sync or you add someone.</p>

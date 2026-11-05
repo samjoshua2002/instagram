@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Sk } from '../components/Skeletons';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import {
@@ -338,7 +339,7 @@ export default function SuperadminPage() {
             REGISTERED ACCOUNTS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '6px' }}>
-            {data?.totalAccounts ?? (loading ? '...' : 0)}
+            {data?.totalAccounts ?? (loading ? <Sk w={56} h={28} r={8} style={{ display: 'inline-block' }} /> : 0)}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
             Active platform users
@@ -356,7 +357,7 @@ export default function SuperadminPage() {
             TOTAL CIRCLE MEMBERS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '6px' }}>
-            {data?.totalContacts ?? (loading ? '...' : 0)}
+            {data?.totalContacts ?? (loading ? <Sk w={56} h={28} r={8} style={{ display: 'inline-block' }} /> : 0)}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
             SocialGraph mapped contacts
@@ -374,7 +375,7 @@ export default function SuperadminPage() {
             CLOSE FRIENDS
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#16a34a', marginTop: '6px' }}>
-            {data?.contactsBreakdown?.closeFriends ?? (loading ? '...' : 0)}
+            {data?.contactsBreakdown?.closeFriends ?? (loading ? <Sk w={56} h={28} r={8} style={{ display: 'inline-block' }} /> : 0)}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
             High-affinity inner circle
@@ -392,7 +393,7 @@ export default function SuperadminPage() {
             ONLINE & DM NETWORK
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--ambient-dominant)', marginTop: '6px' }}>
-            {data?.contactsBreakdown?.onlineFriends ?? (loading ? '...' : 0)}
+            {data?.contactsBreakdown?.onlineFriends ?? (loading ? <Sk w={56} h={28} r={8} style={{ display: 'inline-block' }} /> : 0)}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
             Instagram chat relationships
@@ -761,6 +762,18 @@ export default function SuperadminPage() {
               );
             })}
 
+            {filteredAccounts.length === 0 && loading && (
+              <div className="sk-col" role="status" aria-busy="true" aria-label="Loading">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div key={i} className="sk-list-row">
+                    <Sk w={36} h={36} r={999} />
+                    <div className="sk-col" style={{ gap: 8, flex: 1 }}><Sk w={`${40 + i * 7}%`} h={13} /><Sk w="25%" h={11} /></div>
+                    <Sk w={70} h={24} r={999} />
+                  </div>
+                ))}
+              </div>
+            )}
+
             {filteredAccounts.length === 0 && !loading && (
               <div style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                 No accounts match your query.
@@ -850,6 +863,18 @@ export default function SuperadminPage() {
                 ))}
               </tbody>
             </table>
+
+            {filteredMembers.length === 0 && loading && (
+              <div className="sk-col" role="status" aria-busy="true" aria-label="Loading">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div key={i} className="sk-list-row">
+                    <Sk w={36} h={36} r={999} />
+                    <div className="sk-col" style={{ gap: 8, flex: 1 }}><Sk w={`${40 + i * 7}%`} h={13} /><Sk w="25%" h={11} /></div>
+                    <Sk w={70} h={24} r={999} />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {filteredMembers.length === 0 && !loading && (
               <div style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>

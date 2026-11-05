@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import PageSkeleton from '../components/Skeletons';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
@@ -20,6 +21,7 @@ function ControlsPageContent() {
     updateContactPreferences,
     showToast,
     user,
+    isSyncingInitial,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -649,6 +651,10 @@ function ControlsPageContent() {
     }
     return renderContactCard(contact);
   };
+
+  if (isSyncingInitial && !(nodes || []).some(n => !n.isRoot)) {
+    return <PageSkeleton variant="table" label="Loading controls" />;
+  }
 
   return (
     <motion.div
