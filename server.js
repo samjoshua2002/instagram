@@ -2941,7 +2941,7 @@ app.delete('/api/social-graph/node/:name', async (req, res) => {
 app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
   try {
     const { identifier } = req.params;
-    const { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts, autoSendReels } = req.body;
+    const { aiMode, aiEnabled, replyToMessages, replyToReelsAndPosts, autoSendReels, isFavourite } = req.body;
 
     let finalAiEnabled = aiEnabled;
     let finalReplyMessages = replyToMessages;
@@ -3010,7 +3010,8 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
           ...(typeof finalAiEnabled === 'boolean' ? { aiEnabled: finalAiEnabled } : {}),
           ...(typeof finalReplyMessages === 'boolean' ? { replyToMessages: finalReplyMessages } : {}),
           ...(typeof finalReplyReels === 'boolean' ? { replyToReelsAndPosts: finalReplyReels } : {}),
-          ...(typeof autoSendReels === 'boolean' ? { autoSendReels } : {})
+          ...(typeof autoSendReels === 'boolean' ? { autoSendReels } : {}),
+          ...(typeof isFavourite === 'boolean' ? { isFavourite } : {})
         }
       }
     );

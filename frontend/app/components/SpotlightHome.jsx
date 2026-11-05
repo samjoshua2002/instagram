@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, Clock, User } from 'lucide-react';
+import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, ExternalLink } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
@@ -112,8 +112,98 @@ export function StatStrip({ stats }) {
   );
 }
 
+/**
+ * Long press (touch, 500 ms) or right-click on a card opens the profile menu.
+ * Moving the finger (scrolling a row) cancels it; the tap after a long press does not open the link.
+ */
+function useLongPress(onOpen) {
+  const timer = useRef(null);
+  const start = useRef(null);
+  const fired = useRef(false);
+  const clear = () => { clearTimeout(timer.current); timer.current = null; };
+  useEffect(() => clear, []);
+  return useCallback(person => ({
+    onPointerDown: e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      fired.current = false;
+      start.current = { x: e.clientX, y: e.clientY };
+      clear();
+      timer.current = setTimeout(() => {
+        fired.current = true;
+        if (navigator.vibrate) { try { navigator.vibrate(15); } catch { /* not supported */ } }
+        onOpen(person, start.current.x, start.current.y);
+      }, 500);
+    },
+    onPointerMove: e => {
+      if (start.current && Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 10) clear();
+    },
+    onPointerUp: clear,
+    onPointerCancel: clear,
+    onPointerLeave: clear,
+    onContextMenu: e => {
+      e.preventDefault();
+      clear();
+      fired.current = true;
+      onOpen(person, e.clientX, e.clientY);
+    },
+    onClickCapture: e => {
+      if (fired.current) { e.preventDefault(); e.stopPropagation(); fired.current = false; }
+    },
+  }), [onOpen]);
+}
+
+/** Small menu shown after a long press: add/remove favourite, open profile. */
+function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: menu.x, top: menu.y });
+  useEffect(() => {
+    // Keep the menu inside the screen
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPos({
+      left: Math.max(12, Math.min(menu.x, window.innerWidth - width - 12)),
+      top: Math.max(12, Math.min(menu.y, window.innerHeight - height - 12)),
+    });
+    el.querySelector('button, a')?.focus({ preventScroll: true });
+  }, [menu.x, menu.y]);
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onClose);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [onClose]);
+  const p = menu.person;
+  return (
+    <>
+      <div className="sh-menu-backdrop" onClick={onClose} onContextMenu={e => { e.preventDefault(); onClose(); }} />
+      <div ref={ref} className="sh-menu" role="menu" aria-label={`Options for ${p.name}`} style={pos}>
+        <div className="sh-menu-head">
+          <Photo person={p} className="sh-menu-photo" />
+          <span className="sh-menu-name">{p.name}</span>
+        </div>
+        <button type="button" role="menuitem" className="sh-menu-item" onClick={() => { onToggle(p, !isFavourite); onClose(); }}>
+          {isFavourite ? <HeartOff size={18} /> : <Heart size={18} />}
+          <span>{isFavourite ? 'Remove from favourites' : 'Add to favourites'}</span>
+        </button>
+        <Link href={personHref(p)} role="menuitem" className="sh-menu-item" onClick={onClose}>
+          <ExternalLink size={18} />
+          <span>Open profile</span>
+        </Link>
+      </div>
+    </>
+  );
+}
+
 export default function SpotlightHome() {
-  const { nodes, user, routingConfig, isSyncingInitial } = useApp();
+  const { nodes, user, routingConfig, isSyncingInitial, setFavourite } = useApp();
+  const [menu, setMenu] = useState(null); // { person, x, y } while the long-press menu is open
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const openMenu = useCallback((person, x, y) => setMenu({ person, x, y }), []);
+  const pressProps = useLongPress(openMenu);
   const [category, setCategory] = useState('all');
   const [showAlerts, setShowAlerts] = useState(false);
 
@@ -132,13 +222,18 @@ export default function SpotlightHome() {
   );
   const score = p => (p.chatsCount || 0) + (p.reelsCount || 0) * 5;
   const spotlight = useMemo(() => [...filtered].sort((a, b) => score(b) - score(a)).slice(0, 8), [filtered]);
-  const favourites = useMemo(
-    () => [...filtered].filter(p => p.category === 'close_friend' || p.category === 'family')
-      .concat([...filtered].sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0)))
+  // People the user added come first; the rest are suggestions (close friends, family, top chats)
+  // unless the user removed them from favourites
+  const favourites = useMemo(() => {
+    const pinned = filtered.filter(p => p.isFavourite === true);
+    const open = filtered.filter(p => p.isFavourite !== false);
+    const suggested = open.filter(p => p.category === 'close_friend' || p.category === 'family')
+      .concat([...open].sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0)));
+    return pinned.concat(suggested)
       .filter((p, i, arr) => arr.findIndex(q => q.id === p.id) === i)
-      .slice(0, 10),
-    [filtered]
-  );
+      .slice(0, Math.max(10, pinned.length));
+  }, [filtered]);
+  const favouriteIds = useMemo(() => new Set(favourites.map(p => p.id)), [favourites]);
   const reconnect = useMemo(
     () => [...filtered].filter(p => (p.chatsCount || 0) > 0).sort((a, b) => (a.chatsCount || 0) - (b.chatsCount || 0)).slice(0, 10),
     [filtered]
@@ -223,7 +318,7 @@ export default function SpotlightHome() {
           <section aria-label="Spotlight">
             <div className="sh-spot-row">
               {spotlight.map(p => (
-                <Link key={p.id} href={personHref(p)} className="sh-spot" style={{ backgroundImage: abstractArt(p.name) }}>
+                <Link key={p.id} href={personHref(p)} className="sh-spot sh-pressable" {...pressProps(p)} style={{ backgroundImage: abstractArt(p.name) }}>
                   <span className="sh-spot-glow" aria-hidden="true" />
                   <Photo person={p} className="sh-spot-avatar" />
                   <span className="sh-spot-text">
@@ -253,7 +348,7 @@ export default function SpotlightHome() {
               <div className="sh-row-head"><h2>Favourite people</h2><Link href="/relationships" className="sh-link">Show all</Link></div>
               <div className="sh-fav-row">
                 {favourites.map(p => (
-                  <Link key={p.id} href={personHref(p)} className="sh-fav">
+                  <Link key={p.id} href={personHref(p)} className="sh-fav sh-pressable" {...pressProps(p)}>
                     <Photo person={p} className="sh-fav-photo" />
                     <span className="sh-fav-name">{p.name}</span>
                     <span className="sh-fav-sub">{CATEGORY_LABEL[p.category || 'online_friend'] || p.relationship || 'Friend'}</span>
@@ -269,7 +364,7 @@ export default function SpotlightHome() {
               <ul className="sh-list">
                 {reconnect.map(p => (
                   <li key={p.id}>
-                    <Link href={personHref(p)} className="sh-list-item">
+                    <Link href={personHref(p)} className="sh-list-item sh-pressable" {...pressProps(p)}>
                       <Photo person={p} className="sh-list-photo" />
                       <span className="sh-list-main">
                         <span className="sh-list-name">{p.name}</span>
@@ -289,6 +384,15 @@ export default function SpotlightHome() {
             <Link href="/analytics"><Clock size={22} /><span>Activity</span></Link>
           </nav>
         </>
+      )}
+
+      {menu && (
+        <ProfileMenu
+          menu={menu}
+          isFavourite={favouriteIds.has(menu.person.id)}
+          onToggle={setFavourite}
+          onClose={closeMenu}
+        />
       )}
     </div>
   );

@@ -55,6 +55,12 @@ const SocialGraphSchema = new mongoose.Schema({
     enum: ['close_friend', 'online_friend', 'offline_friend', 'family', 'professional', 'business', 'relative', 'homie', 'group_icon', 'other'],
     default: 'online_friend',
   },
+  // Home "Favourite people": true = added by the user, false = removed by the user,
+  // null = not chosen yet (Home then suggests close friends, family and top chats)
+  isFavourite: {
+    type: Boolean,
+    default: null,
+  },
   // Age learned from DMs (shown on the profile when no full birthday is known)
   age: {
     type: Number,

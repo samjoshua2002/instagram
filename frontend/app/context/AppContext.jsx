@@ -12,6 +12,7 @@ const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 const SYNC_COMPARE_FIELDS = [
   'id', 'name', 'handle', 'senderId', 'profilePic', 'category', 'relationship', 'dob', 'age', 'gender', 'personalNotes',
   'chatsCount', 'reelsCount', 'aiEnabled', 'replyToMessages', 'replyToReelsAndPosts', 'roastiness', 'greetingStyle',
+  'isFavourite',
 ];
 
 // Auth endpoints that answer 401 for a wrong code/password, not for an expired session
@@ -141,6 +142,7 @@ export function deduplicateNodes(nodesList) {
       if (typeof node.aiEnabled === 'boolean') existing.aiEnabled = node.aiEnabled;
       if (typeof node.replyToMessages === 'boolean') existing.replyToMessages = node.replyToMessages;
       if (typeof node.replyToReelsAndPosts === 'boolean') existing.replyToReelsAndPosts = node.replyToReelsAndPosts;
+      if (typeof node.isFavourite === 'boolean') existing.isFavourite = node.isFavourite;
       if (typeof node.chatsCount === 'number') existing.chatsCount = node.chatsCount;
       if (typeof node.reelsCount === 'number') existing.reelsCount = node.reelsCount;
       if (typeof node.messageCount === 'number') existing.messageCount = node.messageCount;
@@ -734,6 +736,7 @@ export function AppProvider({ children }) {
               aiEnabled: sn.aiEnabled !== false,
               replyToMessages: sn.replyToMessages !== false,
               replyToReelsAndPosts: sn.replyToReelsAndPosts !== false,
+              isFavourite: typeof sn.isFavourite === 'boolean' ? sn.isFavourite : null,
               chatsCount,
               reelsCount,
               messageCount: chatsCount,
@@ -891,6 +894,7 @@ export function AppProvider({ children }) {
       aiEnabled: accumulatedNode.aiEnabled !== false,
       replyToMessages: accumulatedNode.replyToMessages !== false,
       replyToReelsAndPosts: accumulatedNode.replyToReelsAndPosts !== false,
+      isFavourite: typeof accumulatedNode.isFavourite === 'boolean' ? accumulatedNode.isFavourite : null,
       chatsCount: typeof accumulatedNode.chatsCount === 'number' ? accumulatedNode.chatsCount : (accumulatedNode.messageCount || 0),
       reelsCount: typeof accumulatedNode.reelsCount === 'number' ? accumulatedNode.reelsCount : 0,
       messageCount: typeof accumulatedNode.chatsCount === 'number' ? accumulatedNode.chatsCount : (accumulatedNode.messageCount || 0),
@@ -1159,6 +1163,34 @@ export function AppProvider({ children }) {
       console.warn('Preferences backend sync note:', e.message);
       if (silent) throw e;
       showToast(`Could not update ${nameStr}: ${e.message}`, 'error');
+    }
+  };
+
+  // Add or remove a person from Home's "Favourite people" (long-press menu)
+  const setFavourite = async (node, isFavourite) => {
+    if (!node) return;
+    const fav = !!isFavourite;
+    const before = node.isFavourite ?? null;
+    const apply = value => setNodes(prev => {
+      const next = prev.map(n => (n.id === node.id ? { ...n, isFavourite: value } : n));
+      try { localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(next)); } catch (e) { }
+      return next;
+    });
+    apply(fav);
+    try {
+      const res = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(node.senderId || node.name)}/preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isFavourite: fav }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `server answered ${res.status}`);
+      }
+      showToast(fav ? `${node.name} added to favourites` : `${node.name} removed from favourites`);
+    } catch (e) {
+      apply(before);
+      showToast(`Could not update favourites for ${node.name}: ${e.message}`, 'error');
     }
   };
 
@@ -1442,6 +1474,7 @@ export function AppProvider({ children }) {
   const saveNodeStable = useLatestCallback(saveNode);
   const deleteNodeStable = useLatestCallback(deleteNode);
   const updateContactPreferencesStable = useLatestCallback(updateContactPreferences);
+  const setFavouriteStable = useLatestCallback(setFavourite);
   const addFactStable = useLatestCallback(addFact);
   const startAiInterviewStable = useLatestCallback(startAiInterview);
   const aiAutofillPersonStable = useLatestCallback(aiAutofillPerson);
@@ -1462,6 +1495,7 @@ export function AppProvider({ children }) {
     saveNode: saveNodeStable,
     deleteNode: deleteNodeStable,
     updateContactPreferences: updateContactPreferencesStable,
+    setFavourite: setFavouriteStable,
     addFact: addFactStable,
     showToast,
     dismissToast,
@@ -1500,7 +1534,7 @@ export function AppProvider({ children }) {
     isImpersonating,
     enterWorkspace,
     exitWorkspace,
-  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, requestFreshPhoto, isSyncingInitial, API_BASE, user, token, authLoading, login, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
+  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, setFavouriteStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, requestFreshPhoto, isSyncingInitial, API_BASE, user, token, authLoading, login, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
 
   return (
     <AppContext.Provider value={contextValue}>
