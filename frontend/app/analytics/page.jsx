@@ -18,6 +18,7 @@ import { motion, animate, AnimatePresence } from 'framer-motion';
 import { DUR, EASE_OUT, STAGGER, T, rowMotion } from '../lib/motion';
 import BusinessConversionPanel from '../components/BusinessConversionPanel';
 import WorkspaceModeSwitch from '../components/WorkspaceModeSwitch';
+import PageHero from '../components/PageHero';
 import { WORKSPACE_MODES, FEATURE_GROUPS, currentMode, isFeatureOn } from '../lib/workspaceFeatures';
 
 // Tiny 14-day trend line for the KPI cards (PLAN.md §17.3); flat when there is no data yet
@@ -500,24 +501,17 @@ export default function AnalyticsPage() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DUR.page, ease: EASE_OUT }}
-      className="page-container dashboard-container"
+      className="page-container dashboard-container spx-page has-hero"
     >
-      {/* HEADER WITH VIEW SWITCHER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', letterSpacing: '0.08em' }}>
-            {isSuperadmin ? 'SUPERADMIN OBSERVATORY' : 'COMMAND CENTER'}
-          </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-0.7px', marginTop: '4px', color: 'var(--color-text-primary)' }}>
-            {isSuperadmin && activeTab === 'platform' ? 'Platform Users & Workspaces' : 'Analytics Overview'}
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-            {isSuperadmin && activeTab === 'platform'
-              ? 'Multi-tenant management for all registered accounts, connected Instagram workspaces, and automations.'
-              : 'Real-time analytics on your contacts, interaction volume, and AI routing.'}
-          </p>
-        </div>
-
+      <PageHero
+        seed="page-analytics"
+        icon={<Layers size={96} strokeWidth={2} />}
+        eyebrow={isSuperadmin ? 'Superadmin observatory' : 'Command center'}
+        title={isSuperadmin && activeTab === 'platform' ? 'Platform Users & Workspaces' : 'Analytics Overview'}
+        desc={isSuperadmin && activeTab === 'platform'
+          ? 'Multi-tenant management for all registered accounts, connected Instagram workspaces, and automations.'
+          : 'Real-time analytics on your contacts, interaction volume, and AI routing.'}
+      >
         {/* Quick mode switch: Personal / Business / Hybrid */}
         {!isSuperadmin && <WorkspaceModeSwitch />}
 
@@ -566,7 +560,7 @@ export default function AnalyticsPage() {
             </button>
           </div>
         )}
-      </div>
+      </PageHero>
 
       {/* ─────────────────────────────────────────────────────────────
           PRACTICAL SUPERADMIN VIEW FOR 25+ USERS
