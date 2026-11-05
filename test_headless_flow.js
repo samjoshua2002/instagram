@@ -1,4 +1,17 @@
 require('dotenv').config();
+
+// This script writes test users and messages. It must never touch the real (production) database
+// in MONGODB_URI, so it only runs against a separate TEST_MONGODB_URI.
+const TEST_URI = (process.env.TEST_MONGODB_URI || '').trim().replace(/^["']|["']$/g, '');
+if (!TEST_URI) {
+  console.error('❌ Refusing to run: set TEST_MONGODB_URI to a separate test database (MONGODB_URI is never used by this script).');
+  process.exit(1);
+}
+if (TEST_URI === (process.env.MONGODB_URI || '').trim().replace(/^["']|["']$/g, '')) {
+  console.error('❌ Refusing to run: TEST_MONGODB_URI is the same as MONGODB_URI (production).');
+  process.exit(1);
+}
+process.env.MONGODB_URI = TEST_URI; // config/db reads MONGODB_URI
 const connectDB = require('./config/db');
 const UserMemory = require('./models/UserMemory');
 const Message = require('./models/Message');

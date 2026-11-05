@@ -7,23 +7,36 @@ const instagramService = require('./instagramService');
 const { getOwnerSendToken } = require('./instagramTokenService');
 const azureOpenAI = require('./azureOpenAI');
 
+const {
+  HOUR_MS, REMINDER_GRACE_HOURS, MAX_REMINDER_AFTER_HOURS, DEFAULT_TIMEZONE,
+  localHour, isQuietHours, reminderDelayHours, isWithinReminderWindow,
+} = require('./reminderSchedule');
+
 class ReminderService {
+  constructor() {
+    this.running = false;
+  }
+
   /**
-   * Scans for conversations that have been inactive for 5-6 hours
-   * and sends an authentic, friendly follow-up check-in.
+   * Scans for conversations that have been inactive for the owner's delay (default 5h)
+   * and sends an authentic, friendly follow-up check-in. Runs never overlap.
    */
   async checkAndSendReminders() {
+    if (this.running) {
+      console.log('⏭️ [Reminder Service] Previous run still in progress; skipping this tick.');
+      return;
+    }
+    this.running = true;
     try {
-      const maxInactiveMs = 10 * 60 * 60 * 1000; // Strictly capped at 10 hours max (if idle for 1 day or >=10h, do NOT remind them - wait until they text)
       const now = Date.now();
-      const policyCutoff = new Date(now - maxInactiveMs);
+      // Widest possible window; each owner's own delay and grace window are applied in remindOne
+      const policyCutoff = new Date(now - (MAX_REMINDER_AFTER_HOURS + REMINDER_GRACE_HOURS) * HOUR_MS);
 
-      // Find candidates who interacted between 1 and 10 hours ago; each owner's own delay is applied below
       const candidateUsers = await UserMemory.find({
         aiEnabled: true,
         remindersEnabled: { $ne: false },
         handoffRequestedAt: null,
-        lastInteraction: { $gte: policyCutoff, $lte: new Date(now - 60 * 60 * 1000) },
+        lastInteraction: { $gte: policyCutoff, $lte: new Date(now - HOUR_MS) },
       });
 
       const botAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
@@ -39,18 +52,19 @@ class ReminderService {
       }
     } catch (err) {
       console.error('❌ Error in checkAndSendReminders:', err.message);
+    } finally {
+      this.running = false;
     }
   }
 
   /**
-   * The contact owner's persona and workspace mode (legacy contacts without an owner use the admin persona)
+   * The contact owner's persona and workspace mode (legacy contacts without an owner use the
+   * legacy admin persona, ownerId null — never an arbitrary tenant's persona)
    */
   async loadOwner(ownerId, ownerCache) {
     const key = String(ownerId || '');
     if (!ownerCache.has(key)) {
-      const config = ownerId
-        ? await PersonaConfig.findOne({ ownerId })
-        : (await PersonaConfig.findOne({ ownerId: null })) || (await PersonaConfig.findOne());
+      const config = await PersonaConfig.findOne({ ownerId: ownerId || null });
       const ownerUser = ownerId ? await User.findById(ownerId) : null;
       const features = ownerUser ? await workspaceFeatureService.getFeaturesSafe(ownerUser) : null;
       ownerCache.set(key, { config, activeMode: features?.activeMode || 'personal' });
@@ -69,15 +83,18 @@ class ReminderService {
     if (config.chatMode === 'everyone_except' && (config.excludedContactIds || []).includes(user.senderId)) return;
     if (config.chatMode === 'only_selected' && !(config.includedContactIds || []).includes(user.senderId)) return;
 
-    const reminderHours = config.reminderAfterHours || 5;
-    if (new Date(user.lastInteraction).getTime() > now - reminderHours * 60 * 60 * 1000) return;
+    if (!isWithinReminderWindow(user.lastInteraction, now, reminderDelayHours(config))) return;
+
+    // Quiet hours in the owner's time zone: try again on a later tick
+    const timeZone = config.businessPolicy?.timezone || DEFAULT_TIMEZONE;
+    if (isQuietHours(new Date(now), timeZone)) return;
 
     // Avoid sending another reminder if one was already sent after their last interaction
     if (user.lastReminderSentAt && user.lastReminderSentAt >= user.lastInteraction) return;
 
     // Check the most recent message in the conversation
     const lastMsg = await Message.findOne({
-      $or: [{ senderId: user.senderId }, { recipientId: user.senderId }]
+      ownerId: user.ownerId || null, $or: [{ senderId: user.senderId }, { recipientId: user.senderId }]
     }).sort({ createdAt: -1 });
 
     // If the last message was from the bot/assistant (user left on seen/read), DO NOT double-text like a bot
@@ -85,7 +102,7 @@ class ReminderService {
 
     // Fetch recent conversation history for context
     const history = await Message.find({
-      $or: [{ senderId: user.senderId }, { recipientId: user.senderId }]
+      ownerId: user.ownerId || null, $or: [{ senderId: user.senderId }, { recipientId: user.senderId }]
     }).sort({ createdAt: -1 }).limit(8);
     history.reverse();
 
@@ -113,7 +130,31 @@ class ReminderService {
       console.warn(`⚠️ [Reminder Service] Skipping @${user.username}: owner's Instagram is not connected.`);
       return;
     }
-    const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText, ownerToken);
+    // Claim the contact atomically: only succeeds if nobody (another run / server instance) sent or
+    // claimed a reminder since we read it, and they have not texted again in the meantime.
+    const previousSentAt = user.lastReminderSentAt || null;
+    const claimedAt = new Date();
+    const claimed = await UserMemory.findOneAndUpdate(
+      { _id: user._id, lastReminderSentAt: previousSentAt, lastInteraction: user.lastInteraction },
+      { $set: { lastReminderSentAt: claimedAt } },
+      { new: true }
+    );
+    if (!claimed) {
+      console.log(`⏭️ [Reminder Service] @${user.username} already claimed or active again; skipping.`);
+      return;
+    }
+
+    const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText, ownerToken)
+      .catch(err => ({ success: false, error: err.message }));
+    if (!sendResult?.success) {
+      // Not delivered: release the claim (only if it is still ours) so a later run can retry
+      await UserMemory.updateOne(
+        { _id: user._id, lastReminderSentAt: claimedAt },
+        { $set: { lastReminderSentAt: previousSentAt } }
+      ).catch(() => {});
+      console.warn(`⚠️ [Reminder Service] Send to @${user.username} failed; not recorded:`, sendResult?.error || sendResult?.reason || 'unknown error');
+      return;
+    }
 
     // Record reminder in DB
     await Message.create({
@@ -128,9 +169,8 @@ class ReminderService {
       timestamp: new Date(),
     });
 
-    // Update user memory so no duplicate reminders are sent
-    user.lastReminderSentAt = new Date();
-    await user.save();
+    // lastReminderSentAt was already set by the claim above, so no duplicate reminders are sent
+    user.lastReminderSentAt = claimedAt;
 
     console.log(`✅ [Follow-up Reminder Sent] to @${user.username}: "${reminderText}"`);
   }
@@ -159,3 +199,4 @@ class ReminderService {
 }
 
 module.exports = new ReminderService();
+Object.assign(module.exports, { isQuietHours, localHour, reminderDelayHours, isWithinReminderWindow });

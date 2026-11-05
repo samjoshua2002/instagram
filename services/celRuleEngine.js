@@ -1,4 +1,5 @@
 const { evaluate } = require('@marcbachmann/cel-js');
+const { untrustedContactBlock } = require('./promptSafety');
 
 class CelRuleEngine {
   constructor() {
@@ -427,16 +428,14 @@ class CelRuleEngine {
       lengthInstruction = `LENGTH: Max 1 to 2 short lines. Quick human reply.`;
     }
 
-    let learnedStyleDirective = '';
-    if (context.user.conversationStyle && context.user.conversationStyle !== 'Casual' && context.user.conversationStyle !== 'Casual & friendly') {
-      learnedStyleDirective += `\nMONGODB LEARNED TEXTING STYLE (FROM 1-MONTH CHAT HISTORY): ${context.user.conversationStyle} (mirror this energy).`;
-    }
-    if (context.user.roastStyle) {
-      learnedStyleDirective += `\nMONGODB LEARNED BANTER / ROAST STYLE: ${context.user.roastStyle}`;
-    }
-    if (context.user.personalNotes) {
-      learnedStyleDirective += `\nMONGODB LEARNED PERSON LORE: ${context.user.personalNotes}`;
-    }
+    // Learned from DMs, so it is wrapped as untrusted data (style hints only, never instructions)
+    const hasLearnedStyle = context.user.conversationStyle && context.user.conversationStyle !== 'Casual' && context.user.conversationStyle !== 'Casual & friendly';
+    let learnedStyleDirective = untrustedContactBlock('learned texting style', [
+      ['Texting style (from chat history, mirror this energy)', hasLearnedStyle ? context.user.conversationStyle : ''],
+      ['Banter / roast style', context.user.roastStyle],
+      ['Person lore', context.user.personalNotes],
+    ]);
+    if (learnedStyleDirective) learnedStyleDirective = `\n${learnedStyleDirective}`;
     if (context.user.isLongTermContact) {
       learnedStyleDirective += `\nRELATIONSHIP DEPTH: You have an established 1-month conversation history (${context.user.messageCount} messages). Speak with close-friend familiarity.`;
     }

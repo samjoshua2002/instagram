@@ -30,23 +30,92 @@ function extractPhone(text) {
   return '';
 }
 
-/**
- * Best-effort date/time from phrases like "tomorrow at 5pm", "friday 10:30", "24 oct 3 pm", "25/10 at 11am".
- * Returns a Date, or null when no day or time is mentioned.
- */
-function extractBookingTime(text, now = new Date()) {
-  const lower = String(text || '').toLowerCase();
-  let day = null;
+const DEFAULT_TIMEZONE = 'Asia/Kolkata';
+const WEEKDAY_ABBR = { sun: 0, mon: 1, tue: 2, tues: 2, wed: 3, thu: 4, thur: 4, thurs: 4, fri: 5, sat: 6 };
 
-  if (/\btoday|tonight\b/.test(lower)) day = new Date(now);
-  else if (/\btomorrow|tmrw|tmr\b/.test(lower)) day = new Date(now.getTime() + 864e5);
-  else if (/\bday after tomorrow\b/.test(lower)) day = new Date(now.getTime() + 2 * 864e5);
+/** A valid IANA zone name, else the default (Asia/Kolkata). */
+function resolveTimeZone(timeZone) {
+  if (!timeZone) return DEFAULT_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(0);
+    return timeZone;
+  } catch (_) {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
+/** Wall-clock parts of an instant in a time zone: { year, month (1-12), day, hour, minute, weekday (0=Sun) }. */
+function zonedParts(date, timeZone) {
+  const parts = {};
+  for (const p of new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric', weekday: 'short',
+  }).formatToParts(date)) parts[p.type] = p.value;
+  return {
+    year: Number(parts.year), month: Number(parts.month), day: Number(parts.day),
+    hour: Number(parts.hour) % 24, minute: Number(parts.minute), second: Number(parts.second),
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday),
+  };
+}
+
+/** UTC instant for a wall-clock time in a time zone (DST-safe: offset re-checked at the result). */
+function zonedToUtc(year, month, day, hour, minute, timeZone) {
+  const wall = Date.UTC(year, month - 1, day, hour, minute);
+  const offsetAt = (ms) => {
+    const p = zonedParts(new Date(ms), timeZone);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+  };
+  let utc = wall - offsetAt(wall);
+  const second = offsetAt(utc);
+  if (wall - second !== utc) utc = wall - second;
+  return new Date(utc);
+}
+
+/** Calendar date n days after { year, month, day } (plain date arithmetic, no time zone). */
+function addDays({ year, month, day }, n) {
+  const d = new Date(Date.UTC(year, month - 1, day + n));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
+const isValidDate = (y, m, d) => m >= 1 && m <= 12 && d >= 1 && d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
+const dateKey = ({ year, month, day }) => year * 10000 + month * 100 + day;
+
+/**
+ * Best-effort date/time from phrases like "tomorrow at 5pm", "friday 10:30", "24 oct 3 pm", "25/10 at 11am",
+ * read in the business's time zone (default Asia/Kolkata). Returns a Date (correct UTC instant),
+ * or null when no day or time is mentioned. `now` is injectable for tests.
+ */
+function extractBookingTime(text, now = new Date(), timeZone = DEFAULT_TIMEZONE) {
+  const tz = resolveTimeZone(timeZone);
+  const lower = String(text || '').toLowerCase();
+  const local = zonedParts(now, tz);
+  const today = { year: local.year, month: local.month, day: local.day };
+  let day = null;
+  let tonight = false;
+
+  // "day after tomorrow" must be checked before "tomorrow" (it contains it)
+  if (/\bday\s+after\s+(?:tomorrow|tmrw|tmr)\b/.test(lower)) day = addDays(today, 2);
+  else if (/\b(?:tomorrow|tmrw|tmr)\b/.test(lower)) day = addDays(today, 1);
+  else if (/\b(?:today|tonight)\b/.test(lower)) {
+    day = today;
+    tonight = /\btonight\b/.test(lower);
+  }
 
   if (!day) {
-    const wd = WEEKDAYS.findIndex(w => new RegExp(`\\b${w}|\\b${w.slice(0, 3)}\\b`).test(lower));
+    // Full weekday names anywhere; short forms ("sat", "fri") only with booking context
+    // ("on sat", "next fri", "sat at 5", "sat 10am") so "i sat down" is not Saturday
+    let wd = -1;
+    const full = lower.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+    if (full) wd = WEEKDAYS.indexOf(full[1]);
+    else {
+      const abbr = '(sun|mon|tues?|wed|thu(?:rs?)?|fri|sat)';
+      const short = lower.match(new RegExp(`\\b(?:on|next|this|coming|by|till|until)\\s+${abbr}\\b`))
+        || lower.match(new RegExp(`\\b${abbr}\\s+(?:at\\s+|@\\s*)?\\d{1,2}(?:[:.]\\d{2})?\\s*(?:am|pm)?\\b`));
+      if (short) wd = WEEKDAY_ABBR[short[1]];
+    }
     if (wd >= 0) {
-      const diff = (wd - now.getDay() + 7) % 7 || 7;
-      day = new Date(now.getTime() + diff * 864e5);
+      const diff = (wd - local.weekday + 7) % 7 || 7;
+      day = addDays(today, diff);
     }
   }
 
@@ -56,32 +125,45 @@ function extractBookingTime(text, now = new Date()) {
       || lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?\b/);
     if (m1) {
       const [dd, mon] = /\d/.test(m1[1]) ? [Number(m1[1]), m1[2]] : [Number(m1[2]), m1[1]];
-      day = new Date(now.getFullYear(), MONTHS.indexOf(mon.slice(0, 3)), dd);
-      if (day < new Date(now.getFullYear(), now.getMonth(), now.getDate())) day.setFullYear(day.getFullYear() + 1);
+      const month = MONTHS.indexOf(mon.slice(0, 3)) + 1;
+      let candidate = { year: today.year, month, day: dd };
+      if (dateKey(candidate) < dateKey(today)) candidate = { ...candidate, year: today.year + 1 };
+      if (isValidDate(candidate.year, month, dd)) day = candidate;
     } else {
-      // "25/10" or "25-10-2026" (day first)
-      const m2 = lower.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
-      if (m2 && Number(m2[2]) <= 12) {
-        const year = m2[3] ? (m2[3].length === 2 ? 2000 + Number(m2[3]) : Number(m2[3])) : now.getFullYear();
-        day = new Date(year, Number(m2[2]) - 1, Number(m2[1]));
+      // "25/10" or "25-10-2026" (day first). "24/7" is a phrase, not a date.
+      const m2 = /\b24\s*\/\s*7\b/.test(lower) ? null : lower.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
+      if (m2) {
+        const dd = Number(m2[1]);
+        const month = Number(m2[2]);
+        let year = m2[3] ? (m2[3].length === 2 ? 2000 + Number(m2[3]) : Number(m2[3])) : today.year;
+        if (!m2[3] && isValidDate(year, month, dd) && dateKey({ year, month, day: dd }) < dateKey(today)) year += 1;
+        if (isValidDate(year, month, dd)) day = { year, month, day: dd };
       }
     }
   }
 
   // "5pm", "5:30 pm", "at 17:00", "10.30am"
-  const t = lower.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/) || lower.match(/\b(?:at\s+)?([01]?\d|2[0-3])[:.](\d{2})\b/);
+  let t = lower.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/);
+  if (t && (Number(t[1]) < 1 || Number(t[1]) > 12 || Number(t[2] || 0) > 59)) t = null;
+  if (!t) {
+    t = lower.match(/\b(?:at\s+)?([01]?\d|2[0-3])[:.]([0-5]\d)\b/);
+  }
   if (!day && !t) return null;
 
-  const result = new Date(day || now);
-  if (t) {
-    let hours = Number(t[1]);
-    const minutes = Number(t[2] || 0);
-    if (t[3] === 'pm' && hours < 12) hours += 12;
-    if (t[3] === 'am' && hours === 12) hours = 0;
-    result.setHours(hours, minutes, 0, 0);
-    if (!day && result < now) result.setDate(result.getDate() + 1); // "at 5pm" already passed today
-  } else {
-    result.setHours(10, 0, 0, 0); // day only: keep it on the calendar at 10:00
+  const base = day || today;
+  if (!t) {
+    // Day only: keep it on the calendar at 10:00 (20:00 for "tonight")
+    return zonedToUtc(base.year, base.month, base.day, tonight ? 20 : 10, 0, tz);
+  }
+  let hours = Number(t[1]);
+  const minutes = Number(t[2] || 0);
+  if (t[3] === 'pm' && hours < 12) hours += 12;
+  if (t[3] === 'am' && hours === 12) hours = 0;
+  let result = zonedToUtc(base.year, base.month, base.day, hours, minutes, tz);
+  if (!day && result < now) {
+    // "at 5pm" already passed today: next day
+    const next = addDays(today, 1);
+    result = zonedToUtc(next.year, next.month, next.day, hours, minutes, tz);
   }
   return result;
 }
@@ -100,13 +182,13 @@ function extractLeadSignals(incomingText, replyText = '') {
 /**
  * Scans the exchange for an appointment: customer intent plus a time, confirmed when the reply agrees.
  */
-function extractBookingSignals(incomingText, replyText = '', now = new Date()) {
+function extractBookingSignals(incomingText, replyText = '', now = new Date(), timeZone = DEFAULT_TIMEZONE) {
   const combined = `${incomingText || ''}\n${replyText || ''}`;
   if (BOOKING_CANCEL_RE.test(incomingText || '')) return { isBooking: true, cancelled: true };
   const hasIntent = BOOKING_INTENT_RE.test(combined);
   if (!hasIntent) return { isBooking: false };
 
-  const bookingTime = extractBookingTime(incomingText, now) || extractBookingTime(replyText, now);
+  const bookingTime = extractBookingTime(incomingText, now, timeZone) || extractBookingTime(replyText, now, timeZone);
   const confirmed = BOOKING_CONFIRM_RE.test(replyText || '') || /\b(confirm|done|yes book|book it)\b/i.test(incomingText || '');
   const serviceMatch = combined.match(/\b(?:book|reserve|schedule)\s+(?:(?:a|an|the|my)\s+)?([a-z][a-z\s]{2,30}?)(?:\s+(?:for|on|at|tomorrow|today)\b|[.,!?\n]|$)/i)
     || combined.match(/\b(table for \d+|haircut|facial|massage|consultation|demo|session|appointment)\b/i);
@@ -122,7 +204,7 @@ function extractBookingSignals(incomingText, replyText = '', now = new Date()) {
 /**
  * Records leads and bookings for one business conversation turn. Never throws.
  */
-async function processConversationTurn({ ownerId, senderId, handle = '', incomingText, replyText = '', captureLeads = true, captureBookings = true }) {
+async function processConversationTurn({ ownerId, senderId, handle = '', incomingText, replyText = '', captureLeads = true, captureBookings = true, timeZone = null }) {
   if (!ownerId || !senderId) return { lead: null, booking: null };
   const result = { lead: null, booking: null };
 
@@ -153,7 +235,14 @@ async function processConversationTurn({ ownerId, senderId, handle = '', incomin
   }
 
   try {
-    const booking = captureBookings ? extractBookingSignals(incomingText, replyText) : { isBooking: false };
+    // Times are read in the business's own time zone (businessPolicy.timezone, default Asia/Kolkata)
+    let tz = timeZone;
+    if (!tz && captureBookings) {
+      const PersonaConfig = require('../models/PersonaConfig');
+      const cfg = await PersonaConfig.findOne({ ownerId }).select('businessPolicy.timezone').lean().catch(() => null);
+      tz = cfg?.businessPolicy?.timezone || DEFAULT_TIMEZONE;
+    }
+    const booking = captureBookings ? extractBookingSignals(incomingText, replyText, new Date(), tz) : { isBooking: false };
     if (booking.isBooking) {
       // Update the customer's latest open booking instead of creating duplicates
       const open = await Booking.findOne({ ownerId, senderId, status: { $in: ['pending', 'confirmed'] } }).sort({ createdAt: -1 });
@@ -187,4 +276,7 @@ async function processConversationTurn({ ownerId, senderId, handle = '', incomin
   return result;
 }
 
-module.exports = { extractLeadSignals, extractBookingSignals, extractBookingTime, extractPhone, processConversationTurn };
+module.exports = {
+  extractLeadSignals, extractBookingSignals, extractBookingTime, extractPhone, processConversationTurn,
+  zonedParts, zonedToUtc, resolveTimeZone, DEFAULT_TIMEZONE,
+};

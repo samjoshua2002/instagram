@@ -4,6 +4,18 @@ const MediaVault = require('../models/MediaVault');
 const PersonaConfig = require('../models/PersonaConfig');
 
 /**
+ * Media Vault filter for one owner. No user = legacy admin media (ownerId null), never every
+ * tenant's media. The ownerUsername clause is only added when a username is actually known
+ * ({ ownerUsername: undefined } is dropped by Mongoose and would match everything).
+ */
+function vaultOwnerQuery(user) {
+  if (!user || !user._id) return { ownerId: null };
+  return user.username
+    ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] }
+    : { ownerId: user._id };
+}
+
+/**
  * Dynamic Media Vault & Reaction GIF Service
  * Prioritizes user-uploaded images/GIFs from MediaVault across emotional categories,
  * with fallback to curated funny reaction GIFs/memes.
@@ -276,7 +288,7 @@ class StickerService {
       : list;
 
     const results = { added: 0, skipped: 0, items: [] };
-    const ownerQuery = user ? { ownerId: user._id } : {};
+    const ownerQuery = user ? { ownerId: user._id } : { ownerId: null };
 
     for (const item of toImport) {
       try {
@@ -417,7 +429,7 @@ class StickerService {
 
     // 1. FIRST PRIORITY: User's custom uploaded media in MongoDB MediaVault
     try {
-      const ownerQuery = user ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] } : {};
+      const ownerQuery = vaultOwnerQuery(user);
       let allVaultItems = await MediaVault.find(ownerQuery);
       // Auto-seed predefined catalog if vault is empty for system
       if ((!allVaultItems || allVaultItems.length === 0) && !user) {
@@ -515,7 +527,7 @@ class StickerService {
     // 3. THIRD PRIORITY: Direct live GIPHY API search (only if not rate-limited)
     if (!this.isGiphyRateLimited || Date.now() > this.rateLimitResetTime) {
       try {
-        const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText);
+        const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText, user);
         if (liveGiphyUrl) return liveGiphyUrl;
       } catch (err) {
         console.warn('⚠️ Live Giphy API search failed, falling back:', err.message);
@@ -556,9 +568,10 @@ class StickerService {
   /**
    * Queries GIPHY API live using the stored API key and context
    */
-  async fetchFromGiphyApi(category, contextText = '') {
+  async fetchFromGiphyApi(category, contextText = '', user = null) {
     try {
-      const config = await PersonaConfig.findOne();
+      // The owner's own GIPHY key (legacy admin persona when there is no owner), else the platform key
+      const config = await PersonaConfig.findOne({ ownerId: user?._id || null }).select('giphyApiKey').lean();
       const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
       if (!apiKey) return null;
 
@@ -580,7 +593,8 @@ class StickerService {
       }
 
       const url = `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(searchQuery)}&limit=12&rating=pg-13`;
-      const res = await fetch(url);
+      // GIPHY's search API takes the key as the api_key query param
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (res.status === 429) {
         this.isGiphyRateLimited = true;
         this.rateLimitResetTime = Date.now() + 3600000; // block for 1 hour
@@ -611,18 +625,12 @@ class StickerService {
     const defaultIds = this.defaultCategories.map(c => c.id);
     let customList = [];
     try {
-      let config = null;
-      if (user) {
-        config = await PersonaConfig.findOne({ ownerId: user._id });
-      }
-      if (!config) {
-        config = await PersonaConfig.findOne();
-      }
+      // This owner's persona only (legacy admin persona when there is no owner), never another tenant's
+      const config = await PersonaConfig.findOne({ ownerId: user?._id || null });
       if (config && config.customReactionCategories) {
         customList = config.customReactionCategories;
       }
-      const ownerQuery = user ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] } : {};
-      const dbCategories = await MediaVault.distinct('category', ownerQuery);
+      const dbCategories = await MediaVault.distinct('category', vaultOwnerQuery(user));
       customList = Array.from(new Set([...customList, ...dbCategories]));
     } catch (_) {}
 
@@ -642,3 +650,4 @@ class StickerService {
 }
 
 module.exports = new StickerService();
+module.exports.vaultOwnerQuery = vaultOwnerQuery;

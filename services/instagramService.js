@@ -1,37 +1,64 @@
 const axios = require('axios');
 const PersonaConfig = require('../models/PersonaConfig');
+const { graphBaseUrl } = require('./graphApi');
 
 // ── Shared axios config ────────────────────────────────────────────────────
 const TIMEOUT_MS = 12000; // 12 seconds max per request
 
+// The request never left this machine (no connection was made), so retrying cannot double-send
+const PRE_SEND_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH']);
+// Transient failures that are safe to retry only for reads (GET): the request may have reached Meta
+const READ_FLAKE_CODES = new Set([...PRE_SEND_CODES, 'ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'EPIPE']);
+
 /**
- * Retry helper: retries `fn` up to `maxRetries` times with exponential backoff.
- * Only retries on network errors (ECONNRESET, ETIMEDOUT, ECONNABORTED) – not on
- * 4xx/5xx HTTP errors from the Graph API (those are real app errors, not flakes).
+ * Should this failed request be retried?
+ * - POST (sends): only clear pre-send failures. A timeout / reset after sending may already have
+ *   delivered the DM, and retrying would send it twice.
+ * - GET: network flakes and 5xx responses.
  */
-async function withRetry(fn, maxRetries = 2, label = 'API call') {
+function isRetryable(err, method = 'POST') {
+  if (!err) return false;
+  if (String(method).toUpperCase() !== 'GET') return !err.response && PRE_SEND_CODES.has(err.code);
+  if (err.response) return err.response.status >= 500;
+  return READ_FLAKE_CODES.has(err.code) || /wsarecv|stream reading error/.test(err.message || '');
+}
+
+/**
+ * Retry helper: retries `fn` up to `maxRetries` times with exponential backoff, only when
+ * isRetryable(err, method) says it is safe (see above). `method` defaults to POST.
+ */
+async function withRetry(fn, maxRetries = 2, label = 'API call', { method = 'POST', baseDelayMs = 1000 } = {}) {
   let lastErr;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       lastErr = err;
-      const isNetworkFlake = !err.response && (
-        err.code === 'ECONNRESET' ||
-        err.code === 'ETIMEDOUT' ||
-        err.code === 'ECONNABORTED' ||
-        err.code === 'ENETUNREACH' ||
-        err.message?.includes('wsarecv') ||
-        err.message?.includes('stream reading error')
-      );
-      if (!isNetworkFlake || attempt === maxRetries) break;
-      const delay = 1000 * Math.pow(2, attempt); // 1s, 2s
-      console.warn(`⚠️ [${label}] Network flake (attempt ${attempt + 1}), retrying in ${delay}ms… (${err.code || err.message})`);
+      if (!isRetryable(err, method) || attempt === maxRetries) break;
+      const delay = baseDelayMs * Math.pow(2, attempt); // 1s, 2s
+      console.warn(`⚠️ [${label}] Network flake (attempt ${attempt + 1}), retrying in ${delay}ms… (${err.code || err.response?.status || err.message})`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
   throw lastErr;
 }
+
+/**
+ * True only when Meta rejected the request because of the reply_to / mid itself, so resending
+ * without reply_to is right. Rate limits, closed messaging windows, auth errors and network
+ * failures (which may already have delivered the DM) are not.
+ */
+function isReplyToError(err) {
+  const res = err?.response;
+  if (!res || res.status >= 500) return false;
+  const e = res.data?.error || {};
+  const code = Number(e.code);
+  // 4/17/32/613 = rate limits, 10 / 2018278 = outside the messaging window, 190 = bad token
+  if ([4, 17, 32, 613, 10, 190].includes(code) || Number(e.error_subcode) === 2018278) return false;
+  return /reply_to|reply to|\bmid\b|message[_ ]?id/i.test(`${e.message || ''} ${e.error_user_msg || ''}`);
+}
+
+const authHeaders = (token) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
 
 /**
  * The legacy admin bot's persona (ownerId null). Tenant personas are never used here,
@@ -117,7 +144,7 @@ class InstagramService {
     }
 
     const isInstagramToken = token.startsWith('IG');
-    const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
+    const baseUrl = graphBaseUrl(token);
     const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
@@ -131,11 +158,8 @@ class InstagramService {
       requestBody.reply_to = { mid: replyToMid };
     }
 
-    const axiosConfig = {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      params: { access_token: token },
-      timeout: TIMEOUT_MS,
-    };
+    // Token in the Authorization header only (never in the URL, where it ends up in logs)
+    const axiosConfig = { headers: authHeaders(token), timeout: TIMEOUT_MS };
 
     try {
       const response = await withRetry(
@@ -146,8 +170,8 @@ class InstagramService {
       console.log(`📤 Message sent successfully to ${recipientId} (swipe-reply: ${!!requestBody.reply_to}):`, response.data);
       return { success: true, data: response.data };
     } catch (error) {
-      // If reply_to caused an issue on this message type, retry without reply_to
-      if (requestBody.reply_to) {
+      // Resend without reply_to only when Meta rejected the quoted mid itself
+      if (requestBody.reply_to && isReplyToError(error)) {
         delete requestBody.reply_to;
         try {
           const retryRes = await withRetry(
@@ -180,7 +204,7 @@ class InstagramService {
     if (!token || !imageUrl) return { success: false };
 
     const isInstagramToken = token.startsWith('IG');
-    const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
+    const baseUrl = graphBaseUrl(token);
     const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
@@ -198,11 +222,7 @@ class InstagramService {
       requestBody.reply_to = { mid: replyToMid };
     }
 
-    const axiosConfig = {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      params: { access_token: token },
-      timeout: TIMEOUT_MS,
-    };
+    const axiosConfig = { headers: authHeaders(token), timeout: TIMEOUT_MS };
 
     try {
       const response = await withRetry(
@@ -213,8 +233,8 @@ class InstagramService {
       console.log(`🖼️ [Sticker/Image Sent] to ${recipientId}:`, response.data);
       return { success: true, data: response.data };
     } catch (err) {
-      // If reply_to failed, retry without reply_to
-      if (requestBody.reply_to) {
+      // Resend without reply_to only when Meta rejected the quoted mid itself
+      if (requestBody.reply_to && isReplyToError(err)) {
         delete requestBody.reply_to;
         try {
           const r2 = await withRetry(
@@ -237,7 +257,7 @@ class InstagramService {
     if (!token) return;
 
     const isInstagramToken = token.startsWith('IG');
-    const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
+    const baseUrl = graphBaseUrl(token);
     const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
@@ -247,8 +267,7 @@ class InstagramService {
           url,
           { recipient: { id: recipientId }, sender_action: action },
           {
-            headers: { 'Content-Type': 'application/json' },
-            params: { access_token: token },
+            headers: authHeaders(token),
             timeout: 6000, // shorter timeout for typing indicator — not critical
           }
         ),
@@ -268,7 +287,7 @@ class InstagramService {
     if (!token || !messageId) return;
 
     const isInstagramToken = token.startsWith('IG');
-    const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
+    const baseUrl = graphBaseUrl(token);
     const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
     const url = `${baseUrl}/${accountId}/messages`;
 
@@ -282,8 +301,7 @@ class InstagramService {
             reaction: { message_id: messageId, reaction: emoji },
           },
           {
-            headers: { 'Content-Type': 'application/json' },
-            params: { access_token: token },
+            headers: authHeaders(token),
             timeout: TIMEOUT_MS,
           }
         ),
@@ -304,16 +322,16 @@ class InstagramService {
     if (!token) return null;
 
     try {
-      const isInstagramToken = token.startsWith('IG');
-      const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v21.0' : 'https://graph.facebook.com/v21.0';
-      const url = `${baseUrl}/${senderId}`;
+      const url = `${graphBaseUrl(token)}/${senderId}`;
       const res = await withRetry(
         () => axios.get(url, {
-          params: { fields: 'name,username,profile_pic', access_token: token },
+          params: { fields: 'name,username,profile_pic' },
+          headers: { Authorization: `Bearer ${token}` },
           timeout: TIMEOUT_MS,
         }),
         2,
-        `getUserProfile → ${senderId}`
+        `getUserProfile → ${senderId}`,
+        { method: 'GET' }
       );
       return res.data;
     } catch (err) {
@@ -324,3 +342,4 @@ class InstagramService {
 }
 
 module.exports = new InstagramService();
+Object.assign(module.exports, { withRetry, isRetryable, isReplyToError });

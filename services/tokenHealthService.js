@@ -2,7 +2,10 @@ const axios = require('axios');
 const User = require('../models/User');
 const { setUserInstagram, getUserInstagramToken } = require('./instagramTokenService');
 
+const { FACEBOOK_GRAPH_URL } = require('./graphApi');
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 15000;
 const REFRESH_WINDOW_DAYS = 15;
 
 // Users that hold an Instagram token, encrypted or legacy plaintext
@@ -34,8 +37,11 @@ async function inspectFacebookToken(token) {
   const appSecret = process.env.META_APP_SECRET;
   if (!appId || !appSecret || isInstagramLoginToken(token)) return null;
   try {
-    const { data } = await axios.get('https://graph.facebook.com/v21.0/debug_token', {
+    // debug_token takes the token being inspected as input_token and the app token as access_token
+    // (both as query params per Meta's docs); the app token could also go in a header but input_token cannot.
+    const { data } = await axios.get(`${FACEBOOK_GRAPH_URL}/debug_token`, {
       params: { input_token: token, access_token: `${appId}|${appSecret}` },
+      timeout: REQUEST_TIMEOUT_MS,
     });
     const info = data?.data || {};
     return {
@@ -57,8 +63,10 @@ async function refreshUserToken(user) {
 
   try {
     if (isInstagramLoginToken(token)) {
+      // Instagram's refresh endpoint is unversioned and documented with access_token as a query param
       const { data } = await axios.get('https://graph.instagram.com/refresh_access_token', {
         params: { grant_type: 'ig_refresh_token', access_token: token },
+        timeout: REQUEST_TIMEOUT_MS,
       });
       const expiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null;
       setUserInstagram(user, {
@@ -118,11 +126,20 @@ async function runDailyRefresh() {
   const users = await User.find({ ...TOKEN_HOLDERS, isBanned: { $ne: true } });
   let checked = 0, refreshed = 0, failed = 0;
   for (const user of users) {
-    const expiresAt = user.instagram?.tokenExpiresAt;
-    const needsCheck = expiresAt ? new Date(expiresAt) <= soon : isInstagramLoginToken(getUserInstagramToken(user));
-    if (!needsCheck) continue;
-    checked++;
-    const result = await refreshUserToken(user);
+    // One tenant failing (undecryptable token, save error, bad data) must not stop the refresh for everyone after it
+    let result;
+    let counted = false;
+    try {
+      const expiresAt = user.instagram?.tokenExpiresAt;
+      const needsCheck = expiresAt ? new Date(expiresAt) <= soon : isInstagramLoginToken(getUserInstagramToken(user));
+      if (!needsCheck) continue;
+      checked++;
+      counted = true;
+      result = await refreshUserToken(user);
+    } catch (err) {
+      if (!counted) checked++;
+      result = { error: err.message };
+    }
     if (result.error) {
       failed++;
       console.warn(`⚠️ [TokenRefresh] User ${user._id}: ${result.error}`);
