@@ -12,8 +12,9 @@
   --font-sans: var(--font-figtree, 'Figtree'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-label: var(--font-sans);
   --font-code: var(--font-jetbrains, 'JetBrains Mono'), ui-monospace, monospace;
-  --spotify-green: #1ed760;
-  --spotify-green-dark: #1db954;
+  /* The accent follows the page's banner / photo colour (theme green when there is none) */
+  --spotify-green: var(--ambient-accent, #1ed760);
+  --spotify-green-dark: var(--ambient-dominant, #1db954);
 
   /* Spotify Core Surfaces */
   --color-background: #121212;

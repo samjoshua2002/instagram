@@ -23,7 +23,7 @@
    The active item keeps its text colour but drops its own background;
    the shared .seg-indicator paints it and morphs between items. */
 :where(.sheet-segment, .mode-segment) { --seg-bg: var(--color-text-primary); }
-:where(.spx-pills, .people-pills) { --seg-bg: #1db954; }
+:where(.spx-pills, .people-pills) { --seg-bg: var(--sp-green-press); }
 :where(.sp-chips) { --seg-bg: var(--sp-green); }
 :where(.sh-chips) { --seg-bg: var(--sh-accent); }
 
