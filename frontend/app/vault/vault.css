@@ -405,3 +405,12 @@
   }
   .vx-modal-actions > * { flex: 1; justify-content: center; }
 }
+
+/* Phone: the three add modes share the row equally so none is cut off */
+@media (max-width: 640px) {
+  .vx-modes { gap: 6px; }
+  .vx-modes .spx-pill { flex: 1 1 0; justify-content: center; gap: 5px; padding: 0 6px; font-size: 13px; }
+}
+@media (max-width: 360px) {
+  .vx-modes .spx-pill svg { display: none; }
+}

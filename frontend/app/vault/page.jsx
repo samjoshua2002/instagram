@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { enterMotion } from '../lib/motion';
 import UnsplashBanner from '../components/UnsplashBanner';
 import { SegIndicator } from '../components/ui/motion';
@@ -529,8 +530,8 @@ function MediaVaultPageContent() {
     </div>
   );
 
-  const renderModal = (open, onClose, title, children) => open && (
-    <div className="vx-modal-back" onClick={onClose}>
+  const renderModal = (open, onClose, title, children) => open && typeof document !== 'undefined' && createPortal(
+    <div className="vx-modal-back" onClick={onClose} onKeyDown={e => e.key === 'Escape' && onClose()}>
       <div className="vx-modal spx-page" role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()}>
         <div className="vx-modal-head">
           <h3>{title}</h3>
@@ -538,7 +539,8 @@ function MediaVaultPageContent() {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 
   return (
@@ -561,9 +563,6 @@ function MediaVaultPageContent() {
         <button type="button" className="spx-play" onClick={() => openMode('file')}>
           <Upload size={18} /> Upload media
         </button>
-        <button type="button" className="spx-outline" aria-pressed={uploadMode === 'giphy'} onClick={() => openMode('giphy')}>
-          <Search size={14} /> Search GIPHY
-        </button>
         <button type="button" className="spx-outline" onClick={() => setShowNewCategoryModal(true)}>
           <Plus size={14} /> Add category
         </button>
@@ -582,7 +581,7 @@ function MediaVaultPageContent() {
 
       {/* Add media */}
       <div className="spx-panel vx-add" ref={addPanelRef}>
-        <div className="spx-pills vx-scroll" role="tablist">
+        <div className="spx-pills vx-scroll vx-modes" role="tablist">
           {MODES.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
