@@ -35,6 +35,7 @@ import { dropMotion, maskCircleMotion } from '../lib/motion';
 import { startRegistration } from '@simplewebauthn/browser';
 import ChangePasswordCard from '../components/ChangePasswordCard';
 import { IconSwap } from '../components/ui/motion';
+import PageHero from '../components/PageHero';
 
 const formatAddress = (addr) => {
   if (!addr) return '';
@@ -318,7 +319,7 @@ export default function ProfilePage() {
   const isBusiness = ['business', 'agency'].includes(formData.accountType);
 
   return (
-    <div className="page-container settings-fullwidth">
+    <div className="page-container settings-fullwidth spx-page">
       {/* Hidden file input for avatar */}
       <input
         ref={fileInputRef}
@@ -328,57 +329,18 @@ export default function ProfilePage() {
         style={{ display: 'none' }}
       />
 
-      {/* Top Breadcrumb & Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{
-            fontSize: '0.7rem',
-            fontWeight: 800,
-            fontFamily: "var(--font-label)",
-            color: 'var(--color-text-secondary)',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            marginBottom: '4px'
-          }}>
-            WORKSPACE // IDENTITY &amp; SECURITY
-          </div>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 900,
-            color: 'var(--text, var(--color-text-primary))',
-            letterSpacing: '-0.7px',
-            margin: 0
-          }}>
-            Account Profile
-          </h1>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted, var(--color-text-secondary))', marginTop: '4px', margin: '4px 0 0' }}>
-            Manage your personal profile, connected Instagram Meta account, and biometric security keys.
-          </p>
-        </div>
-
-        <button
-          onClick={handleSaveProfile}
-          disabled={saving}
-          style={{
-            background: 'var(--primary, var(--ambient-dominant))',
-            color: 'var(--color-surface)',
-            border: 'none',
-            borderRadius: '10px',
-            padding: '10px 22px',
-            fontSize: '0.84rem',
-            fontWeight: 800,
-            cursor: saving ? 'wait' : 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(30, 215, 96, 0.3)',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
+      <PageHero
+        seed="page-profile"
+        icon={<User size={96} strokeWidth={2} />}
+        eyebrow="Identity & security"
+        title="Account Profile"
+        desc="Manage your personal profile, connected Instagram Meta account, and biometric security keys."
+      >
+        <button type="button" className="spx-play" onClick={handleSaveProfile} disabled={saving}>
+          {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
           <span>{saving ? 'Saving...' : 'Save Profile'}</span>
         </button>
-      </div>
+      </PageHero>
 
       {/* Alerts */}
       <AnimatePresence>

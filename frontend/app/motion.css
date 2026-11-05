@@ -183,7 +183,7 @@ html.theme-vt::view-transition-new(root) { z-index: 2; }
 }
 
 /* Toolbar stays under the compact band on screens tall and wide enough for both */
-@media (min-width: 769px) and (min-height: 600px) {
+@media (min-width: 641px) and (min-height: 600px) {
   .spx-page .people-filters {
     position: sticky;
     top: var(--hero-band, 0px);
