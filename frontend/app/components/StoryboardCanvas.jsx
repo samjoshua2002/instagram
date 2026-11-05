@@ -24,16 +24,18 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
  * link them, edit notes in the side panel. Saves to /api/storyboard/:kind a
  * moment after each change.
  *
- * nodeTypes: [{ key, label, color, icon, circles? }] (circles: true shows the closeness picker); seed(): { nodes, edges } for an empty board.
+ * nodeTypes: [{ key, label, color, icon, circles? }] (circles: true shows the closeness picker).
+ * templates: [{ id, name, description, build(ctx) }] offered when the board is empty and on Reset; templateContext is passed to build().
  * onSelect(node|null) lets the page react (e.g. pick who the test chat is with).
  */
-export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extraAdd }) {
+export default function StoryboardCanvas({ kind, nodeTypes, templates, templateContext, onSelect, extraAdd }) {
   const { API_BASE, token, showToast } = useApp();
   const confirm = useConfirm();
   const [board, setBoard] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [linkFrom, setLinkFrom] = useState(null);
   const [saveState, setSaveState] = useState('saved');
+  const [picking, setPicking] = useState(false);
   const dragRef = useRef(null);
   const saveTimer = useRef(null);
   // After a failed load the starter layout is shown, but it must never be saved over the real board
@@ -42,6 +44,7 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
 
   const typeOf = key => nodeTypes.find(t => t.key === key) || nodeTypes[0];
   const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  const buildTemplate = t => t.build(templateContext || {});
 
   // Load once; an empty board gets the page's starter layout
   useEffect(() => {
@@ -50,9 +53,10 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
       .then(res => (res.ok ? res.json() : Promise.reject(new Error('load failed'))))
       .then(data => {
         if (cancelled) return;
-        setBoard(data.nodes?.length ? { nodes: data.nodes, edges: data.edges || [] } : seed());
+        if (data.nodes?.length) setBoard({ nodes: data.nodes, edges: data.edges || [] });
+        else { setBoard({ nodes: [], edges: [] }); setPicking(true); }
       })
-      .catch(() => { if (!cancelled) { loadFailedRef.current = true; setBoard(seed()); setSaveState('offline'); } });
+      .catch(() => { if (!cancelled) { loadFailedRef.current = true; setBoard(buildTemplate(templates[0])); setSaveState('offline'); } });
     return () => { cancelled = true; };
   }, [API_BASE, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -148,20 +152,23 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
   const patchEdge = (id, patch) => update(prev => ({ ...prev, edges: prev.edges.map(e => (e.id === id ? { ...e, ...patch } : e)) }));
   const removeEdge = id => update(prev => ({ ...prev, edges: prev.edges.filter(e => e.id !== id) }));
 
-  const resetBoard = async () => {
-    if (!(await confirm({ title: 'Reset storyboard?', message: 'Your current cards will be replaced with the starter layout.', confirmLabel: 'Reset', tone: 'danger' }))) return;
-    const fresh = seed();
+  // Replaces the board with a template (asks first when there are cards to lose)
+  const applyTemplate = async t => {
+    if (board?.nodes.length && !(await confirm({ title: `Use "${t.name}"?`, message: 'Your current cards will be replaced with this template.', confirmLabel: 'Replace', tone: 'danger' }))) return;
+    const fresh = buildTemplate(t);
     centeredRef.current = false;
     setBoard(fresh);
     persist(fresh);
     setSelectedId(null);
-    showToast?.('Storyboard reset', 'info');
+    setLinkFrom(null);
+    setPicking(false);
+    showToast?.(`${t.name} template loaded`, 'info');
   };
 
   // Delete key removes the selected card (not while typing); Escape cancels linking
   useEffect(() => {
     const onKey = e => {
-      if (e.key === 'Escape') { setLinkFrom(null); return; }
+      if (e.key === 'Escape') { setLinkFrom(null); if (board?.nodes.length) setPicking(false); return; }
       const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
       if (!typing && selectedId && (e.key === 'Delete' || e.key === 'Backspace')) removeNode(selectedId);
     };
@@ -188,8 +195,8 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
         <span className={`story-save ${saveState}`}>
           {saveState === 'saving' ? 'Saving…' : saveState === 'offline' ? 'Not saved' : 'Saved'}
         </span>
-        <button type="button" className="story-chip" onClick={resetBoard} title="Start over from the starter layout">
-          <RotateCcw size={13} /> Reset
+        <button type="button" className="story-chip" onClick={() => setPicking(true)} title="Start over from a template">
+          <RotateCcw size={13} /> Templates
         </button>
       </div>
 
@@ -197,6 +204,28 @@ export default function StoryboardCanvas({ kind, nodeTypes, seed, onSelect, extr
         <div className="story-banner">
           Click another card to link it to <strong>{byId[linkFrom]?.label || 'this card'}</strong>.
           <button type="button" onClick={() => setLinkFrom(null)}>Cancel</button>
+        </div>
+      )}
+
+      {picking && (
+        <div className="story-templates" role="dialog" aria-label="Pick a template">
+          <div className="story-templates-head">
+            <div>
+              <strong>Pick a template</strong>
+              <span>Start from a ready-made board, then change anything you like.</span>
+            </div>
+            {board.nodes.length > 0 && (
+              <button type="button" className="story-icon-btn" onClick={() => setPicking(false)} aria-label="Close templates"><X size={16} /></button>
+            )}
+          </div>
+          <div className="story-templates-grid">
+            {templates.map(t => (
+              <button key={t.id} type="button" className="story-template" onClick={() => applyTemplate(t)}>
+                <strong>{t.name}</strong>
+                <span>{t.description}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

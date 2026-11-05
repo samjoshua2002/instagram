@@ -179,7 +179,7 @@ export default function Sidebar() {
     ]
     : [
       ...workspaceNav[mode],
-      { href: '/storyboard/business', label: 'Storyboard', icon: Workflow },
+      { href: mode === 'business' ? '/storyboard/business' : '/storyboard/personal', label: 'Storyboard', icon: Workflow },
       { href: '/settings/features', label: 'Feature Store', icon: Layers },
       isSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
     ])
@@ -428,7 +428,7 @@ export default function Sidebar() {
             >
               {navItems.map(item => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || (item.href.startsWith('/storyboard/') && pathname.startsWith('/storyboard/'));
                 return (
                   <motion.div key={item.href} variants={navItemVariants}>
                     <Link
