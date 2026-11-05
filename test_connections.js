@@ -33,10 +33,16 @@ async function testAzureOpenAI(deployment) {
         { role: "system", content: "You are an assistant. Reply with only one word: 'CONNECTED'." },
         { role: "user", content: "Test ping" }
       ],
-      max_tokens: 10,
+      // gpt-5.x / o-series are reasoning models: they need max_completion_tokens (and room to think)
+      ...(/^(gpt-5|o\d)/i.test(deployment) ? { max_completion_tokens: 1200 } : { max_tokens: 10 }),
     });
 
-    console.log(`✅ Azure OpenAI (${deployment}) response:`, response.choices[0].message.content.trim());
+    const text = String(response.choices?.[0]?.message?.content ?? '').trim();
+    if (!text) {
+      console.error(`❌ Azure OpenAI (${deployment}) returned no text (finish_reason: ${response.choices?.[0]?.finish_reason || 'unknown'})`);
+      return false;
+    }
+    console.log(`✅ Azure OpenAI (${deployment}) response:`, text);
     return true;
   } catch (err) {
     console.error(`❌ Azure OpenAI (${deployment}) error:`, err.message);

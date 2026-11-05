@@ -73,14 +73,25 @@ async function main() {
   }
 
   // Search: each account only ever gets its own documents
-  const owners = await KnowledgeDoc.distinct('ownerId');
-  for (const ownerId of owners.slice(0, 5)) {
+  const owners = (await KnowledgeDoc.distinct('ownerId')).filter(Boolean);
+  const sampled = owners.slice(0, 5);
+  for (const [i, ownerId] of sampled.entries()) {
     const doc = await KnowledgeDoc.findOne({ ownerId }).lean();
     const question = `${doc.title} ${(doc.keywords || []).slice(0, 5).join(' ')}`;
     const { chunks } = await ragService.retrieve({ ownerId, incomingText: question });
     check('search', `account ${String(ownerId).slice(-6)}: a question from its own document finds it`, chunks.length > 0, `${chunks.length} hits`);
-    check('isolation', `account ${String(ownerId).slice(-6)}: search returns only its own documents`, chunks.every(c => String(c.ownerId) === String(ownerId)));
+    // Cross-account probe: ask THIS account a question taken from ANOTHER account's document.
+    // Any hit owned by the other account is a leak (checking only the account's own query would always pass).
+    const other = sampled[(i + 1) % sampled.length];
+    if (other && String(other) !== String(ownerId)) {
+      const otherDoc = await KnowledgeDoc.findOne({ ownerId: other }).lean();
+      const probe = `${otherDoc.title} ${(otherDoc.keywords || []).slice(0, 5).join(' ')} ${String(otherDoc.textContent || '').slice(0, 200)}`;
+      const { chunks: probeHits } = await ragService.retrieve({ ownerId, incomingText: probe });
+      const leaked = probeHits.filter(c => String(c.ownerId) !== String(ownerId));
+      check('isolation', `account ${String(ownerId).slice(-6)}: another account's document text never returns that account's documents`, leaked.length === 0, leaked.length ? `${leaked.length} foreign hits` : `${probeHits.length} own hits`);
+    }
   }
+  if (owners.length === 1) check('isolation', 'only one account has documents, cross-account search not tested', true);
   if (!owners.length) check('search', 'no uploaded documents yet, search not tested', true);
 
   // Signed-in reads for two real accounts: each sees only its own chats and documents
@@ -92,7 +103,7 @@ async function main() {
     check('auth', `account ${tag}: valid token signs in to /api/auth/me`, me.status === 200, `HTTP ${me.status}`);
     const convos = await http.get('/api/conversations', bearer(tokenFor(user)));
     const list = Array.isArray(convos.data) ? convos.data : (convos.data?.conversations || convos.data?.items || []);
-    const ownSenders = new Set((await UserMemory.find({ $or: [{ ownerId: user._id }, { ownerUsername: user.username }] }).select('senderId').lean()).map(m => String(m.senderId)));
+    const ownSenders = new Set((await UserMemory.find({ ownerId: user._id }).select('senderId').lean()).map(m => String(m.senderId)));
     const foreign = list.filter(c => c.senderId && !ownSenders.has(String(c.senderId)));
     check('isolation', `account ${tag}: chat list holds only its own chats (${list.length})`, convos.status === 200 && foreign.length === 0, foreign.length ? `${foreign.length} foreign` : `HTTP ${convos.status}`);
     const kb = await http.get('/api/knowledge', bearer(tokenFor(user)));

@@ -16,7 +16,12 @@ async function run() {
   console.log(`👥 Total user memories: ${totalUsers}`);
 
   console.log('\n🧠 Starting deep memory synthesis for all contacts across past 1-month chat data...');
-  const results = await memoryService.batchSyncAllChatsFromMongo();
+  // Optional: --owner <userId|legacy> syncs only one creator's contacts (legacy = admin data, ownerId null)
+  const ownerArgIdx = process.argv.indexOf('--owner');
+  const ownerArg = ownerArgIdx > -1 ? process.argv[ownerArgIdx + 1] : undefined;
+  const results = await memoryService.batchSyncAllChatsFromMongo(
+    ownerArg === undefined ? {} : { ownerId: ownerArg === 'legacy' ? null : ownerArg }
+  );
 
   console.log('\n================ SUMMARY ================');
   console.log(`✅ Successfully synthesized and learned memory for ${results.length} contacts!`);

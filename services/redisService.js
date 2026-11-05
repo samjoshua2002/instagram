@@ -20,17 +20,21 @@ class RedisService {
         },
       });
 
-      this.client.on('connect', () => {
+      // 'connect' fires before the server is usable (AUTH/SELECT may still be pending); 'ready' means commands work
+      this.client.on('ready', () => {
         this.isConnected = true;
-        console.log('⚡ [Redis/Valkey]: Connected successfully to', redisUrl);
+        console.log('⚡ [Redis/Valkey]: Connected successfully to', redisUrl.replace(/\/\/[^@/]*@/, '//****@'));
       });
 
-      this.client.on('error', (err) => {
+      const markDown = () => {
         if (this.isConnected) {
           console.warn('⚠️ [Redis/Valkey Connection Lost]: Operating in in-memory fallback mode.');
         }
         this.isConnected = false;
-      });
+      };
+      this.client.on('error', markDown);
+      this.client.on('close', markDown);
+      this.client.on('end', markDown);
     } catch (err) {
       console.warn('⚠️ [Redis/Valkey Init Warning]: Could not initialize client. Falling back to in-memory store.');
       this.client = null;
@@ -57,7 +61,8 @@ class RedisService {
       return null;
     }
     const val = this.fallbackStore.get(key);
-    return val !== undefined ? val : null;
+    // A copy, like a Redis read: callers mutating the result must not change the stored value
+    return val !== undefined ? structuredClone(val) : null;
   }
 
   // While Redis is down, expired keys were only dropped when read, so the in-memory store grew forever
@@ -94,7 +99,8 @@ class RedisService {
     }
     // In-memory fallback
     this._pruneFallback();
-    this.fallbackStore.set(key, value);
+    // Stored as Redis would see it (JSON round trip), so ObjectIds, Dates and documents behave the same
+    this.fallbackStore.set(key, value === undefined ? null : JSON.parse(JSON.stringify(value)));
     if (ttlSeconds) {
       this.fallbackExpiry.set(key, Date.now() + ttlSeconds * 1000);
     }
@@ -153,7 +159,7 @@ class RedisService {
     }
 
     const list = this.fallbackStore.get(key) || [];
-    return list.slice(-limit);
+    return structuredClone(list.slice(-limit));
   }
 
   // --- User Memory & Persona Cache Helpers ---
@@ -170,16 +176,47 @@ class RedisService {
     await this.del(`user:memory:${senderId}`);
   }
 
-  async getCachedPersonaConfig() {
-    return await this.get('persona:config');
+  // Persona cache is per owner: persona:config:<ownerId>, or persona:config:legacy for the admin (ownerId null)
+  personaConfigKey(ownerId) {
+    return `persona:config:${ownerId ? String(ownerId) : 'legacy'}`;
   }
 
-  async cachePersonaConfig(config, ttlSeconds = 600) {
-    await this.set('persona:config', config, ttlSeconds);
+  async getCachedPersonaConfig(ownerId = null) {
+    return await this.get(this.personaConfigKey(ownerId));
   }
 
-  async invalidatePersonaConfig() {
+  /** ownerId defaults to config.ownerId. */
+  async cachePersonaConfig(config, ttlSeconds = 600, ownerId) {
+    const owner = ownerId !== undefined ? ownerId : (config && config.ownerId) || null;
+    await this.set(this.personaConfigKey(owner), config, ttlSeconds);
+  }
+
+  /**
+   * Drops one owner's cached persona. Called with no argument (older call sites) it drops every
+   * owner's cached persona, plus the old shared 'persona:config' key.
+   */
+  async invalidatePersonaConfig(ownerId) {
+    if (ownerId !== undefined) {
+      await this.del(this.personaConfigKey(ownerId));
+      return;
+    }
     await this.del('persona:config');
+    if (this.isConnected && this.client) {
+      try {
+        let cursor = '0';
+        do {
+          const [next, keys] = await this.client.scan(cursor, 'MATCH', 'persona:config:*', 'COUNT', 200);
+          cursor = next;
+          if (keys.length) await this.client.del(...keys);
+        } while (cursor !== '0');
+      } catch (_) {}
+    }
+    for (const key of [...this.fallbackStore.keys()]) {
+      if (key.startsWith('persona:config:')) {
+        this.fallbackStore.delete(key);
+        this.fallbackExpiry.delete(key);
+      }
+    }
   }
 }
 

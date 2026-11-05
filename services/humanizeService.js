@@ -101,7 +101,7 @@ function splitIntoBubbles(text, { maxBubbles = 3, minLength = 60 } = {}) {
   return [...parts.slice(0, maxBubbles - 1), parts.slice(maxBubbles - 1).join(' ')];
 }
 
-// Gap between bubbles: 1-2 seconds (§15.6.5)
+// Gap between bubbles: 300-600 ms
 function bubbleGapMs() {
   return 300 + Math.floor(Math.random() * 300);
 }
