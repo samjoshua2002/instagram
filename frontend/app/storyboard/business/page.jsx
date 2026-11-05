@@ -25,7 +25,7 @@ const NODE_TYPES = [
 /** Business Storyboard: customer journey flow (PLAN.md §13 Phase 4). */
 export default function BusinessStoryboardPage() {
   return (
-    <div className="page-container story-page">
+    <div className="page-container story-page spx-page">
       <StoryboardHeader
         active="business"
         code="// BUSINESS STORYBOARD"

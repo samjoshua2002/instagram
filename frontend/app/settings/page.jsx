@@ -14,7 +14,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
-import PageCover from '../components/PageCover';
+import PageHero from '../components/PageHero';
 import { IconSwap } from '../components/ui/motion';
 import '../split.css';
 
@@ -492,21 +492,19 @@ function SettingsPageContent() {
   return (
     <motion.div
       {...enterMotion}
-      className="page-container split-page settings-fullwidth settings-split"
+      className="page-container split-page spx-page has-hero settings-fullwidth settings-split"
     >
-      <PageCover seed="page-settings" />
-      <header className="split-top">
-        <div className="split-top-text">
-          <h1>Persona &amp; AI Studio</h1>
-          <p>Teach the AI your voice, texting style and background so its replies sound like you.</p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="split-actions">
+      <PageHero
+        seed="page-settings"
+        icon={<UserCheck size={96} strokeWidth={2} />}
+        eyebrow="Persona & AI model"
+        title="Persona & AI Studio"
+        desc="Teach the AI your voice, texting style and background so its replies sound like you."
+      >
           <button
             onClick={fetchPersona}
-            className="btn"
-            style={{ fontSize: '0.82rem', padding: '9px 15px', borderRadius: '10px', fontWeight: 700 }}
+            type="button"
+            className="spx-outline"
             title="Reload settings from server"
           >
             <RefreshCw size={14} />
@@ -515,15 +513,8 @@ function SettingsPageContent() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="btn btn-primary"
-            style={{
-              fontSize: '0.82rem',
-              padding: '9px 20px',
-              borderRadius: '10px',
-              fontWeight: 700,
-              background: saveSuccess ? '#16a34a' : 'var(--color-text-primary)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
-            }}
+            type="button"
+            className="spx-play"
           >
             {saving ? (
               <>
@@ -542,8 +533,7 @@ function SettingsPageContent() {
               </>
             )}
           </button>
-        </div>
-      </header>
+      </PageHero>
 
       {/* Error alert if any */}
       {errorMsg && (

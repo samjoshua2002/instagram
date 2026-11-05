@@ -14,7 +14,7 @@ import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
 import UnsplashBanner from '../components/UnsplashBanner';
-import PageCover from '../components/PageCover';
+import PageHero from '../components/PageHero';
 import '../split.css';
 import { useBanner, bannerSrc } from '../lib/banners';
 import { personArtUrl, savedPhotoUrl } from '../lib/utils';
@@ -176,8 +176,10 @@ function RelationshipsPageContent() {
   const [newConnRel, setNewConnRel] = useState('');
 
   // Pagination state — table
-  const TABLE_PAGE_SIZE = 10;
+  // Table view fits as many rows as the panel height allows (no empty space under the table)
+  const [fitPageSize, setFitPageSize] = useState(10);
   const [tablePage, setTablePage] = useState(1);
+  const tableScrollRef = useRef(null);
 
   // Layout switcher state: 'table' | 'grid' | 'dense'
   const [layoutMode, setLayoutMode] = useState(() => {
@@ -416,8 +418,42 @@ function RelationshipsPageContent() {
   useEffect(() => { setFactsPage(1); }, [selectedPerson?.id]);
 
   // Paginated slices
+  const TABLE_PAGE_SIZE = layoutMode === 'table' ? fitPageSize : 10;
   const totalTablePages = Math.max(1, Math.ceil(filteredPeople.length / TABLE_PAGE_SIZE));
   const pagedPeople = filteredPeople.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE);
+
+  // Work out how many table rows fit in the panel, so the table fills it with no empty gap
+  useLayoutEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el || layoutMode !== 'table') return;
+    const measure = () => {
+      // Only on desktop, where the panel has a fixed height and scrolls inside
+      if (getComputedStyle(el).overflowY !== 'auto') { setFitPageSize(10); return; }
+      const results = el.querySelector('.people-results');
+      const tbody = el.querySelector('.spx-table tbody');
+      const row = tbody?.querySelector('tr');
+      if (!results || !tbody || !row) return;
+      const rowH = row.getBoundingClientRect().height;
+      if (!rowH) return;
+      const pager = el.querySelector('.people-pager');
+      const pagerH = pager ? 0 : 58; // room for the pager when it is not shown yet
+      const cs = getComputedStyle(el);
+      const fixed = results.getBoundingClientRect().height - tbody.getBoundingClientRect().height
+        + parseFloat(getComputedStyle(results).marginTop || 0)
+        + parseFloat(cs.paddingTop || 0) + parseFloat(cs.paddingBottom || 0) + pagerH;
+      const n = Math.max(5, Math.floor((el.clientHeight - fixed) / rowH));
+      setFitPageSize(prev => (prev === n ? prev : n));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [layoutMode, pagedPeople.length, isSyncingInitial]);
+
+  // Keep the current page valid when the page size changes
+  useEffect(() => {
+    if (tablePage > totalTablePages) setTablePage(totalTablePages);
+  }, [tablePage, totalTablePages]);
 
 
   // Autocomplete Suggestions for Friend Connections
@@ -1884,15 +1920,17 @@ function RelationshipsPageContent() {
     <motion.div
       ref={pageRef}
       {...enterMotion}
-      className="page-container split-page spx-page spx-blue people-split"
+      className="page-container split-page spx-page has-hero spx-blue people-split"
     >
-      <PageCover seed="page-people" tint={false} />
-      <header className="split-top">
-        <div className="split-top-text">
-          <h1>All People</h1>
-          <p>{dashboardStats.totalPeople.toLocaleString()} people · {dashboardStats.totalDMs.toLocaleString()} chats. Click someone to open their profile.</p>
-        </div>
-      </header>
+      <PageHero
+        seed="page-people"
+        tint={false}
+        icon={<Users size={96} strokeWidth={2} />}
+        eyebrow="People directory"
+        title="All People"
+        desc="Everyone you chat with on Instagram. Click someone to open their profile."
+        meta={`${dashboardStats.totalPeople.toLocaleString()} people · ${dashboardStats.totalDMs.toLocaleString()} chats`}
+      />
 
       <div className="split-body">
       <aside className="split-side">
@@ -2015,7 +2053,7 @@ function RelationshipsPageContent() {
           </div>
         </div>
 
-        <div className="split-scroll">
+        <div className="split-scroll" ref={tableScrollRef}>
 
       {/* ================= SHADCN LIGHT MONOCHROME TABLE ================= */}
       <div
@@ -2639,7 +2677,7 @@ function RelationshipsPageContent() {
 
         {/* Table Pagination */}
         {totalTablePages > 1 && (
-          <div style={{
+          <div className="people-pager" style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
