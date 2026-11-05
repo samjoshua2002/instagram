@@ -22,7 +22,9 @@ if (typeof window !== 'undefined') gsap.registerPlugin(ScrollTrigger);
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 const MOTION_OK = '(prefers-reduced-motion: no-preference)';
-const PHONE = '(max-width: 640px)';
+// Same breakpoint as the app's sticky mobile header (Sidebar .mobile-header). There the
+// hero must not collapse into a second sticky bar: one header only, the hero just scrolls away.
+const PHONE = '(max-width: 768px)';
 
 export const scrollerOf = (el) => el?.closest('.app-main-content') || window;
 
@@ -78,8 +80,9 @@ export function useHeroCollapse(rootRef, o, deps = []) {
     const mm = gsap.matchMedia();
 
     mm.add({ motion: MOTION_OK, phone: PHONE }, (ctx) => {
-      const { motion, phone } = ctx.conditions;
-      const band = motion ? (phone ? 56 : 64) : 0;
+      const { motion: motionOk, phone } = ctx.conditions;
+      const motion = motionOk && !phone;
+      const band = motion ? 64 : 0;
       const cleanups = [];
       gsap.set(root, { '--hero-band': `${band}px` });
 
@@ -121,7 +124,7 @@ export function useHeroCollapse(rootRef, o, deps = []) {
           const to = offsetIn(title, hero);
           const ink = inkBox(title);
           const fs = parseFloat(getComputedStyle(title).fontSize) || 32;
-          const s = Math.min((phone ? 17 : 20) / fs, (band - 14) / ink.h, (W - left - 8) / ink.w);
+          const s = Math.min(20 / fs, (band - 14) / ink.h, (W - left - 8) / ink.w);
           m.titleS = s;
           m.titleOrigin = `${ink.dx}px ${ink.dy}px`;
           m.titleX = left - (to.x + ink.dx);
@@ -139,9 +142,7 @@ export function useHeroCollapse(rootRef, o, deps = []) {
             scroller,
             start: 'top top',
             end: () => `+=${m.travel}`,
-            // Touch scrolling already moves smoothly; extra smoothing on phones makes the
-            // avatar/title trail behind the (natively sticky) band, which reads as lag.
-            scrub: phone ? true : 0.2,
+            scrub: 0.2,
             invalidateOnRefresh: true,
           },
         });
