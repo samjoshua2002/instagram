@@ -137,9 +137,12 @@ const UserSchema = new mongoose.Schema({
     postalCode: { type: String, default: '' },
   },
   twoFactor: {
-    enabled: { type: Boolean, default: true },
+    // Off unless explicitly set (registration and the owner bootstrap set it themselves)
+    enabled: { type: Boolean, default: false },
     secret: { type: String, default: '' },
     backupCodes: [{ type: String }],
+    // Last accepted TOTP time-step: a code can be used only once (replay guard)
+    lastUsedStep: { type: Number, default: 0 },
   },
   passkeys: [{
     credentialId: { type: String, required: true },
@@ -155,9 +158,16 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Stays default true: accounts created before this field existed have no value stored
+  // and must keep working. Registration always sets isVerified: false explicitly.
   isVerified: {
     type: Boolean,
     default: true,
+  },
+  // Bumped on password change/reset, ban and role change: older JWTs stop working
+  tokenVersion: {
+    type: Number,
+    default: 0,
   },
   verificationOtp: {
     code: { type: String, default: '' },

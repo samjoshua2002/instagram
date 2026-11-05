@@ -16,6 +16,102 @@ const { setUserInstagram } = require('./instagramTokenService');
 const JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(48).toString('hex');
 if (!process.env.JWT_SECRET) console.warn('⚠️ JWT_SECRET is not set: using a random secret, so sessions end when the server restarts.');
 const RP_NAME = process.env.RP_NAME || 'Chatter OS';
+const TOTP_TOLERANCE_SECONDS = 30;
+
+// ---------- Pure helpers (no database; unit-tested in tests/auth.test.js) ----------
+
+const splitList = (raw) => String(raw || '').split(',').map((s) => s.trim()).filter(Boolean);
+
+// Escapes text for HTML element content and quoted attributes
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"'`]/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;',
+  }[c]));
+}
+
+// JSON for an inline <script>: cannot close the tag, open a comment or break the line
+function safeJsonForScript(value) {
+  const json = JSON.stringify(value === undefined ? null : value);
+  return json
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+// A TOTP time-step may be used once: it must be newer than the last accepted one
+function isTotpStepFresh(lastUsedStep, step) {
+  if (!Number.isFinite(step) || step <= 0) return false;
+  const last = Number(lastUsedStep) || 0;
+  return step > last;
+}
+
+function isTokenVersionCurrent(decoded, user) {
+  if (!decoded || !user) return false;
+  return (Number(decoded.tokenVersion) || 0) === (Number(user.tokenVersion) || 0);
+}
+
+// Returns the trimmed string, '' for missing values, or null when the value is not a string
+function asString(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') return null;
+  return value.trim();
+}
+
+// Maps a stored upload URL (".../uploads/<file>") to a file directly inside uploadsDir, or null
+function resolveUploadPath(url, uploadsDir) {
+  const path = require('path');
+  if (typeof url !== 'string' || !url.includes('/uploads/')) return null;
+  let name = url.split('/uploads/').pop().split(/[?#]/)[0];
+  try { name = decodeURIComponent(name); } catch { return null; }
+  if (!name || name.includes('/') || name.includes('\\') || name === '.' || name === '..') return null;
+  const root = path.resolve(uploadsDir);
+  const full = path.resolve(root, name);
+  if (path.dirname(full) !== root) return null;
+  return full;
+}
+
+// Reads the challenge out of a WebAuthn clientDataJSON (base64url)
+function challengeFromClientData(clientDataJSON) {
+  if (typeof clientDataJSON !== 'string' || clientDataJSON.length > 8192) return null;
+  try {
+    const data = JSON.parse(Buffer.from(clientDataJSON, 'base64url').toString('utf8'));
+    return typeof data?.challenge === 'string' && data.challenge ? data.challenge : null;
+  } catch {
+    return null;
+  }
+}
+
+// Short-lived single-use values (passkey challenges), in memory
+class ChallengeStore {
+  constructor({ ttlMs = 5 * 60 * 1000, maxEntries = 10000, now = Date.now } = {}) {
+    this.ttlMs = ttlMs;
+    this.maxEntries = maxEntries;
+    this.now = now;
+    this.items = new Map();
+  }
+
+  put(key, value) {
+    this.prune();
+    if (this.items.size >= this.maxEntries) this.items.delete(this.items.keys().next().value);
+    this.items.set(key, { value, expiresAt: this.now() + this.ttlMs });
+  }
+
+  take(key) {
+    const item = this.items.get(key);
+    this.items.delete(key);
+    if (!item || item.expiresAt <= this.now()) return null;
+    return item.value;
+  }
+
+  prune() {
+    const t = this.now();
+    for (const [k, v] of this.items) if (v.expiresAt <= t) this.items.delete(k);
+  }
+}
+
+const passkeyChallenges = new ChallengeStore();
 
 class AuthService {
   constructor() {
@@ -50,42 +146,45 @@ class AuthService {
   }
 
   /**
-   * Automatically initializes Sam Joshua's primary owner account if not already created
+   * Creates the primary owner (superadmin) account on first boot.
+   * The initial password comes from OWNER_INITIAL_PASSWORD; without it no owner is created.
+   * The role is set only on creation, so a later role change in the admin panel is kept.
    */
   async ensureOwnerUser() {
     try {
-      const superadminEmail = 'samjoshuacs2002@gmail.com';
+      const superadminEmail = (process.env.OWNER_EMAIL || 'samjoshuacs2002@gmail.com').trim().toLowerCase();
+      const ownerUsername = (process.env.OWNER_USERNAME || 'samjoshua2002').trim().toLowerCase();
       let user = await User.findOne({
-        $or: [{ email: superadminEmail }, { username: 'samjoshua2002' }]
+        $or: [{ email: superadminEmail }, { username: ownerUsername }]
       });
 
       const totpSecret = generateSecret();
 
       if (!user) {
-        // Initial default password: SamJoshua@2026!
-        const initialHash = await User.hashPassword('SamJoshua@2026!');
+        const initialPassword = process.env.OWNER_INITIAL_PASSWORD;
+        if (!initialPassword || initialPassword.length < 12) {
+          console.warn('⚠️ [AuthService]: Owner account not found and OWNER_INITIAL_PASSWORD is not set (min 12 chars); skipping owner creation.');
+          return null;
+        }
+        const initialHash = await User.hashPassword(initialPassword);
         user = new User({
-          username: 'samjoshua2002',
+          username: ownerUsername,
           email: superadminEmail,
           passwordHash: initialHash,
           firstName: 'Sam',
           lastName: 'Joshua',
           role: 'superadmin',
           accountType: 'personal',
+          isVerified: true,
           twoFactor: {
             enabled: true,
             secret: totpSecret,
           },
         });
         await user.save();
-        console.log(`🔐 [AuthService]: Created primary superadmin account for Sam Joshua (${superadminEmail})`);
+        console.log(`🔐 [AuthService]: Created primary superadmin account (${superadminEmail}). Change the initial password and remove OWNER_INITIAL_PASSWORD.`);
       } else {
-        // Ensure superadmin role is strictly applied to samjoshuacs2002@gmail.com
         let changed = false;
-        if (user.role !== 'superadmin') {
-          user.role = 'superadmin';
-          changed = true;
-        }
         const envAccountId = (process.env.INSTAGRAM_ACCOUNT_ID || '').trim();
         if (envAccountId) {
           const claimedByOther = await User.exists({
@@ -93,7 +192,7 @@ class AuthService {
             $or: [{ instagramAccountId: envAccountId }, { instagramId: envAccountId }, { 'instagram.accountId': envAccountId }]
           });
           if (claimedByOther) {
-            // Unlink from superadmin if claimed by another workspace (e.g. samjoshua / guidetalk.app@gmail.com)
+            // Another workspace owns this Instagram account: drop only the owner's own env-based link
             if (user.instagramAccountId === envAccountId || user.instagram?.accountId === envAccountId) {
               user.instagramAccountId = '';
               user.instagramId = '';
@@ -121,14 +220,6 @@ class AuthService {
         if (changed) await user.save();
       }
 
-      // Demote guidetalk.app@gmail.com to standard user if it was previously superadmin
-      const guidetalkUser = await User.findOne({ email: 'guidetalk.app@gmail.com' });
-      if (guidetalkUser && guidetalkUser.role === 'superadmin') {
-        guidetalkUser.role = 'user';
-        await guidetalkUser.save();
-        console.log('ℹ️ [AuthService]: guidetalk.app@gmail.com role set to "user". Only samjoshuacs2002@gmail.com is superadmin.');
-      }
-
       return user;
     } catch (err) {
       console.error('❌ [AuthService] Failed ensuring owner user:', err.message);
@@ -137,24 +228,27 @@ class AuthService {
   }
 
   /**
-   * Sign a JWT session token (valid for 30 days)
+   * Sign a JWT session token (valid for 30 days; impersonation sessions 12 hours).
+   * tokenVersion ties the token to the account's current password / role / ban state.
    */
-  generateToken(user) {
+  generateToken(user, { impersonatedBy = null } = {}) {
     const isSuper = user.role === 'superadmin';
-    return jwt.sign(
-      {
-        userId: user._id.toString(),
-        username: user.username,
-        email: user.email,
-        accountType: user.accountType || 'personal',
-        role: isSuper ? 'superadmin' : 'user',
-        instagramId: user.instagramId || '',
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-      JWT_SECRET,
-      { expiresIn: '30d' }
-    );
+    const claims = {
+      userId: user._id.toString(),
+      username: user.username,
+      email: user.email,
+      accountType: user.accountType || 'personal',
+      role: isSuper ? 'superadmin' : 'user',
+      instagramId: user.instagramId || '',
+      firstName: user.firstName,
+      lastName: user.lastName,
+      tokenVersion: user.tokenVersion || 0,
+    };
+    if (impersonatedBy) {
+      claims.impersonatedBy = impersonatedBy._id.toString();
+      claims.impersonatorTokenVersion = impersonatedBy.tokenVersion || 0;
+    }
+    return jwt.sign(claims, JWT_SECRET, { expiresIn: impersonatedBy ? '12h' : '30d' });
   }
 
   /**
@@ -166,6 +260,17 @@ class AuthService {
     } catch (err) {
       return null;
     }
+  }
+
+  // True when a decoded JWT still matches the account (tokens without tokenVersion count as 0)
+  isTokenCurrent(decoded, user) {
+    return isTokenVersionCurrent(decoded, user);
+  }
+
+  // Invalidates every existing session of this user (caller saves the document)
+  bumpTokenVersion(user) {
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    return user.tokenVersion;
   }
 
   /**
@@ -251,32 +356,7 @@ class AuthService {
         });
 
         if (result.error) {
-          // If Resend is in free onboarding sandbox mode, it only allows sending to the registered account (guidetalk.app@gmail.com)
-          const errorMsg = result.error.message || '';
-          if (result.error.statusCode === 403 && errorMsg.includes('only send testing emails')) {
-            console.log(`ℹ️ [Resend Sandbox] Forwarding code for ${cleanTo} to registered Resend email guidetalk.app@gmail.com`);
-            const fallbackResult = await this.resend.emails.send({
-              from: fromAddress,
-              to: ['guidetalk.app@gmail.com'],
-              subject: `${otpCode} is your Chatter verification code (for ${cleanTo})`,
-              text: `Your ${purpose} verification code for ${cleanTo} is: ${otpCode}\n\n(Delivered to guidetalk.app@gmail.com via Resend testing mode)`,
-              html: html.replace('Identity verification', `Identity verification for ${cleanTo} (Delivered to Resend verified account)`),
-            });
-
-            if (fallbackResult.error) {
-              throw new Error(fallbackResult.error.message || 'Resend sandbox delivery failed');
-            }
-
-            console.log(`✅ [Resend] Dispatched to guidetalk.app@gmail.com (ID: ${fallbackResult.data?.id})`);
-            return {
-              success: true,
-              provider: 'resend',
-              deliveredTo: 'guidetalk.app@gmail.com',
-              forwarded: true,
-              id: fallbackResult.data?.id
-            };
-          }
-
+          // Never redirect a user's code to a shared inbox (e.g. Resend sandbox mode): fail instead
           throw new Error(result.error.message || 'Resend email sending failed');
         }
 
@@ -312,7 +392,7 @@ class AuthService {
     // 2. Direct SMTP Fallback
     if (!this.transporter) this.initMailer();
     if (!this.transporter) {
-      throw new Error('Email service is not configured. Please ensure RESEND_API_KEY or EMAIL_USER is set.');
+      throw new Error('Email service is not configured. Please ensure BREVO_API_KEY, RESEND_API_KEY or EMAIL_USER is set.');
     }
 
     const info = await this.transporter.sendMail({
@@ -430,21 +510,51 @@ class AuthService {
   }
 
   /**
-   * Verify a 6-digit TOTP code from OneAuth / Authenticator app
+   * Check a 6-digit TOTP code from OneAuth / Authenticator app.
+   * Returns { valid, timeStep } without consuming the code (see consumeTotp).
    */
-  verifyTotp(user, token) {
-    if (!user.twoFactor?.secret) return false;
-    const cleanToken = (token || '').toString().trim();
-    if (!/^\d{6}$/.test(cleanToken)) return false;
-
-    // Check with TOTP (support ±35s window for device clock drift)
+  checkTotp(user, token) {
+    if (!user?.twoFactor?.secret) return { valid: false, timeStep: 0 };
+    const cleanToken = (token ?? '').toString().trim();
+    if (!/^\d{6}$/.test(cleanToken)) return { valid: false, timeStep: 0 };
     try {
-      const result = verifySync({ token: cleanToken, secret: user.twoFactor.secret, epochTolerance: 35 });
-      return !!result?.valid;
+      // epochTolerance is in seconds: 30 = the previous / next 30 s code (one time-step) for clock drift
+      const result = verifySync({ token: cleanToken, secret: user.twoFactor.secret, epochTolerance: TOTP_TOLERANCE_SECONDS });
+      if (!result?.valid) return { valid: false, timeStep: 0 };
+      return { valid: true, timeStep: Number(result.timeStep) || 0 };
     } catch (err) {
       console.warn('⚠️ [AuthService] TOTP verify error:', err.message);
-      return false;
+      return { valid: false, timeStep: 0 };
     }
+  }
+
+  verifyTotp(user, token) {
+    return this.checkTotp(user, token).valid;
+  }
+
+  /**
+   * Verify a TOTP code and burn its time-step so the same code cannot be used twice.
+   * The update is atomic, so two parallel requests with one code cannot both pass.
+   * Returns 'ok' | 'invalid' | 'replayed'.
+   */
+  async consumeTotp(user, token) {
+    const { valid, timeStep } = this.checkTotp(user, token);
+    if (!valid) return 'invalid';
+    if (!isTotpStepFresh(user.twoFactor?.lastUsedStep, timeStep)) return 'replayed';
+    const result = await User.updateOne(
+      {
+        _id: user._id,
+        $or: [
+          { 'twoFactor.lastUsedStep': { $exists: false } },
+          { 'twoFactor.lastUsedStep': null },
+          { 'twoFactor.lastUsedStep': { $lt: timeStep } },
+        ],
+      },
+      { $set: { 'twoFactor.lastUsedStep': timeStep } }
+    );
+    if (!result?.modifiedCount) return 'replayed';
+    if (user.twoFactor) user.twoFactor.lastUsedStep = timeStep;
+    return 'ok';
   }
 
   /**
@@ -472,7 +582,17 @@ class AuthService {
 
   // --- WebAuthn / Passkey Methods ---
 
-  getRpID(req) {
+  // Relying-party IDs and origins: PASSKEY_RP_ID / PASSKEY_ORIGIN (comma-separated) when set,
+  // otherwise derived from the request as before.
+  getAllowedRpIds() {
+    return splitList(process.env.PASSKEY_RP_ID);
+  }
+
+  getAllowedOrigins() {
+    return splitList(process.env.PASSKEY_ORIGIN).map((o) => o.replace(/\/+$/, ''));
+  }
+
+  getRequestRpID(req) {
     const origin = req.get('origin') || req.get('referer');
     if (origin) {
       try {
@@ -484,7 +604,7 @@ class AuthService {
     return host.split(':')[0];
   }
 
-  getOrigin(req) {
+  getRequestOrigin(req) {
     const origin = req.get('origin') || req.get('referer');
     if (origin) {
       try {
@@ -495,6 +615,30 @@ class AuthService {
     const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
     const host = req.get('host') || 'localhost:3000';
     return `${proto}://${host}`;
+  }
+
+  // One rpID for generating options: the configured one matching the caller's host, else the first
+  getRpID(req) {
+    const allowed = this.getAllowedRpIds();
+    if (!allowed.length) return this.getRequestRpID(req);
+    const host = this.getRequestRpID(req);
+    return allowed.find((id) => host === id || host.endsWith(`.${id}`)) || allowed[0];
+  }
+
+  // What verification accepts (string or list)
+  getExpectedRpIDs(req) {
+    const allowed = this.getAllowedRpIds();
+    return allowed.length ? allowed : this.getRequestRpID(req);
+  }
+
+  getExpectedOrigins(req) {
+    const allowed = this.getAllowedOrigins();
+    return allowed.length ? allowed : this.getRequestOrigin(req);
+  }
+
+  getOrigin(req) {
+    const allowed = this.getAllowedOrigins();
+    return allowed.length ? allowed[0] : this.getRequestOrigin(req);
   }
 
   async generatePasskeyRegistrationOptions(user, req) {
@@ -523,8 +667,9 @@ class AuthService {
 
   async verifyPasskeyRegistration(user, response, req) {
     const expectedChallenge = user.currentChallenge;
-    const expectedOrigin = this.getOrigin(req);
-    const expectedRPID = this.getRpID(req);
+    if (!expectedChallenge) return false;
+    const expectedOrigin = this.getExpectedOrigins(req);
+    const expectedRPID = this.getExpectedRpIDs(req);
 
     const verification = await verifyRegistrationResponse({
       response,
@@ -556,6 +701,10 @@ class AuthService {
     return false;
   }
 
+  /**
+   * Login options. Every challenge is also kept server-side (5 min, single use), so a
+   * discoverable "no username" login is checked against a challenge this server issued.
+   */
   async generatePasskeyAuthenticationOptions(user, req) {
     const rpID = this.getRpID(req);
     const allowCredentials = user
@@ -571,6 +720,7 @@ class AuthService {
       userVerification: 'preferred',
     });
 
+    passkeyChallenges.put(options.challenge, { userId: user ? user._id.toString() : null });
     if (user) {
       user.currentChallenge = options.challenge;
       await user.save();
@@ -578,21 +728,30 @@ class AuthService {
     return options;
   }
 
+  /**
+   * Verifies a login assertion against a challenge issued by generatePasskeyAuthenticationOptions.
+   * The challenge is read from the signed clientDataJSON and must be one we issued and not yet used.
+   */
   async verifyPasskeyAuthentication(user, response, req) {
-    const passkey = (user.passkeys || []).find(p => p.credentialId === response.id);
+    const passkey = (user.passkeys || []).find(p => p.credentialId === response?.id);
     if (!passkey) {
-      throw new Error('Passkey not registered on this account.');
+      throw new PasskeyError('Passkey not registered on this account.');
     }
 
-    const expectedChallenge = user.currentChallenge;
-    const expectedOrigin = this.getOrigin(req);
-    const expectedRPID = this.getRpID(req);
+    const presented = challengeFromClientData(response?.response?.clientDataJSON);
+    const issued = presented ? passkeyChallenges.take(presented) : null;
+    if (!issued) {
+      throw new PasskeyError('This passkey request has expired. Please try again.');
+    }
+    if (issued.userId && issued.userId !== user._id.toString()) {
+      throw new PasskeyError('Passkey does not match the requested account.');
+    }
 
     const verification = await verifyAuthenticationResponse({
       response,
-      expectedChallenge,
-      expectedOrigin,
-      expectedRPID,
+      expectedChallenge: presented,
+      expectedOrigin: this.getExpectedOrigins(req),
+      expectedRPID: this.getExpectedRpIDs(req),
       credential: {
         id: passkey.credentialId,
         publicKey: Buffer.from(passkey.publicKey, 'base64'),
@@ -613,4 +772,19 @@ class AuthService {
   }
 }
 
-module.exports = new AuthService();
+class PasskeyError extends Error {}
+
+const instance = new AuthService();
+Object.assign(instance, {
+  PasskeyError,
+  passkeyChallenges,
+  escapeHtml,
+  safeJsonForScript,
+  isTotpStepFresh,
+  isTokenVersionCurrent,
+  asString,
+  resolveUploadPath,
+  challengeFromClientData,
+  ChallengeStore,
+});
+module.exports = instance;
