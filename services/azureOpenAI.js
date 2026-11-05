@@ -260,7 +260,8 @@ ${directives.factInstruction}
 TEXTING STYLE RULES:
 - TEXT LIKE A REAL HUMAN: No formal punctuation, no ending periods, no robotic grammar. Casual lowercase, chill phrases.
 - NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand", "delighted to help"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
-- KEEP IT CONCISE: 1–2 short lines max. Quick, natural, immediate DM replies.
+- ANSWER EVERY QUESTION (TOP PRIORITY): Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If a detail about you isn't in your bio, give a casual vague answer (e.g. "old enough lol", "around chennai") instead of ignoring it.
+- KEEP IT CONCISE: 1–2 short lines max (one short line per question when they asked several). Quick, natural, immediate DM replies.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths — sometimes 1 word, sometimes an emoji alone, sometimes a one-liner. Keep it unpredictable.
 - TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they've told you before naturally like a close friend would.
 - INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}
@@ -364,12 +365,18 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
           text: b.text
         }));
 
-    // Add recent history (up to last 10 messages)
-    if (effectiveHistory && effectiveHistory.length > 0) {
-      for (const msg of effectiveHistory) {
-        if (msg.text && msg.text.trim() === incomingText.trim() && msg.role === 'user') {
-          continue;
-        }
+    // Add recent history (up to last 10 messages). The new message(s) are already saved, so skip
+    // them here: grouped messages were sent twice and the AI answered only the last one.
+    const incomingLines = new Set(incomingText.split('\n').map(t => t.trim()).filter(Boolean));
+    const historyToSend = [...(effectiveHistory || [])];
+    while (historyToSend.length) {
+      const last = historyToSend[historyToSend.length - 1];
+      const t = (last.text || '').trim();
+      if (last.role === 'assistant' || !(t === incomingText.trim() || incomingLines.has(t))) break;
+      historyToSend.pop();
+    }
+    if (historyToSend.length > 0) {
+      for (const msg of historyToSend) {
         messages.push({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
           content: msg.text,

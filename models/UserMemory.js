@@ -62,6 +62,11 @@ const UserMemorySchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Age they told in DMs (latest statement wins); used to fill the birth year
+  age: {
+    type: Number,
+    default: null,
+  },
   dob: {
     type: String,
     default: '',

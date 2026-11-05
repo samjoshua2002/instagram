@@ -55,6 +55,11 @@ const SocialGraphSchema = new mongoose.Schema({
     enum: ['close_friend', 'online_friend', 'offline_friend', 'family', 'professional', 'business', 'relative', 'homie', 'group_icon', 'other'],
     default: 'online_friend',
   },
+  // Age learned from DMs (shown on the profile when no full birthday is known)
+  age: {
+    type: Number,
+    default: null,
+  },
   dob: {
     type: String,
     default: '',
