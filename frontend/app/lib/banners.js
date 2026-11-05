@@ -19,10 +19,11 @@ const jobs = new Map(); // topic -> Promise<photos[]>
 
 export const hashSeed = s => [...String(s || '?')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
-function readStore(topic) {
+// `anyAge` returns an old list too: used as the fallback when the server has no photos to give
+function readStore(topic, anyAge = false) {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}')[topic];
-    if (saved && Array.isArray(saved.photos) && saved.photos.length && Date.now() - saved.at < TTL) return saved.photos;
+    if (saved && Array.isArray(saved.photos) && saved.photos.length && (anyAge || Date.now() - saved.at < TTL)) return saved.photos;
   } catch { /* storage blocked or corrupt */ }
   return null;
 }
@@ -57,10 +58,11 @@ export function loadBanners(topic = 'abstract') {
       if (photos.length) {
         lists.set(topic, photos);
         writeStore(topic, photos);
+        return photos;
       }
-      return photos;
+      return readStore(topic, true) || [];
     })
-    .catch(() => [])
+    .catch(() => readStore(topic, true) || [])
     .finally(() => jobs.delete(topic));
   jobs.set(topic, job);
   return job;
