@@ -7,7 +7,7 @@ import {
   UserCheck, Save, Sparkles, MessageSquare, AlertCircle,
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
   Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff, Instagram,
-  Copy, Check, BarChart3
+  Copy, Check, BarChart3, ArrowUpRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
@@ -15,6 +15,7 @@ import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
 import { IconSwap } from '../components/ui/motion';
+import '../split.css';
 
 function SettingsPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating, updateUserProfile } = useApp();
@@ -490,34 +491,16 @@ function SettingsPageContent() {
   return (
     <motion.div
       {...enterMotion}
-      className="page-container settings-fullwidth"
-     
+      className="page-container split-page settings-fullwidth settings-split"
     >
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '28px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 800,
-              fontFamily: "var(--font-label)",
-              color: 'var(--color-text-secondary)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase'
-            }}>
-              INTELLIGENCE // PERSONA &amp; STYLING ENGINE
-            </span>
-          </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--color-text-primary)', letterSpacing: '-0.7px', margin: 0 }}>
-            Persona &amp; AI Studio
-          </h1>
-          <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginTop: '6px', maxWidth: '680px', lineHeight: 1.5 }}>
-            Fine-tune your AI clone's voice, texting cadence, slang vocabulary, and knowledge base so replies feel indistinguishable from your own.
-          </p>
+      <header className="split-top">
+        <div className="split-top-text">
+          <h1>Persona &amp; AI Studio</h1>
+          <p>Teach the AI your voice, texting style and background so its replies sound like you.</p>
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="split-actions">
           <button
             onClick={fetchPersona}
             className="btn"
@@ -558,7 +541,7 @@ function SettingsPageContent() {
             )}
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Error alert if any */}
       {errorMsg && (
@@ -571,7 +554,6 @@ function SettingsPageContent() {
           padding: '14px 18px',
           borderRadius: '12px',
           color: '#f87171',
-          marginBottom: '24px',
           fontSize: '0.86rem',
           boxShadow: '0 2px 8px rgba(239,68,68,0.06)'
         }}>
@@ -580,54 +562,33 @@ function SettingsPageContent() {
         </div>
       )}
 
-      {/* Segmented Navigation Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        overflowX: 'auto',
-        scrollbarWidth: 'none',
-        scrollSnapType: 'x mandatory',
-        padding: '5px',
-        marginBottom: '28px',
-        background: 'var(--color-surface-hover)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '14px',
-        width: 'fit-content',
-        maxWidth: '100%'
-      }}>
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => (tab.href ? router.push(tab.href) : setActiveTab(tab.id))}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '9px 16px',
-                borderRadius: '10px',
-                border: 'none',
-                background: isActive ? 'var(--color-text-primary)' : 'transparent',
-                color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                fontSize: '0.82rem',
-                fontWeight: isActive ? 800 : 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                scrollSnapAlign: 'start',
-                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
-                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            >
-              <Icon size={14} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <div className="split-body">
+      <aside className="split-side">
+        <nav className="split-card split-nav" aria-label="Persona sections">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={isActive ? 'is-on' : ''}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => (tab.href ? router.push(tab.href) : setActiveTab(tab.id))}
+              >
+                <Icon size={15} />
+                <span>{tab.label}</span>
+                {tab.href && <ArrowUpRight size={13} className="split-nav-arrow" />}
+              </button>
+            );
+          })}
+        </nav>
+        <section className="split-card split-grow split-hide-mobile">
+          <p className="split-tip"><b>Tip:</b> fill in About Me and How To Text first. Then use <b>Test My Clone</b> to see how the AI replies. Press <b>Save Persona</b> when you are done.</p>
+        </section>
+      </aside>
 
+      <div className="split-main settings-main">
       {/* TAB 1: ABOUT ME & PERSONAL DETAILS */}
       {activeTab === 'about' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1508,6 +1469,8 @@ function SettingsPageContent() {
           </div>
         </div>
       )}
+      </div>
+      </div>
     </motion.div>
   );
 }
