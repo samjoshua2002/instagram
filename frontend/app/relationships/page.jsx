@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
   Trash2, Calendar, Bot, Film, Pause, Check, Save, User,
@@ -50,7 +51,7 @@ const MONTH_NAMES = [
 // Drop broken years (e.g. "0002" from a half-typed date picker) so only day + month show
 function cleanDob(dob) {
   if (!dob) return "";
-  return String(dob).replace(/,?s*0d{3}/, "").replace(/^0d{3}-/, "").trim();
+  return String(dob).replace(/^0\d{3}-/, "").replace(/,?\s*0\d{3}\b/, "").trim();
 }
 
 // Robust timezone-agnostic helper to parse date strings into YYYY-MM-DD
@@ -104,10 +105,26 @@ function RelationshipsPageContent() {
     user,
     isImpersonating
   } = useApp();
+  const confirm = useConfirm();
+  const confirmDelete = (name, extra = 'Their contact and saved profile will be removed.') =>
+    confirm({ title: `Delete ${name}?`, message: extra, confirmLabel: 'Delete', tone: 'danger' });
 
 
   // Navigation State: null = Directory Table view; Object = Full Inner Person Page
   const [selectedPerson, setSelectedPerson] = useState(null);
+
+  // Deep link from Home: /relationships?person=<node id> opens that person's page once people load
+  const deepLinkDoneRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkDoneRef.current || typeof window === 'undefined') return;
+    const wanted = new URLSearchParams(window.location.search).get('person');
+    if (!wanted) { deepLinkDoneRef.current = true; return; }
+    const match = (nodes || []).find(n => !n.isRoot && (n.id === wanted || n._id === wanted || n.senderId === wanted));
+    if (match) {
+      deepLinkDoneRef.current = true;
+      setSelectedPerson(match);
+    }
+  }, [nodes]);
 
   // Filters State
   const [activeCategory, setActiveCategory] = useState('all');
@@ -147,11 +164,11 @@ function RelationshipsPageContent() {
 
   // Layout switcher state: 'table' | 'grid' | 'dense'
   const [layoutMode, setLayoutMode] = useState(() => {
-    if (typeof window === 'undefined') return 'table';
+    if (typeof window === 'undefined') return 'grid';
     try {
-      return localStorage.getItem('chatter_people_layout') || 'table';
+      return localStorage.getItem('chatter_people_layout') || 'grid';
     } catch {
-      return 'table';
+      return 'grid';
     }
   });
 
@@ -813,8 +830,8 @@ function RelationshipsPageContent() {
               type="button"
               className="person-action danger"
               aria-label="Delete contact"
-              onClick={() => {
-                if (window.confirm(`Delete ${selectedPerson.name}? This removes the contact and their saved profile.`)) {
+              onClick={async () => {
+                if (await confirmDelete(selectedPerson.name)) {
                   deleteNode(selectedPerson);
                   setSelectedPerson(null);
                 }
@@ -901,7 +918,7 @@ function RelationshipsPageContent() {
                 {/* Paste Raw Chat */}
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                     Paste Raw Direct Message Chat or Conversation Notes
                   </label>
                 </div>
@@ -916,7 +933,7 @@ function RelationshipsPageContent() {
 
               {/* User Clarification input if needed */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Additional Notes or Clarifications for AI (Optional)
                 </label>
                 <input
@@ -956,7 +973,7 @@ function RelationshipsPageContent() {
               {/* Extracted Data Preview & Clarifying Questions */}
               {extractedData && (
                 <div style={{ background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '16px', marginBottom: '18px' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '8px' }}>
                     AI EXTRACTED ATTRIBUTES
                   </div>
 
@@ -1037,7 +1054,7 @@ function RelationshipsPageContent() {
         <div className="person-glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700' }}>
                 INTEL DEPTH
               </div>
               <div style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '2px' }}>
@@ -1048,7 +1065,7 @@ function RelationshipsPageContent() {
               </p>
             </div>
 
-            <div style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '700', fontFamily: "var(--font-label)" }}>
               {knowledgeBreakdown.score >= 80 ? 'HIGH INTEL' : (knowledgeBreakdown.score >= 50 ? 'MEDIUM INTEL' : 'NEEDS DATA')}
             </div>
           </div>
@@ -1109,14 +1126,14 @@ function RelationshipsPageContent() {
         <div className="person-glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700' }}>
                 DIRECT MESSAGE AUTOMATION
               </div>
               <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '2px' }}>
                 AI Reply Rules for {formData.name}
               </div>
             </div>
-            <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+            <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontFamily: "var(--font-label)", fontWeight: '700' }}>
               CURRENT: {isPaused ? 'MANUAL' : (isReelsOnly ? 'REELS ONLY' : 'FULL AI')}
             </span>
           </div>
@@ -1231,7 +1248,7 @@ function RelationshipsPageContent() {
 
         {/* ================= CARD 3: PREDEFINED NECESSARY FIELDS ================= */}
         <div className="person-glass-card">
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '4px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '4px' }}>
             PROFILE FIELDS
           </div>
           <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginBottom: '16px' }}>
@@ -1242,7 +1259,7 @@ function RelationshipsPageContent() {
             {/* Row 1: Name, Handle */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Full Name
                 </label>
                 <input
@@ -1255,7 +1272,7 @@ function RelationshipsPageContent() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Instagram Handle
                 </label>
                 <input
@@ -1271,7 +1288,7 @@ function RelationshipsPageContent() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                     Birthday Calendar
                   </label>
                   <button
@@ -1373,7 +1390,7 @@ function RelationshipsPageContent() {
 
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Gender
                 </label>
                 <select
@@ -1388,7 +1405,7 @@ function RelationshipsPageContent() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Category Filter
                 </label>
                 <select
@@ -1407,7 +1424,7 @@ function RelationshipsPageContent() {
 
             {/* Row 3: Relationship */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Specific Relationship To You
               </label>
               <input
@@ -1421,7 +1438,7 @@ function RelationshipsPageContent() {
             {/* Row 4: Personal Notes & Highlights (Linked to facts!) */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                   Personal Lore, Habits & Synthesized DM Notes
                 </label>
                 <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>Linked to DM Intel</span>
@@ -1436,7 +1453,7 @@ function RelationshipsPageContent() {
 
             {/* Row 5: Banter Style */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Banter & Conversation Style
               </label>
               <input
@@ -1450,7 +1467,7 @@ function RelationshipsPageContent() {
             {/* Row 6: Lifetime Interaction Statistics (Chats & Reels) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', paddingTop: '10px', borderTop: '1px solid var(--color-surface-hover)' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Total DMs Exchanged
                 </label>
                 <input
@@ -1459,7 +1476,7 @@ function RelationshipsPageContent() {
                   value={formData.chatsCount}
                   onChange={(e) => setFormData({ ...formData, chatsCount: parseInt(e.target.value, 10) || 0 })}
                   placeholder="0"
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}
+                  style={{ fontFamily: "var(--font-label)", fontWeight: '700' }}
                 />
                 <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '3px', display: 'block' }}>
                   Cumulative lifetime chats (preserved across message cleanups)
@@ -1467,7 +1484,7 @@ function RelationshipsPageContent() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                   Total Reels Shared
                 </label>
                 <input
@@ -1476,7 +1493,7 @@ function RelationshipsPageContent() {
                   value={formData.reelsCount}
                   onChange={(e) => setFormData({ ...formData, reelsCount: parseInt(e.target.value, 10) || 0 })}
                   placeholder="0"
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}
+                  style={{ fontFamily: "var(--font-label)", fontWeight: '700' }}
                 />
                 <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '3px', display: 'block' }}>
                   Cumulative reels shared by this contact
@@ -1489,7 +1506,7 @@ function RelationshipsPageContent() {
 
         {/* ================= CARD 4: SOCIAL CONNECTIONS (WITH SUGGESTIONS) ================= */}
         <div className="person-glass-card">
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '4px' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '4px' }}>
             SOCIAL GRAPH
           </div>
           <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginBottom: '14px' }}>
@@ -1515,7 +1532,7 @@ function RelationshipsPageContent() {
                     <Link2 size={14} style={{ color: 'var(--color-text-primary)' }} />
                     <span style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>{c.targetName}</span>
                   </div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                     {c.rel || c.relationship}
                   </span>
                 </div>
@@ -1575,7 +1592,7 @@ function RelationshipsPageContent() {
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-surface)')}
                       >
                         <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{sug.name}</span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                           {sug.handle || sug.relationship}
                         </span>
                       </div>
@@ -1621,7 +1638,7 @@ function RelationshipsPageContent() {
         <div className="person-glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700' }}>
                 LEARNED INTEL
               </div>
               <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '2px' }}>
@@ -1630,12 +1647,12 @@ function RelationshipsPageContent() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontFamily: "var(--font-label)" }}>
                 {(selectedPerson.facts || selectedPerson.lore || []).length} Facts Captured
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
-                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>AUTO-SYNCING</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>AUTO-SYNCING</span>
               </div>
             </div>
           </div>
@@ -1842,7 +1859,7 @@ function RelationshipsPageContent() {
       {/* Top Header */}
       <div className="directory-header-row page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             PEOPLE DIRECTORY & INTELLIGENCE
           </div>
           <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
@@ -1869,19 +1886,19 @@ function RelationshipsPageContent() {
         ].map(({ icon, label, value }) => (
           <div key={label} style={{
             background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '10px',
-            padding: '14px 16px',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: '10px'
           }}>
-            <div style={{ background: 'var(--color-surface-hover)', padding: '8px', borderRadius: '7px', color: 'var(--color-text-primary)', flexShrink: 0 }}>
+            <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(30, 215, 96, 0.15)', border: '1.5px solid var(--spotify-green)', borderRadius: '9999px', color: 'var(--spotify-green)', flexShrink: 0 }}>
               {icon}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', whiteSpace: 'nowrap' }}>{label}</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>{value}</div>
+              <div style={{ fontSize: '9px', letterSpacing: '0.06em', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', whiteSpace: 'nowrap' }}>{label}</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>{value.toLocaleString?.() ?? value}</div>
             </div>
           </div>
         ))}
@@ -1963,14 +1980,15 @@ function RelationshipsPageContent() {
                 onClick={() => setActiveCategory(tab.id)}
                 className="people-pill"
                 style={{
-                  background: isActive ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                  color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                  border: '1px solid',
-                  borderColor: isActive ? 'var(--color-text-primary)' : 'var(--color-border)',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  fontWeight: '600',
+                  background: isActive ? 'var(--spotify-green)' : 'var(--color-surface-elevated-2)',
+                  color: isActive ? '#000000' : 'var(--color-text-primary)',
+                  border: 'none',
+                  height: '36px',
+                  minHeight: '36px',
+                  padding: '0 8px 0 12px',
+                  borderRadius: '9999px',
+                  fontSize: '13px',
+                  fontWeight: isActive ? '700' : '600',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -1981,12 +1999,12 @@ function RelationshipsPageContent() {
                 <span>{tab.label}</span>
                 <span
                   style={{
-                    background: isActive ? 'var(--color-surface)' : 'var(--color-surface-hover)',
-                    color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                    background: isActive ? '#000000' : 'var(--color-chip-badge)',
+                    color: isActive ? 'var(--spotify-green)' : 'var(--color-text-primary)',
                     padding: '1px 5px',
-                    borderRadius: '4px',
-                    fontSize: '0.68rem',
-                    fontFamily: "'JetBrains Mono', monospace",
+                    borderRadius: '9999px',
+                    fontSize: '11px',
+                    fontFamily: "var(--font-label)",
                     fontWeight: '700'
                   }}
                 >
@@ -2008,9 +2026,12 @@ function RelationshipsPageContent() {
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 paddingLeft: '34px',
-                height: '38px',
-                fontSize: '0.82rem',
-                width: '100%'
+                height: '40px',
+                fontSize: '13px',
+                width: '100%',
+                background: 'var(--color-search)',
+                border: 'none',
+                borderRadius: '9999px'
               }}
             />
           </div>
@@ -2021,12 +2042,12 @@ function RelationshipsPageContent() {
             className="people-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            style={{ height: '38px', fontSize: '0.82rem', padding: '0 10px', borderRadius: '8px', flexShrink: 0, cursor: 'pointer' }}
+            style={{ height: '40px', minHeight: '40px', fontSize: '13px', fontWeight: 600, padding: '0 12px', borderRadius: '9999px', background: 'var(--color-search)', border: 'none', color: 'var(--color-text-primary)', flexShrink: 0, cursor: 'pointer' }}
           >
-            <option value="newest">Newest messages</option>
-            <option value="oldest">Oldest messages</option>
-            <option value="most">Most messages</option>
-            <option value="az">Name A–Z</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="most">Most chats</option>
+            <option value="az">A–Z</option>
           </select>
 
           {/* Layout Switcher Icons (Table / Grid / Dense) */}
@@ -2034,10 +2055,11 @@ function RelationshipsPageContent() {
             display: 'flex',
             alignItems: 'center',
             gap: '3px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
+            background: 'var(--color-search)',
+            border: 'none',
+            height: '40px',
             padding: '3px',
-            borderRadius: '8px',
+            borderRadius: '9999px',
             flexShrink: 0
           }}>
             {[
@@ -2057,14 +2079,16 @@ function RelationshipsPageContent() {
                     background: isActive ? 'var(--color-text-primary)' : 'transparent',
                     color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                     border: 'none',
-                    padding: '6px 11px',
-                    borderRadius: '6px',
+                    padding: '0 12px',
+                    height: '100%',
+                    minHeight: 0,
+                    borderRadius: '9999px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '5px',
-                    fontSize: '0.74rem',
-                    fontWeight: isActive ? '700' : '500',
+                    fontSize: '12px',
+                    fontWeight: isActive ? '700' : '400',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -2094,28 +2118,28 @@ function RelationshipsPageContent() {
               <table className="card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '56px' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", width: '56px' }}>
                     PROFILE
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                     NAME
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                     USERNAME
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                     DATE OF BIRTH
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                     RELATION
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", textAlign: 'center' }}>
                     CHATS
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", textAlign: 'center' }}>
                     REELS
                   </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", textAlign: 'right' }}>
                     ACTION
                   </th>
                 </tr>
@@ -2204,7 +2228,7 @@ function RelationshipsPageContent() {
                               style={{
                                 fontSize: '0.78rem',
                                 color: 'var(--color-text-primary)',
-                                fontFamily: "'JetBrains Mono', monospace",
+                                fontFamily: "var(--font-label)",
                                 fontWeight: '600',
                                 cursor: 'pointer',
                                 display: 'inline-flex',
@@ -2251,7 +2275,7 @@ function RelationshipsPageContent() {
                             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-primary)', fontWeight: '600' }}>
                               {person.relationship || person.relationshipToSam || 'Friend'}
                             </span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                               {person.category ? person.category.replace('_', ' ').toUpperCase() : 'ONLINE FRIEND'}
                             </span>
                           </div>
@@ -2259,7 +2283,7 @@ function RelationshipsPageContent() {
 
                         {/* Column 6: CHATS COUNT */}
                         <td data-label="Chats" style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "var(--font-label)", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <MessageSquare size={11} style={{ color: 'var(--color-text-secondary)' }} />
                             <span>{chatsCount}</span>
                           </span>
@@ -2267,7 +2291,7 @@ function RelationshipsPageContent() {
 
                         {/* Column 7: REELS COUNT */}
                         <td data-label="Reels" style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "var(--font-label)", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <Film size={11} style={{ color: 'var(--color-text-secondary)' }} />
                             <span>{reelsCount}</span>
                           </span>
@@ -2297,8 +2321,8 @@ function RelationshipsPageContent() {
                             </button>
 
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Delete ${person.name} from Database?`)) {
+                              onClick={async () => {
+                                if (await confirmDelete(person.name)) {
                                   deleteNode(person);
                                 }
                               }}
@@ -2371,10 +2395,9 @@ function RelationshipsPageContent() {
                   onClick={() => setSelectedPerson(person)}
                   style={{
                     background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '14px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '10px',
@@ -2385,9 +2408,9 @@ function RelationshipsPageContent() {
                   {/* Card Top Row: Avatar + Name/Handle + Category badge */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                      <ContactAvatar contact={person} size={42} showStatus={true} />
+                      <ContactAvatar contact={person} size={48} showStatus={true} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontWeight: '700', fontSize: '0.92rem', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {person.name}
                           </span>
@@ -2405,7 +2428,7 @@ function RelationshipsPageContent() {
                               style={{
                                 fontSize: '0.74rem',
                                 color: 'var(--color-text-secondary)',
-                                fontFamily: "'JetBrains Mono', monospace",
+                                fontFamily: "var(--font-label)",
                                 fontWeight: '600',
                                 cursor: 'pointer',
                                 overflow: 'hidden',
@@ -2439,14 +2462,14 @@ function RelationshipsPageContent() {
                     {/* Category Tag */}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <span style={{
-                        background: 'var(--color-surface-hover)',
-                        border: '1px solid var(--color-border)',
+                        background: 'var(--color-surface-elevated-2)',
+                        border: 'none',
                         color: 'var(--color-text-primary)',
-                        padding: '3px 8px',
-                        borderRadius: '5px',
-                        fontSize: '0.66rem',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        fontSize: '11px',
                         fontWeight: '700',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "var(--font-label)",
                         display: 'inline-block'
                       }}>
                         {catDisplay}
@@ -2482,7 +2505,7 @@ function RelationshipsPageContent() {
                         padding: '2px 7px',
                         borderRadius: '4px',
                         fontSize: '0.7rem',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "var(--font-label)",
                         fontWeight: '700',
                         color: 'var(--color-text-primary)',
                         display: 'inline-flex',
@@ -2499,7 +2522,7 @@ function RelationshipsPageContent() {
                         padding: '2px 7px',
                         borderRadius: '4px',
                         fontSize: '0.7rem',
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "var(--font-label)",
                         fontWeight: '700',
                         color: 'var(--color-text-primary)',
                         display: 'inline-flex',
@@ -2546,8 +2569,8 @@ function RelationshipsPageContent() {
                     </button>
 
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Delete ${person.name} from Database?`)) {
+                      onClick={async () => {
+                        if (await confirmDelete(person.name)) {
                           deleteNode(person);
                         }
                       }}
@@ -2628,12 +2651,12 @@ function RelationshipsPageContent() {
                         <div style={{ fontWeight: '700', fontSize: '0.92rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {person.name}
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {handleDisplay || 'No handle linked'}
                         </div>
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.66rem', background: 'var(--color-surface-hover)', padding: '2px 7px', borderRadius: '4px', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", border: '1px solid var(--color-border)' }}>
+                    <span style={{ fontSize: '0.66rem', background: 'var(--color-surface-hover)', padding: '2px 7px', borderRadius: '4px', fontWeight: '700', fontFamily: "var(--font-label)", border: '1px solid var(--color-border)' }}>
                       {relDisplay}
                     </span>
                   </div>
@@ -2672,8 +2695,8 @@ function RelationshipsPageContent() {
                       <ArrowRight size={12} />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Delete ${person.name} from Database?`)) {
+                      onClick={async () => {
+                        if (await confirmDelete(person.name)) {
                           deleteNode(person);
                         }
                       }}
@@ -2756,7 +2779,7 @@ function RelationshipsPageContent() {
                     <span style={{ fontWeight: '700', fontSize: '0.86rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {person.name}
                     </span>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {handleDisplay || '—'}
                     </span>
                   </div>
@@ -2765,7 +2788,7 @@ function RelationshipsPageContent() {
                     <span style={{ fontSize: '0.68rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
                       {relDisplay}
                     </span>
-                    <span style={{ fontSize: '0.72rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: 'var(--color-text-secondary)' }}>
+                    <span style={{ fontSize: '0.72rem', fontFamily: "var(--font-label)", fontWeight: '700', color: 'var(--color-text-secondary)' }}>
                       {chatsCount} chats
                     </span>
                     <button
@@ -2806,7 +2829,7 @@ function RelationshipsPageContent() {
             borderBottomLeftRadius: '10px',
             borderBottomRightRadius: '10px'
           }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
               {filteredPeople.length} people &nbsp;·&nbsp; Page {tablePage} of {totalTablePages}
             </span>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

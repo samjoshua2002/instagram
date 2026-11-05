@@ -220,9 +220,9 @@ export function AppProvider({ children }) {
     lastRoutingEditTimeRef.current = Date.now();
     setRoutingConfigState(updater);
   }, []);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState('info');
-  const toastTimerRef = useRef(null);
+  // Toast stack: newest last, max 3 visible; each closes itself (errors stay longer)
+  const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
 
   // AI Interview Modal State
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -231,13 +231,23 @@ export function AppProvider({ children }) {
   // Link Instagram ID Modal State
   const [linkingTargetPerson, setLinkingTargetPerson] = useState(null);
 
-  const showToast = useCallback((msg, type = 'info') => {
-    setToastMessage(msg);
-    setToastType(type);
-    // A new toast restarts the timer, so the previous toast's timer cannot hide it early
-    clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToastMessage(''), 4000);
+  const dismissToast = useCallback((id) => {
+    setToasts(list => list.filter(t => t.id !== id));
   }, []);
+
+  const showToast = useCallback((msg, type = 'info', opts = {}) => {
+    if (!msg) return;
+    const text = String(msg).replace(/[🌀-🧿☀-⛿✀-➿]/gu, '').trim();
+    const id = ++toastIdRef.current;
+    setToasts(list => {
+      // Same message already showing: replace it instead of stacking a copy
+      const rest = list.filter(t => t.text !== text);
+      return [...rest, { id, text, type, action: opts.action || null }].slice(-3);
+    });
+    const ms = opts.duration ?? (type === 'error' ? 6000 : 4000);
+    if (ms > 0) setTimeout(() => dismissToast(id), ms);
+    return id;
+  }, [dismissToast]);
 
   const login = useCallback((jwtToken, userData) => {
     localStorage.setItem('chatter_jwt_token', jwtToken);
@@ -459,16 +469,42 @@ export function AppProvider({ children }) {
     if (typeof window === 'undefined') return;
 
     const originalFetch = window.fetch;
+    // Every request gets a time limit, so a slow or dropped mobile connection
+    // can never leave a button spinning forever. Uploads get longer.
     window.fetch = async (url, options = {}) => {
       const storedToken = localStorage.getItem('chatter_jwt_token');
+      let opts = options;
       if (storedToken && typeof url === 'string') {
         const headers = new Headers(options.headers || {});
         if (!headers.has('Authorization')) {
           headers.set('Authorization', `Bearer ${storedToken}`);
         }
-        return originalFetch(url, { ...options, headers });
+        opts = { ...options, headers };
       }
-      return originalFetch(url, options);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new Error('You are offline. Check your internet connection and try again.');
+      }
+      const isUpload = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+      const limitMs = isUpload ? 120000 : 30000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort('timeout'), limitMs);
+      if (opts.signal) {
+        if (opts.signal.aborted) controller.abort(opts.signal.reason);
+        else opts.signal.addEventListener('abort', () => controller.abort(opts.signal.reason), { once: true });
+      }
+      try {
+        return await originalFetch(url, { ...opts, signal: controller.signal });
+      } catch (err) {
+        if (controller.signal.reason === 'timeout') {
+          throw new Error('The server is taking too long to answer. Please try again.');
+        }
+        if (err?.name === 'AbortError') throw err;
+        throw new Error(navigator.onLine === false
+          ? 'You are offline. Check your internet connection and try again.'
+          : 'Could not reach the server. Please try again in a moment.');
+      } finally {
+        clearTimeout(timer);
+      }
     };
 
     const savedToken = localStorage.getItem('chatter_jwt_token');
@@ -556,16 +592,29 @@ export function AppProvider({ children }) {
     syncBackend();
 
     // Live background polling every 8 seconds to sync chat & reel counts smoothly
+    // Skipped while the tab is hidden or offline, so it never competes with button actions
     const interval = setInterval(() => {
+      if (document.hidden || navigator.onLine === false) return;
       syncBackend();
     }, 8000);
+    const onVisible = () => { if (!document.hidden) syncBackend(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onVisible);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onVisible);
+    };
   }, [user?._id || user?.username]);
 
+  const syncInFlightRef = useRef(false);
   const syncBackend = async () => {
     // Signed out (login screen): polling would only collect 401s
     try { if (!localStorage.getItem('chatter_jwt_token')) return; } catch (e) { return; }
+    // One sync at a time: on slow mobile data, overlapping syncs pile up and delay button requests
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
     try {
       // 1. Sync social graph directly from live MongoDB database
       const res = await fetch(`${API_BASE}/api/social-graph`);
@@ -697,6 +746,7 @@ export function AppProvider({ children }) {
     } catch (e) {
       console.warn('Backend sync note (using cached):', e.message);
     } finally {
+      syncInFlightRef.current = false;
       setIsSyncingInitial(false);
     }
   };
@@ -837,7 +887,7 @@ export function AppProvider({ children }) {
         const data = await saveRes.json().catch(() => ({}));
         throw new Error(data.error || `server answered ${saveRes.status}`);
       }
-      showToast(`Saved ${cleanName} to Knowledge Tree & DB!`);
+      showToast(`Saved ${cleanName} to Knowledge Tree & DB!`, 'success');
 
       for (const dup of toDelete) {
         if (dup && dup.trim().toLowerCase() !== cleanName.toLowerCase()) {
@@ -921,7 +971,7 @@ export function AppProvider({ children }) {
         const data = await delRes.json().catch(() => ({}));
         throw new Error(data.error || `server answered ${delRes.status}`);
       }
-      showToast(`Deleted ${targetName || 'contact'} from Directory`);
+      showToast(`Deleted ${targetName || 'contact'} from Directory`, 'success');
     } catch (err) {
       console.warn('Backend delete node error:', err.message);
       showToast(`Could not delete ${targetName || 'contact'}: ${err.message}`, 'error');
@@ -1267,8 +1317,8 @@ export function AppProvider({ children }) {
         updateContactPreferences,
         addFact,
         showToast,
-        toastMessage,
-        toastType,
+        dismissToast,
+        toasts,
         isAiModalOpen,
         setIsAiModalOpen,
         editingNode,

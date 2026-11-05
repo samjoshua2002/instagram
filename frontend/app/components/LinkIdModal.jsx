@@ -6,7 +6,7 @@ import { X, Link2, Search, UserCheck } from 'lucide-react';
 import ContactAvatar from './ContactAvatar';
 
 export default function LinkIdModal() {
-  const { linkingTargetPerson, setLinkingTargetPerson, linkContactId, API_BASE } = useApp();
+  const { linkingTargetPerson, setLinkingTargetPerson, linkContactId, API_BASE, showToast } = useApp();
 
   const [handleInput, setHandleInput] = useState('');
   const [senderIdInput, setSenderIdInput] = useState('');
@@ -56,7 +56,7 @@ export default function LinkIdModal() {
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!handleInput.trim() && !senderIdInput.trim()) {
-      alert('Please enter an Instagram handle or Sender ID.');
+      showToast('Enter an Instagram handle or Sender ID.', 'warning');
       return;
     }
 
@@ -138,7 +138,7 @@ export default function LinkIdModal() {
               <Link2 size={16} />
             </div>
             <div>
-              <div style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>
+              <div style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>
                 IDENTITY LINK
               </div>
               <h2 style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
@@ -183,7 +183,7 @@ export default function LinkIdModal() {
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Instagram Handle
               </label>
               <div style={{ position: 'relative' }}>
@@ -209,7 +209,7 @@ export default function LinkIdModal() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Numeric Sender ID (Optional)
               </label>
               <input
@@ -225,7 +225,7 @@ export default function LinkIdModal() {
                   padding: '9px 12px',
                   color: 'var(--color-text-primary)',
                   fontSize: '0.82rem',
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "var(--font-label)",
                   outline: 'none',
                   boxSizing: 'border-box'
                 }}
@@ -234,7 +234,7 @@ export default function LinkIdModal() {
 
             {/* Suggestions from Recent DMs */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Or Pick From Recent Instagram DM Chatters
               </label>
 
@@ -304,7 +304,7 @@ export default function LinkIdModal() {
                             <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
                               {c.name || c.username}
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                               {c.username || c.senderId}
                             </div>
                           </div>

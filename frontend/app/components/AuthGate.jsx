@@ -6,7 +6,6 @@ import { useApp } from '../context/AppContext';
 import LoginPage from './LoginPage';
 import PasskeyManagerModal from './PasskeyManagerModal';
 import Sidebar from './Sidebar';
-import Toast from './Toast';
 import AiInterviewModal from './AiInterviewModal';
 import LinkIdModal from './LinkIdModal';
 import OnboardingWizard from './OnboardingWizard';
@@ -90,7 +89,7 @@ export default function AuthGate({ children }) {
         alignItems: 'center',
         justifyContent: 'center',
         gap: '14px',
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+        fontFamily: 'var(--font-sans)',
       }}>
         <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: 'var(--ambient-dominant)', color: 'var(--color-background)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ShieldCheck size={22} />
@@ -123,7 +122,6 @@ export default function AuthGate({ children }) {
           )}
         </main>
       </div>
-      <Toast />
       <AiInterviewModal />
       <LinkIdModal />
       <PasskeyManagerModal

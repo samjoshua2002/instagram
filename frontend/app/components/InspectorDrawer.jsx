@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 import ContactAvatar from './ContactAvatar';
 import {
   X, Sparkles, Clock, Check, Film, PauseCircle, Trash2, Link2,
@@ -21,6 +22,7 @@ export default function InspectorDrawer() {
     API_BASE,
     showToast
   } = useApp();
+  const confirm = useConfirm();
 
   const [drawerTab, setDrawerTab] = useState('edit'); // 'edit' | 'memories' | 'connections'
   const [newFact, setNewFact] = useState('');
@@ -197,13 +199,13 @@ export default function InspectorDrawer() {
               <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-surface)', margin: 0 }}>
                 {selectedNode.name}
               </h2>
-              <span style={{ fontSize: '0.66rem', background: 'var(--color-text-primary)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", border: '1px solid var(--color-text-secondary)' }}>
+              <span style={{ fontSize: '0.66rem', background: 'var(--color-text-primary)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontFamily: "var(--font-label)", border: '1px solid var(--color-text-secondary)' }}>
                 {(selectedNode.category || 'friend').toUpperCase()}
               </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-              <span style={{ fontSize: '0.78rem', color: hasInstagramId ? '#10b981' : '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontSize: '0.78rem', color: hasInstagramId ? '#10b981' : '#f59e0b', fontFamily: "var(--font-label)" }}>
                 {selectedNode.handle || (selectedNode.senderId ? `ID: ${selectedNode.senderId}` : 'No Instagram ID')}
               </span>
               <button
@@ -281,7 +283,7 @@ export default function InspectorDrawer() {
       {/* ================= SECTION 1: CHAT CONTROL INSIDE PAGE ================= */}
       <div style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '10px', padding: '14px', marginBottom: '18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "var(--font-label)" }}>
             CHAT CONTROL FOR {selectedNode.name.toUpperCase()}
           </span>
           <span
@@ -289,7 +291,7 @@ export default function InspectorDrawer() {
               fontSize: '0.64rem',
               padding: '2px 7px',
               borderRadius: '4px',
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-label)",
               fontWeight: '700',
               background: isPaused ? 'rgba(239, 68, 68, 0.15)' : (isReelsOnly ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
               color: isPaused ? '#ef4444' : (isReelsOnly ? '#f59e0b' : '#10b981'),
@@ -462,7 +464,7 @@ export default function InspectorDrawer() {
           {/* Name & Date of Birth */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Name
               </label>
               <input
@@ -474,7 +476,7 @@ export default function InspectorDrawer() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Date of Birth (DOB)
               </label>
               <input
@@ -490,7 +492,7 @@ export default function InspectorDrawer() {
           {/* Category & Specific Relationship */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Category Filter
               </label>
               <select
@@ -508,7 +510,7 @@ export default function InspectorDrawer() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
                 Relationship Note
               </label>
               <input
@@ -524,7 +526,7 @@ export default function InspectorDrawer() {
           {/* Personal Notes & Bio Lore */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+              <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
                 Personal Notes & Lore (Netflix, Studies, Habits, Family)
               </label>
               <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)' }}>Multi-line text</span>
@@ -552,7 +554,7 @@ export default function InspectorDrawer() {
 
           {/* Banter & Cussing Style */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#f43f5e', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "'JetBrains Mono', monospace" }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#f43f5e', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
               Banter & Cussing Style
             </label>
             <input
@@ -590,8 +592,8 @@ export default function InspectorDrawer() {
 
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm(`Delete ${selectedNode.name} from Database & Knowledge Tree?`)) {
+              onClick={async () => {
+                if (await confirm({ title: `Delete ${selectedNode.name}?`, message: 'Their contact and saved profile will be removed from the directory.', confirmLabel: 'Delete', tone: 'danger' })) {
                   deleteNode(selectedNode.id || selectedNode.name);
                 }
               }}
@@ -637,7 +639,7 @@ export default function InspectorDrawer() {
           </button>
 
           <div>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "var(--font-label)" }}>
               Remembered Facts Learned by AI
             </span>
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -668,7 +670,7 @@ export default function InspectorDrawer() {
 
           {selectedNode.rollingSummary && (
             <div>
-              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "var(--font-label)" }}>
                 AI Rolling Summary
               </span>
               <div style={{ marginTop: '6px', background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '8px', padding: '12px', fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
@@ -678,7 +680,7 @@ export default function InspectorDrawer() {
           )}
 
           <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', padding: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '0.8rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '0.8rem', fontWeight: '700', fontFamily: "var(--font-label)" }}>
               <Clock size={14} />
               <span>5–10H FOLLOW-UP REMINDER ACTIVE</span>
             </div>
@@ -693,7 +695,7 @@ export default function InspectorDrawer() {
       {drawerTab === 'connections' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: 'bold', fontFamily: "var(--font-label)" }}>
               Interlinked Friends ({selectedNode.connections?.length || 0})
             </span>
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -716,7 +718,7 @@ export default function InspectorDrawer() {
 
           {/* Add Connection Form */}
           <form onSubmit={handleAddConnection} style={{ background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
               + Link Another Friend to {selectedNode.name}
             </span>
             <input

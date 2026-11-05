@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/DialogContext';
 import { FileText, Link2, Type, UploadCloud, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 
 const ACCEPT = '.pdf,.txt,.md,.csv';
@@ -19,6 +20,7 @@ const SourceIcon = ({ type, size = 18 }) =>
  */
 export default function DocumentsPage() {
   const { API_BASE, token, showToast } = useApp();
+  const confirm = useConfirm();
   const [items, setItems] = useState(null);
   const [tab, setTab] = useState('file');
   const [busy, setBusy] = useState(false);
@@ -86,7 +88,7 @@ export default function DocumentsPage() {
   );
 
   const remove = async (item) => {
-    if (!window.confirm(`Remove "${item.title}" from the knowledge base?`)) return;
+    if (!(await confirm({ title: 'Remove document?', message: `"${item.title}" will be removed from the knowledge base. The AI will stop using it.`, confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       const res = await fetch(`${API_BASE}/api/knowledge/${item._id}`, { method: 'DELETE', headers: authHeaders() });
       if (!res.ok) throw new Error((await res.json()).error);

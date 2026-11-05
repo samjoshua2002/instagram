@@ -1,9 +1,13 @@
 import './globals.css';
+import './spotify.css';
 import { AppProvider } from './context/AppContext';
 import AuthGate from './components/AuthGate';
 import AmbientBackground from './components/AmbientBackground';
 import InstagramSetupModal from './components/InstagramSetupModal';
-import DesktopAlerts from './components/DesktopAlerts';
+import BrowserAlerts from './components/BrowserAlerts';
+import Toaster from './components/Toast';
+import NetworkStatus from './components/NetworkStatus';
+import { DialogProvider } from './context/DialogContext';
 import { themeBootScript } from './lib/themeBoot';
 import MuiProvider from './components/MuiProvider';
 
@@ -35,11 +39,15 @@ export default function RootLayout({ children }) {
         <AmbientBackground />
         <MuiProvider>
           <AppProvider>
-            <AuthGate>
-              {children}
-            </AuthGate>
-            <InstagramSetupModal />
-            <DesktopAlerts />
+            <DialogProvider>
+              <AuthGate>
+                {children}
+              </AuthGate>
+              <InstagramSetupModal />
+              <BrowserAlerts />
+              <NetworkStatus />
+              <Toaster />
+            </DialogProvider>
           </AppProvider>
         </MuiProvider>
       </body>

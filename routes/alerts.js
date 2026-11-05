@@ -1,42 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const DesktopDevice = require('../models/DesktopDevice');
 const Lead = require('../models/Lead');
 const Booking = require('../models/Booking');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const workspaceFeatureService = require('../services/workspaceFeatureService');
 
-// Mounted behind requireAuth at /api/desktop (PLAN.md §13 Phase 8).
-// The desktop app polls /alerts and shows each item as a native notification.
+// Mounted behind requireAuth at /api/alerts.
+// The web app polls /alerts and shows each item as a browser notification.
 
-const PLATFORMS = ['macos-arm64', 'macos-x64', 'windows-x64', 'windows-x86'];
 const MAX_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 /**
- * POST /api/desktop/register  Body: { platform, deviceName }
- */
-router.post('/register', async (req, res) => {
-  try {
-    const { platform, deviceName = '' } = req.body || {};
-    if (!PLATFORMS.includes(platform)) return res.status(400).json({ error: 'Unknown platform' });
-    const device = await DesktopDevice.findOneAndUpdate(
-      { userId: req.user._id, platform, deviceName: String(deviceName).slice(0, 80) },
-      { $set: { lastActiveAt: new Date() } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    ).lean();
-    res.json({ success: true, deviceId: device._id });
-  } catch (err) {
-    console.error('❌ [Desktop] register failed:', err.message);
-    res.status(500).json({ error: 'Could not register this device' });
-  }
-});
-
-/**
- * GET /api/desktop/alerts?since=ISO
+ * GET /api/alerts?since=ISO
  * -> { alerts: [{ id, kind, title, body, at }], now, enabled }
  */
-router.get('/alerts', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const now = new Date();
     const features = await workspaceFeatureService.getFeaturesSafe(req.user);
@@ -94,7 +73,7 @@ router.get('/alerts', async (req, res) => {
 
     res.json({ success: true, alerts, now, enabled: true });
   } catch (err) {
-    console.error('❌ [Desktop] alerts failed:', err.message);
+    console.error('❌ [Alerts] alerts failed:', err.message);
     res.status(500).json({ error: 'Could not load alerts' });
   }
 });
