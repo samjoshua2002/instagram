@@ -2103,7 +2103,7 @@ function RelationshipsPageContent() {
 
       {/* ================= SHADCN LIGHT MONOCHROME TABLE ================= */}
       <div
-        style={{
+        style={layoutMode === 'grid' ? { background: 'transparent' } : {
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '10px',
@@ -2609,8 +2609,8 @@ function RelationshipsPageContent() {
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '14px',
-            padding: '16px'
+            gap: '12px',
+            padding: 0
           }}
         >
           {pagedPeople.length === 0 ? (
@@ -2632,11 +2632,12 @@ function RelationshipsPageContent() {
                   layout
                   whileHover={{ y: -2, boxShadow: '0 6px 16px rgba(0,0,0,0.06)' }}
                   onClick={() => setSelectedPerson(person)}
+                  className="people-grid-card"
                   style={{
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface-elevated)',
+                    border: 'none',
                     borderRadius: '12px',
-                    padding: '16px',
+                    padding: '14px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
@@ -2646,33 +2647,33 @@ function RelationshipsPageContent() {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                      <ContactAvatar contact={person} size={42} showStatus={true} />
+                      <ContactAvatar contact={person} size={48} showStatus={true} />
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: '700', fontSize: '0.92rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {person.name}
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {handleDisplay || 'No handle linked'}
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {handleDisplay ? `@${String(handleDisplay).replace(/^@/, '')}` : 'No handle linked'}
                         </div>
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.66rem', background: 'var(--color-surface-hover)', padding: '2px 7px', borderRadius: '4px', fontWeight: '700', fontFamily: "var(--font-label)", border: '1px solid var(--color-border)' }}>
+                    <span style={{ fontSize: '11px', background: 'var(--color-surface-hover)', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', fontFamily: "var(--font-label)", border: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {relDisplay}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--color-text-secondary)', paddingTop: '8px', borderTop: '1px solid var(--color-surface-hover)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: 'var(--color-text-secondary)', paddingTop: '12px', borderTop: '1px solid var(--color-surface-hover)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Calendar size={12} />
                       <span>{dobDisplay || 'Birthday not set'}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{chatsCount} chats</span>
-                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{reelsCount} reels</span>
+                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{Number(chatsCount).toLocaleString('en-US')} chats</span>
+                      <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{Number(reelsCount).toLocaleString('en-US')} reels</span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', paddingTop: '4px' }} onClick={(e) => e.stopPropagation()}>
+                  <div className="people-grid-actions" style={{ display: 'flex', gap: '6px', paddingTop: '4px' }} onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setSelectedPerson(person)}
                       style={{
