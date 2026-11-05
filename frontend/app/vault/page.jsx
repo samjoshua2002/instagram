@@ -8,7 +8,7 @@ import {
   Image as ImageIcon, Upload, Plus, Trash2, CheckCircle2,
   AlertCircle, RefreshCw, Link as LinkIcon, Film, Sparkles,
   Smile, Flame, Eye, Heart, HelpCircle, Frown, X, ExternalLink,
-  Pencil, Tag, Search, Download, Key, Check, Layers
+  Pencil, Tag, Search, Check
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
@@ -36,11 +36,6 @@ function MediaVaultPageContent() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-
-  // Gallery View Switcher: 'vault' | 'predefined'
-  const [galleryView, setGalleryView] = useState('vault');
-  const [predefinedList, setPredefinedList] = useState([]);
-  const [importingPredefined, setImportingPredefined] = useState(false);
 
   // Upload Form State
   const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'url' | 'giphy'
@@ -81,7 +76,6 @@ function MediaVaultPageContent() {
 
   useEffect(() => {
     fetchVaultData();
-    fetchPredefined();
     // Switching category (or leaving) makes any answer still on its way stale
     return () => { vaultRequestRef.current += 1; };
   }, [activeCategory]);
@@ -108,40 +102,6 @@ function MediaVaultPageContent() {
       showToast('Failed to load media vault', 'error');
     } finally {
       if (!isStale()) setLoading(false);
-    }
-  };
-
-  const fetchPredefined = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/media-vault/predefined`, { headers: getAuthHeaders() });
-      const data = await res.json();
-      if (data.success) {
-        setPredefinedList(data.predefined || []);
-      }
-    } catch (_) {}
-  };
-
-  const handleImportPredefined = async (ids = null) => {
-    setImportingPredefined(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/media-vault/import-predefined`, {
-        method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ ids }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const added = data.results?.added || 0;
-        const skipped = data.results?.skipped || 0;
-        showToast(`Imported ${added} reaction GIFs to your vault! (${skipped} already in vault)`, 'success');
-        fetchVaultData();
-      } else {
-        showToast(data.error || 'Failed to import predefined GIFs', 'error');
-      }
-    } catch (err) {
-      showToast('Import error', 'error');
-    } finally {
-      setImportingPredefined(false);
     }
   };
 
@@ -500,7 +460,6 @@ function MediaVaultPageContent() {
     { id: 'url', label: 'Paste URL', icon: LinkIcon },
   ];
   const categoryLabel = (id) => categories.find(c => c.id === id)?.label || id;
-  const shownPredefined = activeCategory === 'all' ? predefinedList : predefinedList.filter(p => p.category === activeCategory);
   const addPanelRef = useRef(null);
 
   const openMode = (mode) => {
@@ -579,8 +538,10 @@ function MediaVaultPageContent() {
         hidden
       />
 
+      <div className="vx-layout">
       {/* Add media */}
       <div className="spx-panel vx-add" ref={addPanelRef}>
+        <h2 className="vx-add-title">Add a reaction</h2>
         <div className="spx-pills vx-scroll vx-modes" role="tablist">
           {MODES.map(({ id, label, icon: Icon }) => (
             <button
@@ -767,35 +728,10 @@ function MediaVaultPageContent() {
         )}
       </div>
 
-      {/* Curated library */}
-      <div className="spx-banner">
-        <Sparkles size={22} />
-        <div className="spx-banner-text">
-          <div className="spx-banner-title">Curated reaction library · {predefinedList.length} GIFs ready</div>
-          <div className="spx-banner-sub">Popular memes already tagged with keywords. Add them all in one tap.</div>
-        </div>
-        <div className="spx-banner-actions">
-          <button type="button" className="spx-outline" onClick={() => setGalleryView(galleryView === 'predefined' ? 'vault' : 'predefined')}>
-            {galleryView === 'predefined' ? 'Back to my vault' : 'Browse library'}
-          </button>
-          <button type="button" className="spx-outline vx-outline-green" onClick={() => handleImportPredefined()} disabled={importingPredefined}>
-            {importingPredefined ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
-            {importingPredefined ? 'Importing…' : 'Import all'}
-          </button>
-        </div>
-      </div>
-
       {/* Gallery */}
+      <section className="vx-gallery">
       <div className="spx-section-head vx-gallery-head">
-        <h2 className="spx-section-title">{galleryView === 'predefined' ? 'Curated library' : 'Your reactions'}</h2>
-        <div className="vx-switch" role="tablist" aria-label="Gallery">
-          <button type="button" role="tab" aria-selected={galleryView === 'vault'} className={galleryView === 'vault' ? 'active' : ''} onClick={() => setGalleryView('vault')}>
-            My vault <span>{items.length}</span>
-          </button>
-          <button type="button" role="tab" aria-selected={galleryView === 'predefined'} className={galleryView === 'predefined' ? 'active' : ''} onClick={() => setGalleryView('predefined')}>
-            Curated <span>{predefinedList.length}</span>
-          </button>
-        </div>
+        <h2 className="spx-section-title">Your reactions <span className="vx-count">{items.length}</span></h2>
       </div>
 
       <div className="spx-pills vx-scroll vx-cats" aria-label="Filter by emotion">
@@ -831,29 +767,7 @@ function MediaVaultPageContent() {
         })}
       </div>
 
-      {galleryView === 'predefined' ? (
-        shownPredefined.length === 0 ? (
-          <div className="spx-empty-card">No curated GIFs in this category.</div>
-        ) : (
-          <div className="vx-grid stagger-in">
-            {shownPredefined.map(pred => renderCard({
-              key: pred.id,
-              url: pred.url,
-              name: pred.name,
-              category: pred.category,
-              badge: 'Curated',
-              keywords: pred.keywords,
-              footer: items.some(i => i.url === pred.url) ? (
-                <span className="vx-in"><CheckCircle2 size={14} /> In my vault</span>
-              ) : (
-                <button type="button" className="spx-outline vx-outline-green" onClick={() => handleImportPredefined([pred.id])} disabled={importingPredefined}>
-                  <Plus size={13} /> Add to vault
-                </button>
-              ),
-            }))}
-          </div>
-        )
-      ) : loading ? (
+      {loading ? (
         <div className="vx-grid" role="status" aria-busy="true" aria-label="Loading reaction vault media">
           {Array.from({ length: 8 }, (_, i) => (
             <div key={i} className="vx-card vx-card-sk">
@@ -866,7 +780,7 @@ function MediaVaultPageContent() {
         <div className="spx-empty-card vx-empty">
           <ImageIcon className="icon-keep" size={32} />
           <div className="vx-empty-title">No reactions in {activeCategory === 'all' ? 'your vault' : categoryLabel(activeCategory)} yet</div>
-          <p>Until you add your own, the AI uses the curated GIFs when this emotion comes up in a chat.</p>
+          <p>Upload a GIF, search GIPHY or paste a link above and save it here.</p>
           <button
             type="button"
             className="spx-play vx-play-sm"
@@ -899,6 +813,9 @@ function MediaVaultPageContent() {
           }))}
         </div>
       )}
+
+      </section>
+      </div>
 
       {renderModal(!!editingItem, () => setEditingItem(null), 'Edit reaction', (
         <form className="vx-form" onSubmit={handleSaveEditItem}>

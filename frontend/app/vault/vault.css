@@ -7,6 +7,38 @@
 .vx-page .spx-actions .spx-play { margin-right: 12px; }
 .vx-refresh { width: 36px; height: 36px; }
 
+/* ── Layout: add form on the left, gallery on the right (wide screens) ── */
+.vx-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 8px;
+}
+.vx-add { margin: 0; min-width: 0; }
+.vx-add-title { margin: 0 0 14px; font-size: 18px; font-weight: 800; }
+.vx-gallery { min-width: 0; }
+.vx-page .vx-gallery-head { margin-top: 0; padding-top: 0; }
+.vx-count {
+  margin-left: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-2);
+}
+@media (min-width: 1200px) {
+  .vx-layout { grid-template-columns: minmax(360px, 420px) minmax(0, 1fr); gap: 32px; }
+  .vx-add { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+  /* The narrow column fits these better stacked */
+  .vx-add .vx-form-grid { grid-template-columns: 1fr; }
+  .vx-add .vx-batch-form { width: 100%; }
+  .vx-page .vx-add .vx-batch-form select { flex: 1 1 120px; }
+  .vx-page .vx-add .vx-batch-form input { flex: 1 1 100%; width: auto; }
+  .vx-add .vx-batch-form .spx-play { flex: 1 1 100%; justify-content: center; }
+  .vx-add .vx-pick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 420px; }
+  .vx-add .vx-form > .spx-play { align-self: stretch; justify-content: center; }
+  .vx-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+
 /* Rows that scroll sideways on small screens instead of wrapping into a wall */
 .vx-scroll {
   flex-wrap: nowrap;
@@ -204,31 +236,6 @@
 .vx-badge-in { left: 6px; top: 6px; background: #1db954; color: #000; }
 
 /* ── Gallery ──────────────────────────────────────────────────── */
-.vx-gallery-head { gap: 12px; flex-wrap: wrap; }
-.vx-switch {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: 9999px;
-  background: var(--sp-tile);
-}
-.vx-switch button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 9999px;
-  background: transparent;
-  color: var(--sp-text-2);
-  font: 700 13px var(--font-sans);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.vx-switch button span { font-size: 12px; opacity: 0.7; }
-.vx-switch button.active { background: var(--sp-text); color: var(--sp-panel); }
-
 .vx-cats { padding-top: 16px; }
 .vx-cats .spx-pill { text-transform: capitalize; }
 .vx-pill-act {
@@ -293,20 +300,8 @@
   margin-top: 10px;
   min-height: 32px;
 }
-.vx-card-foot > .spx-outline { margin-left: auto; }
 .vx-foot-gap { flex: 1; }
 .vx-danger:hover { color: #f3727f; }
-.vx-in {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--spx-green-text);
-}
-.vx-outline-green { border-color: #1db954; color: var(--spx-green-text); }
-.vx-outline-green:disabled { opacity: 0.6; cursor: default; transform: none; }
 .vx-card-sk { gap: 0; }
 .vx-card-sk .vx-card-body { gap: 8px; }
 
@@ -360,7 +355,9 @@
   .vx-page .spx-actions .spx-play { margin-right: 0; }
   .vx-page .spx-actions { gap: 8px; }
   .vx-refresh { margin-left: auto; }
-  .vx-page .spx-panel { padding: 12px; }
+  .vx-page .spx-panel { padding: 14px; }
+  .vx-add-title { font-size: 16px; margin-bottom: 10px; }
+  .vx-layout { gap: 20px; }
 
   .vx-search .spx-play { padding: 0 16px; }
   .vx-batch { padding: 10px; }
@@ -371,15 +368,6 @@
   .vx-pick-title { display: none; }
 
   .vx-form > .spx-play { align-self: stretch; justify-content: center; }
-
-  .vx-page .spx-banner { gap: 10px; }
-  .vx-page .spx-banner-text { flex-basis: calc(100% - 40px); }
-  .vx-page .spx-banner-actions { width: 100%; }
-  .vx-page .spx-banner-actions > * { flex: 1; justify-content: center; }
-
-  .vx-gallery-head { align-items: flex-start; flex-direction: column; }
-  .vx-switch { width: 100%; }
-  .vx-switch button { flex: 1; justify-content: center; }
 
   /* Two cards per row so the GIFs stay big enough to see */
   .vx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -392,8 +380,6 @@
   .vx-card-title { font-size: 14px; }
   .vx-tags .spx-chip:nth-child(n + 4) { display: none; }
   .vx-card-foot { margin-top: 6px; }
-  .vx-card-foot > .spx-outline { width: 100%; justify-content: center; padding: 0 8px; }
-  .vx-in { margin: 0 auto; font-size: 12px; }
 
   /* Dialogs become bottom sheets */
   .vx-modal-back { align-items: flex-end; padding: 0; }
