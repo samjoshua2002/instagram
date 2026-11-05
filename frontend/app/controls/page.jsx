@@ -930,6 +930,7 @@ function ControlsPageContent() {
                     gap: '6px',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
+                    flexShrink: 0,
                     touchAction: 'manipulation'
                   }}
                 >
