@@ -16,9 +16,18 @@ const connectDB = async () => {
     const sanitizedUri = mongoUri.replace(/:([^:@]+)@/, ':****@');
     console.log(`🔌 Attempting MongoDB connection to: ${sanitizedUri}`);
 
-    const conn = await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 8000,
-    });
+    const options = { serverSelectionTimeoutMS: 8000 };
+    let conn;
+    try {
+      conn = await mongoose.connect(mongoUri, options);
+    } catch (err) {
+      // Some Windows routers hand out an IPv6 link-local DNS (fe80::1) that Node cannot query,
+      // so the mongodb+srv lookup fails with querySrv ECONNREFUSED. Retry once with public DNS.
+      if (!/querySrv|ENOTFOUND|ECONNREFUSED/.test(err.message || '') || !mongoUri.startsWith('mongodb+srv')) throw err;
+      console.warn('⚠️ DNS lookup for MongoDB failed; retrying with public DNS (1.1.1.1, 8.8.8.8)...');
+      require('dns').setServers(['1.1.1.1', '8.8.8.8']);
+      conn = await mongoose.connect(mongoUri, options);
+    }
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     return conn;
   } catch (error) {

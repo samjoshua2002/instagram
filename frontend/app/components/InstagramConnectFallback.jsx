@@ -683,8 +683,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     disabled={oauthConnecting}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, var(--ambient-dominant) 0%, var(--ambient-dominant) 50%, #db2777 100%)',
-                      color: 'var(--color-surface)',
+                      background: 'var(--ambient-dominant)',
+                      color: '#000',
                       border: 'none',
                       borderRadius: '11px',
                       padding: '14px 20px',
@@ -695,7 +695,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '9px',
-                      boxShadow: '0 6px 20px rgba(124, 58, 237, 0.22)',
+                      boxShadow: '0 6px 20px rgba(0, 0, 0, 0.25)',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -759,7 +759,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       border: '1px solid var(--color-border)',
                       background: 'var(--color-surface)',
                       fontSize: '0.86rem',
-                      fontFamily: 'monospace',
+                      fontFamily: 'var(--font-code)',
                       boxSizing: 'border-box'
                     }}
                   />
@@ -801,7 +801,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       border: '1px solid var(--color-border)',
                       background: 'var(--color-surface)',
                       fontSize: '0.86rem',
-                      fontFamily: 'monospace',
+                      fontFamily: 'var(--font-code)',
                       boxSizing: 'border-box'
                     }}
                   />

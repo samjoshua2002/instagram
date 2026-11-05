@@ -528,7 +528,7 @@ export default function Sidebar() {
               }}
             >
               <Sparkles size={14} color="#000000" />
-              <span>+ Add Person</span>
+              <span>Add Person</span>
             </motion.button>
           )}
 
@@ -757,6 +757,8 @@ export default function Sidebar() {
             <div className="sidebar-profile-actions" style={{ display: 'flex', gap: '6px' }}>
               <Link
                 href="/profile"
+                title="Profile &amp; Security"
+                aria-label="Profile and security"
                 style={{
                   flex: 1,
                   background: 'var(--color-surface)',
@@ -774,7 +776,7 @@ export default function Sidebar() {
                 }}
               >
                 <Fingerprint size={13} />
-                <span>Profile &amp; Security</span>
+                <span style={{ whiteSpace: 'nowrap' }}>Profile</span>
               </Link>
 
               <button

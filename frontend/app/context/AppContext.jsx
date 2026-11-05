@@ -726,21 +726,18 @@ export function AppProvider({ children }) {
       const pData = await personaRes.json();
       if (pData && (pData.chatMode || pData.globalBotActive !== undefined)) {
         if (activeRoutingSavesRef.current === 0 && lastRoutingEditTimeRef.current === editTimestampBefore && Date.now() - editTimestampBefore > 6000) {
-          const mode = pData.chatMode || 'everyone';
-          setRoutingConfigState({
-            chatMode: mode,
+          const nextConfig = {
+            chatMode: pData.chatMode || 'everyone',
             excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
             includedContactIds: (pData.includedContactIds || []).filter(Boolean),
             globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
-          });
+          };
+          const nextJson = JSON.stringify(nextConfig);
+          // Same answer as last poll -> keep the old object so the whole app does not re-render every 8s
+          setRoutingConfigState(prev => (JSON.stringify(prev) === nextJson ? prev : nextConfig));
           const currentUser = userRef.current;
           const userConfigKey = getStorageConfigKey(currentUser);
-          localStorage.setItem(userConfigKey, JSON.stringify({
-            chatMode: mode,
-            excludedContactIds: (pData.excludedContactIds || []).filter(Boolean),
-            includedContactIds: (pData.includedContactIds || []).filter(Boolean),
-            globalBotActive: pData.globalBotActive !== undefined ? pData.globalBotActive : true
-          }));
+          localStorage.setItem(userConfigKey, nextJson);
         }
       }
     } catch (e) {

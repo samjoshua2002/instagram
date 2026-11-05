@@ -70,7 +70,7 @@
 /* Spotlight cards: abstract light artwork, rounded, horizontally scrolling */
 .sh-spot-row {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 340px);
-  gap: 16px; margin: 20px -28px 0; padding: 4px 28px 8px; scroll-padding-inline: 28px;
+  gap: 16px; margin: 0 -28px -26px; padding: 24px 28px 34px; scroll-padding-inline: 28px; /* room for the card shadow, so it is not clipped into a band */
   overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
 }
 .sh-spot-row::-webkit-scrollbar { display: none; }
@@ -111,7 +111,7 @@
 .sh-pulse-sub { color: var(--sh-text-2); font-size: 0.85rem; }
 
 /* At a glance: four headline numbers */
-.sh-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 720px; }
+.sh-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .sh-stat {
   display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 20px;
   background: var(--sh-card); border: 1px solid var(--sh-border); min-width: 0;
@@ -154,7 +154,7 @@
 
 @media (max-width: 640px) {
   .sh-home { padding: 20px 16px 32px; border-radius: 0; }
-  .sh-spot-row { margin: 16px -16px 0; padding: 4px 16px 8px; scroll-padding-inline: 16px; grid-auto-columns: 82%; }
+  .sh-spot-row { margin: -4px -16px -26px; padding: 24px 16px 34px; scroll-padding-inline: 16px; grid-auto-columns: 82%; }
   .sh-fav-row { grid-auto-columns: 120px; }
   .sh-fav-photo { width: 120px; height: 120px; border-radius: 22px; }
   .sh-list { grid-template-columns: 1fr; }

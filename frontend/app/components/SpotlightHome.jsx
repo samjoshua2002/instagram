@@ -258,7 +258,7 @@ export default function SpotlightHome() {
                       <Photo person={p} className="sh-list-photo" />
                       <span className="sh-list-main">
                         <span className="sh-list-name">{p.name}</span>
-                        <span className="sh-list-sub">{handleOf(p) ? `@${handleOf(p)}` : (p.relationship || 'Friend')} · {fmt(p.chatsCount)} DMs</span>
+                        <span className="sh-list-sub">{handleOf(p) ? `@${handleOf(p)}` : (CATEGORY_LABEL[p.category || 'online_friend'] || p.relationship || 'Friend')} · {fmt(p.chatsCount)} DMs</span>
                       </span>
                     </Link>
                   </li>
