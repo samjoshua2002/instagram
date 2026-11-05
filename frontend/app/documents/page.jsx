@@ -5,8 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import { FileText, Link2, Type, UploadCloud, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 import { IconSwap, SegIndicator } from '../components/ui/motion';
-import UnsplashBanner from '../components/UnsplashBanner';
-import PageCover from '../components/PageCover';
+import PageHero from '../components/PageHero';
 
 const ACCEPT = '.pdf,.txt,.md,.csv';
 const TABS = [
@@ -138,22 +137,14 @@ export default function DocumentsPage() {
 
   return (
     <div className="page-container settings-fullwidth spx-page">
-      <PageCover seed="page-documents" />
-      <header className="spx-hero">
-        <UnsplashBanner seed="page-documents" credit={false} className="spx-cover"><FileText size={96} strokeWidth={2} /></UnsplashBanner>
-        <div className="spx-hero-text">
-          <div className="spx-eyebrow">Knowledge base</div>
-          <h1 className="spx-title">Document &amp; Service Vault</h1>
-          <p className="spx-desc">
-            Add price lists, menus, FAQs and brochure links. The AI reads the matching parts before replying to customers.
-          </p>
-          <div className="spx-meta">
-            Chatter OS <span>· {items?.length || 0} document{items?.length === 1 ? '' : 's'} · {sections} section{sections === 1 ? '' : 's'} indexed</span>
-          </div>
-        </div>
-      </header>
-
-      <div className="spx-actions">
+      <PageHero
+        seed="page-documents"
+        icon={<FileText size={96} strokeWidth={2} />}
+        eyebrow="Knowledge base"
+        title="Document & Service Vault"
+        desc="Add price lists, menus, FAQs and brochure links. The AI reads the matching parts before replying to customers."
+        meta={`${items?.length || 0} document${items?.length === 1 ? '' : 's'} · ${sections} section${sections === 1 ? '' : 's'} indexed`}
+      >
         <button type="button" className="spx-play" disabled={busy} onClick={() => openTab('file')}>
           <IconSwap k={busy ? 'loader2' : 'uploadcloud'}>{busy ? <Loader2 size={20} className="animate-spin" /> : <UploadCloud size={20} />}</IconSwap> Upload file
         </button>
@@ -163,7 +154,7 @@ export default function DocumentsPage() {
         <button type="button" className="spx-outline" aria-pressed={tab === 'text'} onClick={() => setTab('text')}>
           <Type size={14} /> Paste text
         </button>
-      </div>
+      </PageHero>
 
       <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
 

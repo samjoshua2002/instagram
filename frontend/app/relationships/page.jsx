@@ -1925,6 +1925,7 @@ function RelationshipsPageContent() {
       <PageHero
         seed="page-people"
         tint={false}
+        collapse={false}
         icon={<Users size={96} strokeWidth={2} />}
         eyebrow="People directory"
         title="All People"

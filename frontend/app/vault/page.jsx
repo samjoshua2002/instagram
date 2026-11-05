@@ -14,8 +14,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { enterMotion } from '../lib/motion';
-import UnsplashBanner from '../components/UnsplashBanner';
-import PageCover from '../components/PageCover';
+import PageHero from '../components/PageHero';
 import { SegIndicator } from '../components/ui/motion';
 import './vault.css';
 
@@ -505,22 +504,14 @@ function MediaVaultPageContent() {
 
   return (
     <motion.div {...enterMotion} className="page-container settings-fullwidth spx-page vx-page">
-      <PageCover seed="page-vault" />
-      <header className="spx-hero">
-        <UnsplashBanner seed="page-vault" credit={false} className="spx-cover"><Film size={96} strokeWidth={2} /></UnsplashBanner>
-        <div className="spx-hero-text">
-          <div className="spx-eyebrow">Reaction vault</div>
-          <h1 className="spx-title">Media &amp; Reaction Vault</h1>
-          <p className="spx-desc">
-            Add GIFs and images with an emotion and a few keywords. When a chat matches, the AI sends your best matching reaction.
-          </p>
-          <div className="spx-meta">
-            Chatter OS <span>· {items.length} item{items.length === 1 ? '' : 's'} · {categories.length} categor{categories.length === 1 ? 'y' : 'ies'}</span>
-          </div>
-        </div>
-      </header>
-
-      <div className="spx-actions">
+      <PageHero
+        seed="page-vault"
+        icon={<Film size={96} strokeWidth={2} />}
+        eyebrow="Reaction vault"
+        title="Media & Reaction Vault"
+        desc="Add GIFs and images with an emotion and a few keywords. When a chat matches, the AI sends your best matching reaction."
+        meta={`${items.length} item${items.length === 1 ? '' : 's'} · ${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
+      >
         <button type="button" className="spx-play" onClick={() => openMode('file')}>
           <Upload size={18} /> Upload media
         </button>
@@ -530,7 +521,7 @@ function MediaVaultPageContent() {
         <button type="button" className="spx-icon-btn vx-refresh" onClick={fetchVaultData} title="Refresh vault" aria-label="Refresh vault">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
-      </div>
+      </PageHero>
 
       <input
         type="file"
