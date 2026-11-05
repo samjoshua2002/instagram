@@ -2091,7 +2091,7 @@ function RelationshipsPageContent() {
         {layoutMode === 'table' && (
           <div className="desktop-table-container">
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+              <table className="card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
                   <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace", width: '56px' }}>
@@ -2154,7 +2154,7 @@ function RelationshipsPageContent() {
                   ))
                 ) : pagedPeople.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+                    <td className="ct-full" colSpan={8} style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
                       {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
                     </td>
                   </tr>
@@ -2179,12 +2179,12 @@ function RelationshipsPageContent() {
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-surface)')}
                       >
                         {/* Column 1: PROFILE */}
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className="ct-avatar" style={{ padding: '10px 16px' }}>
                           <ContactAvatar contact={person} size={36} showStatus={true} />
                         </td>
 
                         {/* Column 2: NAME */}
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className="ct-title" style={{ padding: '10px 16px' }}>
                           <div style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
                             {person.name}
                           </div>
@@ -2196,7 +2196,7 @@ function RelationshipsPageContent() {
                         </td>
 
                         {/* Column 3: USERNAME */}
-                        <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
+                        <td data-label="Username" style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
                           {hasHandle ? (
                             <span
                               onClick={() => setLinkingTargetPerson(person)}
@@ -2234,7 +2234,7 @@ function RelationshipsPageContent() {
                         </td>
 
                         {/* Column 4: DATE OF BIRTH */}
-                        <td style={{ padding: '10px 16px' }}>
+                        <td data-label="Birthday" style={{ padding: '10px 16px' }}>
                           {dobDisplay ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-primary)' }}>
                               <Calendar size={12} style={{ color: 'var(--color-text-secondary)' }} />
@@ -2246,7 +2246,7 @@ function RelationshipsPageContent() {
                         </td>
 
                         {/* Column 5: RELATION */}
-                        <td style={{ padding: '10px 16px' }}>
+                        <td data-label="Relation" style={{ padding: '10px 16px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-primary)', fontWeight: '600' }}>
                               {person.relationship || person.relationshipToSam || 'Friend'}
@@ -2258,7 +2258,7 @@ function RelationshipsPageContent() {
                         </td>
 
                         {/* Column 6: CHATS COUNT */}
-                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <td data-label="Chats" style={{ padding: '10px 16px', textAlign: 'center' }}>
                           <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <MessageSquare size={11} style={{ color: 'var(--color-text-secondary)' }} />
                             <span>{chatsCount}</span>
@@ -2266,7 +2266,7 @@ function RelationshipsPageContent() {
                         </td>
 
                         {/* Column 7: REELS COUNT */}
-                        <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <td data-label="Reels" style={{ padding: '10px 16px', textAlign: 'center' }}>
                           <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <Film size={11} style={{ color: 'var(--color-text-secondary)' }} />
                             <span>{reelsCount}</span>
@@ -2274,7 +2274,7 @@ function RelationshipsPageContent() {
                         </td>
 
                         {/* Column 8: ACTION */}
-                        <td style={{ padding: '10px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <td className="ct-aside" style={{ padding: '10px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
                             <button
                               onClick={() => setSelectedPerson(person)}

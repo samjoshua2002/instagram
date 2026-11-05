@@ -711,7 +711,7 @@ export default function SuperadminPage() {
         {/* TAB 2: MEMBERS & TOPOLOGY */}
         {activeTab === 'members' && (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+            <table className="card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
               <thead>
                 <tr style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
                   <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -734,7 +734,7 @@ export default function SuperadminPage() {
               <tbody>
                 {filteredMembers.map((member) => (
                   <tr key={member.id} style={{ borderBottom: '1px solid var(--color-surface-hover)' }}>
-                    <td style={{ padding: '12px 14px' }}>
+                    <td className="ct-title" style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
                           width: '32px',
@@ -760,11 +760,11 @@ export default function SuperadminPage() {
                       </div>
                     </td>
 
-                    <td style={{ padding: '12px 14px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+                    <td data-label="Instagram" style={{ padding: '12px 14px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
                       {member.handle ? `@${member.handle}` : <span style={{ color: 'var(--color-border-strong)' }}>None</span>}
                     </td>
 
-                    <td style={{ padding: '12px 14px' }}>
+                    <td data-label="Category" style={{ padding: '12px 14px' }}>
                       <span style={{
                         fontSize: '0.66rem',
                         fontWeight: '700',
@@ -778,11 +778,11 @@ export default function SuperadminPage() {
                       </span>
                     </td>
 
-                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                    <td data-label="Relationship" style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                       {member.relationship || 'Friend'}
                     </td>
 
-                    <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', fontSize: '0.8rem' }}>
+                    <td data-label="Lore facts" style={{ padding: '12px 14px', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', fontSize: '0.8rem' }}>
                       {member.factsCount || 0}
                     </td>
                   </tr>

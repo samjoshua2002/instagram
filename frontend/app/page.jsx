@@ -862,7 +862,7 @@ export default function AnalyticsPage() {
 
             {/* PRACTICAL ENTERPRISE USER DIRECTORY TABLE */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+              <table className="card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{
                     borderBottom: '1.5px solid var(--color-border)',
@@ -900,7 +900,7 @@ export default function AnalyticsPage() {
                             }}
                           >
                             {/* User Identity */}
-                            <td style={{ padding: '12px' }}>
+                            <td className="ct-title" style={{ padding: '12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
                                   width: '36px',
@@ -949,7 +949,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Workspace / Business */}
-                            <td style={{ padding: '12px' }}>
+                            <td data-label="Workspace" style={{ padding: '12px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>
                                   {acc.businessProfile?.businessName || (isBusiness ? 'Creator Studio' : 'Personal')}
@@ -961,7 +961,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Instagram Handle */}
-                            <td style={{ padding: '12px' }}>
+                            <td data-label="Instagram" style={{ padding: '12px' }}>
                               {acc.instagramUsername ? (
                                 <a
                                   href={`https://instagram.com/${acc.instagramUsername}`}
@@ -986,7 +986,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Role */}
-                            <td style={{ padding: '12px' }}>
+                            <td data-label="Role" style={{ padding: '12px' }}>
                               <span style={{
                                 fontSize: '0.62rem',
                                 fontWeight: '800',
@@ -1001,7 +1001,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Automation Status */}
-                            <td style={{ padding: '12px' }}>
+                            <td data-label="Automation" style={{ padding: '12px' }}>
                               {(() => {
                                 const isConnected = Boolean(acc.hasInstagramToken || acc.isInstagramConnected);
                                 const isPending = acc.igApprovalStatus === 'pending';
@@ -1047,7 +1047,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Security */}
-                            <td style={{ padding: '12px' }}>
+                            <td data-label="Security" style={{ padding: '12px' }}>
                               {acc.hasPasskeys ? (
                                 <span style={{
                                   display: 'inline-flex',
@@ -1070,12 +1070,12 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Registered */}
-                            <td style={{ padding: '12px', fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                            <td data-label="Registered" style={{ padding: '12px', fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
                               {acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : 'Recent'}
                             </td>
 
                             {/* Actions: Impersonate / Approve / Details */}
-                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                            <td className="ct-actions" style={{ padding: '12px', textAlign: 'right' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 {!isSelf && !acc.hasInstagramToken && !acc.isInstagramConnected && (
                                   <button
@@ -1184,8 +1184,8 @@ export default function AnalyticsPage() {
 
                           {/* Expanded Drawer */}
                           {isExpanded && (
-                            <tr style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                              <td colSpan={8} style={{ padding: '16px 20px' }}>
+                            <tr className="ct-detail-row" style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
+                              <td className="ct-full" colSpan={8} style={{ padding: '16px 20px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', fontSize: '0.76rem' }}>
                                   <div>
                                     <div style={{ color: 'var(--color-text-secondary)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>USER ID</div>
@@ -1216,7 +1216,7 @@ export default function AnalyticsPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-secondary)' }}>
+                      <td className="ct-full" colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-secondary)' }}>
                         No accounts found matching your filter criteria.
                       </td>
                     </tr>
