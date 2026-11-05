@@ -32,7 +32,7 @@ const cryptoService = require('./services/cryptoService');
 const { getUserInstagramToken, getOwnerSendToken, setUserInstagram } = require('./services/instagramTokenService');
 const {
   isProduction, checkMetaSignature, resolveInsideDir, isHttpUrl, randomFilename, serializePersona,
-  validatePersonaUpdate, ownerFilter, contactKey,
+  validatePersonaUpdate, ownerFilter, contactKey, cleanPhotoIds,
 } = require('./lib/serverSecurity');
 const { router: authRouter, requireAuth } = require('./routes/auth');
 const authService = require('./services/authService');
@@ -2373,6 +2373,40 @@ app.get('/api/social-graph', async (req, res) => {
   }
 });
 
+
+// Instagram photo links expire after a few days. When a card's photo fails to load, the browser
+// sends that contact's id here; we ask Instagram for a fresh link and save it.
+const photoRefreshAt = new Map(); // `${ownerId}:${senderId}` -> last attempt (ms)
+const PHOTO_RETRY_MS = 30 * 60 * 1000;
+app.post('/api/social-graph/refresh-photos', async (req, res) => {
+  try {
+    const ids = cleanPhotoIds(req.body?.senderIds);
+    if (!ids.length) return res.json({ photos: {} });
+
+    const token = (await getOwnerSendToken(req.user._id))
+      || (isSuperUser(req) ? (process.env.INSTAGRAM_PAGE_ACCESS_TOKEN || '').trim() : '');
+    if (!token) return res.json({ photos: {} });
+
+    const now = Date.now();
+    if (photoRefreshAt.size > 20000) photoRefreshAt.clear();
+    const owned = await UserMemory.find(inMemories(req, { senderId: { $in: ids } })).select('senderId');
+    const due = owned.filter(m => now - (photoRefreshAt.get(`${req.user._id}:${m.senderId}`) || 0) > PHOTO_RETRY_MS);
+    due.forEach(m => photoRefreshAt.set(`${req.user._id}:${m.senderId}`, now));
+
+    const photos = {};
+    await Promise.all(due.map(async m => {
+      const profile = await instagramService.getUserProfile(m.senderId, token);
+      const pic = profile?.profile_pic;
+      if (typeof pic !== 'string' || !pic.startsWith('https://')) return;
+      photos[m.senderId] = pic;
+      await UserMemory.updateOne({ _id: m._id }, { profilePic: pic });
+      await SocialGraph.updateMany({ ...ownedBy(req), senderId: m.senderId }, { profilePic: pic });
+    }));
+    res.json({ photos });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
 
 app.post('/api/social-graph/sync', async (req, res) => {
   try {

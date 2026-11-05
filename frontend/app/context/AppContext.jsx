@@ -1407,6 +1407,36 @@ export function AppProvider({ children }) {
     return null;
   };
 
+  // Instagram photo links expire after a few days. Cards report a broken photo here; the ids are
+  // sent in batches and the fresh links the server returns replace the old ones.
+  const photoTried = useRef(new Set());
+  const photoQueue = useRef(new Set());
+  const photoTimer = useRef(null);
+  const requestFreshPhoto = useCallback((senderId) => {
+    const id = String(senderId || '');
+    if (!id || photoTried.current.has(id)) return;
+    photoTried.current.add(id);
+    photoQueue.current.add(id);
+    clearTimeout(photoTimer.current);
+    photoTimer.current = setTimeout(async () => {
+      const ids = [...photoQueue.current];
+      photoQueue.current.clear();
+      for (let i = 0; i < ids.length; i += 25) {
+        try {
+          const res = await fetch(`${API_BASE}/api/social-graph/refresh-photos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderIds: ids.slice(i, i + 25) }),
+          });
+          if (!res.ok) continue;
+          const { photos } = await res.json();
+          if (!photos || !Object.keys(photos).length) continue;
+          setNodes(prev => prev.map(n => (n.senderId && photos[n.senderId] ? { ...n, profilePic: photos[n.senderId] } : n)));
+        } catch { /* offline: the card keeps its artwork */ }
+      }
+    }, 600);
+  }, []);
+
   const saveRoutingStable = useLatestCallback(saveRouting);
   const toggleGlobalBotStable = useLatestCallback(toggleGlobalBot);
   const saveNodeStable = useLatestCallback(saveNode);
@@ -1447,6 +1477,7 @@ export function AppProvider({ children }) {
     lookupContact: lookupContactStable,
     extractFromRawChat: extractFromRawChatStable,
     syncBackend: syncBackendStable,
+    requestFreshPhoto,
     isSyncingInitial,
     API_BASE,
     user,
@@ -1469,7 +1500,7 @@ export function AppProvider({ children }) {
     isImpersonating,
     enterWorkspace,
     exitWorkspace,
-  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, isSyncingInitial, API_BASE, user, token, authLoading, login, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
+  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, requestFreshPhoto, isSyncingInitial, API_BASE, user, token, authLoading, login, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
 
   return (
     <AppContext.Provider value={contextValue}>

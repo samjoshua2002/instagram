@@ -7,7 +7,7 @@ import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
-import { personArtUrl } from '../lib/utils';
+import { savedPhotoUrl } from '../lib/utils';
 
 /**
  * Home after login: "Hello, <name>!" greeting, spotlight cards with abstract
@@ -55,20 +55,32 @@ const personHref = p => `/relationships?person=${encodeURIComponent(p.id)}`;
 const handleOf = p => (p.handle || '').replace(/^@/, '').trim();
 const fmt = n => Number(n || 0).toLocaleString();
 
-/** Photo -> unavatar -> abstract artwork. */
+/** Saved photo (a fresh link is fetched when it has expired) -> unavatar -> abstract artwork. */
 function Photo({ person, className = '' }) {
+  const { requestFreshPhoto } = useApp();
   const [stage, setStage] = useState(0);
   const handle = handleOf(person);
+  const saved = savedPhotoUrl(person);
   const sources = [
-    person.profilePic?.startsWith('http') ? person.profilePic : null,
+    saved,
     handle ? `https://unavatar.io/instagram/${handle}?fallback=false` : null,
   ].filter(Boolean);
   const src = sources[stage];
+
+  // A new link from the server starts the chain again
+  useEffect(() => { setStage(0); }, [saved]);
+  // No saved photo at all: ask the server for one
+  useEffect(() => { if (!saved && person.senderId) requestFreshPhoto?.(person.senderId); }, [saved, person.senderId, requestFreshPhoto]);
+
+  const onError = () => {
+    if (stage === 0 && saved && person.senderId) requestFreshPhoto?.(person.senderId);
+    setStage(s => s + 1);
+  };
   const initials = (person.name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
   return (
     <div className={`sh-photo ${className}`} style={{ backgroundImage: abstractArt(person.name) }}>
       {src ? (
-        <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setStage(s => s + 1)} />
+        <img key={src} src={src} alt="" referrerPolicy="no-referrer" onError={onError} />
       ) : (
         <span className="sh-photo-initials">{initials}</span>
       )}
@@ -108,7 +120,8 @@ export default function SpotlightHome() {
   const people = useMemo(() => (nodes || []).filter(n => !n.isRoot && n.name), [nodes]);
 
   // Pre-compute each contact's page colours so tapping a card opens an already-tinted page
-  useEffect(() => { prefetchAmbientImages(people.map(personArtUrl)); }, [people]);
+  // (saved photos only: looking up all 55 on unavatar.io used up its small daily free limit)
+  useEffect(() => { prefetchAmbientImages(people.map(savedPhotoUrl)); }, [people]);
   const chips = useMemo(
     () => CATEGORIES.filter(c => c.id === 'all' || people.some(p => (p.category || 'online_friend') === c.id)),
     [people]
