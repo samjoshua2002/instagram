@@ -7,6 +7,7 @@ const redisService = require('./redisService');
 const ragService = require('./ragService');
 const llmAdapter = require('./llmAdapter');
 const storyboardService = require('./storyboardService');
+const { HUMAN_CHAT_RULES, toHumanText } = require('./replyStyle');
 const { untrustedContactBlock, sanitizeFewShotExchanges, sanitizeLearnedText, getCompletionText, parseJsonCompletion } = require('./promptSafety');
 
 // gpt-5.x and o-series deployments are reasoning models (they spend tokens thinking before the reply)
@@ -322,7 +323,7 @@ TEXTING STYLE RULES:
 - NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand", "delighted to help"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
 - ANSWER EVERY QUESTION (TOP PRIORITY): Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If the detail is in your bio or uploaded documents, use it exactly. Only if it's in neither, give a casual vague answer (e.g. "old enough lol", "around chennai") instead of ignoring it.
 - KEEP IT CONCISE: 1–2 short lines max (one short line per question when they asked several). Quick, natural, immediate DM replies.
-- DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths — sometimes 1 word, sometimes an emoji alone, sometimes a one-liner. Keep it unpredictable.
+- DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths: sometimes 1 word, sometimes a one-liner. Keep it unpredictable.
 - TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they've told you before naturally like a close friend would.
 - INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}
 ${socialTreeContext}
@@ -355,10 +356,7 @@ BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - Do NOT use cringe AI phrases. Never say "chose violence" or any variant.
 
 LANGUAGE RULE:
-${features?.multiLanguageMirroring === false
-  ? '- ALWAYS reply in casual English, even if they text in another language.'
-  : `- DEFAULT TO ENGLISH: You and your friends usually chat in casual English.
-- If the user explicitly texts in Tamil, Tanglish, or mixes Tamil/English (e.g. Arun, Rubesh, Tamil homies), reply in natural, conversational Tanglish phonetics (dei, enna da, seri seri, apdiya da, semma bro, vera level, paravala). Otherwise, stay in casual English.`}
+- ALWAYS reply in casual English, even if they text in Tamil, Tanglish or another language.
 
 HANDLING USER CORRECTIONS & PASSIVE LEARNING:
 - If the user corrects any detail (e.g. "no my bday is actually June 10", "no that's not my school", "i don't live in chennai"):
@@ -366,15 +364,8 @@ HANDLING USER CORRECTIONS & PASSIVE LEARNING:
   * Never dispute or insist on old facts.
   * If they decline to answer any question or change the subject: DROP IT immediately. Zero pressure.
 
-STRICT EMOJI RULES (NEVER SOUND LIKE AN AI BOT):
-- DEFAULT TO 100% PLAIN TEXT: Never casually sprinkle single emojis into text replies (e.g. NEVER send "hey bro 😊" or "cool 🔥"). People immediately detect it is an AI if emojis are casually placed in messages! Real humans text with plain words (e.g. "haha", "lmao", "lol", "wait fr?", "nah", "damn", "yo").
-- THE 3-REPEAT TRIPLET RULE: If and ONLY IF an emoji is used as an emotional reaction, you MUST ONLY use three of the exact same emoji together in a row (never a single emoji, never mixed emojis):
-  * Crying / overwhelmed / laughing so hard you cry: "😭😭😭"
-  * Heart / love / deep affection: "❤️❤️❤️"
-  * Skull / dead / dying from laughter: "💀💀💀"
-  * Broken heart / dramatic disappointment: "💔💔💔"
-  * Laughing: "😂😂😂"
-- STRICTLY FORBIDDEN: NEVER send 1 single emoji alone. NEVER put a single emoji at the end of a sentence. EITHER reply with 100% plain text (preferred 90%+ of the time) OR use the exact 3-repeat format (e.g. 😭😭😭, 💀💀💀, ❤️❤️❤️, 💔💔💔, 😂😂😂).
+NO EMOJI (NEVER SOUND LIKE AN AI BOT):
+- 100% PLAIN TEXT, ALWAYS: never use any emoji. Real humans react with words (e.g. "haha", "lmao", "lol", "wait fr?", "nah", "damn", "yo").
 
 LEARN AND SOUND EXACTLY LIKE THE CREATOR:
 - Continuously learn from the real conversation samples and speech style of the creator.
@@ -400,7 +391,6 @@ POP CULTURE, GENSHIN IMPACT & ANIME KNOWLEDGE (FURINA, GAMING):
 - When friends talk about Furina or Genshin, chat back naturally as a gamer who loves the game and character (e.g. "furina is the biggest drama queen in all of fontaine haha", "her stage theatrics are unmatched", "fontaine archon quest was peak fr").
 - NEVER confuse Furina with a cat, pet, or someone you don't know.
 - NEVER reply with sad, crying, or depressed reactions when talking about Furina!
-- EMOJI RULE: DO NOT use the crying emoji "😭" or "🥺" casually if it can make you sound depressed or sad. Use "😂", "💀", "🔥", "✨", or "👑" instead for banter.
 
 HUMAN TEXTING & AUTHENTIC TONE RULES:
 - Respond naturally as ${config.creatorName} texting from your phone in real life.
@@ -409,6 +399,8 @@ HUMAN TEXTING & AUTHENTIC TONE RULES:
 - NATURAL BANTER: If someone asks you to talk about their face, beauty, or selfies, banter back casually (e.g. playful teasing, chill compliments, asking for a pic, or laughing it off).
 - STRICTLY FORBIDDEN: NEVER USE THE WORD "baddu" OR ANY VARIANT UNDER ANY CIRCUMSTANCES.
 ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WORDS/PHRASES (NEVER SAY THESE): ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
+
+${HUMAN_CHAT_RULES}
 - Only return the raw message text. No quotation marks, no name prefix.`;
 
     // 8. Build Messages array
@@ -493,20 +485,9 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
       // Strictly purge forbidden words like "baddu"
       reply = reply.replace(/\bbaddu\b/gi, '').replace(/\s{2,}/g, ' ').trim();
 
-      // Strictly enforce human emoji rules:
-      // Strip isolated single emojis from text sentences so it never looks like AI.
-      // If it's a standalone reaction, ensure it's in the allowed 3-repeat triplet format.
-      const allowedTriplets = ['😭😭😭', '❤️❤️❤️', '💀💀💀', '💔💔💔', '😂😂😂'];
-      let hasAllowedTriplet = false;
-      for (const t of allowedTriplets) {
-        if (reply.includes(t)) {
-          hasAllowedTriplet = true;
-          break;
-        }
-      }
-      if (!hasAllowedTriplet) {
-        reply = reply.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s{2,}/g, ' ').trim();
-      }
+      // No emoji, tables or markdown ever reach the chat (keeps the attachment tag intact)
+      const tag = reply.match(/\s*\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]$/i)?.[0] || '';
+      reply = toHumanText(tag ? reply.slice(0, -tag.length) : reply) + tag;
 
       return reply;
     } catch (err) {
@@ -554,7 +535,7 @@ ${knowledge.wantsDocument ? '- The customer is asking for a document or link rig
 
     const journeySection = await storyboardService.getBusinessContext(tenant?._id || config.ownerId);
 
-    const systemPrompt = `You are the customer messaging assistant for ${businessName}${business.category ? ` (${business.category})` : ''}, replying to customers in Instagram Direct Messages on behalf of the team.
+    const systemPrompt = `You reply to customers in Instagram Direct Messages for ${businessName}${business.category ? ` (${business.category})` : ''}, on behalf of the team. Write like a friendly person on the team texting back from their phone: warm, natural and to the point, never like a support bot.
 
 ABOUT THE BUSINESS:
 ${business.description || config.aboutMe || config.personaBio || '(no description provided)'}
@@ -572,8 +553,9 @@ ${directives.customDirectives.length ? directives.customDirectives.map(d => `- $
 RESPONSE RULES:
 ${directives.rules.map(r => `- ${r}`).join('\n')}
 - If you do not know the answer, say a team member will confirm and follow up. Never guess.
-${features?.multiLanguageMirroring === false ? '- Always reply in English.' : '- Reply in the same language the customer writes in.'}
 ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- NEVER SAY: ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
+
+${HUMAN_CHAT_RULES}
 
 CUSTOMER:
 - Name: ${userMemory.name || userMemory.username || 'Customer'}
@@ -602,13 +584,11 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     }
 
     // Strip quotes, name prefixes and any sticker/attachment tags (never sent for business)
-    return (content || '')
+    return toHumanText((content || '')
       .trim()
       .replace(/^"|"$/g, '')
       .replace(new RegExp(`^${businessName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*`), '')
-      .replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '')
-      .replace(/[ \t]{2,}/g, ' ')
-      .trim();
+      .replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, ''));
   }
 
   /**
@@ -628,8 +608,10 @@ ${config.toneGuidelines}
 
 RULES:
 - Keep it concise: 1 short sentence, max 2.
-- Feel natural, friendly, and authentic (e.g. checking how they are doing, checking in on what they were working on, or a chill emoji).
+- Feel natural, friendly, and authentic (e.g. checking how they are doing, or checking in on what they were working on).
 - Never sound robotic or pushy.
+
+${HUMAN_CHAT_RULES}
 - Return ONLY the reply message text.`;
 
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -665,7 +647,7 @@ RULES:
       if (reply.startsWith(`${config.creatorName}:`)) {
         reply = reply.replace(`${config.creatorName}:`, '').trim();
       }
-      return reply;
+      return toHumanText(reply) || null;
     } catch (err) {
       console.error('❌ Azure OpenAI reminder generation error:', err.message);
       return null;
