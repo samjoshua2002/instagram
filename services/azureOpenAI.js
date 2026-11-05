@@ -623,10 +623,7 @@ RULES:
       const client = this.getClient('gpt-5.1-chat');
       const response = await client.chat.completions.create({
         messages,
-        temperature: 0.8,
-        frequency_penalty: 0.5,
-        presence_penalty: 0.5,
-        max_tokens: 150,
+        max_completion_tokens: 150,
       });
 
       let reply = response.choices[0].message.content.trim();
@@ -716,7 +713,7 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
       const client = this.getClient('gpt-5.6-luna');
       const response = await client.chat.completions.create({
         messages,
-        temperature: 0.4,
+        // gpt-5 models only accept the default temperature
         response_format: { type: 'json_object' }
       });
 
@@ -769,7 +766,6 @@ Return a STRICT JSON object in this exact format:
       const client = this.getClient('gpt-5.6-luna');
       const response = await client.chat.completions.create({
         messages: [{ role: 'system', content: systemPrompt }],
-        temperature: 0.3,
         response_format: { type: 'json_object' }
       });
       return JSON.parse(response.choices[0].message.content.trim());

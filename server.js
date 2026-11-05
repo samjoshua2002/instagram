@@ -2215,22 +2215,19 @@ app.get('/api/social-graph', async (req, res) => {
     if (req.user && !isSuper && req.user.instagramAccountId) {
       try {
         const creatorIgId = req.user.instagramAccountId;
-        const messages = await Message.find({
-          $or: [{ recipientId: creatorIgId }, { senderId: creatorIgId }]
-        }).sort({ createdAt: -1 });
-
-        const contactIds = new Set();
-        for (const m of messages) {
-          if (m.senderId && m.senderId !== creatorIgId) contactIds.add(m.senderId);
-          if (m.recipientId && m.recipientId !== creatorIgId) contactIds.add(m.recipientId);
-        }
+        // Distinct ids only: loading every message on each 8s poll made the list take minutes
+        const [fromIds, toIds] = await Promise.all([
+          Message.distinct('senderId', { recipientId: creatorIgId }),
+          Message.distinct('recipientId', { senderId: creatorIgId }),
+        ]);
+        const contactIds = new Set([...fromIds, ...toIds].filter(id => id && id !== creatorIgId));
+        const known = new Set(await SocialGraph.distinct('senderId', {
+          ownerId: req.user._id,
+          senderId: { $in: [...contactIds] }
+        }));
 
         for (const cid of contactIds) {
-          const exists = await SocialGraph.findOne({
-            ownerId: req.user._id,
-            senderId: cid
-          });
-          if (!exists) {
+          if (!known.has(cid)) {
             const mem = await UserMemory.findOne({ senderId: cid });
             const chatsCount = await Message.countDocuments({
               $or: [
@@ -2261,14 +2258,17 @@ app.get('/api/social-graph', async (req, res) => {
 
     const nodes = await SocialGraph.find(query).sort({ updatedAt: -1 });
 
+    // One query for all linked memories instead of one per person
+    const linkedIds = [...new Set(nodes.map(n => n.senderId).filter(Boolean))];
+    const memoryById = new Map(
+      (linkedIds.length ? await UserMemory.find({ senderId: { $in: linkedIds } }) : []).map(m => [m.senderId, m])
+    );
+
     // Attach UserMemory settings (aiEnabled, replyToMessages, replyToReelsAndPosts, profilePic, messageCount) to each node
     const enrichedNodes = await Promise.all(nodes.map(async (n) => {
-      let memory = null;
       let effectiveSenderId = n.senderId || '';
+      let memory = effectiveSenderId ? (memoryById.get(effectiveSenderId) || null) : null;
 
-      if (effectiveSenderId) {
-        memory = await UserMemory.findOne({ senderId: effectiveSenderId });
-      }
       if (!memory && n.instagramHandle) {
         const cleanU = n.instagramHandle.replace(/^@/, '').toLowerCase().trim();
         memory = await UserMemory.findOne({ username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
