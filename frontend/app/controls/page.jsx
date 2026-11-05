@@ -8,6 +8,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import BusinessPolicyCard from '../components/BusinessPolicyCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
+import PageCover from '../components/PageCover';
 import { Search, Bot, Pause, X } from 'lucide-react';
 import '../split.css';
 import './controls.css';
@@ -297,6 +298,7 @@ function ControlsPageContent() {
 
   return (
     <motion.div {...enterMotion} className="page-container split-page ctl-page">
+      <PageCover seed="page-controls" />
       <header className="split-top">
         <div className="split-top-text">
           <h1>AI Reply Rules</h1>

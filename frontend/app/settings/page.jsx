@@ -14,6 +14,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
+import PageCover from '../components/PageCover';
 import { IconSwap } from '../components/ui/motion';
 import '../split.css';
 
@@ -493,6 +494,7 @@ function SettingsPageContent() {
       {...enterMotion}
       className="page-container split-page settings-fullwidth settings-split"
     >
+      <PageCover seed="page-settings" />
       <header className="split-top">
         <div className="split-top-text">
           <h1>Persona &amp; AI Studio</h1>

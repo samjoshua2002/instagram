@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import PageCover from '../../components/PageCover';
 import { ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import SuperadminWorkspacePrompt from '../../components/SuperadminWorkspacePrompt';
@@ -42,6 +43,7 @@ export default function FeatureStorePage() {
 
   return (
     <div className="page-container settings-fullwidth">
+      <PageCover seed="page-features" />
       <div style={{ marginBottom: '24px' }}>
         <Link href="/settings" className="feature-back">
           <ArrowLeft size={14} /> Settings

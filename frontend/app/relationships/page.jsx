@@ -14,6 +14,7 @@ import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
 import UnsplashBanner from '../components/UnsplashBanner';
+import PageCover from '../components/PageCover';
 import '../split.css';
 import { useBanner, bannerSrc } from '../lib/banners';
 import { personArtUrl, savedPhotoUrl } from '../lib/utils';
@@ -765,7 +766,8 @@ function RelationshipsPageContent() {
   // Tint the whole screen from the open contact's photo (Apple Music style, PLAN.md §15.3)
   // No photo: the contact's Unsplash banner gives the colours instead of a plain green wash
   const personArt = personArtUrl(selectedPerson);
-  const personBanner = useBanner(selectedPerson ? (selectedPerson.name || selectedPerson.id) : null);
+  // People list: the page's own cover photo (PageCover seed "page-people") gives the colours
+  const personBanner = useBanner(selectedPerson ? (selectedPerson.name || selectedPerson.id) : 'page-people');
   useAmbientImage(personArt || bannerSrc(personBanner, 400), { strong: Boolean(selectedPerson) });
 
   const birthday = useMemo(() => getNextBirthday(formData.dob), [formData.dob]);
@@ -1884,6 +1886,7 @@ function RelationshipsPageContent() {
       {...enterMotion}
       className="page-container split-page spx-page spx-blue people-split"
     >
+      <PageCover seed="page-people" tint={false} />
       <header className="split-top">
         <div className="split-top-text">
           <h1>All People</h1>
