@@ -8,19 +8,21 @@ import { usePalette } from './AmbientBackground';
  * A banner filled with an Unsplash photo picked by `seed`.
  * `matchImage` (a contact's photo link): the banner photo follows that photo's main colour,
  * the same colour that tints the page, so the top of the page matches the profile.
- * The abstract gradient shows first, so there is never an empty or plain green box.
+ * Two-colour wave artwork shows first, so there is never an empty or plain green box.
  * `credit` shows the photographer line Unsplash asks for; turn it off only where the
  * banner sits inside a link (cards), where it moves to the tooltip instead.
  */
 export default function UnsplashBanner({
   seed, topic = 'abstract', width = 1600, credit = true, matchImage = null, className = '', style, children, as: Tag = 'div',
+  photo: chosen, // a photo picked by the page (useFreshBanner); null while it loads
 }) {
   const palette = usePalette(matchImage);
   const color = palette ? palette.dominant : null;
   // Wait for the profile photo's colour before choosing, so the wrong photo never flashes in
   const waiting = Boolean(matchImage) && palette === undefined;
-  const matched = useMatchedBanner(waiting ? null : seed, color, topic);
-  const photo = waiting ? null : matched;
+  const given = chosen !== undefined;
+  const matched = useMatchedBanner(waiting || given ? null : seed, color, topic);
+  const photo = given ? chosen : waiting ? null : matched;
   const src = bannerSrc(photo, width);
   const [loadedSrc, setLoadedSrc] = useState(null);
   const title = photo && !credit ? `Photo by ${photo.author} on Unsplash` : undefined;

@@ -8,8 +8,9 @@ import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
 import { savedPhotoUrl } from '../lib/utils';
-import { abstractArt } from '../lib/banners';
+import { abstractArt, useFreshBanner } from '../lib/banners';
 import UnsplashBanner from './UnsplashBanner';
+import PageCover from './PageCover';
 
 /**
  * Home after login: "Hello, <name>!" greeting, spotlight cards with abstract
@@ -291,12 +292,14 @@ export default function SpotlightHome() {
     paused.length > 0 && { id: 'paused', icon: PauseCircle, title: `${paused.length} with AI paused`, href: '/controls' },
   ].filter(Boolean);
 
-  // A new banner photo every day
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // A new background and banner photo every time Home opens (page colours follow the background)
+  const coverPhoto = useFreshBanner('home-cover', 'abstract');
+  const bannerPhoto = useFreshBanner('home-banner', 'colorful');
   const firstName = (user?.firstName || user?.name || user?.username || '').split(' ')[0];
 
   return (
-    <div className="sh-home">
+    <div className={`sh-home${coverPhoto ? ' sh-tinted' : ''}`}>
+      <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
         <h1 className="sh-hello">Hello, {firstName || 'there'}!</h1>
         <div className="sh-bell-wrap">
@@ -343,7 +346,7 @@ export default function SpotlightHome() {
         </div>
       )}
 
-      <UnsplashBanner seed={`home-${todayKey}`} topic="colorful" className="sh-banner">
+      <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
         <div className="sh-banner-text">
           <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           <h2 className="sh-banner-title">Your circle today</h2>

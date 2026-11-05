@@ -167,6 +167,21 @@ html.theme-vt::view-transition-new(root) { z-index: 2; }
   box-shadow: 0 10px 24px -18px rgba(0, 0, 0, 0.6);
 }
 
+/* Phones: live blur under moving parts is re-rendered every scroll frame and makes the
+   collapse stutter. The band is already ~90% opaque, so a solid fill looks the same. */
+@media (max-width: 768px) {
+  .hero-surface {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 22%, var(--sp-panel, #121212));
+  }
+  .person-back {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.5);
+  }
+}
+
 /* Toolbar stays under the compact band on screens tall and wide enough for both */
 @media (min-width: 641px) and (min-height: 600px) {
   .spx-page .people-filters {

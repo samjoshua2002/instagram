@@ -118,7 +118,7 @@ test('unknown topic falls back to abstract; bad image hosts are dropped', async 
   const s = setup({ responses: [{ status: 200, results: [bad, apiPhoto('ok')] }] });
   const photos = await s.cache.getPhotos('nope');
   assert.deepEqual(photos.map(p => p.id), ['ok']);
-  assert.match(s.calls[0], /query=abstract\+gradient/);
+  assert.match(s.calls[0], /query=abstract\+wave\+pattern/);
 });
 
 test('empty Unsplash result keeps the old list instead of wiping it', async () => {
@@ -133,7 +133,7 @@ test('colour topics ask Unsplash for that colour only', async () => {
   assert.deepEqual(photos.map(p => p.id), ['y']);
   const url = new URL(s.calls[0]);
   assert.equal(url.searchParams.get('color'), 'yellow');
-  assert.equal(url.searchParams.get('query'), 'abstract gradient');
+  assert.equal(url.searchParams.get('query'), 'wavy lines');
   // Normal topics send no colour filter
   await s.cache.getPhotos('fluid');
   assert.equal(new URL(s.calls[1]).searchParams.get('color'), null);
@@ -166,4 +166,17 @@ test('profile colour picks the matching Unsplash colour list and nearest photo',
   // No colour: the old pick by name still works
   assert.ok(b.pickBannerByColor(photos, null, 'Aradhana'));
   assert.deepEqual(b.parseColor('#ff0000'), { h: 0, s: 1, l: 0.5 });
+});
+
+test('plain gradient / blur photos are dropped, wave textures kept', () => {
+  const { toPhotos, isPlain } = require('../services/unsplashService');
+  const mk = (id, alt) => ({ id, alt_description: alt, urls: { raw: `https://images.unsplash.com/${id}` }, user: {}, links: {} });
+  assert.equal(isPlain({ alt_description: 'a blurry purple gradient background' }), true);
+  assert.equal(isPlain({ alt_description: 'blue and pink gradient waves' }), false);
+  assert.equal(isPlain({ alt_description: 'red and black wavy lines' }), false);
+  assert.equal(isPlain({ alt_description: 'sea wave during daytime' }), true);
+  const list = [mk('a', 'purple gradient'), ...['b', 'c', 'd', 'e', 'f'].map(i => mk(i, 'two tone wave pattern'))];
+  assert.deepEqual(toPhotos(list).map(p => p.id), ['b', 'c', 'd', 'e', 'f']);
+  // Too few textured photos: keep them all rather than an almost empty list
+  assert.equal(toPhotos([mk('a', 'gradient'), mk('b', 'waves')]).length, 2);
 });

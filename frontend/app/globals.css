@@ -1747,6 +1747,17 @@ select:focus {
   opacity: 0.35;
 }
 
+/* Phones: the page background is a fixed layer under the scrolling content. Keep it
+   static and cheap so scrolling never has to re-render a huge blur. */
+@media (max-width: 768px) {
+  .ambient-background { transform: translateZ(0); contain: strict; }
+  .ambient-contours { animation: none; }
+  .ambient-artwork { filter: blur(40px) brightness(0.5) saturate(1.3); }
+  :root[data-theme="light"] .ambient-artwork { filter: blur(40px) brightness(1.1) saturate(1.1); }
+  .ambient-wash::after { filter: blur(40px) saturate(1.4); }
+  :root[data-theme="light"] .ambient-wash::after { filter: blur(40px) saturate(1.2) brightness(1.15); }
+}
+
 @keyframes ambient-drift {
   from { transform: translate3d(0, 0, 0) rotate(0deg); }
   to { transform: translate3d(-2.5%, 1.5%, 0) rotate(-1.5deg); }

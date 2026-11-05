@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
-const STORE_KEY = 'chatter_banners_v1';
+const STORE_KEY = 'chatter_banners_v2'; // v2: wave-pattern photos (old lists had plain gradients)
 const TTL = 6 * 60 * 60 * 1000;
 export const UTM = 'utm_source=chatter_box&utm_medium=referral';
 
@@ -91,6 +91,29 @@ export function useBanner(seed, topic = 'abstract') {
   return seed === null || seed === undefined ? null : pickBanner(photos, seed);
 }
 
+/**
+ * A new photo every time the page opens (each mount picks again), never the same as
+ * the last one shown in this `slot`. Picked after mount, so the server render matches.
+ */
+export function useFreshBanner(slot, topic = 'abstract') {
+  const [photo, setPhoto] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    loadBanners(topic).then(photos => {
+      if (!alive || !photos.length) return;
+      const key = `chatter_banner_last_${slot}`;
+      let last = null;
+      try { last = localStorage.getItem(key); } catch { /* storage blocked */ }
+      const pool = photos.length > 1 ? photos.filter(p => p.id !== last) : photos;
+      const next = pool[Math.floor(Math.random() * pool.length)];
+      try { localStorage.setItem(key, next.id); } catch { /* storage blocked */ }
+      setPhoto(next);
+    });
+    return () => { alive = false; };
+  }, [slot, topic]);
+  return photo;
+}
+
 // Colour sets for the abstract artwork shown while a photo loads (or when Unsplash is unavailable)
 const PALETTES = [
   ['#ff3d5a', '#ff9a8b', '#6a8dff'],
@@ -102,17 +125,34 @@ const PALETTES = [
   ['#00c6ff', '#ff3a6e', '#fbd786'],
 ];
 
-/** Deterministic abstract "blurred light" artwork for a name. */
-export function abstractArt(seed) {
+/**
+ * Two-colour wave texture (inline SVG) as a CSS background-image value.
+ * Never a plain gradient: a dark base in colour `a`, layered waves in `b` and `a`.
+ */
+export function waveArt(a, b, seed) {
   const h = hashSeed(seed);
-  const [a, b, c] = PALETTES[h % PALETTES.length];
-  const x1 = 15 + (h % 50), y1 = 10 + ((h >> 3) % 50), x2 = 55 + ((h >> 5) % 40), y2 = 45 + ((h >> 7) % 50);
-  return [
-    `radial-gradient(circle at ${x1}% ${y1}%, ${a} 0%, transparent 55%)`,
-    `radial-gradient(circle at ${x2}% ${y2}%, ${b} 0%, transparent 50%)`,
-    `radial-gradient(circle at ${100 - x1}% ${100 - y2 / 2}%, ${c} 0%, transparent 60%)`,
-    `linear-gradient(${(h % 360)}deg, ${c}, ${a})`,
-  ].join(', ');
+  const waves = [];
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const y = 40 + i * 42 + ((h >> i) % 18);
+    const amp = 28 + ((h >> (i + 3)) % 40);
+    const shift = (h >> (i + 5)) % 200;
+    const col = i % 2 ? a : b;
+    const op = (0.35 + (i / n) * 0.5).toFixed(2);
+    waves.push(
+      `<path d="M-200 ${y} C ${shift} ${y - amp}, ${300 + shift} ${y + amp}, ${600 + shift / 2} ${y} S ${1100} ${y - amp}, 1400 ${y} V400 H-200Z" fill="${col}" fill-opacity="${op}"/>`,
+      `<path d="M-200 ${y + 6} C ${shift} ${y - amp + 6}, ${300 + shift} ${y + amp + 6}, ${600 + shift / 2} ${y + 6} S 1100 ${y - amp + 6}, 1400 ${y + 6}" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="1.5"/>`,
+    );
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice">`
+    + `<rect width="1200" height="400" fill="${a}"/><rect width="1200" height="400" fill="#000" fill-opacity="0.35"/>${waves.join('')}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+/** Deterministic two-colour wave artwork for a name (shown while a photo loads). */
+export function abstractArt(seed) {
+  const [a, b] = PALETTES[hashSeed(seed) % PALETTES.length];
+  return waveArt(a, b, seed);
 }
 
 /** The main colour of the fallback artwork for a seed (used before a photo's palette is known). */
@@ -217,16 +257,11 @@ export function useMatchedBanner(seed, color, topic = 'abstract') {
   return pickBannerByColor(base, color, seed);
 }
 
-/** Soft gradient in one colour family, shown while a matched photo loads. */
+/** Two-colour waves in one colour family (main colour + a neighbour hue), shown while a matched photo loads. */
 export function toneArt(color, seed) {
   const c = parseColor(color);
   if (!c) return abstractArt(seed);
   const h = Math.round(c.h);
   const s = Math.round(Math.min(Math.max(c.s, 0.35), 0.85) * 100);
-  const x = 20 + (hashSeed(seed) % 50);
-  return [
-    `radial-gradient(circle at ${x}% 30%, hsl(${h} ${s}% 60%) 0%, transparent 55%)`,
-    `radial-gradient(circle at ${100 - x}% 70%, hsl(${(h + 25) % 360} ${s}% 45%) 0%, transparent 60%)`,
-    `linear-gradient(135deg, hsl(${h} ${s}% 22%), hsl(${(h + 340) % 360} ${s}% 12%))`,
-  ].join(', ');
+  return waveArt(`hsl(${h} ${s}% 30%)`, `hsl(${(h + 35) % 360} ${s}% 58%)`, seed);
 }
