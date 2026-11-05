@@ -4,32 +4,48 @@ import { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { isFeatureOn } from '../lib/workspaceFeatures';
 
-const POLL_MS = 30 * 1000;
+const POLL_MS = 15 * 1000;
 const SINCE_KEY = 'chatter_desktop_alerts_since';
 
 const readSince = () => { try { return localStorage.getItem(SINCE_KEY); } catch { return null; } };
 const writeSince = v => { try { localStorage.setItem(SINCE_KEY, v); } catch { /* storage blocked */ } };
 
 /**
- * Native desktop notifications (PLAN.md §13 Phase 8). Renders nothing and only
- * runs inside the Tauri app (window.__TAURI__ comes from withGlobalTauri):
- * registers the device, then polls /api/desktop/alerts for new leads,
- * bookings and handoffs.
+ * Notifications (PLAN.md §13 Phase 8). Renders nothing. Inside the Tauri app
+ * (window.__TAURI__ from withGlobalTauri) it registers the device and uses
+ * native notifications; in a normal browser it uses the Web Notification API.
+ * Polls /api/desktop/alerts for new DMs (first-time senders flagged as
+ * "New person"), leads, bookings and handoffs.
  */
 export default function DesktopAlerts() {
   const { API_BASE, token, user, workspaceFeatures } = useApp();
   const enabled = isFeatureOn(workspaceFeatures, 'desktopPushAlerts');
 
   useEffect(() => {
-    const tauri = typeof window !== 'undefined' ? window.__TAURI__ : null;
-    if (!tauri || !token || !user || !enabled) return;
+    if (typeof window === 'undefined' || !token || !user || !enabled) return;
+    const tauri = window.__TAURI__ || null;
+    const WebN = !tauri && 'Notification' in window ? window.Notification : null;
+    if (!tauri && !WebN) return;
 
     const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-    const notify = tauri.notification;
     let timer;
     let stopped = false;
 
+    // Browsers only show the permission prompt after a click, so ask on the first one
+    const askOnClick = () => { WebN.requestPermission().catch(() => {}); };
+    if (WebN && WebN.permission === 'default') window.addEventListener('click', askOnClick, { once: true });
+
+    const notify = tauri ? tauri.notification : {
+      sendNotification: ({ title, body, tag }) => {
+        try {
+          const n = new WebN(title, { body, tag, icon: '/favicon.svg' });
+          n.onclick = () => { window.focus(); window.location.href = '/relationships'; n.close(); };
+        } catch { /* some mobile browsers need a service worker */ }
+      },
+    };
+
     const allowed = async () => {
+      if (WebN) return WebN.permission === 'granted';
       if (!notify) return false;
       if (await notify.isPermissionGranted()) return true;
       return (await notify.requestPermission()) === 'granted';
@@ -45,9 +61,10 @@ export default function DesktopAlerts() {
         if (data.alerts?.length && await allowed()) {
           // Many at once (e.g. after sleep): one summary instead of a flood
           if (data.alerts.length > 3) {
-            notify.sendNotification({ title: 'Chatter OS', body: `${data.alerts.length} new updates: leads, bookings or chats that need you` });
+            const msgs = data.alerts.filter(a => a.kind === 'message' || a.kind === 'new_contact').length;
+            notify.sendNotification({ title: 'Chatter OS', body: msgs ? `${msgs} people messaged you${data.alerts.length > msgs ? `, plus ${data.alerts.length - msgs} other updates` : ''}` : `${data.alerts.length} new updates: leads, bookings or chats that need you` });
           } else {
-            data.alerts.forEach(a => notify.sendNotification({ title: a.title, body: a.body }));
+            data.alerts.forEach(a => notify.sendNotification({ title: a.title, body: a.body, tag: a.id }));
           }
         }
       } catch { /* offline: try again next tick */ }
@@ -55,6 +72,7 @@ export default function DesktopAlerts() {
     };
 
     (async () => {
+      if (!tauri) { poll(); return; }
       try {
         const platform = await tauri.core.invoke('platform_id');
         await fetch(`${API_BASE}/api/desktop/register`, {
@@ -64,7 +82,7 @@ export default function DesktopAlerts() {
       poll();
     })();
 
-    return () => { stopped = true; clearTimeout(timer); };
+    return () => { stopped = true; clearTimeout(timer); window.removeEventListener('click', askOnClick); };
   }, [API_BASE, token, user?._id, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
