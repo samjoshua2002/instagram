@@ -9,6 +9,11 @@ const TOPICS = {
   fluid: 'fluid art',
 };
 
+// One list per Unsplash colour filter ("tone-yellow", ...), so a contact's banner can match
+// the main colour of their profile photo. Each costs one call a week, like the topics above.
+const TONES = ['black_and_white', 'black', 'white', 'yellow', 'orange', 'red', 'purple', 'magenta', 'green', 'teal', 'blue'];
+for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: 'abstract gradient', color: tone };
+
 const REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // ask Unsplash for a new list at most once a week per topic
 const RETRY_MS = 10 * 60 * 1000; // after a network/server error
 const LIMIT_MS = 60 * 60 * 1000; // after 429/403 or when the hourly quota is nearly used up
@@ -76,9 +81,11 @@ function createUnsplashCache({
     const key = getKey();
     if (!key) return null;
     if (now() < blockedUntil) return null;
+    const spec = typeof TOPICS[topic] === 'string' ? { query: TOPICS[topic] } : TOPICS[topic];
     const params = new URLSearchParams({
-      query: TOPICS[topic], per_page: '30', orientation: 'landscape', content_filter: 'high',
+      query: spec.query, per_page: '30', orientation: 'landscape', content_filter: 'high',
     });
+    if (spec.color) params.set('color', spec.color);
     let res;
     try {
       res = await fetchImpl(`https://api.unsplash.com/search/photos?${params}`, {
@@ -90,7 +97,8 @@ function createUnsplashCache({
       log('request failed:', err.message);
       return null;
     }
-    const remaining = Number(res.headers?.get?.('x-ratelimit-remaining'));
+    const left = res.headers?.get?.('x-ratelimit-remaining');
+    const remaining = left === null || left === undefined || left === '' ? NaN : Number(left); // missing header is not "0 left"
     if (res.status === 429 || res.status === 403) {
       blockedUntil = now() + LIMIT_MS;
       log(`rate limited (${res.status}); using saved photos for the next hour`);
@@ -145,4 +153,4 @@ function createUnsplashCache({
   return { getPhotos, isBlocked: () => now() < blockedUntil };
 }
 
-module.exports = { createUnsplashCache, TOPICS, REFRESH_MS, toPhotos };
+module.exports = { createUnsplashCache, TOPICS, TONES, REFRESH_MS, toPhotos };

@@ -809,7 +809,7 @@ function RelationshipsPageContent() {
       <div ref={pageRef} className="page-container person-page">
         {/* ================= SPOTIFY ARTIST-STYLE HERO (PLAN.md §15.3) ================= */}
         <div className="person-hero">
-          <UnsplashBanner seed={selectedPerson.name || selectedPerson.id} className="person-cover" />
+          <UnsplashBanner seed={selectedPerson.name || selectedPerson.id} matchImage={personArt} className="person-cover" />
           <span className="hero-surface" aria-hidden="true" />
           <button type="button" className="person-back" onClick={() => setSelectedPerson(null)} aria-label="Back to directory">
             <ArrowLeft size={22} />
@@ -1849,7 +1849,7 @@ function RelationshipsPageContent() {
 
             {/* DM transcript preview */}
             <div className="person-glass-card">
-              <UnsplashBanner seed={`chat-${selectedPerson.name || selectedPerson.id}`} topic="fluid" width={900} className="chat-banner person-chat-banner">
+              <UnsplashBanner seed={`chat-${selectedPerson.name || selectedPerson.id}`} topic="fluid" width={900} matchImage={personArt} className="chat-banner person-chat-banner">
                 <div>
                   <div className="person-card-eyebrow">RECENT DMS</div>
                   <div className="person-card-title">Conversation preview</div>

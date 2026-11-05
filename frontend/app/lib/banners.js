@@ -16,6 +16,7 @@ export const UTM = 'utm_source=chatter_box&utm_medium=referral';
 
 const lists = new Map(); // topic -> photos[]
 const jobs = new Map(); // topic -> Promise<photos[]>
+const tried = new Set(); // topics asked for this session (loaded or failed)
 
 export const hashSeed = s => [...String(s || '?')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
@@ -63,7 +64,7 @@ export function loadBanners(topic = 'abstract') {
       return readStore(topic, true) || [];
     })
     .catch(() => readStore(topic, true) || [])
-    .finally(() => jobs.delete(topic));
+    .finally(() => { jobs.delete(topic); tried.add(topic); });
   jobs.set(topic, job);
   return job;
 }
@@ -117,4 +118,115 @@ export function abstractArt(seed) {
 /** The main colour of the fallback artwork for a seed (used before a photo's palette is known). */
 export function abstractColor(seed) {
   return PALETTES[hashSeed(seed) % PALETTES.length][0];
+}
+
+// ── Colour matching ─────────────────────────────────────────────
+// A contact's banner follows the main colour of their profile photo (the same colour
+// that tints the page), so the top of the page and the photo never clash.
+
+/** "#rrggbb", "#rgb" or "hsl(h s% l%)" -> { h, s, l } (s and l from 0 to 1), or null. */
+export function parseColor(color) {
+  const c = String(color || '').trim();
+  const m = c.match(/^hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/i);
+  if (m) return { h: Number(m[1]) % 360, s: Number(m[2]) / 100, l: Number(m[3]) / 100 };
+  let hex = c.replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(hex)) hex = [...hex].map(x => x + x).join('');
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return { h: h * 60, s, l };
+}
+
+/** The Unsplash colour filter nearest to a colour (server topic "tone-<name>"). */
+export function toneFor(color) {
+  const c = typeof color === 'object' && color ? color : parseColor(color);
+  if (!c) return null;
+  if (c.s < 0.12) return c.l > 0.8 ? 'white' : c.l < 0.15 ? 'black' : 'black_and_white';
+  const h = c.h;
+  if (h < 15 || h >= 345) return 'red';
+  if (h < 40) return 'orange';
+  if (h < 70) return 'yellow';
+  if (h < 160) return 'green';
+  if (h < 195) return 'teal';
+  if (h < 255) return 'blue';
+  if (h < 285) return 'purple';
+  return 'magenta';
+}
+
+const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+
+/** How far a photo's colour is from the target (0 = same). Greys only match greys. */
+export function colorDistance(target, photoColor) {
+  const p = parseColor(photoColor);
+  if (!target || !p) return 1;
+  const grey = t => t.s < 0.12 || t.l < 0.06;
+  if (grey(target)) return Math.min(1, p.s);
+  if (grey(p)) return 0.9;
+  return hueGap(target.h, p.h) / 180 * 0.8 + Math.abs(target.s - p.s) * 0.2;
+}
+
+/**
+ * Pick the photo nearest to `color`; among the few closest, `seed` decides,
+ * so two contacts with the same colour don't always get the same photo.
+ */
+export function pickBannerByColor(photos, color, seed) {
+  if (!photos || !photos.length) return null;
+  const target = typeof color === 'object' && color ? color : parseColor(color);
+  if (!target) return pickBanner(photos, seed);
+  const ranked = photos
+    .map(p => ({ p, d: colorDistance(target, p.color) }))
+    .sort((a, b) => a.d - b.d);
+  const best = ranked[0].d;
+  const close = ranked.filter(r => r.d <= best + 0.08).slice(0, 5);
+  return close[hashSeed(seed) % close.length].p;
+}
+
+/**
+ * The banner for `seed` that matches `color` (e.g. the contact photo's main colour).
+ * Uses the matching Unsplash colour list; if that list is empty (no key / rate limited),
+ * falls back to the best match in `topic`'s list. With no colour it is useBanner().
+ */
+export function useMatchedBanner(seed, color, topic = 'abstract') {
+  const tone = color ? toneFor(color) : null;
+  const toneTopic = tone ? `tone-${tone}` : null;
+  const [, setTick] = useState(0); // re-render when a list arrives
+  useEffect(() => {
+    let alive = true;
+    const bump = () => alive && setTick(t => t + 1);
+    loadBanners(topic).then(bump);
+    if (toneTopic) loadBanners(toneTopic).then(bump);
+    return () => { alive = false; };
+  }, [topic, toneTopic]);
+  if (seed === null || seed === undefined || typeof window === 'undefined') return null;
+  const base = cachedBanners(topic);
+  if (!toneTopic) return pickBanner(base, seed);
+  const toned = cachedBanners(toneTopic);
+  if (toned && toned.length) return pickBannerByColor(toned, color, seed);
+  // Colour list still loading: wait, so a wrong-colour photo never flashes in.
+  // It failed (no key / rate limited): best colour match from the normal list.
+  if (!tried.has(toneTopic)) return null;
+  return pickBannerByColor(base, color, seed);
+}
+
+/** Soft gradient in one colour family, shown while a matched photo loads. */
+export function toneArt(color, seed) {
+  const c = parseColor(color);
+  if (!c) return abstractArt(seed);
+  const h = Math.round(c.h);
+  const s = Math.round(Math.min(Math.max(c.s, 0.35), 0.85) * 100);
+  const x = 20 + (hashSeed(seed) % 50);
+  return [
+    `radial-gradient(circle at ${x}% 30%, hsl(${h} ${s}% 60%) 0%, transparent 55%)`,
+    `radial-gradient(circle at ${100 - x}% 70%, hsl(${(h + 25) % 360} ${s}% 45%) 0%, transparent 60%)`,
+    `linear-gradient(135deg, hsl(${h} ${s}% 22%), hsl(${(h + 340) % 360} ${s}% 12%))`,
+  ].join(', ');
 }

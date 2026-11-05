@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Spotify-style Dynamic Ambient Background (PLAN.md §15.2)
@@ -103,6 +103,25 @@ export function prefetchAmbientImages(urls, concurrency = 4) {
   const start = () => Array.from({ length: Math.min(concurrency, queue.length) }, worker);
   if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 800 });
   else setTimeout(start, 50);
+}
+
+/**
+ * The palette of `url` (same one that tints the page): undefined while it is worked out,
+ * null when the image could not be read.
+ */
+export function usePalette(url) {
+  const [state, setState] = useState(() => ({ url, palette: getCachedPalette(url) }));
+  useEffect(() => {
+    let alive = true;
+    if (!url) { setState({ url, palette: null }); return undefined; }
+    const ready = getCachedPalette(url);
+    if (ready !== undefined) { setState({ url, palette: ready }); return undefined; }
+    setState({ url, palette: undefined });
+    ensurePalette(url).then(p => alive && setState({ url, palette: p }));
+    return () => { alive = false; };
+  }, [url]);
+  if (!url) return null;
+  return state.url === url ? state.palette : getCachedPalette(url);
 }
 
 export function setAmbientImage(url) {

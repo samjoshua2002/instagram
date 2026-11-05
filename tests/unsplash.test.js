@@ -126,3 +126,44 @@ test('empty Unsplash result keeps the old list instead of wiping it', async () =
   assert.deepEqual((await s.cache.getPhotos('abstract')).map(p => p.id), ['old']);
   assert.equal(s.db.abstract.photos[0].id, 'old');
 });
+
+test('colour topics ask Unsplash for that colour only', async () => {
+  const s = setup({ responses: [{ status: 200, results: [apiPhoto('y')] }] });
+  const photos = await s.cache.getPhotos('tone-yellow');
+  assert.deepEqual(photos.map(p => p.id), ['y']);
+  const url = new URL(s.calls[0]);
+  assert.equal(url.searchParams.get('color'), 'yellow');
+  assert.equal(url.searchParams.get('query'), 'abstract gradient');
+  // Normal topics send no colour filter
+  await s.cache.getPhotos('fluid');
+  assert.equal(new URL(s.calls[1]).searchParams.get('color'), null);
+});
+
+// Frontend colour matching (frontend/app/lib/banners.js): the banner follows the profile photo colour
+test('profile colour picks the matching Unsplash colour list and nearest photo', async () => {
+  const b = await import('../frontend/app/lib/banners.js');
+  // Palettes from the page tint look like "hsl(45 70% 50%)"
+  assert.equal(b.toneFor('hsl(45 70% 50%)'), 'yellow'); // Aradhana: gold page
+  assert.equal(b.toneFor('hsl(285 60% 50%)'), 'magenta');
+  assert.equal(b.toneFor('hsl(270 60% 50%)'), 'purple'); // mikasa: purple page
+  assert.equal(b.toneFor('hsl(220 70% 50%)'), 'blue');
+  assert.equal(b.toneFor('hsl(141 55% 50%)'), 'green');
+  assert.equal(b.toneFor('hsl(220 8% 50%)'), 'black_and_white');
+  assert.equal(b.toneFor('#ffffff'), 'white');
+  assert.equal(b.toneFor(null), null);
+
+  const photos = [
+    { id: 'blue', raw: 'x', color: '#0c2a73' },
+    { id: 'gold', raw: 'x', color: '#d9a640' },
+    { id: 'pink', raw: 'x', color: '#d0407a' },
+    { id: 'grey', raw: 'x', color: '#777777' },
+  ];
+  for (const seed of ['Aradhana', 'mikasa', 'x', 'y', 'z']) {
+    assert.equal(b.pickBannerByColor(photos, 'hsl(42 65% 50%)', seed).id, 'gold');
+    assert.equal(b.pickBannerByColor(photos, 'hsl(330 70% 55%)', seed).id, 'pink');
+    assert.equal(b.pickBannerByColor(photos, 'hsl(220 8% 50%)', seed).id, 'grey');
+  }
+  // No colour: the old pick by name still works
+  assert.ok(b.pickBannerByColor(photos, null, 'Aradhana'));
+  assert.deepEqual(b.parseColor('#ff0000'), { h: 0, s: 1, l: 0.5 });
+});

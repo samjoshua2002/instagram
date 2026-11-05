@@ -370,7 +370,7 @@ export default function SpotlightHome() {
             <div className="sh-spot-row">
               {spotlight.map(p => (
                 <Link key={p.id} href={personHref(p)} className="sh-spot sh-pressable" {...pressProps(p)}>
-                  <UnsplashBanner as="span" seed={p.name} width={720} credit={false} className="sh-spot-art" />
+                  <UnsplashBanner as="span" seed={p.name} width={720} credit={false} matchImage={savedPhotoUrl(p)} className="sh-spot-art" />
                   <span className="sh-spot-glow" aria-hidden="true" />
                   <Photo person={p} className="sh-spot-avatar" />
                   <span className="sh-spot-text">
