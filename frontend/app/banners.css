@@ -86,11 +86,14 @@
   left: -36px;
   right: -36px;
   height: 340px;
+  /* The photo hangs below the hero (which turns sticky, z-index 30), so it must let
+     clicks through to the action buttons underneath; only the credit link stays live. */
+  pointer-events: none;
   -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
   mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
 }
 .person-cover .ub-shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.45) 100%); }
-.person-cover .ub-credit { top: 12px; bottom: auto; }
+.person-cover .ub-credit { top: 12px; bottom: auto; pointer-events: auto; }
 .person-hero .person-name,
 .person-hero .person-handle,
 .person-hero .person-stat-value,
