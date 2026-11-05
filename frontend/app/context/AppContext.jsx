@@ -636,7 +636,14 @@ export function AppProvider({ children }) {
               return sn;
             });
 
-            const deduplicated = deduplicateNodes([root, ...mergedContacts]);
+            // A person saved moments ago may not be in this server answer yet: keep them instead of wiping them
+            const serverNames = new Set(serverContacts.map(sn => sn.name.toLowerCase()));
+            const pendingOnly = prev.filter(p =>
+              !p.isRoot && pendingSaved.has((p.name || '').toLowerCase()) && !serverNames.has(p.name.toLowerCase())
+            );
+            root.children = [...root.children, ...pendingOnly.map(p => p.id)];
+
+            const deduplicated = deduplicateNodes([root, ...mergedContacts, ...pendingOnly]);
 
             // Prevent unnecessary re-render if data has not changed
             if (prev.length === deduplicated.length) {
@@ -729,10 +736,6 @@ export function AppProvider({ children }) {
     // Make sure new cleanName is NOT marked as deleted
     deletedNamesRef.current.delete(cleanName.toLowerCase());
     persistDeletedNames(deletedNamesRef.current);
-
-    setTimeout(() => {
-      pendingSavedNamesRef.current.delete(cleanName.toLowerCase());
-    }, 6000);
 
     const formattedNode = {
       id,
@@ -842,9 +845,16 @@ export function AppProvider({ children }) {
           });
         }
       }
+      // Pull the saved record (profile pic, Instagram link) right away instead of waiting for the next poll
+      syncBackend();
     } catch (err) {
       console.warn('Backend node save error:', err.message);
       showToast(`Could not save ${cleanName}: ${err.message}`, 'error');
+    } finally {
+      // Keep the local copy protected until a sync that started after the save has landed
+      setTimeout(() => {
+        pendingSavedNamesRef.current.delete(cleanName.toLowerCase());
+      }, 15000);
     }
   };
 
