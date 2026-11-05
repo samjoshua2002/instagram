@@ -104,7 +104,7 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="page-container" style={{ maxWidth: '860px' }}>
+    <div className="page-container settings-fullwidth">
       <div style={{ marginBottom: '24px' }}>
         <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>
           // KNOWLEDGE BASE
@@ -183,7 +183,7 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {items?.map(item => (
+      {items?.length > 0 && <div className="docs-grid">{items.map(item => (
         <div key={item._id} className="download-card docs-item">
           <div className="download-icon"><SourceIcon type={item.sourceType} /></div>
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -204,7 +204,7 @@ export default function DocumentsPage() {
             <button type="button" className="btn" onClick={() => remove(item)} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
           </div>
         </div>
-      ))}
+      ))}</div>}
     </div>
   );
 }

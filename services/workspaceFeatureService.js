@@ -7,6 +7,7 @@
  * business tools (documents, leads, bookings) through the toggles.
  */
 const WorkspaceFeatures = require('../models/WorkspaceFeatures');
+const KnowledgeDoc = require('../models/KnowledgeDoc');
 const llmAdapter = require('./llmAdapter');
 
 const FEATURE_KEYS = [
@@ -37,6 +38,10 @@ const MODE_PRESETS = {
 const MODES = Object.keys(MODE_PRESETS);
 const CACHE_MS = 30 * 1000;
 const cache = new Map();
+
+// A workspace that has uploaded documents always keeps document search on: the Personal
+// preset turned it off on every mode switch, so uploaded docs were silently ignored
+const hasDocuments = (ownerId) => KnowledgeDoc.exists({ ownerId }).then(Boolean).catch(() => false);
 
 const isBusinessType = (accountType) => accountType === 'business' || accountType === 'agency';
 const modeFromAccountType = (accountType) => (isBusinessType(accountType) ? 'business' : 'personal');
@@ -79,7 +84,11 @@ async function getFeatures(user) {
           ownerId: user._id,
           activeMode: mode,
           // Existing BYO-LLM users keep their provider switched on
-          enabledFeatures: { ...MODE_PRESETS[mode], byoLlmCustomEndpoint: llmAdapter.isCustomProvider(user.aiProviderConfig) },
+          enabledFeatures: {
+            ...MODE_PRESETS[mode],
+            byoLlmCustomEndpoint: llmAdapter.isCustomProvider(user.aiProviderConfig),
+            ...((await hasDocuments(user._id)) ? { ragKnowledgeBase: true } : {}),
+          },
         },
       },
       { upsert: true, new: true }
@@ -115,7 +124,8 @@ async function updateFeatures(user, { activeMode, enabledFeatures, customBrandin
     if (activeMode !== doc.activeMode) {
       const keepByo = Boolean(doc.enabledFeatures?.byoLlmCustomEndpoint);
       doc.activeMode = activeMode;
-      doc.enabledFeatures = { ...MODE_PRESETS[activeMode], byoLlmCustomEndpoint: keepByo };
+      const keepRag = Boolean(doc.enabledFeatures?.ragKnowledgeBase) && (await hasDocuments(user._id));
+      doc.enabledFeatures = { ...MODE_PRESETS[activeMode], byoLlmCustomEndpoint: keepByo, ...(keepRag ? { ragKnowledgeBase: true } : {}) };
     }
     // Business voice for business mode (agency stays agency); personal voice for personal and hybrid
     const wantsBusiness = activeMode === 'business';
@@ -146,4 +156,11 @@ async function updateFeatures(user, { activeMode, enabledFeatures, customBrandin
   return { view, accountType };
 }
 
-module.exports = { FEATURE_KEYS, MODE_PRESETS, MODES, getFeatures, getFeaturesSafe, updateFeatures };
+/** Turns document search on after an upload so a new document is used straight away. */
+async function enableDocumentSearch(user) {
+  const view = await getFeatures(user);
+  if (view.enabledFeatures.ragKnowledgeBase) return view;
+  return (await updateFeatures(user, { enabledFeatures: { ragKnowledgeBase: true } })).view;
+}
+
+module.exports = { FEATURE_KEYS, MODE_PRESETS, MODES, getFeatures, getFeaturesSafe, updateFeatures, enableDocumentSearch };

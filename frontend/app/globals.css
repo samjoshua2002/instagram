@@ -1438,6 +1438,18 @@ select:focus {
   gap: 12px;
 }
 
+/* Documents fill the full page width: two or more columns on wide screens, one on phones */
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: 14px;
+}
+
+.docs-grid .docs-item {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
 .docs-preview {
   font-size: 0.8rem;
   color: var(--text-muted);

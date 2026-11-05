@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const ragService = require('../services/ragService');
+const workspaceFeatureService = require('../services/workspaceFeatureService');
+
+// A new document should be used straight away, so make sure document search is on
+const afterIngest = (user) => workspaceFeatureService.enableDocumentSearch(user).then(v => v.enabledFeatures.ragKnowledgeBase).catch(() => undefined);
 
 const router = express.Router();
 
@@ -63,7 +67,7 @@ router.post('/upload', (req, res) => {
         category: (req.body.category || '').trim(),
         sourceType: 'file',
       });
-      res.json({ success: true, ...result });
+      res.json({ success: true, ...result, documentSearchOn: await afterIngest(req.user) });
     } catch (err) {
       fs.unlink(req.file.path, () => {});
       res.status(400).json({ error: err.message || 'Could not read this file.' });
@@ -81,7 +85,7 @@ router.post('/link', async (req, res) => {
     const result = await ragService.ingestDocument({
       ownerId: req.user._id, title, text: description, fileUrl: url, category, sourceType: 'link',
     });
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, documentSearchOn: await afterIngest(req.user) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -93,7 +97,7 @@ router.post('/text', async (req, res) => {
     const { title, text, category = '' } = req.body || {};
     if (!title || !(text || '').trim()) return res.status(400).json({ error: 'A title and some text are required.' });
     const result = await ragService.ingestDocument({ ownerId: req.user._id, title, text, category, sourceType: 'text' });
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, documentSearchOn: await afterIngest(req.user) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -28,7 +28,7 @@ export default function ModelSettingsPage() {
   const byoOn = isFeatureOn(workspaceFeatures, 'byoLlmCustomEndpoint');
 
   return (
-    <div className="page-container" style={{ maxWidth: '860px' }}>
+    <div className="page-container settings-fullwidth">
       <div style={{ marginBottom: '24px' }}>
         <Link href="/settings" className="feature-back">
           <ArrowLeft size={14} /> Settings
