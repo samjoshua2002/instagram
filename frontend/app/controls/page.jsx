@@ -371,7 +371,7 @@ function ControlsPageContent() {
             <div style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
               {contact.name}
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
               {contact.handle || contact.relationship || 'Friend'}
             </div>
           </div>
@@ -530,7 +530,7 @@ function ControlsPageContent() {
               <div style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 {contact.name}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 {contact.handle || contact.relationship || 'Friend'}
               </div>
             </div>
@@ -542,7 +542,7 @@ function ControlsPageContent() {
               fontSize: '0.64rem',
               padding: '2px 7px',
               borderRadius: '4px',
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-label)",
               fontWeight: '700',
               background: isFullAi ? 'var(--color-text-primary)' : (isReelsOnly ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)'),
               color: (isFullAi || isReelsOnly) ? 'var(--color-surface)' : 'var(--color-text-secondary)',
@@ -660,7 +660,7 @@ function ControlsPageContent() {
     >
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
           AUTOMATION POLICY
         </div>
         <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: 'var(--color-text-primary)' }}>
@@ -723,7 +723,7 @@ function ControlsPageContent() {
                       color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                       padding: '2px 7px',
                       borderRadius: '4px',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "var(--font-label)",
                       fontWeight: '700'
                     }}
                   >
@@ -766,10 +766,10 @@ function ControlsPageContent() {
         }}
       >
         <div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             ACTIVE SYSTEM POLICY
           </span>
-          <div style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--color-text-primary)', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--color-text-primary)', marginTop: '2px', fontFamily: "var(--font-label)" }}>
             {routingConfig.chatMode === 'everyone' && 'AI RESPONDS TO EVERYONE AUTOMATICALLY'}
             {routingConfig.chatMode === 'everyone_except' && `AI RESPONDS TO EVERYONE EXCEPT ${activeCount} CHECKED FRIENDS`}
             {routingConfig.chatMode === 'only_selected' && `AI ONLY RESPONDS TO ${activeCount} CHECKED CONTACTS`}
@@ -934,7 +934,7 @@ function ControlsPageContent() {
                     borderRadius: '4px',
                     background: isTabActive ? 'var(--color-text-secondary)' : 'var(--color-surface-hover)',
                     color: isTabActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "var(--font-label)",
                     fontWeight: '700'
                   }}>
                     {tab.count}
@@ -956,7 +956,7 @@ function ControlsPageContent() {
                   <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                     1. Full AI Active (Auto-Replies to Messages & Reels)
                   </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
                     {fullAiContacts.length}
                   </span>
                 </div>
@@ -989,7 +989,7 @@ function ControlsPageContent() {
                   <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                     2. Reels Only (Reacts Exclusively to Shared Reels)
                   </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
                     {reelsOnlyContacts.length}
                   </span>
                 </div>
@@ -1022,7 +1022,7 @@ function ControlsPageContent() {
                   <h4 style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                     3. Manual Chat / Paused (Not Selected)
                   </h4>
-                  <span style={{ fontSize: '0.68rem', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.68rem', fontFamily: "var(--font-label)", fontWeight: '700', background: 'var(--color-surface-hover)', padding: '2px 6px', borderRadius: '4px' }}>
                     {manualContacts.length}
                   </span>
                 </div>

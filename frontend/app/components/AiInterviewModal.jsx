@@ -257,7 +257,7 @@ export default function AiInterviewModal() {
         {/* Right: Live Preview & Save */}
         <div className="interview-preview-pane" style={{ flex: 0.85, padding: '22px', background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', fontWeight: '700', fontFamily: "var(--font-label)" }}>
               LIVE PROFILE PREVIEW
             </div>
 
@@ -267,7 +267,7 @@ export default function AiInterviewModal() {
                 <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--color-text-primary)', margin: 0 }}>
                   {accumulatedNode?.name || '(Waiting for name...)'}
                 </h3>
-                <span style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                   {accumulatedNode?.instagramHandle || 'No handle set'}
                 </span>
               </div>

@@ -274,7 +274,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
             <span style={{
               fontSize: '0.7rem',
               fontWeight: '700',
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-label)",
               color: 'var(--color-text-secondary)'
             }}>
               STEP {step} OF {TOTAL_STEPS}
@@ -377,7 +377,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                         <span style={{
                           fontSize: '0.64rem',
                           fontWeight: '800',
-                          fontFamily: "'JetBrains Mono', monospace",
+                          fontFamily: "var(--font-label)",
                           background: 'color-mix(in srgb, #22c55e 14%, transparent)',
                           color: '#4ade80',
                           padding: '1px 6px',
@@ -386,7 +386,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           LINKED
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#4ade80', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <div style={{ fontSize: '0.72rem', color: '#4ade80', marginTop: '2px', fontFamily: "var(--font-label)" }}>
                         ID: {instagramAccountId || 'Connected'} • Page Token Active
                       </div>
                     </div>
@@ -540,7 +540,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           border: '1px solid var(--color-border)',
                           background: 'var(--color-surface)',
                           fontSize: '0.78rem',
-                          fontFamily: "'JetBrains Mono', monospace",
+                          fontFamily: "var(--font-label)",
                           boxSizing: 'border-box'
                         }}
                       />
@@ -888,7 +888,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           <span style={{
                             fontSize: '0.62rem',
                             fontWeight: '700',
-                            fontFamily: "'JetBrains Mono', monospace",
+                            fontFamily: "var(--font-label)",
                             background: isSelected ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
                             color: isSelected ? 'var(--color-surface)' : 'var(--color-text-secondary)',
                             padding: '1px 6px',

@@ -117,7 +117,7 @@ export default function AiProviderCard() {
             }}>
               <Cpu size={15} />
             </div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: 700, letterSpacing: '0.06em' }}>
               BYO-LLM &amp; INFERENCE ENGINE
             </span>
           </div>
@@ -237,7 +237,7 @@ export default function AiProviderCard() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                 <span style={{
                   fontSize: '0.62rem',
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "var(--font-label)",
                   fontWeight: 800,
                   padding: '2px 6px',
                   borderRadius: '4px',
@@ -299,7 +299,7 @@ export default function AiProviderCard() {
                 border: '1px solid var(--color-border)',
                 background: 'var(--color-surface)',
                 fontSize: '0.85rem',
-                fontFamily: "'JetBrains Mono', monospace"
+                fontFamily: "var(--font-label)"
               }}
               value={form.model}
               onChange={e => set('model', e.target.value)}
@@ -319,7 +319,7 @@ export default function AiProviderCard() {
                 border: '1px solid var(--color-border)',
                 background: 'var(--color-surface)',
                 fontSize: '0.85rem',
-                fontFamily: "'JetBrains Mono', monospace"
+                fontFamily: "var(--font-label)"
               }}
               value={form.endpoint}
               onChange={e => set('endpoint', e.target.value)}
@@ -342,7 +342,7 @@ export default function AiProviderCard() {
                   border: '1px solid var(--color-border)',
                   background: 'var(--color-surface)',
                   fontSize: '0.85rem',
-                  fontFamily: "'JetBrains Mono', monospace"
+                  fontFamily: "var(--font-label)"
                 }}
                 value={form.apiKey}
                 onChange={e => set('apiKey', e.target.value)}

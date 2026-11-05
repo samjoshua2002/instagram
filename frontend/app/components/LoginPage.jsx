@@ -1287,7 +1287,7 @@ export default function LoginPage({ onLoginSuccess }) {
                                 {isSuper && (
                                   <span style={{
                                     fontSize: '0.62rem',
-                                    fontFamily: "'JetBrains Mono', monospace",
+                                    fontFamily: "var(--font-label)",
                                     fontWeight: '800',
                                     background: 'var(--color-text-primary)',
                                     color: 'var(--color-surface)',
@@ -1299,7 +1299,7 @@ export default function LoginPage({ onLoginSuccess }) {
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {acc.email} • @{acc.username}
                               </div>
                             </div>
@@ -1399,7 +1399,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           {rememberedAccount.role === 'superadmin' && (
                             <span style={{
                               fontSize: '0.6rem',
-                              fontFamily: "'JetBrains Mono', monospace",
+                              fontFamily: "var(--font-label)",
                               fontWeight: '800',
                               background: 'var(--color-text-primary)',
                               color: 'var(--color-surface)',
@@ -1613,7 +1613,7 @@ export default function LoginPage({ onLoginSuccess }) {
                               padding: '10px',
                               color: 'var(--color-text-primary)',
                               fontSize: '1.25rem',
-                              fontFamily: "'JetBrains Mono', monospace",
+                              fontFamily: "var(--font-label)",
                               letterSpacing: '5px',
                               textAlign: 'center',
                               boxSizing: 'border-box',
@@ -1697,7 +1697,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             padding: '11px',
                             color: 'var(--color-text-primary)',
                             fontSize: '1.25rem',
-                            fontFamily: "'JetBrains Mono', monospace",
+                            fontFamily: "var(--font-label)",
                             letterSpacing: '6px',
                             textAlign: 'center',
                             boxSizing: 'border-box',
@@ -1909,7 +1909,7 @@ export default function LoginPage({ onLoginSuccess }) {
                               padding: '8px',
                               color: 'var(--color-text-primary)',
                               fontSize: '1.1rem',
-                              fontFamily: "'JetBrains Mono', monospace",
+                              fontFamily: "var(--font-label)",
                               letterSpacing: '4px',
                               boxSizing: 'border-box',
                               outline: 'none',
@@ -2016,7 +2016,7 @@ export default function LoginPage({ onLoginSuccess }) {
                             padding: '10px',
                             color: 'var(--color-text-primary)',
                             fontSize: '1.25rem',
-                            fontFamily: "'JetBrains Mono', monospace",
+                            fontFamily: "var(--font-label)",
                             letterSpacing: '5px',
                             textAlign: 'center',
                             boxSizing: 'border-box',
@@ -2338,11 +2338,11 @@ export default function LoginPage({ onLoginSuccess }) {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           @{instaPreview.username} {instaPreview.instagramId ? `• ID: ${instaPreview.instagramId}` : ''}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4ade80', fontSize: '0.68rem', fontWeight: '800', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, background: 'color-mix(in srgb, #22c55e 14%, transparent)', padding: '3px 7px', borderRadius: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4ade80', fontSize: '0.68rem', fontWeight: '800', fontFamily: "var(--font-label)", flexShrink: 0, background: 'color-mix(in srgb, #22c55e 14%, transparent)', padding: '3px 7px', borderRadius: '4px' }}>
                         <Check size={12} strokeWidth={3} />
                         <span>{instaPreview.isVerified ? 'VERIFIED' : 'READY'}</span>
                       </div>
@@ -2466,7 +2466,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           padding: '11px',
                           color: 'var(--color-text-primary)',
                           fontSize: '1.3rem',
-                          fontFamily: "'JetBrains Mono', monospace",
+                          fontFamily: "var(--font-label)",
                           letterSpacing: '6px',
                           textAlign: 'center',
                           boxSizing: 'border-box',
@@ -2789,7 +2789,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       padding: '8px',
                       color: 'var(--color-text-primary)',
                       fontSize: '1.1rem',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "var(--font-label)",
                       letterSpacing: '4px',
                       textAlign: 'center',
                       boxSizing: 'border-box'
@@ -2919,7 +2919,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           padding: '8px',
                           color: 'var(--color-text-primary)',
                           fontSize: '1.1rem',
-                          fontFamily: "'JetBrains Mono', monospace",
+                          fontFamily: "var(--font-label)",
                           letterSpacing: '4px',
                           textAlign: 'center',
                           boxSizing: 'border-box'

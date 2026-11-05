@@ -34,7 +34,7 @@ export default function WorkspaceImpersonationBanner() {
           style={{
             background: '#22c55e',
             color: 'var(--color-text-primary)',
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "var(--font-label)",
             fontWeight: '800',
             fontSize: '0.64rem',
             padding: '2px 6px',
