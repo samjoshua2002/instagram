@@ -103,7 +103,7 @@ function splitIntoBubbles(text, { maxBubbles = 3, minLength = 60 } = {}) {
 
 // Gap between bubbles: 1-2 seconds (§15.6.5)
 function bubbleGapMs() {
-  return 1000 + Math.floor(Math.random() * 1000);
+  return 300 + Math.floor(Math.random() * 300);
 }
 
 // Reel reaction that fits the contact's tone: kind contacts (roastiness < 20) get a heart, everyone else a laugh

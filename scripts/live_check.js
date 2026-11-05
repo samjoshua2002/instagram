@@ -113,15 +113,15 @@ async function main() {
     ${block}
     return humanTypingDelayMs;`);
   const on = { antiAiHumanMimicry: true };
-  const cases = [['😂', 1800, 3000], ['haha yes da', 3500, 6500], ['a'.repeat(60), 7000, 12000], ['a'.repeat(150), 13000, 20000], ['a'.repeat(400), 21000, 34000]];
+  const cases = [['😂', 300, 300], ['haha yes da', 300, 400], ['a'.repeat(60), 500, 600], ['a'.repeat(150), 800, 950], ['a'.repeat(400), 1200, 1200]];
   for (const [text, min, max] of cases) {
     const ms = delayFor(text, false, on);
     check('delay', `${text.length}-char reply waits ${min / 1000}-${max / 1000}s`, ms >= min && ms <= max, `${ms}ms`);
   }
-  check('delay', 'mimicry off replies after a fixed 1.2s', delayFor('hello there', false, { antiAiHumanMimicry: false }) === 1200);
+  check('delay', 'mimicry off replies with no pause', delayFor('hello there', false, { antiAiHumanMimicry: false }) === 0);
   const { bubbleGapMs, splitIntoBubbles } = require('../services/humanizeService');
   const gaps = Array.from({ length: 200 }, bubbleGapMs);
-  check('delay', 'gap between bubbles stays 1-2s', gaps.every(g => g >= 1000 && g < 2000));
+  check('delay', 'gap between bubbles stays 0.3-0.6s', gaps.every(g => g >= 300 && g < 600));
   check('delay', 'long reply splits into at most 3 bubbles', splitIntoBubbles('One thing first. '.repeat(20)).length <= 3);
 
   const failed = results.filter(r => !r.ok);
