@@ -58,23 +58,34 @@ class AzureOpenAIService {
     }
 
     // Hybrid workspaces keep the personal voice but can ground replies in their documents (Feature Store)
+    // All context lookups run at the same time so the reply is not held up by each one in turn
+    const storyboardOwner = tenant?._id || config.ownerId;
+    const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext] = await Promise.all([
+      features?.ragKnowledgeBase && storyboardOwner
+        ? ragService.retrieve({ ownerId: storyboardOwner, incomingText }).catch(err => {
+            console.warn('⚠️ [RAG] Personal retrieval failed:', err.message);
+            return null;
+          })
+        : null,
+      // 1b. Active reaction categories from user's Media Vault
+      Promise.resolve().then(() => stickerService.getAllCategories()).catch(() => null),
+      // Storyboard canvases (PLAN.md §5): lore, Secret Vault, this contact's circle; Hybrid adds the journey playbook
+      Promise.all([
+        storyboardService.getPersonalContext(storyboardOwner, userMemory),
+        features?.activeMode === 'hybrid' ? storyboardService.getBusinessContext(storyboardOwner) : '',
+      ]),
+      // 2. Social knowledge graph context (tree chain linking friends & lore)
+      socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory),
+    ]);
+
     let personalKnowledgeSection = '';
-    if (features?.ragKnowledgeBase && (tenant?._id || config.ownerId)) {
-      try {
-        const knowledge = await ragService.retrieve({ ownerId: tenant?._id || config.ownerId, incomingText });
-        if (knowledge.context) {
-          personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; QUOTE PRICES AND LINKS EXACTLY):\n${knowledge.context}\n`;
-        }
-      } catch (err) {
-        console.warn('⚠️ [RAG] Personal retrieval failed:', err.message);
-      }
+    if (knowledge?.context) {
+      personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; QUOTE PRICES AND LINKS EXACTLY):\n${knowledge.context}\n`;
     }
 
-    // 1b. Fetch active reaction categories from user's Media Vault
     let availableCategoriesStr = 'joy, lol, wonder, sad, happy, side_eye, confused, cool';
     let categoriesMappingPrompt = '';
     try {
-      const allCats = await stickerService.getAllCategories();
       if (allCats && allCats.length > 0) {
         availableCategoriesStr = allCats.map(c => c.id).join(', ');
         const triggerGuide = {
@@ -93,20 +104,6 @@ class AzureOpenAIService {
         }).join('\n');
       }
     } catch (_) {}
-
-    // Storyboard canvases (PLAN.md §5): lore, Secret Vault, this contact's circle; Hybrid adds the journey playbook
-    const storyboardOwner = tenant?._id || config.ownerId;
-    const [personalStoryboard, hybridPlaybook] = await Promise.all([
-      storyboardService.getPersonalContext(storyboardOwner, userMemory),
-      features?.activeMode === 'hybrid' ? storyboardService.getBusinessContext(storyboardOwner) : '',
-    ]);
-
-    // 2. Fetch social knowledge graph context (tree chain linking friends & lore)
-    const socialTreeContext = await socialGraphService.getContextForConversation(
-      userMemory.senderId,
-      incomingText,
-      messageHistory
-    );
 
     // 3. Prepare facts, dates, favorites, events, and personal notes
     const factsList = (userMemory.facts || [])

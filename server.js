@@ -324,7 +324,7 @@ const processedMids = new Set();
 
 // Anti-spam debounce queue: aggregates rapid-fire/spam messages and replies once
 const userDebounceQueues = new Map();
-const DEBOUNCE_WAIT_MS = 3500; // Hold on for 3.5s to see if user is typing multiple quick messages / spamming
+const DEBOUNCE_WAIT_MS = 1000; // Hold on for 1s to group quick back-to-back messages into one reply
 
 // Replies already past the debounce (AI call + typing delay). A newer reply, a creator echo or a
 // manual send marks the older one cancelled so it never goes out as a second answer.
@@ -878,8 +878,8 @@ async function writeAndSendReply(queueEntry, flight) {
     console.log(`🧠 [Anti-Spam Batching]: Aggregated ${messages.length} messages from ${senderId}:\n"${combinedText}"`);
   }
 
-  // Send read receipt immediately
-  await instagramService.sendSenderAction(senderId, 'mark_seen', creatorAccessToken);
+  // Send read receipt immediately (fire-and-forget so the Graph round-trip never delays the reply)
+  instagramService.sendSenderAction(senderId, 'mark_seen', creatorAccessToken).catch(() => {});
 
   // Fetch recent conversation history
   let history = await Message.find({
@@ -1006,12 +1006,10 @@ async function writeAndSendReply(queueEntry, flight) {
     // Stickers, GIFs and meme drops are never sent for business accounts or with the Media Vault feature off
     if (isBusinessTenant || !enabledFeatures.mediaStickerVault) stickerType = null;
 
-    // Calculate dynamic human-realistic typing latency:
-    // - Emojis / reactions (<= 4 chars or pure emoji): quick tap (1800ms - 3000ms)
-    // - 1 short line (5 - 35 chars): 3500ms - 6500ms
-    // - 1-2 medium lines (36 - 90 chars): 7000ms - 12000ms
-    // - 2-3 lines (91 - 180 chars): 13000ms - 20000ms
-    // - Multi-line paragraph / 4+ lines (> 180 chars): 21000ms - 34000ms (authentic phone typing pacing)
+    // Fast replies (2026-11-05): the AI call is already the wait, so only a tiny typing pause is added.
+    // - Emojis / reactions (<= 4 chars or pure emoji): 300ms
+    // - Text: 300ms + 4ms per character, capped at 1200ms
+    // - Human Mimicry off: no pause at all
     const trimmedReply = (replyText || '').trim();
     const charLength = trimmedReply.length;
     const isEmojiOnly = /^[\p{Emoji}\s\d\p{P}]+$/u.test(trimmedReply);
@@ -1019,18 +1017,11 @@ async function writeAndSendReply(queueEntry, flight) {
 
     let humanTypingDelayMs;
     if (!enabledFeatures.antiAiHumanMimicry) {
-      // Human Mimicry feature off: reply promptly with a short fixed pause
-      humanTypingDelayMs = 1200;
+      humanTypingDelayMs = 0;
     } else if (isUltraShort || (isReelOrShare && charLength <= 8)) {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 40 + 1500, 1800), 3000);
-    } else if (charLength <= 35) {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 90 + 2000, 3500), 6500);
-    } else if (charLength <= 90) {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 100 + 2500, 7000), 12000);
-    } else if (charLength <= 180) {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 95 + 3000, 13000), 20000);
+      humanTypingDelayMs = 300;
     } else {
-      humanTypingDelayMs = Math.min(Math.max(charLength * 90 + 4000, 21000), 34000);
+      humanTypingDelayMs = Math.min(300 + charLength * 4, 1200);
     }
 
     console.log(`⏳ [Realistic Human Typing Delay]: ${humanTypingDelayMs}ms for ${charLength} characters (ultra-short: ${isUltraShort}, reel: ${isReelOrShare})...`);
@@ -1081,7 +1072,7 @@ async function writeAndSendReply(queueEntry, flight) {
       const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText, config?.ownerId ? { _id: config.ownerId } : null);
       if (stickerUrl) {
         if (hasText) {
-          await new Promise(resolve => setTimeout(resolve, 600));
+          await new Promise(resolve => setTimeout(resolve, 200));
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending accessory ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
             const accRes = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
