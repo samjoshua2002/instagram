@@ -110,6 +110,17 @@
 .sh-pulse-num small { font-size: 0.95rem; font-weight: 600; margin-left: 6px; color: var(--sh-text-2); }
 .sh-pulse-sub { color: var(--sh-text-2); font-size: 0.85rem; }
 
+/* At a glance: four headline numbers */
+.sh-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 720px; }
+.sh-stat {
+  display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 20px;
+  background: var(--sh-card); border: 1px solid var(--sh-border); min-width: 0;
+}
+.sh-stat:hover { background: var(--sh-card-hover); }
+.sh-stat-num { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.sh-stat-label { font-size: 0.78rem; color: var(--sh-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) { .sh-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* Favourite people: rounded-square photos */
 .sh-fav-row {
   display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 16px;

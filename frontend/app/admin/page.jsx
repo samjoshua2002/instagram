@@ -24,6 +24,7 @@ export default function SuperadminPage() {
   const [enteringId, setEnteringId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [banningId, setBanningId] = useState(null);
+  const [roleId, setRoleId] = useState(null);
 
   const isSuperadmin = user?.role === 'superadmin';
 
@@ -104,6 +105,35 @@ export default function SuperadminPage() {
       showToast?.(err.message || 'Failed to delete account.', 'error');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleToggleRole = async (targetUser) => {
+    const handle = targetUser.instagramUsername || targetUser.username;
+    const promote = targetUser.role !== 'superadmin';
+    const confirmed = await confirm(promote
+      ? { title: `Make @${handle} a superadmin?`, message: `${targetUser.email} will get full platform control: see every workspace, ban or delete accounts, and manage other superadmins.`, confirmLabel: 'Make superadmin', tone: 'danger' }
+      : { title: `Remove superadmin from @${handle}?`, message: 'They become a normal user and lose access to the platform console.', confirmLabel: 'Remove superadmin' });
+    if (!confirmed) return;
+
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    if (!activeToken) return;
+
+    setRoleId(targetUser.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/accounts/${targetUser.id}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeToken}` },
+        body: JSON.stringify({ role: promote ? 'superadmin' : 'user' })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to change role.');
+      showToast?.(resData.message, 'success');
+      await fetchAdminData();
+    } catch (err) {
+      showToast?.(err.message || 'Failed to change role.', 'error');
+    } finally {
+      setRoleId(null);
     }
   };
 
@@ -588,6 +618,34 @@ export default function SuperadminPage() {
                         <Shield size={12} color="#22c55e" />
                         <span>{enteringId === account.id ? 'Opening...' : 'Manage'}</span>
                       </button>
+
+                      {account.id !== user?.id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleRole(account);
+                          }}
+                          disabled={roleId === account.id}
+                          title={isSuper ? 'Remove superadmin rights' : 'Give this account full superadmin control'}
+                          style={{
+                            background: isSuper ? 'var(--color-text-primary)' : 'var(--color-surface)',
+                            color: isSuper ? 'var(--color-surface)' : 'var(--color-text-primary)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '7px',
+                            padding: '6px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: '700',
+                            cursor: roleId === account.id ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Shield size={12} />
+                          <span>{roleId === account.id ? '...' : (isSuper ? 'Remove superadmin' : 'Make superadmin')}</span>
+                        </button>
+                      )}
 
                       {account.id !== user?.id && (
                         <button
