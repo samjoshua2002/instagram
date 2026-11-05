@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
 /* ═══════════════════════════════════════════
    Spotify Dynamic Ambient Glass Tokens (PLAN.md §15.2.2)
    ═══════════════════════════════════════════ */
@@ -153,6 +158,26 @@ body {
 
 .mono {
   font-family: 'JetBrains Mono', monospace;
+}
+
+
+/* One shared icon size for every button (plain, .btn, shadcn Button, MUI).
+   Big nav, tile and drop-zone icons opt out with className="icon-keep". */
+:root {
+  --btn-icon-size: 16px;
+}
+@media (max-width: 768px) {
+  :root { --btn-icon-size: 15px; }
+}
+@media (max-width: 420px) {
+  :root { --btn-icon-size: 14px; }
+}
+button svg.lucide:not(.icon-keep),
+[role="button"] svg.lucide:not(.icon-keep),
+a.btn svg.lucide:not(.icon-keep) {
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  flex-shrink: 0;
 }
 
 /* Shadcn-Style Button Utilities */
@@ -1764,22 +1789,13 @@ body {
   color: var(--color-text-secondary);
 }
 
-/* Floating glass action bar */
+/* Action row: plain buttons under the hero (no container, so it never looks like the tab strip) */
 .person-actionbar {
-  position: sticky;
-  top: 12px;
-  z-index: 20;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 10px;
-  margin-bottom: 18px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-fill-strong);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  margin-bottom: 28px;
 }
 
 .person-cta {
@@ -1802,10 +1818,8 @@ body {
 
 .person-actions {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  scroll-snap-type: x mandatory;
+  flex-wrap: wrap;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1828,7 +1842,6 @@ body {
   white-space: nowrap;
   cursor: pointer;
   flex-shrink: 0;
-  scroll-snap-align: start;
   transition: background var(--duration-fast) ease;
 }
 
@@ -1844,18 +1857,21 @@ body {
   opacity: 0.6;
 }
 
-/* Segmented tabs */
+/* Underline tabs (sticky), clearly different from the action buttons */
 .person-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   gap: 4px;
-  padding: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
-  border-radius: var(--radius-pill);
-  background: var(--glass-fill-subtle);
-  border: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--color-border-strong);
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
 }
 
 .person-tabs::-webkit-scrollbar {
@@ -1868,23 +1884,29 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 16px;
   border: none;
-  border-radius: var(--radius-pill);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   scroll-snap-align: start;
-  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.person-tab:hover {
+  color: var(--color-text-primary);
 }
 
 .person-tab.active {
-  background: var(--color-text-primary);
-  color: var(--color-background);
+  color: var(--color-text-primary);
+  border-bottom-color: var(--ambient-dominant);
   font-weight: 700;
 }
 
@@ -2065,12 +2087,14 @@ body {
   .person-actionbar {
     flex-direction: column;
     align-items: stretch;
-    border-radius: var(--radius-large);
-    top: 8px;
   }
 
   .person-cta {
     width: 100%;
+  }
+
+  .person-actions {
+    justify-content: center;
   }
 
   .person-tab {
