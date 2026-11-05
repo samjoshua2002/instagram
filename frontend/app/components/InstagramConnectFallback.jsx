@@ -172,27 +172,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
       const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : '') || '';
 
       const backendUrl = (API_BASE || 'https://instagram-ai-bot-64tf.onrender.com').replace(/\/+$/, '');
-      const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
-
-      const metaAppId = '28946827981672606';
-      const scopes = [
-        'instagram_basic',
-        'instagram_manage_messages',
-        'pages_show_list',
-        'pages_read_engagement',
-        'pages_manage_metadata'
-      ].join(',');
-
-      const stateObj = {
-        token: currentToken,
-        origin: clientOrigin,
-        redirectUri: redirectUri,
-        appId: metaAppId
-      };
-      const state = btoa(JSON.stringify(stateObj));
-
-      // Official Meta / Facebook OAuth dialog for App ID 28946827981672606
-      const directOAuthUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
+      // The server builds the Instagram Login URL and a single-use state, same as the other connect buttons
+      const directOAuthUrl = `${backendUrl}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(currentToken)}`;
 
       const popup = window.open(directOAuthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
       onPopupClosed(popup, () => setOauthConnecting(false));
@@ -825,7 +806,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     }}
                   />
                   <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
-                    Requires <code>instagram_basic</code> &amp; <code>instagram_manage_messages</code> permissions.
+                    Requires <code>instagram_business_basic</code> &amp; <code>instagram_business_manage_messages</code> permissions.
                   </span>
                 </div>
 
@@ -940,7 +921,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>3</span>
-                  <span>Ensure permissions include: <code>instagram_basic</code>, <code>instagram_manage_messages</code>, and <code>pages_manage_metadata</code>.</span>
+                  <span>Ensure permissions include: <code>instagram_business_basic</code> and <code>instagram_business_manage_messages</code>.</span>
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
