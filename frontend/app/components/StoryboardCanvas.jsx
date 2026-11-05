@@ -60,6 +60,7 @@ export default function StoryboardCanvas({ kind, nodeTypes, templates, templateC
   const zoomRef = useRef(1);
   const anchorRef = useRef(null); // keeps one world point under the same screen point while zooming
   const lastPointRef = useRef(null);
+  const lastTapRef = useRef(null); // last plain click on empty canvas, for double-click to add
   zoomRef.current = zoom;
 
   const typeOf = key => nodeTypes.find(t => t.key === key) || nodeTypes[0];
@@ -250,7 +251,15 @@ export default function StoryboardCanvas({ kind, nodeTypes, templates, templateC
     if (!g) return;
     if (g.kind === 'pan') {
       setPanning(false);
-      if (!g.moved) setSelectedId(null); // a plain click on empty canvas clears the selection
+      if (g.moved) return;
+      setSelectedId(null); // a plain click on empty canvas clears the selection
+      // Double-click is detected here: pointer capture sends the browser's own dblclick to the scroller, not the canvas
+      const last = lastTapRef.current;
+      const now = Date.now();
+      if (last && now - last.t < 400 && Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y) < 12) {
+        lastTapRef.current = null;
+        openAddMenuAt(e.clientX, e.clientY);
+      } else lastTapRef.current = { t: now, x: e.clientX, y: e.clientY };
       return;
     }
     if (g.kind === 'move') {
@@ -391,7 +400,6 @@ export default function StoryboardCanvas({ kind, nodeTypes, templates, templateC
               className="story-world"
               style={{ width: WORLD_W, height: WORLD_H, transform: `scale(${zoom})` }}
               onPointerDown={onWorldPointerDown}
-              onDoubleClick={e => { if (e.target === e.currentTarget) openAddMenuAt(e.clientX, e.clientY); }}
               onContextMenu={e => { if (e.target === e.currentTarget) { e.preventDefault(); openAddMenuAt(e.clientX, e.clientY); } }}
             >
               {/* Wires */}
