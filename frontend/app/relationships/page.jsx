@@ -13,6 +13,8 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
+import UnsplashBanner from '../components/UnsplashBanner';
+import { useBanner, bannerSrc } from '../lib/banners';
 import { personArtUrl, savedPhotoUrl } from '../lib/utils';
 import PageSkeleton, { Sk } from '../components/Skeletons';
 
@@ -761,8 +763,10 @@ function RelationshipsPageContent() {
   }, [nodes]);
 
   // Tint the whole screen from the open contact's photo (Apple Music style, PLAN.md §15.3)
+  // No photo: the contact's Unsplash banner gives the colours instead of a plain green wash
   const personArt = personArtUrl(selectedPerson);
-  useAmbientImage(personArt, { strong: Boolean(selectedPerson) });
+  const personBanner = useBanner(selectedPerson ? (selectedPerson.name || selectedPerson.id) : null);
+  useAmbientImage(personArt || bannerSrc(personBanner, 400), { strong: Boolean(selectedPerson) });
 
   const birthday = useMemo(() => getNextBirthday(formData.dob), [formData.dob]);
   const lastMessage = dmPreview.messages[dmPreview.messages.length - 1];
@@ -786,6 +790,7 @@ function RelationshipsPageContent() {
       <div className="page-container person-page">
         {/* ================= SPOTIFY ARTIST-STYLE HERO (PLAN.md §15.3) ================= */}
         <div className="person-hero">
+          <UnsplashBanner seed={selectedPerson.name || selectedPerson.id} className="person-cover" />
           <button type="button" className="person-back" onClick={() => setSelectedPerson(null)} aria-label="Back to directory">
             <ArrowLeft size={22} />
           </button>
@@ -1849,8 +1854,12 @@ function RelationshipsPageContent() {
 
             {/* DM transcript preview */}
             <div className="person-glass-card">
-              <div className="person-card-eyebrow">RECENT DMS</div>
-              <div className="person-card-title" style={{ marginBottom: '14px' }}>Conversation preview</div>
+              <UnsplashBanner seed={`chat-${selectedPerson.name || selectedPerson.id}`} topic="fluid" width={900} className="chat-banner person-chat-banner">
+                <div>
+                  <div className="person-card-eyebrow">RECENT DMS</div>
+                  <div className="person-card-title">Conversation preview</div>
+                </div>
+              </UnsplashBanner>
               {!selectedPerson.senderId ? (
                 <div className="person-card-sub">Link their Instagram to see the DM history here.</div>
               ) : dmPreview.loading ? (
@@ -1883,7 +1892,7 @@ function RelationshipsPageContent() {
     >
       {/* Top Header (Spotify hero) */}
       <header className="spx-hero">
-        <div className="spx-cover spx-cover-people" aria-hidden="true"><Users size={84} strokeWidth={1.75} /></div>
+        <UnsplashBanner seed="page-people" credit={false} className="spx-cover spx-cover-people"><Users size={84} strokeWidth={1.75} /></UnsplashBanner>
         <div className="spx-hero-text">
           <div className="spx-eyebrow">People directory &amp; intelligence</div>
           <h1 className="spx-title">All People</h1>

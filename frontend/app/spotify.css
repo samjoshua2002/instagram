@@ -97,7 +97,7 @@ body {
     /* Spotify header wash: accent colour fading into the panel, scrolls with content */
     background-image: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--ambient-dominant, #1db954) 32%, var(--sp-panel)) 0px,
+      color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 32%, var(--sp-panel)) 0px,
       var(--sp-panel) 340px
     ) !important;
     background-attachment: local !important;
@@ -121,7 +121,7 @@ body {
     background-color: var(--sp-panel) !important;
     background-image: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--ambient-dominant, #1db954) 28%, var(--sp-panel)) 0px,
+      color-mix(in srgb, var(--ambient-dominant, #8e5cf6) 28%, var(--sp-panel)) 0px,
       var(--sp-panel) 260px
     ) !important;
     background-attachment: local !important;
