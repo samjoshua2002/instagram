@@ -7,7 +7,7 @@ import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
   Trash2, Calendar, Bot, Film, Pause, Check, Save, User,
   Plus, RefreshCw, MessageSquare, Shield, X, Users,
-  LayoutGrid, List, AlignJustify, Table as TableIcon, Cake
+  LayoutGrid, List, AlignJustify, Table as TableIcon, Cake, Pencil
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import ContactAvatar from '../components/ContactAvatar';
@@ -1853,106 +1853,55 @@ function RelationshipsPageContent() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="page-container"
-     
+      className="page-container spx-page spx-blue"
     >
-      {/* Top Header */}
-      <div className="directory-header-row page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-            PEOPLE DIRECTORY & INTELLIGENCE
+      {/* Top Header (Spotify hero) */}
+      <header className="spx-hero">
+        <div className="spx-cover spx-cover-people" aria-hidden="true"><Users size={84} strokeWidth={1.75} /></div>
+        <div className="spx-hero-text">
+          <div className="spx-eyebrow">People directory &amp; intelligence</div>
+          <h1 className="spx-title">All People</h1>
+          <p className="spx-desc">Unified directory showing profiles, interaction statistics, and automated intelligence rules.</p>
+          <div className="spx-meta">
+            Chatter OS <span>· {dashboardStats.totalPeople.toLocaleString()} people · {dashboardStats.totalDMs.toLocaleString()} chats</span>
           </div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '2px', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
-            All People
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.82rem', marginTop: '4px' }}>
-            Unified directory showing profiles, interaction statistics, and automated intelligence rules.
-          </p>
         </div>
-      </div>
+      </header>
 
       {/* ================= DASHBOARD METRICS SUMMARY ================= */}
-      <div className="metrics-summary-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '10px',
-        marginBottom: '20px'
-      }}>
+      <div className="spx-stats">
         {[
-          { icon: <Users size={16} />, label: 'Total People', value: dashboardStats.totalPeople },
-          { icon: <MessageSquare size={16} />, label: 'Total Chats', value: dashboardStats.totalDMs },
-          { icon: <Film size={16} />, label: 'Reels Shared', value: dashboardStats.totalReels },
-          { icon: <Bot size={16} />, label: 'AI Active', value: dashboardStats.activeAi },
-        ].map(({ icon, label, value }) => (
-          <div key={label} style={{
-            background: 'var(--color-surface)',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(30, 215, 96, 0.15)', border: '1.5px solid var(--spotify-green)', borderRadius: '9999px', color: 'var(--spotify-green)', flexShrink: 0 }}>
-              {icon}
-            </div>
+          { icon: <Users size={22} />, label: 'Total People', value: dashboardStats.totalPeople, color: '#1db954' },
+          { icon: <MessageSquare size={22} />, label: 'Total Chats', value: dashboardStats.totalDMs, color: '#509bf5' },
+          { icon: <Film size={22} />, label: 'Reels Shared', value: dashboardStats.totalReels, color: '#e8115b' },
+          { icon: <Bot size={22} />, label: 'AI Active', value: dashboardStats.activeAi, color: '#f59b23' },
+        ].map(({ icon, label, value, color }) => (
+          <div key={label} className="spx-stat">
+            <div className="spx-stat-icon" style={{ background: color }}>{icon}</div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '9px', letterSpacing: '0.06em', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', whiteSpace: 'nowrap' }}>{label}</div>
-              <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>{value.toLocaleString?.() ?? value}</div>
+              <div className="spx-stat-label">{label}</div>
+              <div className="spx-stat-value">{value.toLocaleString?.() ?? value}</div>
             </div>
           </div>
         ))}
       </div>
 
-
       {/* Action Required Banner for missing Instagram IDs */}
       {unlinkedFriends.length > 0 && (
-        <div
-          style={{
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-text-primary)',
-            borderRadius: '10px',
-            padding: '14px 18px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertCircle size={18} style={{ color: 'var(--color-text-primary)', flexShrink: 0 }} />
-            <div>
-              <div style={{ color: 'var(--color-text-primary)', fontWeight: '700', fontSize: '0.86rem' }}>
-                Action Required: {unlinkedFriends.length} Contact{unlinkedFriends.length > 1 ? 's' : ''} Missing Instagram ID
-              </div>
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.78rem', marginTop: '1px' }}>
-                Link their Instagram handle so Chatter OS merges memories and answers appropriately in direct messages.
-              </div>
+        <div className="spx-banner">
+          <AlertCircle size={22} />
+          <div className="spx-banner-text">
+            <div className="spx-banner-title">
+              Action Required: {unlinkedFriends.length} Contact{unlinkedFriends.length > 1 ? 's' : ''} Missing Instagram ID
+            </div>
+            <div className="spx-banner-sub">
+              Link their Instagram handle so Chatter OS merges memories and answers appropriately in direct messages.
             </div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="spx-banner-actions">
             {unlinkedFriends.map(friend => (
-              <button
-                key={friend.id}
-                onClick={() => setLinkingTargetPerson(friend)}
-                style={{
-                  background: 'var(--color-surface-hover)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Link2 size={12} />
+              <button key={friend.id} type="button" className="spx-outline" onClick={() => setLinkingTargetPerson(friend)}>
+                <Link2 size={13} />
                 <span>Link ID: {friend.name}</span>
               </button>
             ))}
@@ -1961,9 +1910,9 @@ function RelationshipsPageContent() {
       )}
 
       {/* Filter Tabs & Search Bar */}
-      <div className="people-filters" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+      <div className="people-filters">
         {/* Category Pills */}
-        <div className="people-pills" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="people-pills spx-pills">
           {[
             { id: 'all', label: 'All People', count: categoryCounts.all },
             { id: 'close_friend', label: 'Close Circle / Family', count: categoryCounts.close_friend },
@@ -1972,67 +1921,28 @@ function RelationshipsPageContent() {
             { id: 'family', label: 'Family / Relatives', count: categoryCounts.family },
             { id: 'professional', label: 'Professional / Business', count: categoryCounts.professional },
             { id: 'unlinked', label: 'Needs ID Link', count: categoryCounts.unlinked }
-          ].map(tab => {
-            const isActive = activeCategory === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveCategory(tab.id)}
-                className="people-pill"
-                style={{
-                  background: isActive ? 'var(--spotify-green)' : 'var(--color-surface-elevated-2)',
-                  color: isActive ? '#000000' : 'var(--color-text-primary)',
-                  border: 'none',
-                  height: '36px',
-                  minHeight: '36px',
-                  padding: '0 8px 0 12px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: isActive ? '700' : '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span>{tab.label}</span>
-                <span
-                  style={{
-                    background: isActive ? '#000000' : 'var(--color-chip-badge)',
-                    color: isActive ? 'var(--spotify-green)' : 'var(--color-text-primary)',
-                    padding: '1px 5px',
-                    borderRadius: '9999px',
-                    fontSize: '11px',
-                    fontFamily: "var(--font-label)",
-                    fontWeight: '700'
-                  }}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
+          ].map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveCategory(tab.id)}
+              className={`people-pill spx-pill${activeCategory === tab.id ? ' active' : ''}`}
+            >
+              <span>{tab.label}</span>
+              <span className="spx-pill-count">{tab.count}</span>
+            </button>
+          ))}
         </div>
 
         {/* Search Input & Layout Mode Switcher */}
-        <div className="people-toolbar" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="people-search" style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+        <div className="people-toolbar spx-toolbar">
+          <div className="people-search">
+            <Search size={16} />
             <input
               type="text"
-              placeholder="Search name, @username, relation..."
+              placeholder="Filter people by name, @username, birth date, relation, or lore..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                paddingLeft: '34px',
-                height: '40px',
-                fontSize: '13px',
-                width: '100%',
-                background: 'var(--color-search)',
-                border: 'none',
-                borderRadius: '9999px'
-              }}
             />
           </div>
 
@@ -2042,68 +1952,40 @@ function RelationshipsPageContent() {
             className="people-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            style={{ height: '40px', minHeight: '40px', fontSize: '13px', fontWeight: 600, padding: '0 12px', borderRadius: '9999px', background: 'var(--color-search)', border: 'none', color: 'var(--color-text-primary)', flexShrink: 0, cursor: 'pointer' }}
           >
-            <option value="newest">Newest</option>
+            <option value="newest">Newest messages</option>
             <option value="oldest">Oldest</option>
             <option value="most">Most chats</option>
             <option value="az">A–Z</option>
           </select>
 
           {/* Layout Switcher Icons (Table / Grid / Dense) */}
-          <div className="people-layout-switch" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '3px',
-            background: 'var(--color-search)',
-            border: 'none',
-            height: '40px',
-            padding: '3px',
-            borderRadius: '9999px',
-            flexShrink: 0
-          }}>
+          <div className="people-layout-switch">
             {[
               { id: 'table', label: 'Table', icon: TableIcon },
               { id: 'grid', label: 'Grid', icon: LayoutGrid },
               { id: 'dense', label: 'Dense', icon: AlignJustify }
-            ].map(({ id, label, icon: Icon }) => {
-              const isActive = layoutMode === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => handleSetLayout(id)}
-                  className="people-layout-btn"
-                  title={`${label} Layout View`}
-                  style={{
-                    background: isActive ? 'var(--color-text-primary)' : 'transparent',
-                    color: isActive ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                    border: 'none',
-                    padding: '0 12px',
-                    height: '100%',
-                    minHeight: 0,
-                    borderRadius: '9999px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '12px',
-                    fontWeight: isActive ? '700' : '400',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <Icon size={13} />
-                  <span>{label}</span>
-                </button>
-              );
-            })}
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleSetLayout(id)}
+                className={`people-layout-btn${layoutMode === id ? ' active' : ''}`}
+                title={`${label} Layout View`}
+                aria-pressed={layoutMode === id}
+              >
+                <Icon size={14} />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {/* ================= SHADCN LIGHT MONOCHROME TABLE ================= */}
       <div
-        style={layoutMode === 'grid' ? { background: 'transparent' } : {
+        style={layoutMode !== 'dense' ? { background: 'transparent', marginTop: '8px' } : {
+          marginTop: '20px',
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: '10px',
@@ -2111,232 +1993,119 @@ function RelationshipsPageContent() {
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}
       >
-        {/* 1. Table View */}
+        {/* 1. Table View (Spotify track list) */}
         {layoutMode === 'table' && (
-          <div className="desktop-table-container">
+          <div className="desktop-table-container spx-table-wrap">
             <div style={{ overflowX: 'auto' }}>
-              <table className="card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+              <table className="card-table spx-table">
               <thead>
-                <tr style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", width: '56px' }}>
-                    PROFILE
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
-                    NAME
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
-                    USERNAME
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
-                    DATE OF BIRTH
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
-                    RELATION
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", textAlign: 'center' }}>
-                    CHATS
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", textAlign: 'center' }}>
-                    REELS
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", textAlign: 'right' }}>
-                    ACTION
-                  </th>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Date of birth</th>
+                  <th>Relation</th>
+                  <th style={{ textAlign: 'center' }}>Chats</th>
+                  <th style={{ textAlign: 'center' }}>Reels</th>
+                  <th style={{ textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isSyncingInitial && pagedPeople.length === 0 ? (
                   Array.from({ length: 6 }).map((_, idx) => (
-                    <tr key={`skel-${idx}`} style={{ borderBottom: '1px solid var(--color-surface-hover)' }}>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div className="skeleton" style={{ width: '36px', height: '36px', borderRadius: '50%' }} />
+                    <tr key={`skel-${idx}`}>
+                      <td className="spx-idx-cell"><div className="skeleton" style={{ width: '14px', height: '16px' }} /></td>
+                      <td className="ct-title">
+                        <div className="spx-who">
+                          <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                          <div className="skeleton" style={{ width: '120px', height: '16px' }} />
+                        </div>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div className="skeleton" style={{ width: '130px', height: '16px', marginBottom: '4px' }} />
-                        <div className="skeleton" style={{ width: '60px', height: '11px' }} />
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div className="skeleton" style={{ width: '100px', height: '15px' }} />
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div className="skeleton" style={{ width: '85px', height: '15px' }} />
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div className="skeleton" style={{ width: '90px', height: '15px', marginBottom: '4px' }} />
-                        <div className="skeleton" style={{ width: '70px', height: '11px' }} />
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div className="skeleton" style={{ width: '40px', height: '22px', margin: '0 auto' }} />
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div className="skeleton" style={{ width: '40px', height: '22px', margin: '0 auto' }} />
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <div className="skeleton" style={{ width: '56px', height: '26px', marginLeft: 'auto' }} />
-                      </td>
+                      <td><div className="skeleton" style={{ width: '90px', height: '14px' }} /></td>
+                      <td><div className="skeleton" style={{ width: '80px', height: '14px' }} /></td>
+                      <td><div className="skeleton" style={{ width: '80px', height: '22px', borderRadius: '9999px' }} /></td>
+                      <td><div className="skeleton" style={{ width: '32px', height: '14px', margin: '0 auto' }} /></td>
+                      <td><div className="skeleton" style={{ width: '32px', height: '14px', margin: '0 auto' }} /></td>
+                      <td><div className="skeleton" style={{ width: '64px', height: '24px', marginLeft: 'auto' }} /></td>
                     </tr>
                   ))
                 ) : pagedPeople.length === 0 ? (
                   <tr>
-                    <td className="ct-full" colSpan={8} style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+                    <td className="ct-full spx-table-empty" colSpan={8}>
                       {filteredPeople.length === 0 ? 'No people found matching your filters.' : 'No results on this page.'}
                     </td>
                   </tr>
                 ) : (
-                  pagedPeople.map((person) => {
+                  pagedPeople.map((person, idx) => {
                     const hasHandle = Boolean(person.handle || person.instagramHandle);
                     const handleDisplay = person.handle || person.instagramHandle;
                     const dobDisplay = cleanDob(person.dob || person.importantDates?.[0]?.date || '');
                     const chatsCount = person.chatsCount || person.messageCount || 0;
                     const reelsCount = person.reelsCount || 0;
+                    const aiOn = person.aiEnabled !== false;
 
                     return (
                       <tr
                         key={person.id || person.senderId || person.name}
                         onClick={() => setSelectedPerson(person)}
-                        style={{
-                          borderBottom: '1px solid var(--color-surface-hover)',
-                          cursor: 'pointer',
-                          transition: 'background 0.1s ease'
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-surface-elevated)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-surface)')}
                       >
-                        {/* Column 1: PROFILE */}
-                        <td className="ct-avatar" style={{ padding: '10px 16px' }}>
-                          <ContactAvatar contact={person} size={36} showStatus={true} />
-                        </td>
+                        {/* Column 1: # */}
+                        <td className="spx-idx-cell"><span className="spx-idx">{(tablePage - 1) * TABLE_PAGE_SIZE + idx + 1}</span></td>
 
-                        {/* Column 2: NAME */}
-                        <td className="ct-title" style={{ padding: '10px 16px' }}>
-                          <div style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
-                            {person.name}
-                          </div>
-                          {person.gender && person.gender !== 'unknown' && (
-                            <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>
-                              {person.gender}
+                        {/* Column 2: NAME (avatar + AI state) */}
+                        <td className="ct-title">
+                          <div className="spx-who">
+                            <ContactAvatar contact={person} size={40} showStatus={false} />
+                            <div style={{ minWidth: 0 }}>
+                              <div className="spx-who-name">{person.name}</div>
+                              <div className={`spx-ai${aiOn ? ' on' : ''}`}>{aiOn ? 'AI on' : 'AI off'}</div>
                             </div>
-                          )}
+                          </div>
                         </td>
 
                         {/* Column 3: USERNAME */}
-                        <td data-label="Username" style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
+                        <td data-label="Username" onClick={(e) => e.stopPropagation()}>
                           {hasHandle ? (
-                            <span
-                              onClick={() => setLinkingTargetPerson(person)}
-                              title="Edit handle"
-                              style={{
-                                fontSize: '0.78rem',
-                                color: 'var(--color-text-primary)',
-                                fontFamily: "var(--font-label)",
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              {handleDisplay}
-                            </span>
+                            <button type="button" className="spx-handle" onClick={() => setLinkingTargetPerson(person)} title="Edit handle">
+                              {String(handleDisplay).startsWith('@') ? handleDisplay : `@${handleDisplay}`}
+                            </button>
                           ) : (
-                            <button
-                              onClick={() => setLinkingTargetPerson(person)}
-                              style={{
-                                background: 'var(--color-surface)',
-                                border: '1px solid var(--color-border)',
-                                color: 'var(--color-text-secondary)',
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.68rem',
-                                fontWeight: '600',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              No Handle
+                            <button type="button" className="spx-outline spx-link-btn" onClick={() => setLinkingTargetPerson(person)}>
+                              <Link2 size={12} /> Link ID
                             </button>
                           )}
                         </td>
 
                         {/* Column 4: DATE OF BIRTH */}
-                        <td data-label="Birthday" style={{ padding: '10px 16px' }}>
-                          {dobDisplay ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-primary)' }}>
-                              <Calendar size={12} style={{ color: 'var(--color-text-secondary)' }} />
-                              <span>{dobDisplay}</span>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
-                          )}
-                        </td>
+                        <td data-label="Birthday">{dobDisplay || '—'}</td>
 
                         {/* Column 5: RELATION */}
-                        <td data-label="Relation" style={{ padding: '10px 16px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-primary)', fontWeight: '600' }}>
-                              {person.relationship || person.relationshipToSam || 'Friend'}
-                            </span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
-                              {person.category ? person.category.replace('_', ' ').toUpperCase() : 'ONLINE FRIEND'}
-                            </span>
-                          </div>
+                        <td data-label="Relation">
+                          <span className="spx-rel">{person.relationship || person.relationshipToSam || 'Friend'}</span>
                         </td>
 
-                        {/* Column 6: CHATS COUNT */}
-                        <td data-label="Chats" style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "var(--font-label)", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <MessageSquare size={11} style={{ color: 'var(--color-text-secondary)' }} />
-                            <span>{chatsCount}</span>
-                          </span>
-                        </td>
-
-                        {/* Column 7: REELS COUNT */}
-                        <td data-label="Reels" style={{ padding: '10px 16px', textAlign: 'center' }}>
-                          <span style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontFamily: "var(--font-label)", fontWeight: '700', color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <Film size={11} style={{ color: 'var(--color-text-secondary)' }} />
-                            <span>{reelsCount}</span>
-                          </span>
-                        </td>
+                        {/* Column 6-7: COUNTS */}
+                        <td data-label="Chats" className="spx-num">{chatsCount.toLocaleString?.() ?? chatsCount}</td>
+                        <td data-label="Reels" className="spx-num">{reelsCount.toLocaleString?.() ?? reelsCount}</td>
 
                         {/* Column 8: ACTION */}
-                        <td className="ct-aside" style={{ padding: '10px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                            <button
-                              onClick={() => setSelectedPerson(person)}
-                              style={{
-                                background: 'var(--color-text-primary)',
-                                color: 'var(--color-surface)',
-                                border: 'none',
-                                padding: '5px 12px',
-                                borderRadius: '6px',
-                                fontSize: '0.74rem',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <span>Open</span>
-                              <ArrowRight size={11} />
+                        <td className="ct-aside" onClick={(e) => e.stopPropagation()}>
+                          <div className="spx-row-actions">
+                            <button type="button" className="spx-icon-btn" onClick={() => setSelectedPerson(person)} title="Open person" aria-label={`Open ${person.name}`}>
+                              <Pencil size={15} />
                             </button>
-
                             <button
+                              type="button"
+                              className="spx-icon-btn"
                               onClick={async () => {
                                 if (await confirmDelete(person.name)) {
                                   deleteNode(person);
                                 }
                               }}
                               title="Delete Person"
-                              style={{
-                                background: 'transparent',
-                                border: '1px solid var(--color-border)',
-                                color: 'var(--color-text-secondary)',
-                                padding: '5px 7px',
-                                borderRadius: '6px',
-                                cursor: 'pointer'
-                              }}
+                              aria-label={`Delete ${person.name}`}
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
