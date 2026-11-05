@@ -309,7 +309,7 @@
 .people-split .people-groups .spx-pill:hover { background: var(--sp-tile-hover); }
 .people-split .people-groups .seg-indicator { border-radius: 9px; }
 
-.people-unlinked-head { display: flex; align-items: center; gap: 8px; color: #1db954; }
+.people-unlinked-head { display: flex; align-items: center; gap: 8px; color: var(--sp-green-press); }
 .people-unlinked-head h2 { margin: 0; font-size: 0.9rem; font-weight: 800; color: var(--color-text-primary); }
 .people-unlinked-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .people-unlinked-list .spx-outline { height: 30px; min-height: 30px; padding: 0 12px; font-size: 12px; max-width: 100%; }

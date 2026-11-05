@@ -113,6 +113,7 @@ function DonutChart({ segments, size = 130, stroke = 20 }) {
             r={r}
             fill="none"
             stroke={seg.color}
+            style={{ stroke: seg.color }}
             strokeWidth={stroke}
             initial={{ strokeDasharray: `0 ${circ}`, strokeDashoffset: -currentOffset }}
             animate={{ strokeDasharray: `${dash} ${circ - dash}`, strokeDashoffset: -currentOffset }}
@@ -449,8 +450,8 @@ export default function AnalyticsPage() {
   const maxReels = topReelers[0] ? (topReelers[0].reelsCount || 0) : 1;
 
   const donutSegments = [
-    { label: 'Close Circle', value: breakdown.close, color: '#1ed760' },
-    { label: 'Online Friends', value: breakdown.online, color: '#1db954' },
+    { label: 'Close Circle', value: breakdown.close, color: 'var(--sp-green)' },
+    { label: 'Online Friends', value: breakdown.online, color: 'var(--sp-green-press)' },
     { label: 'Offline Friends', value: breakdown.offline, color: '#b3b3b3' },
     { label: 'Family', value: breakdown.relatives, color: '#727272' },
     { label: 'Professional', value: breakdown.professional, color: '#535353' },
@@ -1453,8 +1454,8 @@ export default function AnalyticsPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {[
-                  { label: 'Close Circle', value: breakdown.close, color: '#1ed760' },
-                  { label: 'Online Friends', value: breakdown.online, color: '#1db954' },
+                  { label: 'Close Circle', value: breakdown.close, color: 'var(--sp-green)' },
+                  { label: 'Online Friends', value: breakdown.online, color: 'var(--sp-green-press)' },
                   { label: 'Offline Friends', value: breakdown.offline, color: '#b3b3b3' },
                   { label: 'Family', value: breakdown.relatives, color: '#727272' },
                   { label: 'Professional', value: breakdown.professional, color: '#535353' },

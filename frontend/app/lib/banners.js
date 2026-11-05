@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 /**
  * Unsplash banner artwork for home, profile, chat and page headers.
  * The server (/api/banners) holds the Unsplash key and caches each topic for 6 hours;
- * here the list is kept in memory + localStorage, and a seed (a name or a page path)
- * always picks the same photo, so a person's banner never jumps around.
+ * here the list is kept in memory + localStorage. Every visit to a page (each route change
+ * or reload) picks a new photo for each seed; within one visit a seed keeps its photo, so the
+ * cover, the square tile and the page colours all show the same one.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
@@ -69,9 +71,63 @@ export function loadBanners(topic = 'abstract') {
   return job;
 }
 
+// ── Per-visit picks ─────────────────────────────────────────────
+// A new random "salt" each time the route changes (or the page reloads); seed + salt picks
+// the photo. The last photo shown per seed is saved, so the next visit never repeats it.
+const LAST_KEY = 'chatter_banner_last_v1';
+let salt = '';
+let saltPath = null;
+const picks = new Map(); // key -> { salt, id }
+let saved = null; // key -> id, from localStorage
+
+function visitSalt(path) {
+  if (typeof window === 'undefined') return '';
+  if (path !== saltPath) { saltPath = path; salt = Math.random().toString(36).slice(2); }
+  return salt;
+}
+
+function lastIds() {
+  if (saved) return saved;
+  try { saved = JSON.parse(localStorage.getItem(LAST_KEY) || '{}') || {}; } catch { saved = {}; }
+  return saved;
+}
+
+function remember(key, id) {
+  const all = lastIds();
+  if (all[key] === id) return;
+  all[key] = id;
+  try {
+    const keys = Object.keys(all);
+    if (keys.length > 300) keys.slice(0, keys.length - 300).forEach(k => delete all[k]);
+    localStorage.setItem(LAST_KEY, JSON.stringify(all));
+  } catch { /* storage blocked */ }
+}
+
+/** Same photo for `seed` all through this visit; a different one from last visit. */
+function visitPick(list, seed) {
+  if (!salt) return list[hashSeed(seed) % list.length]; // server render / no visit yet
+  const key = `${seed}|${list[0].id}|${list.length}`;
+  const prev = picks.get(key);
+  if (prev && prev.salt === salt) {
+    const same = list.find(p => p.id === prev.id);
+    if (same) return same;
+  }
+  const lastId = prev ? prev.id : lastIds()[key];
+  let i = hashSeed(`${seed}|${salt}`) % list.length;
+  if (list.length > 1 && list[i].id === lastId) i = (i + 1) % list.length;
+  picks.set(key, { salt, id: list[i].id });
+  remember(key, list[i].id);
+  return list[i];
+}
+
+/** Starts a new visit when the route changes; call at the top of every banner hook. */
+function useVisit() {
+  visitSalt(usePathname() || '/');
+}
+
 export function pickBanner(photos, seed) {
   if (!photos || !photos.length) return null;
-  return photos[hashSeed(seed) % photos.length];
+  return visitPick(photos, seed);
 }
 
 /** Sized image link for a photo (Unsplash resizes on its CDN). */
@@ -82,6 +138,7 @@ export function bannerSrc(photo, width = 1600) {
 
 /** The banner photo for `seed`, or null until the list has loaded. */
 export function useBanner(seed, topic = 'abstract') {
+  useVisit();
   const [photos, setPhotos] = useState(() => (typeof window === 'undefined' ? null : cachedBanners(topic)));
   useEffect(() => {
     let alive = true;
@@ -215,8 +272,7 @@ export function colorDistance(target, photoColor) {
 }
 
 /**
- * Pick the photo nearest to `color`; among the few closest, `seed` decides,
- * so two contacts with the same colour don't always get the same photo.
+ * Pick the photo nearest to `color`; among the few closest, a new one each visit.
  */
 export function pickBannerByColor(photos, color, seed) {
   if (!photos || !photos.length) return null;
@@ -226,8 +282,8 @@ export function pickBannerByColor(photos, color, seed) {
     .map(p => ({ p, d: colorDistance(target, p.color) }))
     .sort((a, b) => a.d - b.d);
   const best = ranked[0].d;
-  const close = ranked.filter(r => r.d <= best + 0.08).slice(0, 5);
-  return close[hashSeed(seed) % close.length].p;
+  const close = ranked.filter(r => r.d <= best + 0.15).slice(0, 6).map(r => r.p);
+  return visitPick(close, seed);
 }
 
 /**
@@ -236,6 +292,7 @@ export function pickBannerByColor(photos, color, seed) {
  * falls back to the best match in `topic`'s list. With no colour it is useBanner().
  */
 export function useMatchedBanner(seed, color, topic = 'abstract') {
+  useVisit();
   const tone = color ? toneFor(color) : null;
   const toneTopic = tone ? `tone-${tone}` : null;
   const [, setTick] = useState(0); // re-render when a list arrives

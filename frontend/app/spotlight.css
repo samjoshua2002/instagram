@@ -21,7 +21,7 @@
   --sh-text: #2a1217;
   --sh-text-2: #8a4a50;
   --sh-accent: #d6455a;
-  --sh-action: #1db954;
+  --sh-action: var(--sp-green-press, #1db954);
 }
 
 .sh-home {

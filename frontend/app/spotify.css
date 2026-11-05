@@ -39,8 +39,8 @@
   --sp-tile-hover: #e0e0e0;
   --sp-text: #121212;
   --sp-text-2: #535353;
-  --sp-green: #1db954;
-  --sp-green-press: #169c46;
+  --sp-green: color-mix(in srgb, var(--ambient-dominant, #1db954) 85%, #000);
+  --sp-green-press: color-mix(in srgb, var(--ambient-dominant, #1db954) 70%, #000);
   --glass-fill-subtle: #f7f7f7;
   --glass-fill-standard: #f4f4f4;
   --glass-border: rgba(0, 0, 0, 0.08);

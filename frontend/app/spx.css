@@ -12,8 +12,8 @@
   --spx-raised: #1f1f1f;
   --spx-field: #242424;
   --spx-outline: #727272;
-  --spx-green-text: #1ed760;
-  --spx-green-soft: rgba(29, 185, 84, 0.15);
+  --spx-green-text: var(--sp-green);
+  --spx-green-soft: color-mix(in srgb, var(--sp-green) 15%, transparent);
   --spx-line: rgba(255, 255, 255, 0.1);
   position: relative;
   isolation: isolate;
@@ -26,7 +26,7 @@
   --spx-raised: #f0f0f0;
   --spx-field: #ececec;
   --spx-outline: #9a9a9a;
-  --spx-green-text: #138a3e;
+  --spx-green-text: color-mix(in srgb, var(--ambient-dominant, var(--sp-green-press)) 70%, #000);
   --spx-line: rgba(0, 0, 0, 0.1);
 }
 
@@ -56,7 +56,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1db954 0%, #0c4f24 100%);
+  background: linear-gradient(135deg, var(--sp-green-press) 0%, color-mix(in srgb, var(--sp-green-press) 40%, #000) 100%);
   color: #000;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
 }
@@ -117,7 +117,7 @@
   padding: 0 32px;
   border: none;
   border-radius: 9999px;
-  background: #1db954;
+  background: var(--sp-green-press);
   color: #000;
   font: 800 15px var(--font-sans);
   cursor: pointer;
@@ -125,7 +125,7 @@
 }
 .spx-play:hover:not(:disabled) {
   transform: scale(1.04);
-  background: #1ed760;
+  background: var(--sp-green);
 }
 .spx-play:disabled {
   opacity: 0.6;
@@ -178,7 +178,7 @@
   background: var(--sp-tile-hover);
 }
 .spx-pill.active {
-  background: #1db954;
+  background: var(--sp-green-press);
   color: #000;
   font-weight: 700;
 }
@@ -265,7 +265,7 @@
 }
 .spx-drop:hover,
 .spx-drop.dragging {
-  border-color: #1db954;
+  border-color: var(--sp-green-press);
 }
 .spx-drop-icon {
   width: 56px;
@@ -275,7 +275,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1db954;
+  background: var(--sp-green-press);
   color: #000;
 }
 .spx-drop-title {
@@ -432,12 +432,12 @@
   gap: 14px;
   flex-wrap: wrap;
   padding: 14px 16px;
-  border-left: 4px solid #1db954;
+  border-left: 4px solid var(--sp-green-press);
   border-radius: 8px;
   background: var(--spx-raised);
 }
 .spx-banner > svg {
-  color: #1db954;
+  color: var(--sp-green-press);
   flex-shrink: 0;
 }
 .spx-banner-text {
@@ -608,7 +608,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1db954;
+  background: var(--sp-green-press);
 }
 .spx-handle {
   color: var(--sp-text-2);
