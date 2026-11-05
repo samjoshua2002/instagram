@@ -7,10 +7,11 @@ import { useConfirm } from '../context/DialogContext';
 import {
   Shield, Users, UserCheck, RefreshCw, Search,
   CheckCircle2, AlertCircle, Fingerprint, Mail,
-  ExternalLink, Calendar, ChevronDown, ChevronUp,
+  ExternalLink, Calendar, ChevronDown,
   Layers, Lock, Sparkles, Filter, Instagram, Smartphone, Trash2, Ban
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { enterMotion, revealMotion, T } from '../lib/motion';
 
 export default function SuperadminPage() {
   const { user, API_BASE, token, enterWorkspace, showToast } = useApp();
@@ -250,9 +251,7 @@ export default function SuperadminPage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      {...enterMotion}
       className="page-container"
      
     >
@@ -714,13 +713,14 @@ export default function SuperadminPage() {
                         justifyContent: 'center',
                         color: 'var(--color-text-secondary)'
                       }}>
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        <motion.span style={{ display: 'inline-flex' }} initial={false} animate={{ rotate: isExpanded ? 180 : 0 }} transition={T.move}><ChevronDown size={16} /></motion.span>
                       </div>
                     </div>
                   </div>
 
                   {/* Expanded Account Details */}
-                  {isExpanded && (
+                  <AnimatePresence initial={false}>{isExpanded && (
+<motion.div key="reveal" {...revealMotion} style={{ overflow: 'hidden' }}>
                     <div style={{
                       padding: '16px 18px',
                       borderTop: '1px solid var(--color-border)',
@@ -757,7 +757,8 @@ export default function SuperadminPage() {
                         </span>
                       </div>
                     </div>
-                  )}
+                  </motion.div>
+)}</AnimatePresence>
                 </div>
               );
             })}

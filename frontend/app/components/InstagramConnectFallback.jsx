@@ -28,6 +28,7 @@ import {
   Send,
   Clock
 } from 'lucide-react';
+import { IconSwap } from './ui/motion';
 
 // Feature preview cards shown under the connect form, matched to the workspace type
 const PERSONAL_FEATURES = [
@@ -785,7 +786,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                         gap: '4px'
                       }}
                     >
-                      {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+                      <IconSwap k={showToken ? 'eyeoff' : 'eye'}>{showToken ? <EyeOff size={13} /> : <Eye size={13} />}</IconSwap>
                       <span>{showToken ? 'Hide' : 'Show Token'}</span>
                     </button>
                   </div>

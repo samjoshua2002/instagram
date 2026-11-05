@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, Info } from 'lucide-react';
+import { backdropMotion, isSheetViewport, popFromTrigger } from '../lib/motion';
 
 /**
  * In-app popups instead of the browser's window.confirm / window.alert.
@@ -48,6 +49,8 @@ export function DialogProvider({ children }) {
 
 function DialogView({ dialog, onClose }) {
   const reduce = useReducedMotion();
+  // Grows out of the button that opened it and shrinks back into it (bottom sheet on phones)
+  const [pop] = useState(() => popFromTrigger({ reduce, sheet: isSheetViewport() }));
   const cancelRef = useRef(null);
   const confirmRef = useRef(null);
   const boxRef = useRef(null);
@@ -82,10 +85,7 @@ function DialogView({ dialog, onClose }) {
   return (
     <motion.div
       className="dialog-backdrop"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
+      {...backdropMotion}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(false); }}
     >
       <motion.div
@@ -95,10 +95,7 @@ function DialogView({ dialog, onClose }) {
         aria-modal="true"
         aria-labelledby="app-dialog-title"
         aria-describedby={dialog.message ? 'app-dialog-message' : undefined}
-        initial={{ opacity: 0, y: reduce ? 0 : 24, scale: reduce ? 1 : 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: reduce ? 0 : 16, transition: { duration: 0.12 } }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        {...pop}
       >
         <div className={`dialog-icon ${danger ? 'dialog-icon-danger' : ''}`}><Icon size={20} /></div>
         <h2 id="app-dialog-title" className="dialog-title">{dialog.title || (isAlert ? 'Heads up' : 'Are you sure?')}</h2>

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { IconSwap } from './ui/motion';
 
 const inputStyle = {
   width: '100%',
@@ -82,7 +83,7 @@ export default function ChangePasswordCard() {
           aria-label={show ? 'Hide passwords' : 'Show passwords'}
           style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px' }}
         >
-          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+          <IconSwap k={show ? 'eyeoff' : 'eye'}>{show ? <EyeOff size={16} /> : <Eye size={16} />}</IconSwap>
         </button>
       </div>
 

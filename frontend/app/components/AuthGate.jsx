@@ -16,6 +16,7 @@ const OnboardingWizard = dynamic(() => import('./OnboardingWizard'), { ssr: fals
 const InstagramConnectFallback = dynamic(() => import('./InstagramConnectFallback'), { ssr: false });
 import WorkspaceImpersonationBanner from './WorkspaceImpersonationBanner';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 function GateSpinner() {
   return (
@@ -34,6 +35,8 @@ export default function AuthGate({ children }) {
     authLoading,
     login,
     isPasskeyModalOpen,
+    isAiModalOpen,
+    linkingTargetPerson,
     setIsPasskeyModalOpen,
     isOnboardingModalOpen,
     setIsOnboardingModalOpen,
@@ -134,13 +137,19 @@ export default function AuthGate({ children }) {
           )}
         </main>
       </div>
-      <AiInterviewModal />
-      <LinkIdModal />
+      {/* AnimatePresence lets each popup play its close animation before unmounting */}
+      <AnimatePresence>{isAiModalOpen && <AiInterviewModal key="ai-interview" />}</AnimatePresence>
+      <AnimatePresence>{linkingTargetPerson && <LinkIdModal key="link-id" />}</AnimatePresence>
+      <AnimatePresence>
       {isPasskeyModalOpen && <PasskeyManagerModal
+        key="passkeys"
         isOpen={isPasskeyModalOpen}
         onClose={() => setIsPasskeyModalOpen(false)}
       />}
+      </AnimatePresence>
+      <AnimatePresence>
       {isOnboardingModalOpen && <OnboardingWizard
+        key="onboarding"
         isOpen={isOnboardingModalOpen}
         onClose={() => {
           setWizardDismissed(true);
@@ -150,6 +159,7 @@ export default function AuthGate({ children }) {
           }
         }}
       />}
+      </AnimatePresence>
     </>
   );
 }

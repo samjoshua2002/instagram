@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, Clock, User } from 'lucide-react';
+import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
@@ -189,6 +190,7 @@ export default function SpotlightHome() {
               className={`sh-chip${category === c.id ? ' active' : ''}`}
               onClick={() => setCategory(c.id)}
             >
+              {category === c.id && <SegIndicator id="seg-spotlight" />}
               {c.label}
             </button>
           ))}

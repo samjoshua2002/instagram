@@ -1,7 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { DUR, EASE_IN, EASE_OUT, backdropMotion, exitOf, popFromTrigger } from '../lib/motion';
+import { AutoHeight } from './ui/motion';
+
+// Steps overlap: the old one slides out while the new one slides in (direction follows Next / Back)
+const stepMotion = {
+  enter: (dir) => ({ opacity: 0, x: 24 * dir, filter: 'blur(2px)' }),
+  center: { opacity: 1, x: 0, filter: 'blur(0px)', transition: { duration: DUR.enter, ease: EASE_OUT } },
+  exit: (dir) => ({ opacity: 0, x: -24 * dir, filter: 'blur(2px)', transition: { duration: exitOf(DUR.enter), ease: EASE_IN } }),
+};
 import { Instagram, Facebook, RefreshCw, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -31,6 +40,12 @@ export default function InstagramSetupModal() {
   const { API_BASE, token } = useApp();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const reduce = useReducedMotion();
+  const prevStep = useRef(0);
+  const dir = step >= prevStep.current ? 1 : -1;
+  useEffect(() => { prevStep.current = step; }, [step]);
+  // Computed when it opens: grows from the button that opened it (or the centre) and shrinks back into it
+  const pop = useMemo(() => popFromTrigger({ reduce }), [open, reduce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Opens from the OAuth popup message, or from ?error=no_instagram_linked after a full-page redirect
   useEffect(() => {
@@ -74,26 +89,26 @@ export default function InstagramSetupModal() {
       {open && (
         <motion.div
           className="ig-setup-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          {...backdropMotion}
           onClick={() => setOpen(false)}
         >
+          {/* Outer layer pops out of / back into the trigger; AutoHeight morphs the box per step */}
           <motion.div
+            {...pop}
+            style={{ ...pop.style, width: '100%', maxWidth: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+          <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="ig-setup-title"
             className="ig-setup-modal"
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            onClick={(e) => e.stopPropagation()}
           >
             <button type="button" className="ig-setup-close" onClick={() => setOpen(false)} aria-label="Close">
               <X size={18} />
             </button>
 
+            <AutoHeight>
             <div className="person-card-eyebrow">30-SECOND FIX</div>
             <h2 id="ig-setup-title" className="ig-setup-heading">Finish connecting Instagram</h2>
             <p className="person-card-sub">Chatter OS can only reply from an Instagram Professional account linked to a Facebook Page.</p>
@@ -102,14 +117,15 @@ export default function InstagramSetupModal() {
               {STEPS.map((_, i) => <span key={i} className={i <= step ? 'is-on' : ''} />)}
             </div>
 
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout" initial={false} custom={dir}>
               <motion.div
                 key={step}
                 className="ig-setup-step"
-                initial={{ opacity: 0, x: 24 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -24 }}
-                transition={{ duration: 0.22 }}
+                custom={dir}
+                variants={stepMotion}
+                initial="enter"
+                animate="center"
+                exit="exit"
               >
                 <div className="ig-setup-icon"><current.Icon size={22} /></div>
                 <div style={{ minWidth: 0 }}>
@@ -142,6 +158,8 @@ export default function InstagramSetupModal() {
                 </button>
               )}
             </div>
+            </AutoHeight>
+          </div>
           </motion.div>
         </motion.div>
       )}

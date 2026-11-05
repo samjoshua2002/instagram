@@ -47,6 +47,8 @@ function formatLastContact(ts) {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 import { motion, AnimatePresence } from 'framer-motion';
+import { enterMotion, swapMotion } from '../lib/motion';
+import { SegIndicator } from '../components/ui/motion';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -817,7 +819,6 @@ function RelationshipsPageContent() {
             type="button"
             className="person-cta"
             whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.97 }}
             onClick={() => startAiInterview(selectedPerson)}
           >
             <Sparkles size={16} />
@@ -874,6 +875,7 @@ function RelationshipsPageContent() {
               className={`person-tab${profileTab === id ? ' active' : ''}`}
               onClick={() => setProfileTab(id)}
             >
+              {profileTab === id && <SegIndicator id="seg-person-tab" className="seg-underline" />}
               <Icon size={15} />
               <span>{label}</span>
             </button>
@@ -1865,9 +1867,7 @@ function RelationshipsPageContent() {
   // =========================================================================
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      {...enterMotion}
       className="page-container spx-page spx-blue"
     >
       {/* Top Header (Spotify hero) */}
@@ -1943,6 +1943,7 @@ function RelationshipsPageContent() {
               onClick={() => setActiveCategory(tab.id)}
               className={`people-pill spx-pill${activeCategory === tab.id ? ' active' : ''}`}
             >
+              {activeCategory === tab.id && <SegIndicator id="seg-people-category" />}
               <span>{tab.label}</span>
               <span className="spx-pill-count">{tab.count}</span>
             </button>
@@ -2025,7 +2026,7 @@ function RelationshipsPageContent() {
                   <th style={{ textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="stagger-in">
                 {isSyncingInitial && pagedPeople.length === 0 ? (
                   Array.from({ length: 6 }).map((_, idx) => (
                     <tr key={`skel-${idx}`}>
@@ -2136,7 +2137,7 @@ function RelationshipsPageContent() {
 
       {/* 2. Mobile Compact Table View (screens <= 768px when in table mode) */}
       {layoutMode === 'table' && (
-        <div className="mobile-people-cards" style={{ padding: '12px' }}>
+        <div className="mobile-people-cards stagger-in" style={{ padding: '12px' }}>
           {isSyncingInitial && pagedPeople.length === 0 ? (
             Array.from({ length: 4 }).map((_, idx) => (
               <div
@@ -2386,10 +2387,8 @@ function RelationshipsPageContent() {
         <motion.div
           key="view-grid"
           layout
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98 }}
-          transition={{ duration: 0.18 }}
+          className="stagger-in"
+          {...swapMotion}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -2521,10 +2520,7 @@ function RelationshipsPageContent() {
         <motion.div
           key="view-dense"
           layout
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18 }}
+          {...swapMotion}
           style={{
             padding: '10px',
             display: 'flex',

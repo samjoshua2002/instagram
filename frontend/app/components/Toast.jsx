@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { DUR, EASE_IN, EASE_OUT, T, exitOf, pulseLastTrigger } from '../lib/motion';
 
 const ICONS = { success: Check, error: AlertCircle, warning: AlertTriangle, info: Info };
 
@@ -16,6 +17,16 @@ export default function Toaster() {
   const { toasts = [], dismissToast } = useApp();
   const reduce = useReducedMotion();
 
+  // Success confirms where it happened: the button the user pressed gives a gentle outward pulse
+  const seen = useRef(new Set());
+  useEffect(() => {
+    toasts.forEach(t => {
+      if (seen.current.has(t.id)) return;
+      seen.current.add(t.id);
+      if (t.type === 'success') pulseLastTrigger();
+    });
+  }, [toasts]);
+
   return (
     <div className="toast-region" aria-live="polite" aria-relevant="additions">
       <AnimatePresence initial={false}>
@@ -27,10 +38,10 @@ export default function Toaster() {
               layout
               role={t.type === 'error' ? 'alert' : 'status'}
               className={`toast toast-${ICONS[t.type] ? t.type : 'info'}`}
-              initial={{ opacity: 0, y: reduce ? 0 : 16, scale: reduce ? 1 : 0.96 }}
+              initial={{ opacity: 0, y: reduce ? 0 : 16, scale: reduce ? 1 : 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: reduce ? 0 : 8, transition: { duration: 0.15 } }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ opacity: 0, y: reduce ? 0 : 8, scale: reduce ? 1 : 0.95, transition: { duration: exitOf(DUR.enter), ease: EASE_IN } }}
+              transition={{ duration: DUR.enter, ease: EASE_OUT, layout: T.move }}
             >
               <span className="toast-icon"><Icon size={16} strokeWidth={2.5} /></span>
               <span className="toast-text">{t.text}</span>

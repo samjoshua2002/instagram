@@ -8,6 +8,7 @@ import {
   Search, Lock, ExternalLink, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { T } from '../lib/motion';
 
 export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, sectionDescription }) {
   const { user, token, API_BASE, enterWorkspace, showToast } = useApp();
@@ -87,6 +88,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={T.enter}
         style={{
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
@@ -170,7 +172,7 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ ...T.enter, delay: 0.08 }}
         style={{
           background: 'var(--color-surface)',
           border: '1px solid var(--color-border)',

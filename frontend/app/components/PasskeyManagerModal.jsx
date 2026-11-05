@@ -23,7 +23,9 @@ import {
   Smartphone,
   MapPin
 } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { backdropMotion, popFromTrigger } from '../lib/motion';
 import { useConfirm } from '../context/DialogContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
@@ -50,6 +52,9 @@ function detectCurrentDevice() {
 }
 
 export default function PasskeyManagerModal({ isOpen, onClose }) {
+  // Pops out of the button that opened it and shrinks back into it on close
+  const reduce = useReducedMotion();
+  const [pop] = useState(() => popFromTrigger({ reduce }));
   const { user, token, updateUserProfile, showToast } = useApp();
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('passkeys'); // 'passkeys' | 'profile' | 'oneauth'
@@ -346,7 +351,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{
+    <motion.div
+      {...backdropMotion}
+      style={{
       position: 'fixed',
       inset: 0,
       background: 'rgba(9, 9, 11, 0.45)',
@@ -358,7 +365,10 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       padding: '20px',
       fontFamily: "var(--font-sans)",
     }}>
-      <div style={{
+      <motion.div
+        {...pop}
+        style={{
+          ...pop.style,
         background: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderRadius: '16px',
@@ -875,7 +885,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
             </form>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -2,16 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { T, backdropMotion, popFromTrigger, revealMotion } from '../lib/motion';
 import { isFromApi, onPopupClosed } from '../lib/utils';
 import {
   Briefcase, User, Sparkles, Bot, ShieldCheck, Check,
   ArrowRight, ArrowLeft, RefreshCw, Sliders, CheckCircle2,
   Building2, MessageSquare, Zap, Film, Instagram, X, Globe,
-  ExternalLink, ChevronDown, ChevronUp, Lock
+  ExternalLink, ChevronDown, Lock
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 
 export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
+  // Pops out of the button that opened it and shrinks back into it on close
+  const reduce = useReducedMotion();
+  const [pop] = useState(() => popFromTrigger({ reduce }));
   const { user, token, API_BASE, updateUserProfile, showToast, setRoutingConfig } = useApp();
 
   const TOTAL_STEPS = 5;
@@ -209,7 +213,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   const isConnected = Boolean(instagramPageAccessToken || (instagramAccountId && instagramUsername));
 
   return (
-    <div style={{
+    <motion.div
+      {...backdropMotion}
+      style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -225,11 +231,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
       boxSizing: 'border-box'
     }}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        {...pop}
         style={{
+          ...pop.style,
           width: '100%',
           maxWidth: '580px',
           maxHeight: '90vh',
@@ -476,10 +480,11 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       Manual Credentials Override
                     </span>
                   </div>
-                  {showManualToken ? <ChevronUp size={14} color="var(--color-text-secondary)" /> : <ChevronDown size={14} color="var(--color-text-secondary)" />}
+                  <motion.span style={{ display: 'inline-flex' }} initial={false} animate={{ rotate: showManualToken ? 180 : 0 }} transition={T.move}><ChevronDown size={14} color="var(--color-text-secondary)" /></motion.span>
                 </div>
 
-                {showManualToken && (
+                <AnimatePresence initial={false}>{showManualToken && (
+<motion.div key="reveal" {...revealMotion} style={{ overflow: 'hidden' }}>
                   <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div>
@@ -546,7 +551,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       />
                     </div>
                   </div>
-                )}
+                </motion.div>
+)}</AnimatePresence>
               </div>
             </div>
           )}
@@ -1186,6 +1192,6 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
           </div>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

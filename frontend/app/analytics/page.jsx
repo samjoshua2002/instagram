@@ -9,12 +9,13 @@ import {
   Users, Sliders, Sparkles, ArrowRight,
   MessageSquare, Film, Bot, Shield,
   Search, RefreshCw, CheckCircle2, AlertCircle,
-  ExternalLink, ChevronDown, ChevronUp, Layers,
+  ExternalLink, ChevronDown, Layers,
   Lock, Instagram, Smartphone, Calendar, UserCheck, Mail,
   LogIn, Building2, Briefcase, User as UserIcon, Filter,
   ChevronLeft, Trash2, Send, Clock, Target, Zap
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
+import { DUR, EASE_OUT, STAGGER, T, rowMotion } from '../lib/motion';
 import BusinessConversionPanel from '../components/BusinessConversionPanel';
 import WorkspaceModeSwitch from '../components/WorkspaceModeSwitch';
 import { WORKSPACE_MODES, FEATURE_GROUPS, currentMode, isFeatureOn } from '../lib/workspaceFeatures';
@@ -135,7 +136,7 @@ function BarRow({ label, handle, value, max, index }) {
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.6, delay: 0.2 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: DUR.enter, delay: 0.12 + index * STAGGER, ease: EASE_OUT }}
       style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--color-surface-hover)' }}
     >
       <span style={{ width: '16px', fontSize: '0.66rem', color: 'var(--color-text-muted)', fontFamily: "var(--font-label)", fontWeight: '700', textAlign: 'right', flexShrink: 0 }}>
@@ -152,7 +153,7 @@ function BarRow({ label, handle, value, max, index }) {
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${pct}%` }}
-            transition={{ duration: 1.6, delay: 0.25 + index * 0.12, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.9, delay: 0.2 + index * STAGGER, ease: EASE_OUT }}
             style={{ height: '100%', background: shades[index] || 'var(--color-border-strong)', borderRadius: '3px' }}
           />
         </div>
@@ -167,21 +168,18 @@ const statsContainerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.06
+      staggerChildren: STAGGER,
+      delayChildren: 0.04
     }
   }
 };
 
 const statCardVariants = {
-  hidden: { opacity: 0, y: 14 },
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.55,
-      ease: [0.16, 1, 0.3, 1]
-    }
+    transition: T.enter
   }
 };
 
@@ -497,7 +495,7 @@ export default function AnalyticsPage() {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: DUR.page, ease: EASE_OUT }}
       className="page-container dashboard-container"
     >
       {/* HEADER WITH VIEW SWITCHER */}
@@ -582,7 +580,8 @@ export default function AnalyticsPage() {
             {/* 1. Total Registered Accounts */}
             <motion.div
               variants={statCardVariants}
-              whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
+              className="settle"
+              whileHover={{ y: -3, transition: T.dropdown }}
               style={{
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
@@ -617,7 +616,8 @@ export default function AnalyticsPage() {
             {/* 2. Active Webhook Automations */}
             <motion.div
               variants={statCardVariants}
-              whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
+              className="settle"
+              whileHover={{ y: -3, transition: T.dropdown }}
               style={{
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
@@ -652,7 +652,8 @@ export default function AnalyticsPage() {
             {/* 3. Instagram Connected Workspaces */}
             <motion.div
               variants={statCardVariants}
-              whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
+              className="settle"
+              whileHover={{ y: -3, transition: T.dropdown }}
               style={{
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
@@ -687,7 +688,8 @@ export default function AnalyticsPage() {
             {/* 4. Portfolio Breakdown */}
             <motion.div
               variants={statCardVariants}
-              whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
+              className="settle"
+              whileHover={{ y: -3, transition: T.dropdown }}
               style={{
                 background: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
@@ -1167,7 +1169,7 @@ export default function AnalyticsPage() {
                                   }}
                                 >
                                   <span>{isExpanded ? 'Hide' : 'Info'}</span>
-                                  {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                  <motion.span style={{ display: 'inline-flex' }} initial={false} animate={{ rotate: isExpanded ? 180 : 0 }} transition={T.move}><ChevronDown size={11} /></motion.span>
                                 </button>
 
                                 {!isSelf && (
@@ -1361,8 +1363,8 @@ export default function AnalyticsPage() {
               <motion.div
                 key={i}
                 variants={statCardVariants}
-                whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
-                className="stat-card-item stat-glass"
+              whileHover={{ y: -3, transition: T.dropdown }}
+                className="stat-card-item stat-glass settle"
                 style={{
                   padding: '18px',
                   display: 'flex',
@@ -1407,9 +1409,7 @@ export default function AnalyticsPage() {
                     <motion.div
                       key={lead._id}
                       layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
+                      {...rowMotion(0)}
                       className="stat-glass"
                       style={{ padding: '14px', borderRadius: '14px' }}
                     >
@@ -1437,7 +1437,7 @@ export default function AnalyticsPage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: DUR.page, delay: 0.16, ease: EASE_OUT }}
             className="charts-grid"
           >
             {/* Donut: Circle Breakdown */}
@@ -1511,7 +1511,7 @@ export default function AnalyticsPage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: DUR.page, delay: 0.22, ease: EASE_OUT }}
             className="bottom-grid"
           >
             {/* AI Split */}
