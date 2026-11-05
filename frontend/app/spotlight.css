@@ -236,3 +236,29 @@
 .sh-menu-item:hover, .sh-menu-item:focus-visible { background: rgba(255, 255, 255, 0.1); outline: none; }
 @keyframes sh-menu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sh-menu { animation: none; } }
+
+/* ── Home background photo (PageCover): a new Unsplash photo on every open ──
+   .sh-tinted is added once the photo is chosen; the home colours then follow it. */
+.sh-home:has(> .page-cover) { position: relative; isolation: isolate; }
+.sh-home > .page-cover { height: 420px; border-radius: 8px 8px 0 0; overflow: hidden; }
+.sh-home .sh-hello { text-shadow: 0 1px 14px rgba(0, 0, 0, 0.35); }
+.sh-home.sh-tinted {
+  --sh-accent: color-mix(in srgb, var(--ambient-dominant) 70%, #fff);
+  --sh-text-2: color-mix(in srgb, var(--ambient-dominant) 30%, #d6d6d6);
+  --sh-border: color-mix(in srgb, var(--ambient-dominant) 20%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--ambient-dominant) 22%, #0e0e0e),
+    color-mix(in srgb, var(--ambient-dominant) 8%, #070707));
+}
+:root[data-theme="light"] .sh-home .sh-hello { text-shadow: none; }
+:root[data-theme="light"] .sh-home.sh-tinted {
+  --sh-accent: color-mix(in srgb, var(--ambient-dominant) 80%, #000);
+  --sh-text-2: color-mix(in srgb, var(--ambient-dominant) 35%, #555);
+  --sh-border: color-mix(in srgb, var(--ambient-dominant) 22%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--ambient-dominant) 14%, #fff),
+    color-mix(in srgb, var(--ambient-dominant) 6%, #fafafa));
+}
+@media (max-width: 768px) {
+  .sh-home > .page-cover { height: 340px; border-radius: 0; }
+}
