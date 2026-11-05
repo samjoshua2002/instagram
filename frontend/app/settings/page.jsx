@@ -7,14 +7,16 @@ import {
   UserCheck, Save, Sparkles, MessageSquare, AlertCircle,
   CheckCircle2, Plus, Trash2, Send, Sliders, Info,
   Code, RefreshCw, Smile, Zap, BookOpen, ShieldAlert, Key, Eye, EyeOff, Instagram,
-  Copy, Check
+  Copy, Check, BarChart3
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
 
 function SettingsPageContent() {
   const { API_BASE, token, showToast, user, isImpersonating, updateUserProfile } = useApp();
+  const router = useRouter();
 
 
   const [activeTab, setActiveTab] = useState('about');
@@ -378,6 +380,7 @@ function SettingsPageContent() {
     ...(isSuperadmin ? [{ id: 'integrations', label: 'API Keys & Giphy', icon: Key }] : []),
     { id: 'ai-provider', label: 'AI Provider', icon: Sparkles },
     { id: 'simulator', label: 'Test My Clone', icon: Send },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/analytics' },
   ];
 
   if (loading) {
@@ -570,7 +573,7 @@ function SettingsPageContent() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => (tab.href ? router.push(tab.href) : setActiveTab(tab.id))}
               style={{
                 display: 'flex',
                 alignItems: 'center',

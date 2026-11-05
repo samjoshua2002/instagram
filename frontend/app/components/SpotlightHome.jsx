@@ -82,6 +82,20 @@ function daysUntil(dateStr) {
   return Math.round((next - today) / 86400000);
 }
 
+/** Small row of headline numbers; the full dashboard lives at /analytics (Settings > Analytics). */
+export function StatStrip({ stats }) {
+  return (
+    <div className="sh-stats">
+      {stats.map(s => (
+        <Link key={s.label} href={s.href} className="sh-stat">
+          <span className="sh-stat-num">{s.value === null || s.value === undefined ? '-' : fmt(s.value)}</span>
+          <span className="sh-stat-label">{s.label}</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 export default function SpotlightHome() {
   const { nodes, user, routingConfig } = useApp();
   const [category, setCategory] = useState('all');
@@ -201,13 +215,15 @@ export default function SpotlightHome() {
           </section>
 
           <div className="sh-row-head">
-            <h2>Feel your circle</h2>
-            <Link href="/analytics" className="sh-link">See analytics</Link>
+            <h2>At a glance</h2>
+            <Link href="/analytics" className="sh-link">Full analytics</Link>
           </div>
-          <Link href="/relationships" className="sh-pulse">
-            <span className="sh-pulse-num">{fmt(totalChats)}<small>DMs</small></span>
-            <span className="sh-pulse-sub">{fmt(filtered.length)} people · {fmt(totalReels)} reels shared</span>
-          </Link>
+          <StatStrip stats={[
+            { label: 'People', value: filtered.length, href: '/relationships' },
+            { label: 'DMs', value: totalChats, href: '/analytics' },
+            { label: 'Reels shared', value: totalReels, href: '/analytics' },
+            { label: 'AI replying', value: filtered.filter(p => p.aiEnabled !== false).length, href: '/controls' },
+          ]} />
 
           {favourites.length > 0 && (
             <>

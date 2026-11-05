@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { startRegistration } from '@simplewebauthn/browser';
+import ChangePasswordCard from '../components/ChangePasswordCard';
 
 const formatAddress = (addr) => {
   if (!addr) return '';
@@ -860,6 +861,8 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+
+          <ChangePasswordCard />
 
           {/* Biometric Passkeys Card */}
           <div style={{

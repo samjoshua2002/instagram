@@ -1522,6 +1522,35 @@ router.put('/profile', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/auth/change-password (Protected)
+ * { currentPassword, newPassword }: the signed-in user changes their own password.
+ */
+router.post('/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required.' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+    }
+    const user = req.user;
+    if (!(await user.comparePassword(String(currentPassword)))) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+    if (await user.comparePassword(String(newPassword))) {
+      return res.status(400).json({ error: 'New password must be different from the current one.' });
+    }
+    user.passwordHash = await User.hashPassword(String(newPassword));
+    await user.save();
+    res.json({ success: true, message: 'Password changed.' });
+  } catch (err) {
+    console.error('❌ Change password error:', err.message);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+/**
  * PUT /api/auth/passkeys/:credentialId (Protected)
  * Renames a registered passkey
  */
@@ -2036,6 +2065,46 @@ router.post('/admin/accounts/:userId/ban', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Ban account error:', err.message);
     res.status(500).json({ error: 'Failed to update account status' });
+  }
+});
+
+/**
+ * POST /api/admin/accounts/:userId/role (Superadmin)
+ * { role: 'superadmin' | 'user' } grants or removes superadmin rights.
+ * You cannot change your own role, and the last superadmin can never be removed.
+ */
+router.post('/admin/accounts/:userId/role', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
+    }
+    const role = req.body?.role;
+    if (!['superadmin', 'user'].includes(role)) {
+      return res.status(400).json({ error: "Role must be 'superadmin' or 'user'." });
+    }
+    if (req.user._id.toString() === req.params.userId) {
+      return res.status(400).json({ error: 'You cannot change your own role.' });
+    }
+    const target = await User.findById(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Account not found.' });
+    if (role === 'superadmin' && target.isBanned) {
+      return res.status(400).json({ error: 'Lift the suspension before making this account a superadmin.' });
+    }
+    if (role === 'user' && target.role === 'superadmin') {
+      const supers = await User.countDocuments({ role: 'superadmin' });
+      if (supers <= 1) return res.status(400).json({ error: 'At least one superadmin must remain.' });
+    }
+    target.role = role;
+    await target.save();
+    const handle = target.instagramUsername || target.username;
+    res.json({
+      success: true,
+      role,
+      message: role === 'superadmin' ? `@${handle} is now a superadmin.` : `@${handle} is no longer a superadmin.`,
+    });
+  } catch (err) {
+    console.error('Change role error:', err.message);
+    res.status(500).json({ error: 'Failed to change role' });
   }
 });
 

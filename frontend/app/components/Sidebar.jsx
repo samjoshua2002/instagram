@@ -144,7 +144,6 @@ export default function Sidebar() {
   const workspaceNav = {
     business: [
       { href: '/', label: 'Home', icon: HomeIcon },
-      { href: '/analytics', label: 'Business Analytics', icon: BarChart3 },
       on('ragKnowledgeBase') && { href: '/documents', label: 'Document & Service Vault', icon: FileText },
       { href: '/controls', label: 'Business Policy & Hours', icon: Sliders },
       { href: '/settings', label: 'Brand Voice & AI Model', icon: UserCheck },
@@ -152,7 +151,6 @@ export default function Sidebar() {
     ],
     personal: [
       { href: '/', label: 'Home', icon: HomeIcon },
-      { href: '/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/relationships', label: 'People Directory', icon: Users },
       { href: '/controls', label: 'Chat Rules', icon: Sliders },
       { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
@@ -162,7 +160,6 @@ export default function Sidebar() {
     // Hybrid: personal voice, business tools alongside
     hybrid: [
       { href: '/', label: 'Home', icon: HomeIcon },
-      { href: '/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/relationships', label: 'People & Customers', icon: Users },
       { href: '/controls', label: 'Chat Rules & Hours', icon: Sliders },
       { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
@@ -173,9 +170,10 @@ export default function Sidebar() {
 
   const navItems = (isPureSuperadmin
     ? [
-      { href: '/analytics', label: 'Platform Console', icon: LayoutDashboard },
+      { href: '/', label: 'Home', icon: HomeIcon },
       { href: '/admin', label: 'User Workspaces', icon: Users },
       { href: '/admin/tokens', label: 'Token Health Radar', icon: Activity },
+      { href: '/analytics', label: 'Platform Analytics', icon: LayoutDashboard },
     ]
     : [
       ...workspaceNav[mode],
@@ -203,7 +201,7 @@ export default function Sidebar() {
 
   const mobileTabs = isPureSuperadmin
     ? [
-      { href: '/analytics', label: 'Platform', icon: LayoutDashboard },
+      { href: '/', label: 'Home', icon: HomeIcon },
       { href: '/admin', label: 'Workspaces', icon: Users },
       { href: '/admin/tokens', label: 'Tokens', icon: Activity },
       { label: 'More', icon: LayoutGrid },
