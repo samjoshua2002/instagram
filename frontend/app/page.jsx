@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Users, Activity, BarChart3, ChevronRight } from 'lucide-react';
 import SpotlightHome, { StatStrip } from './components/SpotlightHome';
 import { useApp } from './context/AppContext';
+import PageCover from './components/PageCover';
+import { useFreshBanner } from './lib/banners';
 
 // Home: a welcome page with a few headline numbers for every user.
 // The full analytics dashboard is secondary and lives at /analytics (Settings > Analytics).
@@ -19,6 +21,7 @@ function PlatformWelcome() {
   const { user, token, API_BASE } = useApp();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const coverPhoto = useFreshBanner('home-cover', 'abstract');
 
   useEffect(() => {
     const activeToken = token || localStorage.getItem('chatter_jwt_token');
@@ -40,7 +43,8 @@ function PlatformWelcome() {
   ];
 
   return (
-    <div className="sh-home">
+    <div className={`sh-home${coverPhoto ? ' sh-tinted' : ''}`}>
+      <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
         <h1 className="sh-hello">Hello, {firstName || 'there'}!</h1>
       </header>

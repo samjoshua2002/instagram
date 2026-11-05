@@ -3,17 +3,20 @@
 // If Unsplash fails, is rate limited or has no key, the last saved list is served whatever its age;
 // with nothing saved anywhere the route returns [] and the frontend shows its gradient artwork.
 
+// Two-colour wave / pattern textures only: plain one-colour gradient photos look empty
+// behind a page (asked 2026-11-06), so the queries ask for waves and toPhotos() drops plain ones.
 const TOPICS = {
-  abstract: 'abstract gradient',
-  colorful: 'colorful abstract',
-  fluid: 'fluid art',
+  abstract: 'abstract wave pattern',
+  colorful: 'colorful abstract waves',
+  fluid: 'fluid wave texture',
 };
 
 // One list per Unsplash colour filter ("tone-yellow", ...), so a contact's banner can match
 // the main colour of their profile photo. Each costs one call a week, like the topics above.
 const TONES = ['black_and_white', 'black', 'white', 'yellow', 'orange', 'red', 'purple', 'magenta', 'green', 'teal', 'blue'];
-for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: 'abstract gradient', color: tone };
+for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: 'wavy lines', color: tone };
 
+const STORE_VERSION = 'waves1';
 const REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // ask Unsplash for a new list at most once a week per topic
 const RETRY_MS = 10 * 60 * 1000; // after a network/server error
 const LIMIT_MS = 60 * 60 * 1000; // after 429/403 or when the hourly quota is nearly used up
@@ -21,9 +24,21 @@ const MIN_REMAINING = 3; // keep a few calls spare for other topics
 
 const isPhotoUrl = u => typeof u === 'string' && /^https:\/\/images\.unsplash\.com\//.test(u);
 
+// A photo described only as a gradient / blur / bokeh is a plain colour wash: skip it
+// (unless it also has waves, lines or a pattern in it).
+const PLAIN = /\b(gradients?|blur|blurred|blurry|bokeh|plain|solid colou?r)\b/i;
+const TEXTURED = /\b(waves?|wavy|patterns?|textures?|lines?|stripes?|swirls?|curves?|ripples?|folds?|silk)\b/i;
+// Real-world scenes the colour searches sometimes return (a beach is not a wave texture)
+const SCENE = /\b(sand|beach|sea|ocean|shore|water|fur|trees?|forest|mountains?|sky|person|woman|man)\b/i;
+const isPlain = p => {
+  const text = `${p.alt_description || ''} ${p.description || ''}`;
+  return SCENE.test(text) || (PLAIN.test(text) && !TEXTURED.test(text));
+};
+
 function toPhotos(results) {
-  return (Array.isArray(results) ? results : [])
-    .filter(p => p && p.id && isPhotoUrl(p.urls?.raw))
+  const valid = (Array.isArray(results) ? results : []).filter(p => p && p.id && isPhotoUrl(p.urls?.raw));
+  const textured = valid.filter(p => !isPlain(p));
+  return (textured.length >= 5 ? textured : valid) // never leave a topic with almost no photos
     .map(p => ({
       id: String(p.id),
       raw: p.urls.raw,
@@ -40,15 +55,17 @@ function mongoStore() {
   const mongoose = require('mongoose');
   const Model = require('../models/BannerPhotoCache');
   const up = () => mongoose.connection.readyState === 1;
+  // Bump when the queries change, so lists saved with the old queries are not reused
+  const key = topic => `${STORE_VERSION}:${topic}`;
   return {
     async get(topic) {
       if (!up()) return null;
-      const doc = await Model.findOne({ topic }).lean().maxTimeMS(3000);
+      const doc = await Model.findOne({ topic: key(topic) }).lean().maxTimeMS(3000);
       return doc ? { photos: doc.photos || [], at: new Date(doc.fetchedAt).getTime() } : null;
     },
     async set(topic, photos, at) {
       if (!up()) return;
-      await Model.updateOne({ topic }, { $set: { photos, fetchedAt: new Date(at) } }, { upsert: true });
+      await Model.updateOne({ topic: key(topic) }, { $set: { photos, fetchedAt: new Date(at) } }, { upsert: true });
     },
   };
 }
@@ -153,4 +170,4 @@ function createUnsplashCache({
   return { getPhotos, isBlocked: () => now() < blockedUntil };
 }
 
-module.exports = { createUnsplashCache, TOPICS, TONES, REFRESH_MS, toPhotos };
+module.exports = { createUnsplashCache, TOPICS, TONES, REFRESH_MS, toPhotos, isPlain };

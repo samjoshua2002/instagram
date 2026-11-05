@@ -93,6 +93,9 @@ export function useHeroCollapse(rootRef, o, deps = []) {
 
         gsap.set(hero, { position: 'sticky', zIndex: 30 });
         gsap.set(media, { transformOrigin: '0 0' });
+        // Own GPU layers for everything that moves: the browser only re-composites each
+        // frame instead of re-painting text, shadows and the avatar while scrolling.
+        gsap.set([media, title, pin, surface, ...fades].filter(Boolean), { willChange: 'transform, opacity' });
 
         const measure = () => {
           const H = hero.offsetHeight;
@@ -136,7 +139,9 @@ export function useHeroCollapse(rootRef, o, deps = []) {
             scroller,
             start: 'top top',
             end: () => `+=${m.travel}`,
-            scrub: 0.2,
+            // Touch scrolling already moves smoothly; extra smoothing on phones makes the
+            // avatar/title trail behind the (natively sticky) band, which reads as lag.
+            scrub: phone ? true : 0.2,
             invalidateOnRefresh: true,
           },
         });

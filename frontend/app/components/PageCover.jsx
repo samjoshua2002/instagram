@@ -10,8 +10,10 @@ import { useAmbientImage } from './AmbientBackground';
  * Use the same `seed` as the page's cover square so both show the same photo.
  * `tint={false}` when the page sets the ambient colours itself (People list).
  */
-export default function PageCover({ seed, topic = 'abstract', tint = true }) {
-  const photo = useBanner(seed, topic);
+export default function PageCover({ seed, topic = 'abstract', tint = true, photo: chosen }) {
+  const given = chosen !== undefined; // `photo`: the page picked it (Home: a new one every open)
+  const seeded = useBanner(given ? null : seed, topic);
+  const photo = given ? chosen : seeded;
   useAmbientImage(tint ? bannerSrc(photo, 400) : null);
-  return <UnsplashBanner seed={seed} topic={topic} className="page-cover" />;
+  return <UnsplashBanner seed={seed} topic={topic} photo={given ? chosen : undefined} className="page-cover" />;
 }
