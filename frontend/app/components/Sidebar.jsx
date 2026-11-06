@@ -159,15 +159,6 @@ export default function Sidebar() {
       on('ragKnowledgeBase') && { href: '/documents', label: 'Document Vault (RAG)', icon: FileText },
       on('mediaStickerVault') && { href: '/vault', label: 'Media Vault', icon: ImageIcon },
     ],
-    // Hybrid: personal voice, business tools alongside
-    hybrid: [
-      { href: '/', label: 'Home', icon: HomeIcon },
-      { href: '/relationships', label: 'People & Customers', icon: Users },
-      { href: '/controls', label: 'Chat Rules & Hours', icon: Sliders },
-      { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
-      on('ragKnowledgeBase') && { href: '/documents', label: 'Document & Service Vault', icon: FileText },
-      on('mediaStickerVault') && { href: '/vault', label: 'Media Vault', icon: ImageIcon },
-    ],
   };
 
   const navItems = (isPureSuperadmin

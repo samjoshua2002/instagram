@@ -35,7 +35,9 @@ const MODE_PRESETS = {
   },
 };
 
-const MODES = Object.keys(MODE_PRESETS);
+// Hybrid was removed from the switch: only Personal and Business can be picked now
+// (the hybrid preset stays so old Hybrid workspaces keep working until they switch)
+const MODES = ['personal', 'business'];
 const CACHE_MS = 30 * 1000;
 const cache = new Map();
 

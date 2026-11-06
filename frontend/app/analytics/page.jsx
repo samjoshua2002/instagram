@@ -15,7 +15,7 @@ import PageHero from '../components/PageHero';
 import { currentMode } from '../lib/workspaceFeatures';
 import { useActivity, RangeTabs } from './kit';
 import PersonalView from './PersonalView';
-import BusinessView, { BusinessStrip } from './BusinessView';
+import BusinessView from './BusinessView';
 import PlatformView from './PlatformView';
 import './analytics.css';
 
@@ -95,9 +95,9 @@ export default function AnalyticsPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
 
-  // Layout follows the Personal / Business / Hybrid switch; superadmins get the platform layout
+  // Layout follows the Personal / Business switch; superadmins get the platform layout
   const mode = currentMode(workspaceFeatures, user);
-  const layout = isSuperadmin ? 'platform' : mode === 'business' ? 'business' : mode === 'hybrid' ? 'hybrid' : 'personal';
+  const layout = isSuperadmin ? 'platform' : mode === 'business' ? 'business' : 'personal';
   const [range, setRange] = useState('30d');
   const activity = useActivity(range, isSuperadmin ? 'platform' : undefined);
 
@@ -948,15 +948,13 @@ export default function AnalyticsPage() {
         </div>
       ) : (
         /* ─────────────────────────────────────────────────────────────
-            VIEW B: PERSONAL / BUSINESS / HYBRID ANALYTICS
+            VIEW B: PERSONAL / BUSINESS ANALYTICS
            ───────────────────────────────────────────────────────────── */
         <div className="an">
           {layout === 'business' ? (
             <BusinessView biz={bizStats} routingConfig={routingConfig} range={range} activity={activity} />
           ) : (
-            <PersonalView friendNodes={friendNodes} routingConfig={routingConfig} bizStats={bizStats} range={range} activity={activity}>
-              {layout === 'hybrid' && <BusinessStrip biz={bizStats} />}
-            </PersonalView>
+            <PersonalView friendNodes={friendNodes} routingConfig={routingConfig} bizStats={bizStats} range={range} activity={activity} />
           )}
         </div>
       )}

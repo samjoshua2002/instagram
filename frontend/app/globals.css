@@ -3105,8 +3105,8 @@ body {
 
 /* ═══ Feature Store + mode switch (PLAN.md §4, §13 Phase 3) ═══ */
 .mode-segment {
-  /* Three equal columns that always fit inside the pill (max-content pushed Hybrid out at 360px) */
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Two equal columns (Personal, Business) that always fit inside the pill */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   max-width: 100%;
 }
 
@@ -3131,7 +3131,7 @@ body {
 }
 
 .mode-segment.compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .mode-segment.compact button {
