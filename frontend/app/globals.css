@@ -363,6 +363,70 @@ select option {
   color: var(--color-text-primary);
 }
 
+/* Open dropdown list follows the theme (Chrome/Edge 135+). Older browsers keep the
+   native list with the themed option colours above. */
+@supports (appearance: base-select) {
+  select:not([multiple]),
+  select:not([multiple])::picker(select) {
+    appearance: base-select;
+    -webkit-appearance: base-select;
+  }
+  select:not([multiple]) {
+    display: flex;
+    align-items: center;
+  }
+  /* The trigger already draws its own chevron */
+  select:not([multiple])::picker-icon { display: none; }
+  select:not([multiple])::picker(select) {
+    background: var(--color-surface-elevated);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: var(--space-1);
+    margin-block: var(--space-1);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.16);
+    max-height: min(320px, 60vh);
+    overflow-y: auto;
+    opacity: 1;
+    transition: opacity 150ms ease, overlay 150ms allow-discrete, display 150ms allow-discrete;
+  }
+  @starting-style {
+    select:not([multiple]):open::picker(select) { opacity: 0; }
+  }
+  select:not([multiple]) option {
+    background: transparent;
+    color: var(--color-text-primary);
+    font-family: var(--font-ui);
+    font-size: 0.9375rem;
+    min-height: 2.25rem;
+    padding: 0 var(--space-3);
+    border-radius: 8px;
+    gap: var(--space-2);
+    cursor: pointer;
+    outline: none;
+  }
+  select:not([multiple]) option:hover,
+  select:not([multiple]) option:focus-visible {
+    background: var(--mat-thin-hover);
+  }
+  select:not([multiple]) option:checked {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    font-weight: 600;
+  }
+  select:not([multiple]) option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: var(--accent);
+  }
+  select:not([multiple]) option:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  @media (pointer: coarse) {
+    select:not([multiple]) option { min-height: 2.75rem; font-size: 1rem; }
+  }
+}
+
 input[type="radio"],
 input[type="checkbox"],
 input[type="range"] {
