@@ -83,7 +83,7 @@ export default function ChangePasswordCard() {
           type="button"
           onClick={() => setShow(v => !v)}
           aria-label={show ? 'Hide passwords' : 'Show passwords'}
-          style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: '4px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0, width: '40px', height: '40px', display: 'grid', placeItems: 'center', flexShrink: 0 }}
         >
           <IconSwap k={show ? 'eyeoff' : 'eye'}>{show ? <EyeOff size={16} /> : <Eye size={16} />}</IconSwap>
         </button>

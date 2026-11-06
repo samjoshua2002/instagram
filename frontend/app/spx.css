@@ -147,6 +147,8 @@
   white-space: nowrap;
   transition: border-color 0.12s ease, transform 0.12s ease;
 }
+/* Outline button next to the big main button: same height so the row lines up */
+:has(> .spx-play) > .spx-outline { height: 48px; min-height: 48px; padding: 0 22px; }
 .spx-outline:hover,
 .spx-outline[aria-pressed="true"] {
   border-color: var(--sp-text);
