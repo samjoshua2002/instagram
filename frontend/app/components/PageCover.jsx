@@ -1,7 +1,7 @@
 'use client';
 
 import UnsplashBanner from './UnsplashBanner';
-import { useBanner, bannerSrc } from '../lib/banners';
+import { useBanner, bannerSrc, abstractColor } from '../lib/banners';
 import { useAmbientImage } from './AmbientBackground';
 
 /**
@@ -14,6 +14,7 @@ export default function PageCover({ seed, topic = 'abstract', tint = true, photo
   const given = chosen !== undefined; // `photo`: the page picked it (Home: a new one every open)
   const seeded = useBanner(given ? null : seed, topic);
   const photo = given ? chosen : seeded;
-  useAmbientImage(tint ? bannerSrc(photo, 400) : null);
+  // Until the photo is read (or if it cannot be), the page takes its artwork colour, never the app green
+  useAmbientImage(tint ? bannerSrc(photo, 400) : null, { fallbackColor: tint ? (photo?.color || abstractColor(seed)) : null });
   return <UnsplashBanner seed={seed} topic={topic} photo={given ? chosen : undefined} className="page-cover" />;
 }
