@@ -24,7 +24,10 @@
   transform: scale(1.04); /* hides the blurred edge */
 }
 .ub-img.in { opacity: 1; }
-:root[data-theme="light"] .ub-img { filter: grayscale(1) contrast(0.8) blur(1.5px); }
+:root[data-theme="light"] .ub-img { filter: grayscale(1) contrast(0.75) brightness(1.12) blur(1.5px); }
+/* Theme switch: the circle reveal already blends the change; a photo fade inside it reads as a flicker */
+html.theme-vt .ub-img,
+html.theme-vt .ub-tint { transition: none !important; }
 .ub-tint {
   position: absolute;
   inset: 0;
@@ -178,6 +181,39 @@
 }
 .person-chat-banner .person-card-eyebrow,
 .person-chat-banner .person-card-title { color: #fff !important; margin: 0 !important; }
+
+/* ── Light theme: every banner turns pastel (white wash over a bright photo) with dark text ── */
+:root[data-theme="light"] .ub-shade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.45) 50%, rgba(255, 255, 255, 0.72) 100%);
+}
+:root[data-theme="light"] .sh-spot-art .ub-shade { background: rgba(255, 255, 255, 0.12); }
+:root[data-theme="light"] .sh-spot-glow { background: linear-gradient(180deg, transparent 35%, rgba(255, 255, 255, 0.78)) !important; }
+:root[data-theme="light"] .sh-fact .ub-shade { background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.7)); }
+:root[data-theme="light"] .chat-banner .ub-shade { background: linear-gradient(90deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.3)); }
+:root[data-theme="light"] .person-cover .ub-shade { background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.7) 100%); }
+:root[data-theme="light"] .sh-banner,
+:root[data-theme="light"] .sh-fact,
+:root[data-theme="light"] .sh-spot-text,
+:root[data-theme="light"] .chat-banner,
+:root[data-theme="light"] .spx-cover.ub { color: #16161d; text-shadow: none; }
+:root[data-theme="light"] .person-chat-banner .person-card-eyebrow,
+:root[data-theme="light"] .person-chat-banner .person-card-title { color: #16161d !important; }
+:root[data-theme="light"] .person-hero .person-name,
+:root[data-theme="light"] .person-hero .person-handle,
+:root[data-theme="light"] .person-hero .person-stat-value,
+:root[data-theme="light"] .person-hero .person-stat-label { text-shadow: none; }
+:root[data-theme="light"] .sh-banner,
+:root[data-theme="light"] .sh-fact { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1); }
+:root[data-theme="light"] .sh-pill { background: rgba(255, 255, 255, 0.55); border-color: rgba(0, 0, 0, 0.08); }
+:root[data-theme="light"] .sh-banner-btn { background: #16161d; color: #fff !important; }
+:root[data-theme="light"] .sh-fact-icon { background: rgba(255, 255, 255, 0.5); }
+:root[data-theme="light"] .sh-fact-btn,
+:root[data-theme="light"] .chat-banner .story-icon-btn { color: #16161d; background: rgba(255, 255, 255, 0.55); }
+:root[data-theme="light"] .sh-fact-btn:hover { background: rgba(255, 255, 255, 0.8); }
+:root[data-theme="light"] .spx-cover.ub { background-color: #e6e6ea; }
+:root[data-theme="light"] .spx-cover.ub > svg { filter: none; }
+:root[data-theme="light"] .ub-credit,
+:root[data-theme="light"] .ub-credit a { color: rgba(0, 0, 0, 0.68) !important; text-shadow: none; }
 
 @media (max-width: 768px) {
   .sh-banner { min-height: 0; padding: 16px 16px 26px; border-radius: 18px; margin-top: 12px; gap: 10px; }

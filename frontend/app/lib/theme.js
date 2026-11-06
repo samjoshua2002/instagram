@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { THEME_KEY } from './themeBoot';
+import { bannersReady } from './banners';
 import { getTrigger, prefersReducedMotion } from './motion';
 
 // Light / Dark theme (PLAN.md §15.5.3). Stored per device; applied as :root[data-theme].
@@ -24,7 +26,8 @@ function revealTheme(apply) {
   const y = tr ? tr.y : 0;
   const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
   root.classList.add('theme-vt');
-  const vt = document.startViewTransition(apply);
+  // Hold the new snapshot until the banners have their new-theme photos (no swap mid-reveal)
+  const vt = document.startViewTransition(() => { apply(); return bannersReady(700); });
   vt.ready
     .then(() => root.animate(
       { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
@@ -48,7 +51,8 @@ export function useTheme() {
     const apply = () => {
       document.documentElement.dataset.theme = next;
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
-      window.dispatchEvent(new Event('chatter:theme'));
+      // Sync render, so the banner hooks ask for the new lists before bannersReady() looks
+      flushSync(() => window.dispatchEvent(new Event('chatter:theme')));
     };
     if (readTheme() === next) return apply();
     revealTheme(apply);
