@@ -6,6 +6,7 @@ import { Bell, ChevronRight, MessageCircle, Film, Cake, PauseCircle, BotOff, Pla
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import ContactAvatar from './ContactAvatar';
+import { unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 
 /**
  * Spotify-style Home: greeting + notifications bell, category filter chips,
@@ -43,14 +44,15 @@ function PersonArt({ person, round = false }) {
   const handle = (person.handle || '').replace(/^@/, '').trim();
   const sources = [
     person.profilePic?.startsWith('http') ? person.profilePic : null,
-    handle ? `https://unavatar.io/instagram/${handle}?fallback=false` : null,
+    unavatarUrl(handle),
   ].filter(Boolean);
   const src = sources[stage];
+  const onError = () => { noteUnavatarFailed(src); setStage(s => s + 1); };
   const initials = (person.name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
   return (
     <div className={`sp-art${round ? ' sp-art-round' : ''}`} style={{ background: tileColor(person.name) }}>
       {src ? (
-        <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setStage(s => s + 1)} />
+        <img src={src} alt="" referrerPolicy="no-referrer" onError={onError} />
       ) : (
         <span className="sp-art-initials">{initials}</span>
       )}

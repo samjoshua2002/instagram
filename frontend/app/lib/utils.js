@@ -61,10 +61,47 @@ export function savedPhotoUrl(person) {
   return typeof pic === 'string' && pic.startsWith('http') ? pic : null;
 }
 
+// unavatar.io allows only 25 free lookups a day. Once it answers 429 we stop asking until its reset
+// time, so pages show initials/artwork at once instead of a console full of 429 errors.
+const UNAVATAR_BLOCK_KEY = 'unavatar_blocked_until';
+let unavatarBlockedUntil = 0;
+let unavatarChecking = false;
+let unavatarChecks = 0;
+
+function unavatarBlocked() {
+  if (!unavatarBlockedUntil) {
+    try { unavatarBlockedUntil = Number(localStorage.getItem(UNAVATAR_BLOCK_KEY)) || 0; } catch { }
+  }
+  return Date.now() < unavatarBlockedUntil;
+}
+
+/** unavatar.io link for an Instagram handle, or null while its daily limit is used up. */
+export function unavatarUrl(handle) {
+  const clean = String(handle || '').replace(/^@/, '').trim();
+  if (!clean || unavatarBlocked()) return null;
+  return `https://unavatar.io/instagram/${clean}?fallback=false`;
+}
+
+/** An unavatar image failed: check once whether it was the daily limit (429) and if so pause lookups. */
+export function noteUnavatarFailed(url) {
+  if (!url || !url.startsWith('https://unavatar.io/') || unavatarChecking || unavatarChecks >= 3 || unavatarBlocked()) return;
+  unavatarChecking = true;
+  unavatarChecks++;
+  fetch(url, { method: 'GET', referrerPolicy: 'no-referrer' })
+    .then(res => {
+      if (res.status !== 429) return;
+      const reset = Number(res.headers.get('x-rate-limit-reset'));
+      const retry = Number(res.headers.get('retry-after'));
+      unavatarBlockedUntil = reset > Date.now() ? reset : Date.now() + (retry > 0 ? retry * 1000 : 6 * 3600 * 1000);
+      try { localStorage.setItem(UNAVATAR_BLOCK_KEY, String(unavatarBlockedUntil)); } catch { }
+    })
+    .catch(() => { })
+    .finally(() => { unavatarChecking = false; });
+}
+
 /** The photo used to tint a contact's page: saved photo, else their Instagram avatar. */
 export function personArtUrl(person) {
   if (!person) return null;
   if (savedPhotoUrl(person)) return person.profilePic;
-  const handle = String(person.handle || person.instagramHandle || '').replace(/^@/, '').trim();
-  return handle ? `https://unavatar.io/instagram/${handle}?fallback=false` : null;
+  return unavatarUrl(person.handle || person.instagramHandle);
 }

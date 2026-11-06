@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 
 /**
  * High-performance Monochrome Avatar Component (Light Theme)
@@ -33,7 +34,7 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
   if (!imgError && contact.profilePic && contact.profilePic.startsWith('http')) {
     avatarSrc = contact.profilePic;
   } else if (!unavatarError && rawUsername) {
-    avatarSrc = `https://unavatar.io/instagram/${rawUsername}?fallback=false`;
+    avatarSrc = unavatarUrl(rawUsername);
   }
 
   // Monochrome status indicator
@@ -44,6 +45,7 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
     if (!imgError && contact.profilePic) {
       setImgError(true);
     } else {
+      noteUnavatarFailed(avatarSrc);
       setUnavatarError(true);
     }
   };
