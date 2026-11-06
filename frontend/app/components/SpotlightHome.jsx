@@ -119,7 +119,85 @@ export function followUps(people, birthdays, limit = 6) {
   return out.slice(0, limit);
 }
 
-const FOLLOW_ICON = { birthday: Cake, checkin: Heart, quiet: AlarmClock, keep: MessageCircle, hello: Hand };
+/**
+ * Choices for the top banner, built only from real contact data. A birthday today is
+ * always first (pinned); the rest rotate so Home does not say the same thing every visit.
+ */
+export function todayStories(people, birthdays, follow) {
+  const withDays = people.map(p => ({ p, d: daysSince(p.lastInteraction) }));
+  const today = withDays.filter(x => x.d === 0).map(x => x.p);
+  const week = withDays.filter(x => x.d !== null && x.d <= 7).map(x => x.p);
+  const byChats = list => [...list].sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0));
+  const totalChats = people.reduce((s, p) => s + (p.chatsCount || 0), 0);
+  const totalReels = people.reduce((s, p) => s + (p.reelsCount || 0), 0);
+  const names = list => {
+    const n = list.slice(0, 2).map(p => p.name.split(' ')[0]);
+    return list.length > 2 ? `${n.join(', ')} and ${list.length - 2} more` : n.join(' and ');
+  };
+  const pill = (value, label) => ({ value, label });
+  const base = [
+    pill(people.length, people.length === 1 ? 'person' : 'people'),
+    pill(totalChats, 'DMs'),
+    pill(follow.length, 'to follow up'),
+  ];
+  const pinned = [];
+  const stories = [];
+
+  const bdToday = birthdays.filter(b => b.days === 0);
+  if (bdToday.length) pinned.push({
+    key: 'bd-today', title: `It's ${names(bdToday.map(b => b.p))}'s birthday`,
+    sub: 'Today is the day. Send a wish!', href: personHref(bdToday[0].p), cta: 'Open',
+    pills: [pill(bdToday.length, bdToday.length === 1 ? 'birthday today' : 'birthdays today'), base[2]],
+  });
+  const bdSoon = birthdays.filter(b => b.days > 0 && b.days <= 7);
+  if (bdSoon.length) stories.push({
+    key: 'bd-soon', title: `${bdSoon[0].p.name.split(' ')[0]}'s birthday is in ${bdSoon[0].days} day${bdSoon[0].days === 1 ? '' : 's'}`,
+    sub: bdSoon.length > 1 ? `${bdSoon.length} birthdays this week. Plan your wishes.` : 'Plan a wish ahead of time.',
+    href: personHref(bdSoon[0].p), cta: 'Open',
+    pills: [pill(bdSoon.length, 'this week'), pill(birthdays.length, 'in 30 days')],
+  });
+  if (today.length) stories.push({
+    key: 'today', title: `You chatted with ${today.length} ${today.length === 1 ? 'person' : 'people'} today`,
+    sub: names(byChats(today)), href: '/relationships', cta: 'People',
+    pills: [pill(today.length, 'today'), pill(week.length, 'this week'), base[2]],
+  });
+  if (follow.length) stories.push({
+    key: 'follow', title: {
+      birthday: `Wish ${follow[0].p.name.split(' ')[0]} a happy birthday`,
+      hello: `Say hello to ${follow[0].p.name.split(' ')[0]}`,
+    }[follow[0].kind] || `${follow[0].p.name.split(' ')[0]} could use a message`,
+    sub: follow[0].text, href: personHref(follow[0].p), cta: 'Open',
+    pills: [base[2], pill(week.length, 'active this week')],
+  });
+  const topWeek = byChats(week)[0];
+  if (topWeek && topWeek.chatsCount > 0) stories.push({
+    key: 'top-week', title: `${topWeek.name.split(' ')[0]} is your top chat this week`,
+    sub: `${fmt(topWeek.chatsCount)} DMs together so far.`, href: personHref(topWeek), cta: 'Open',
+    pills: [pill(week.length, 'active this week'), base[1]],
+  });
+  const topAll = byChats(people)[0];
+  if (topAll && topAll.chatsCount > 0 && topAll !== topWeek) stories.push({
+    key: 'top-all', title: `${topAll.name.split(' ')[0]} leads your circle`,
+    sub: `${fmt(topAll.chatsCount)} of your ${fmt(totalChats)} DMs are with ${topAll.name.split(' ')[0]}.`,
+    href: personHref(topAll), cta: 'Open', pills: [base[0], base[1]],
+  });
+  if (totalReels > 0) stories.push({
+    key: 'reels', title: `${fmt(totalReels)} reels shared`,
+    sub: 'Everything your circle has sent you in DMs.', href: '/relationships', cta: 'People',
+    pills: [base[0], pill(totalReels, 'reels')],
+  });
+  stories.push({ key: 'circle', title: 'Your circle today', sub: '', href: '/relationships', cta: 'People', pills: base });
+  return { pinned, stories };
+}
+
+function greeting(hour) {
+  if (hour < 5) return 'Up late';
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+const FOLLOW_ICON ={ birthday: Cake, checkin: Heart, quiet: AlarmClock, keep: MessageCircle, hello: Hand };
 
 function readSnoozed() {
   try {
@@ -130,18 +208,7 @@ function readSnoozed() {
 }
 
 /** "Follow up" card list: open the Instagram DM, or hide a suggestion for a few days. */
-function FollowUps({ people, birthdays, pressProps }) {
-  const [snoozed, setSnoozed] = useState({});
-  useEffect(() => { setSnoozed(readSnoozed()); }, []);
-  const items = useMemo(
-    () => followUps(people.filter(p => !snoozed[p.id]), birthdays.filter(b => !snoozed[b.p.id]), 4),
-    [people, birthdays, snoozed]
-  );
-  const later = id => {
-    const next = { ...readSnoozed(), [id]: Date.now() + SNOOZE_DAYS * DAY_MS };
-    try { localStorage.setItem(SNOOZE_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
-    setSnoozed(next);
-  };
+function FollowUps({ items, later, pressProps }) {
   if (!items.length) return null;
   return (
     <section aria-label="Follow up">
@@ -385,6 +452,22 @@ export default function SpotlightHome() {
     .filter(x => x.days !== null && x.days <= 30)
     .sort((a, b) => a.days - b.days), [people]);
   const followAll = useMemo(() => followUps(people, birthdays, Infinity), [people, birthdays]);
+  // Snoozed suggestions are hidden from the list and from the banner count
+  const [snoozed, setSnoozed] = useState({});
+  useEffect(() => { setSnoozed(readSnoozed()); }, []);
+  const followOpen = useMemo(() => followAll.filter(f => !snoozed[f.p.id]), [followAll, snoozed]);
+  const later = id => {
+    const next = { ...readSnoozed(), [id]: Date.now() + SNOOZE_DAYS * DAY_MS };
+    try { localStorage.setItem(SNOOZE_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
+    setSnoozed(next);
+  };
+  const { pinned, stories } = useMemo(() => todayStories(people, birthdays, followOpen), [people, birthdays, followOpen]);
+  // Picked after mount (not during render) so server and browser HTML match; a new pick each visit
+  const [pick, setPick] = useState(null);
+  const [hour, setHour] = useState(null);
+  useEffect(() => { setPick(Math.random()); setHour(new Date().getHours()); }, []);
+  const story = pinned[0]
+    || (pick === null ? stories[stories.length - 1] : stories[Math.floor(pick * stories.length)]);
   // People already suggested under Follow up are not repeated here
   const reconnect = useMemo(() => {
     const suggested = new Set(followAll.map(f => f.p.id));
@@ -408,13 +491,12 @@ export default function SpotlightHome() {
   const coverPhoto = useFreshBanner('home-cover', 'abstract');
   const bannerPhoto = useFreshBanner('home-banner', 'colorful');
   const firstName = (user?.firstName || user?.name || user?.username || '').split(' ')[0];
-  const followCount = followAll.length;
 
   return (
     <div className={`sh-home${coverPhoto ? ' sh-tinted' : ''}`}>
       <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
-        <h1 className="sh-hello">Hello, {firstName || 'there'}!</h1>
+        <h1 className="sh-hello">{hour === null ? 'Hello' : greeting(hour)}, {firstName || 'there'}!</h1>
         <div className="sh-bell-wrap">
           <button
             type="button"
@@ -444,23 +526,26 @@ export default function SpotlightHome() {
       <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
         <div className="sh-banner-text">
           <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-          <h2 className="sh-banner-title">Your circle today</h2>
+          <h2 className="sh-banner-title">{people.length > 0 ? story.title : 'Your circle today'}</h2>
           {people.length > 0 ? (
-            <div className="sh-banner-pills">
-              <span className="sh-pill"><b>{fmt(people.length)}</b> people</span>
-              <span className="sh-pill"><b>{fmt(people.reduce((s, p) => s + (p.chatsCount || 0), 0))}</b> DMs</span>
-              <span className="sh-pill"><b>{fmt(followCount)}</b> to follow up</span>
-            </div>
+            <>
+              {story.sub && <span className="sh-banner-sub">{story.sub}</span>}
+              <div className="sh-banner-pills">
+                {story.pills.map(s => (
+                  <span key={s.label} className="sh-pill"><b>{fmt(s.value)}</b> {s.label}</span>
+                ))}
+              </div>
+            </>
           ) : (
             <span className="sh-banner-sub">People appear here once Instagram DMs sync.</span>
           )}
         </div>
-        <Link href="/relationships" className="sh-banner-btn" aria-label="Open People">
-          <span>People</span><ChevronRight size={18} />
+        <Link href={people.length > 0 ? story.href : '/relationships'} className="sh-banner-btn" aria-label={`Open ${people.length > 0 ? story.cta : 'People'}`}>
+          <span>{people.length > 0 ? story.cta : 'People'}</span><ChevronRight size={18} />
         </Link>
       </UnsplashBanner>
 
-      {people.length > 0 && <FollowUps people={people} birthdays={birthdays} pressProps={pressProps} />}
+      {people.length > 0 && <FollowUps items={followOpen.slice(0, 4)} later={later} pressProps={pressProps} />}
 
       {people.length > 0 && chips.length > 2 && (
         <div className="sh-chips" role="tablist" aria-label="Filter by category">
