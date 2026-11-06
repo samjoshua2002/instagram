@@ -900,9 +900,12 @@ async function writeAndSendReply(queueEntry, flight) {
   instagramService.sendSenderAction(senderId, 'mark_seen', creatorAccessToken).catch(() => {});
 
   // Fetch recent conversation history
-  let history = await Message.find(conversationMessages(ownerUser?._id, senderId))
-  .sort({ createdAt: -1 })
-  .limit(10);
+  // History and workspace features load together (one DB wait instead of two)
+  const [recentHistory, { enabledFeatures, activeMode }] = await Promise.all([
+    Message.find(conversationMessages(ownerUser?._id, senderId)).sort({ createdAt: -1 }).limit(10),
+    workspaceFeatureService.getFeaturesSafe(ownerUser),
+  ]);
+  let history = recentHistory;
 
   history.reverse();
 
@@ -921,7 +924,6 @@ async function writeAndSendReply(queueEntry, flight) {
 
   // Business tenants: no stickers or GIFs, professional fallbacks, escalations hand off to a human
   const isBusinessTenant = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
-  const { enabledFeatures, activeMode } = await workspaceFeatureService.getFeaturesSafe(ownerUser);
   const businessDecision = isBusinessTenant
     ? celRuleEngine.evaluateForTenant({
         accountType: 'business',
