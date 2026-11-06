@@ -7,7 +7,7 @@ import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
-import { savedPhotoUrl } from '../lib/utils';
+import { savedPhotoUrl, unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 import { abstractArt, useFreshBanner } from '../lib/banners';
 import UnsplashBanner from './UnsplashBanner';
 import PageCover from './PageCover';
@@ -43,7 +43,7 @@ function Photo({ person, className = '' }) {
   const saved = savedPhotoUrl(person);
   const sources = [
     saved,
-    handle ? `https://unavatar.io/instagram/${handle}?fallback=false` : null,
+    unavatarUrl(handle),
   ].filter(Boolean);
   const src = sources[stage];
 
@@ -54,6 +54,7 @@ function Photo({ person, className = '' }) {
 
   const onError = () => {
     if (stage === 0 && saved && person.senderId) requestFreshPhoto?.(person.senderId);
+    noteUnavatarFailed(src);
     setStage(s => s + 1);
   };
   const initials = (person.name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
