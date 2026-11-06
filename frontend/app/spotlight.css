@@ -167,6 +167,26 @@
 .sh-ai-dot { width: 8px; height: 8px; border-radius: 50%; background: #ffb547; flex: none; }
 .sh-ai-pill.on .sh-ai-dot { background: var(--sh-action); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-action) 30%, transparent); }
 
+/* Phones: the app header already has the AI switch (mode chip), and Home's bell moves
+   into that header (HomeBell portal), so Home's own pill + bell are hidden here */
+.mobile-header-slot { display: contents; }
+.sh-hdr-bell { position: relative; }
+.sh-hdr-bell .sh-dot { top: 12px; right: 13px; box-shadow: 0 0 0 2px var(--sp-panel, var(--color-background)); }
+/* Pinned under the header at the right edge (the header is the containing block: it has `translate`) */
+.sh-bell-hdr .sh-alerts {
+  position: fixed; top: calc(54px + env(safe-area-inset-top, 0px)); right: 12px; left: auto;
+  width: min(360px, calc(100vw - 24px)); box-sizing: border-box; color: var(--sh-text);
+}
+.sh-bell-hdr .sh-alert { color: inherit; text-decoration: none; }
+@media (max-width: 768px) {
+  .sh-top-actions { display: none; }
+}
+/* The extra bell must not push "CHATTER OS" onto two lines */
+.mobile-brand-text { white-space: nowrap; }
+@media (max-width: 399px) {
+  body:has(#mobile-header-slot > *) .mobile-brand-text { display: none; } /* the "C" mark stays */
+}
+
 /* Needs your attention: handoffs and Instagram sign-in, same rows as Follow up */
 .sh-attn-badge { background: #ffb547; }
 .sh-attn-icon {
