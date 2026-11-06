@@ -161,9 +161,10 @@ export function useHeroCollapse(rootRef, o, deps = []) {
           // Phones: the header has slid away by the time the band sticks, so the band sits
           // at the screen top (below the notch strip), where the header was.
           const safe = phone ? headerSafeTop() : 0;
-          const padS = scroller === window ? 0 : parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+          // ...and the page starts below a header-high spacer, so the collapse starts at 0.
+          const headerH = phone ? document.querySelector(HEADER)?.offsetHeight || 0 : 0;
           const rootY = scrollYOf(root, scroller);
-          m.start = Math.max(0, rootY - padS);
+          m.start = Math.max(0, rootY - headerH);
           m.end = rootY + parseFloat(getComputedStyle(root).paddingTop) + H - band - safe;
           gsap.set(hero, { top: band - H + safe });
 
