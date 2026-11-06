@@ -4,7 +4,9 @@ const Message = require('../models/Message');
 const UserMemory = require('../models/UserMemory');
 const Lead = require('../models/Lead');
 const Booking = require('../models/Booking');
+const User = require('../models/User');
 const { parseDateParam } = require('../lib/serverSecurity');
+const { parseTzOffset, tzString, localDay } = require('../lib/tzOffset');
 
 // Mounted behind requireAuth; every query is scoped to the signed-in tenant
 const ownerOf = (req) => req.user._id;
@@ -139,4 +141,138 @@ router.get('/bookings', async (req, res) => {
   }
 });
 
+// Range tabs on the analytics page. 0 = all time (chart shows the last 52 weeks).
+const RANGES = { '7d': 7, '30d': 30, '90d': 90, all: 0 };
+const ALL_CHART_DAYS = 52 * 7;
+
+// received = a person wrote to you; ai = the bot replied; human = you replied yourself
+const KIND = {
+  $cond: [{ $eq: ['$role', 'user'] }, 'received', { $cond: [{ $eq: ['$sentByAI', true] }, 'ai', 'human'] }],
+};
+
+// Daily rows -> chart buckets. Up to 30 days: one bar per day; longer: one bar per 7 days,
+// counted back from today (the oldest bar may be shorter). Leading empty weeks of "all" are dropped.
+function buildSeries(days, rows, trimLeading) {
+  const byDay = {};
+  rows.forEach(r => {
+    const d = (byDay[r._id.day] = byDay[r._id.day] || { received: 0, ai: 0, human: 0 });
+    d[r._id.kind] = r.n;
+  });
+  const point = list => ({
+    start: list[0],
+    end: list[list.length - 1],
+    received: list.reduce((s, day) => s + (byDay[day]?.received || 0), 0),
+    ai: list.reduce((s, day) => s + (byDay[day]?.ai || 0), 0),
+    human: list.reduce((s, day) => s + (byDay[day]?.human || 0), 0),
+  });
+  if (days.length <= 30) return { bucket: 'day', series: days.map(day => point([day])) };
+  const series = [];
+  for (let end = days.length; end > 0; end -= 7) series.unshift(point(days.slice(Math.max(0, end - 7), end)));
+  if (trimLeading) {
+    const first = series.findIndex(p => p.received + p.ai + p.human > 0);
+    if (first > 0) series.splice(0, Math.min(first, series.length - 4));
+  }
+  return { bucket: 'week', series };
+}
+
+// Mongo $dayOfWeek (1 = Sunday) rows -> 7 x 24 grid, Monday first
+function buildHeatmap(rows) {
+  const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+  rows.forEach(r => { grid[(r._id.dow + 5) % 7][r._id.hour] = r.n; });
+  return grid;
+}
+
+/**
+ * GET /api/analytics/activity?range=30d&tzOffset=-330[&scope=platform]
+ * Real message counts for the analytics charts: received / AI / you, per day (or per week),
+ * plus a weekday x hour grid of incoming messages in the viewer's time zone.
+ * scope=platform (superadmin only) counts every workspace and lists the busiest ones.
+ */
+router.get('/activity', async (req, res) => {
+  try {
+    const range = Object.prototype.hasOwnProperty.call(RANGES, req.query.range) ? req.query.range : '30d';
+    const platform = req.query.scope === 'platform';
+    if (platform && req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin only' });
+    }
+    const offset = parseTzOffset(req.query.tzOffset);
+    const tz = tzString(offset);
+    const span = RANGES[range];
+    const chartDays = span || ALL_CHART_DAYS;
+    const now = Date.now();
+    const days = Array.from({ length: chartDays }, (_, i) => localDay(now - (chartDays - 1 - i) * 864e5, offset));
+    // Local midnight of the first chart day, as a real UTC moment
+    const chartSince = new Date(Date.parse(`${days[0]}T00:00:00Z`) + offset * 60000);
+    const inRange = span ? { createdAt: { $gte: chartSince } } : {};
+
+    const facets = {
+      totals: [{ $group: { _id: KIND, n: { $sum: 1 } } }],
+      daily: [
+        { $match: { createdAt: { $gte: chartSince } } },
+        { $group: { _id: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: tz } }, kind: KIND }, n: { $sum: 1 } } },
+      ],
+      hours: [
+        { $match: { role: 'user' } },
+        { $group: { _id: { dow: { $dayOfWeek: { date: '$createdAt', timezone: tz } }, hour: { $hour: { date: '$createdAt', timezone: tz } } }, n: { $sum: 1 } } },
+      ],
+    };
+    if (platform) {
+      facets.owners = [
+        { $match: { ownerId: { $ne: null } } },
+        {
+          $group: {
+            _id: '$ownerId',
+            total: { $sum: 1 },
+            received: { $sum: { $cond: [{ $eq: ['$role', 'user'] }, 1, 0] } },
+            ai: { $sum: { $cond: [{ $and: [{ $eq: ['$role', 'assistant'] }, { $eq: ['$sentByAI', true] }] }, 1, 0] } },
+          },
+        },
+        { $sort: { total: -1 } },
+      ];
+    }
+
+    const match = { ...(platform ? {} : { ownerId: ownerOf(req) }), ...inRange };
+    const [out = {}] = await Message.aggregate([{ $match: match }, { $facet: facets }]);
+
+    const totals = { received: 0, ai: 0, human: 0 };
+    (out.totals || []).forEach(r => { totals[r._id] = r.n; });
+    totals.total = totals.received + totals.ai + totals.human;
+
+    const body = {
+      range,
+      ...buildSeries(days, out.daily || [], !span),
+      totals,
+      heatmap: buildHeatmap(out.hours || []),
+    };
+
+    if (platform) {
+      const owners = out.owners || [];
+      const top = owners.slice(0, 8);
+      const users = await User.find({ _id: { $in: top.map(o => o._id) } })
+        .select('username instagramUsername accountType businessProfile.businessName')
+        .lean();
+      const byId = Object.fromEntries(users.map(u => [String(u._id), u]));
+      body.activeWorkspaces = owners.length;
+      body.owners = top.map(o => {
+        const u = byId[String(o._id)] || {};
+        return {
+          id: o._id,
+          username: u.instagramUsername || u.username || 'deleted account',
+          name: u.businessProfile?.businessName || '',
+          accountType: u.accountType || 'personal',
+          total: o.total,
+          received: o.received,
+          ai: o.ai,
+        };
+      });
+    }
+
+    res.json(body);
+  } catch (err) {
+    console.error('Analytics activity error:', err.message);
+    res.status(500).json({ error: 'Failed to load activity' });
+  }
+});
+
 module.exports = router;
+module.exports._test = { buildSeries, buildHeatmap, RANGES };

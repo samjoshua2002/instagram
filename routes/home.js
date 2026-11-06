@@ -3,24 +3,12 @@ const router = express.Router();
 const Message = require('../models/Message');
 const UserMemory = require('../models/UserMemory');
 const { healthOf } = require('../services/tokenHealthService');
+const { parseTzOffset, tzString, localDay } = require('../lib/tzOffset');
 
 // Mounted behind requireAuth at /api/home; every query is scoped to the signed-in account
 const DAY_MS = 864e5;
 const DAYS = 14; // this week + last week, one bucket per local day
 const HANDOFF_LIMIT = 8;
-
-// Browser's Date#getTimezoneOffset() (IST = -330). Bad values fall back to UTC.
-function parseTzOffset(raw) {
-  const n = Number(raw);
-  return Number.isInteger(n) && n >= -840 && n <= 840 ? n : 0;
-}
-// -330 -> "+05:30", the form Mongo's $dateToString timezone accepts
-function tzString(offset) {
-  const mins = Math.abs(offset);
-  return `${offset <= 0 ? '+' : '-'}${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
-}
-// Local calendar day (YYYY-MM-DD) of a moment, for a browser offset
-const localDay = (ms, offset) => new Date(ms - offset * 60000).toISOString().slice(0, 10);
 
 const sum = arr => arr.reduce((s, n) => s + n, 0);
 const share = (ai, human) => (ai + human ? Math.round((ai / (ai + human)) * 100) : null);
