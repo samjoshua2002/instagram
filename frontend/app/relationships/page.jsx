@@ -649,16 +649,20 @@ function RelationshipsPageContent() {
 
   useEffect(() => () => clearTimeout(autosaveTimer.current), []);
 
-  // The ... menu closes on an outside click or Escape
+  // The ... menu closes on an outside click, Escape or scroll (the hero fades its top bar
+  // while scrolling, which would leave an open menu half see-through)
   useEffect(() => {
     if (!isMenuOpen) return undefined;
     const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setIsMenuOpen(false); };
     const onKey = (e) => { if (e.key === 'Escape') setIsMenuOpen(false); };
+    const onScroll = (e) => { if (!menuRef.current?.contains(e.target)) setIsMenuOpen(false); };
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('scroll', onScroll, true);
     return () => {
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('scroll', onScroll, true);
     };
   }, [isMenuOpen]);
 
