@@ -325,18 +325,24 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
   background: linear-gradient(180deg, #2a1217, #12080a);
 }
 :root:not([data-theme="light"]) .login-form-panel { background: transparent; }
-/* Replace the grey photo with abstract blurred light */
-.login-art-panel > div:first-child {
+/* Login art: an Unsplash photo (UnsplashBanner) fills the left panel behind the badge and caption.
+   Same coral as the login form (not the app green), and dark with white text in both themes */
+.login-art-cover {
+  position: absolute !important;
+  inset: 0;
+  z-index: 0;
+  --ub-tint: #ff6b7a;
+  /* Shows while the photo loads, or when Unsplash is unavailable */
   background-image:
-    radial-gradient(circle at 30% 25%, #ff3d5a 0%, transparent 50%),
-    radial-gradient(circle at 70% 60%, #ff9a8b 0%, transparent 45%),
-    radial-gradient(circle at 40% 85%, #6a8dff 0%, transparent 50%),
+    radial-gradient(circle at 30% 25%, rgba(255, 61, 90, 0.75) 0%, transparent 55%),
+    radial-gradient(circle at 70% 60%, rgba(255, 154, 139, 0.55) 0%, transparent 50%),
+    radial-gradient(circle at 40% 85%, rgba(106, 141, 255, 0.5) 0%, transparent 55%),
     linear-gradient(160deg, #3a1219, #12080a) !important;
-  filter: blur(24px) saturate(1.1) !important;
-  transform: scale(1.15);
 }
-.login-art-panel > div:nth-child(2) {
-  background: linear-gradient(180deg, rgba(26, 11, 15, 0.1) 0%, rgba(26, 11, 15, 0.75) 100%) !important;
+:root[data-theme="light"] .login-art-cover .ub-img { filter: grayscale(1) contrast(0.8) brightness(0.85) blur(1.5px); }
+.login-art-cover .ub-shade,
+:root[data-theme="light"] .login-art-cover .ub-shade {
+  background: linear-gradient(180deg, rgba(26, 11, 15, 0.35) 0%, rgba(26, 11, 15, 0.2) 45%, rgba(26, 11, 15, 0.85) 100%);
 }
 
 /* Long-press profile menu (Home cards) */

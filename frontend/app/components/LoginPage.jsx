@@ -35,6 +35,8 @@ import {
   X
 } from 'lucide-react';
 import { IconSwap } from './ui/motion';
+import UnsplashBanner from './UnsplashBanner';
+import { useFreshBanner } from '../lib/banners';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
@@ -60,6 +62,7 @@ function detectCurrentDevice() {
 export default function LoginPage({ onLoginSuccess }) {
   // Top primary navigation tabs: 'signin' | 'register'
   const [authMode, setAuthMode] = useState('signin');
+  const loginPhoto = useFreshBanner('login-art', 'colorful'); // a different photo each open
 
   const sanitizeAccountRole = (acc) => {
     if (!acc) return acc;
@@ -1043,24 +1046,9 @@ export default function LoginPage({ onLoginSuccess }) {
 
   return (
     <div className="login-split-layout">
-      {/* LEFT COLUMN: ARCHITECTURAL POSTSDAMER PLATZ ARTWORK */}
+      {/* LEFT COLUMN: a new Unsplash photo on every open (same banner as Home and person pages) */}
       <div className="login-art-panel">
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: 'url(/login-art.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'contrast(1.08) grayscale(100%)',
-          zIndex: 0
-        }} />
-
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, rgba(9, 9, 11, 0.4) 0%, rgba(9, 9, 11, 0.15) 50%, rgba(9, 9, 11, 0.85) 100%)',
-          zIndex: 1
-        }} />
+        <UnsplashBanner seed="login-art" topic="colorful" photo={loginPhoto} width={1400} className="login-art-cover" />
 
         {/* Top Header Badge */}
         <div style={{ position: 'relative', zIndex: 2 }}>
@@ -1087,7 +1075,7 @@ export default function LoginPage({ onLoginSuccess }) {
         {/* Bottom Architectural Caption */}
         <div style={{ position: 'relative', zIndex: 2, color: '#ffffff', maxWidth: '440px' }}>
           <h2 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.8px', margin: '0 0 8px 0', lineHeight: 1.2 }}>
-            Potsdamer Platz
+            Your DMs, in your voice
           </h2>
           <p style={{ fontSize: '0.86rem', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.5, margin: 0 }}>
             Precision intelligence, few-shot style calibration, and automated Instagram creator workflows.
