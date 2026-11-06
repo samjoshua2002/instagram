@@ -18,15 +18,33 @@
   object-fit: cover;
   opacity: 0;
   transition: opacity 0.5s ease;
+  /* Same look for every photo: no colour of its own (the tint adds one), softer detail,
+     lower contrast, so busy photos calm down and text on top stays readable */
+  filter: grayscale(1) contrast(0.8) brightness(0.85) blur(1.5px);
+  transform: scale(1.04); /* hides the blurred edge */
 }
 .ub-img.in { opacity: 1; }
+:root[data-theme="light"] .ub-img { filter: grayscale(1) contrast(0.8) blur(1.5px); }
+.ub-tint {
+  position: absolute;
+  inset: 0;
+  z-index: -2; /* same layer as the photo, painted after it */
+  pointer-events: none;
+  background: var(--ub-tint, var(--accent, #6d4aff));
+  mix-blend-mode: color;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.ub-tint.in { opacity: 1; }
 .ub-shade {
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.18) 45%, rgba(0, 0, 0, 0.62) 100%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.75) 100%);
 }
+.sh-banner, .sh-fact, .sh-spot-text, .chat-banner { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.sh-banner-btn { text-shadow: none; }
 .ub-credit {
   position: absolute;
   right: 12px;
@@ -73,10 +91,10 @@
 
 /* Spotlight cards: the photo fills the whole card behind the text */
 .sh-spot-art { position: absolute !important; inset: 0; z-index: 0; border-radius: inherit; }
-.sh-spot-art .ub-shade { display: none; }
-.sh-spot-glow { z-index: 1; }
+.sh-spot-art .ub-shade { background: rgba(0, 0, 0, 0.2); }
+.sh-spot-glow { z-index: 1; background: linear-gradient(180deg, transparent 25%, rgba(0, 0, 0, 0.7)) !important; }
 .sh-spot-avatar, .sh-spot-text { z-index: 2; }
-.sh-fact .ub-shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.55)); }
+.sh-fact .ub-shade { background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.72)); }
 
 /* ── Profile (person page): wide cover photo behind the hero ─── */
 .person-cover {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMatchedBanner, bannerSrc, abstractArt, toneArt, UTM } from '../lib/banners';
+import { useMatchedBanner, useBannerTheme, bannerSrc, abstractArt, toneArt, UTM } from '../lib/banners';
 import { usePalette } from './AmbientBackground';
 
 /**
@@ -16,6 +16,7 @@ export default function UnsplashBanner({
   seed, topic = 'abstract', width = 1600, credit = true, matchImage = null, className = '', style, children, as: Tag = 'div',
   photo: chosen, // a photo picked by the page (useFreshBanner); null while it loads
 }) {
+  const theme = useBannerTheme();
   const palette = usePalette(matchImage);
   const color = palette ? palette.dominant : null;
   // Wait for the profile photo's colour before choosing, so the wrong photo never flashes in
@@ -30,7 +31,7 @@ export default function UnsplashBanner({
   return (
     <Tag
       className={`ub ${className}`}
-      style={{ backgroundImage: color ? toneArt(color, seed) : abstractArt(seed), ...style }}
+      style={{ backgroundImage: color ? toneArt(color, seed, theme) : abstractArt(seed, theme), ...style }}
       title={title}
     >
       {src && (
@@ -44,6 +45,8 @@ export default function UnsplashBanner({
           onError={() => setLoadedSrc(null)}
         />
       )}
+      {/* One colour over every photo (the contact's colour, else the app accent), so all banners match */}
+      {src && <span className={`ub-tint${loadedSrc === src ? ' in' : ''}`} aria-hidden="true" />}
       <span className="ub-shade" aria-hidden="true" />
       {children}
       {credit && photo && (

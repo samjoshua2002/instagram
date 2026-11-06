@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { usePathname } from 'next/navigation.js'; // .js so plain Node (the tests) can load this file
 
 /**
@@ -130,6 +130,64 @@ export function pickBanner(photos, seed) {
   return visitPick(photos, seed);
 }
 
+// ── Theme ───────────────────────────────────────────────────────
+// Light theme shows bright / pastel photos, dark theme dark ones. The server has a "-light"
+// list for each artwork topic, and every list is also sorted by the photo's own brightness,
+// so an old server (no "-light" lists) or a colour list still gives photos that fit the theme.
+
+/** 'light' or 'dark', as set on <html data-theme> (lib/theme.js). */
+export function currentTheme() {
+  if (typeof document === 'undefined') return 'dark';
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
+
+// Before paint on the client (no dark-photo flash in light theme); plain effect on the server
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+/** The current theme; re-renders when the user switches it. Starts 'dark' so the server render matches. */
+export function useBannerTheme() {
+  const [theme, setTheme] = useState('dark');
+  useBeforePaint(() => {
+    const sync = () => setTheme(currentTheme());
+    sync();
+    window.addEventListener('chatter:theme', sync);
+    return () => window.removeEventListener('chatter:theme', sync);
+  }, []);
+  return theme;
+}
+
+const LIGHT_TOPICS = new Set(['abstract', 'colorful', 'fluid']);
+
+/** The server topic to ask for in this theme ("abstract" -> "abstract-light"). */
+export function themedTopic(topic, theme) {
+  return theme === 'light' && LIGHT_TOPICS.has(topic) ? `${topic}-light` : topic;
+}
+
+/** How bright a photo looks (0 black … 1 white), from its Unsplash average colour, or null. */
+export function photoBrightness(photo) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(photo?.color || '');
+  if (!m) return null;
+  const [r, g, b] = m.slice(1).map(x => parseInt(x, 16) / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/**
+ * The photos that suit the theme: bright ones (>= 0.6) in light, dark ones (<= 0.5) in dark.
+ * If fewer than 3 fit, the brighter / darker half of the list instead, so there is always a pick.
+ */
+export function forTheme(photos, theme) {
+  if (!photos || photos.length < 2) return photos;
+  const light = theme === 'light';
+  const scored = photos.map(p => ({ p, v: photoBrightness(p) }));
+  const fits = scored.filter(s => s.v !== null && (light ? s.v >= 0.6 : s.v <= 0.5));
+  if (fits.length >= Math.min(3, photos.length)) return fits.map(s => s.p);
+  const key = s => (s.v === null ? 0.5 : s.v);
+  return scored
+    .sort((a, b) => (light ? key(b) - key(a) : key(a) - key(b)))
+    .slice(0, Math.ceil(photos.length / 2))
+    .map(s => s.p);
+}
+
 /** Sized image link for a photo (Unsplash resizes on its CDN). */
 export function bannerSrc(photo, width = 1600) {
   if (!photo?.raw) return null;
@@ -139,13 +197,17 @@ export function bannerSrc(photo, width = 1600) {
 /** The banner photo for `seed`, or null until the list has loaded. */
 export function useBanner(seed, topic = 'abstract') {
   useVisit();
-  const [photos, setPhotos] = useState(() => (typeof window === 'undefined' ? null : cachedBanners(topic)));
+  const theme = useBannerTheme();
+  const t = themedTopic(topic, theme);
+  const [loaded, setLoaded] = useState(null); // { topic, photos } (may be an old saved list)
   useEffect(() => {
     let alive = true;
-    loadBanners(topic).then(p => alive && setPhotos(p));
+    loadBanners(t).then(photos => alive && setLoaded({ topic: t, photos }));
     return () => { alive = false; };
-  }, [topic]);
-  return seed === null || seed === undefined ? null : pickBanner(photos, seed);
+  }, [t]);
+  if (seed === null || seed === undefined || typeof window === 'undefined') return null;
+  const photos = cachedBanners(t) || (loaded && loaded.topic === t ? loaded.photos : null);
+  return pickBanner(forTheme(photos, theme), seed);
 }
 
 /**
@@ -153,10 +215,12 @@ export function useBanner(seed, topic = 'abstract') {
  * the last one shown in this `slot`. Picked after mount, so the server render matches.
  */
 export function useFreshBanner(slot, topic = 'abstract') {
+  const theme = useBannerTheme();
   const [photo, setPhoto] = useState(null);
   useEffect(() => {
     let alive = true;
-    loadBanners(topic).then(photos => {
+    loadBanners(themedTopic(topic, theme)).then(list => {
+      const photos = forTheme(list, theme) || [];
       if (!alive || !photos.length) return;
       const key = `chatter_banner_last_${slot}`;
       let last = null;
@@ -186,7 +250,7 @@ const PALETTES = [
  * Two-colour wave texture (inline SVG) as a CSS background-image value.
  * Never a plain gradient: a dark base in colour `a`, layered waves in `b` and `a`.
  */
-export function waveArt(a, b, seed) {
+export function waveArt(a, b, seed, theme = 'dark') {
   const h = hashSeed(seed);
   const waves = [];
   const n = 7;
@@ -202,14 +266,15 @@ export function waveArt(a, b, seed) {
     );
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice">`
-    + `<rect width="1200" height="400" fill="${a}"/><rect width="1200" height="400" fill="#000" fill-opacity="0.35"/>${waves.join('')}</svg>`;
+    // Dark theme darkens the base colour, light theme washes it out to a pastel
+    + `<rect width="1200" height="400" fill="${a}"/><rect width="1200" height="400" fill="${theme === 'light' ? '#fff' : '#000'}" fill-opacity="${theme === 'light' ? 0.55 : 0.35}"/>${waves.join('')}</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
 /** Deterministic two-colour wave artwork for a name (shown while a photo loads). */
-export function abstractArt(seed) {
+export function abstractArt(seed, theme = 'dark') {
   const [a, b] = PALETTES[hashSeed(seed) % PALETTES.length];
-  return waveArt(a, b, seed);
+  return waveArt(a, b, seed, theme);
 }
 
 /** The main colour of the fallback artwork for a seed (used before a photo's palette is known). */
@@ -291,8 +356,10 @@ export function pickBannerByColor(photos, color, seed) {
  * Uses the matching Unsplash colour list; if that list is empty (no key / rate limited),
  * falls back to the best match in `topic`'s list. With no colour it is useBanner().
  */
-export function useMatchedBanner(seed, color, topic = 'abstract') {
+export function useMatchedBanner(seed, color, baseTopic = 'abstract') {
   useVisit();
+  const theme = useBannerTheme();
+  const topic = themedTopic(baseTopic, theme);
   const tone = color ? toneFor(color) : null;
   const toneTopic = tone ? `tone-${tone}` : null;
   const [, setTick] = useState(0); // re-render when a list arrives
@@ -304,9 +371,9 @@ export function useMatchedBanner(seed, color, topic = 'abstract') {
     return () => { alive = false; };
   }, [topic, toneTopic]);
   if (seed === null || seed === undefined || typeof window === 'undefined') return null;
-  const base = cachedBanners(topic);
+  const base = forTheme(cachedBanners(topic), theme);
   if (!toneTopic) return pickBanner(base, seed);
-  const toned = cachedBanners(toneTopic);
+  const toned = forTheme(cachedBanners(toneTopic), theme);
   if (toned && toned.length) return pickBannerByColor(toned, color, seed);
   // Colour list still loading: wait, so a wrong-colour photo never flashes in.
   // It failed (no key / rate limited): best colour match from the normal list.
@@ -315,10 +382,11 @@ export function useMatchedBanner(seed, color, topic = 'abstract') {
 }
 
 /** Two-colour waves in one colour family (main colour + a neighbour hue), shown while a matched photo loads. */
-export function toneArt(color, seed) {
+export function toneArt(color, seed, theme = 'dark') {
   const c = parseColor(color);
-  if (!c) return abstractArt(seed);
+  if (!c) return abstractArt(seed, theme);
   const h = Math.round(c.h);
   const s = Math.round(Math.min(Math.max(c.s, 0.35), 0.85) * 100);
-  return waveArt(`hsl(${h} ${s}% 30%)`, `hsl(${(h + 35) % 360} ${s}% 58%)`, seed);
+  const [la, lb] = theme === 'light' ? [72, 62] : [30, 58];
+  return waveArt(`hsl(${h} ${s}% ${la}%)`, `hsl(${(h + 35) % 360} ${s}% ${lb}%)`, seed, theme);
 }

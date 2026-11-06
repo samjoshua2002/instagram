@@ -3,20 +3,22 @@
 // If Unsplash fails, is rate limited or has no key, the last saved list is served whatever its age;
 // with nothing saved anywhere the route returns [] and the frontend shows its gradient artwork.
 
-// Two-colour wave / pattern textures only: plain one-colour gradient photos look empty
-// behind a page (asked 2026-11-06), so the queries ask for waves and toPhotos() drops plain ones.
+// One search for every list: smooth, soft 3D-style waves. Mixed searches gave mixed looks
+// (busy marble, sand, canyons) and text on top was hard to read (asked 2026-11-06).
+// The page also tints every photo one colour (banners.css .ub-tint), so they all match.
+const QUERY = 'smooth abstract waves';
 const TOPICS = {
-  abstract: 'abstract wave pattern',
-  colorful: 'colorful abstract waves',
-  fluid: 'fluid wave texture',
+  abstract: QUERY,
+  colorful: QUERY,
+  fluid: QUERY,
 };
 
 // One list per Unsplash colour filter ("tone-yellow", ...), so a contact's banner can match
 // the main colour of their profile photo. Each costs one call a week, like the topics above.
 const TONES = ['black_and_white', 'black', 'white', 'yellow', 'orange', 'red', 'purple', 'magenta', 'green', 'teal', 'blue'];
-for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: 'wavy lines', color: tone };
+for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: QUERY, color: tone };
 
-const STORE_VERSION = 'waves2';
+const STORE_VERSION = 'smooth1';
 const REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // ask Unsplash for a new list at most once a week per topic
 const RETRY_MS = 10 * 60 * 1000; // after a network/server error
 const LIMIT_MS = 60 * 60 * 1000; // after 429/403 or when the hourly quota is nearly used up
