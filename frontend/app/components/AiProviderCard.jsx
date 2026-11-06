@@ -290,15 +290,6 @@ export default function AiProviderCard() {
               {meta.modelLabel || 'Model Name / ID'}
             </label>
             <input
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-surface)',
-                fontSize: '0.85rem',
-                fontFamily: "var(--font-label)"
-              }}
               value={form.model}
               onChange={e => set('model', e.target.value)}
               placeholder={meta.model}
@@ -310,15 +301,6 @@ export default function AiProviderCard() {
               Endpoint URL {meta.id === 'mcp' ? '' : '(Optional)'}
             </label>
             <input
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-surface)',
-                fontSize: '0.85rem',
-                fontFamily: "var(--font-label)"
-              }}
               value={form.endpoint}
               onChange={e => set('endpoint', e.target.value)}
               placeholder={meta.endpoint || 'Default gateway'}
@@ -333,15 +315,6 @@ export default function AiProviderCard() {
               <input
                 type="password"
                 autoComplete="off"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-surface)',
-                  fontSize: '0.85rem',
-                  fontFamily: "var(--font-label)"
-                }}
                 value={form.apiKey}
                 onChange={e => set('apiKey', e.target.value)}
                 placeholder={keySaved ? '•••••••••••••••• (Encrypted in MongoDB — leave blank to keep)' : 'Paste API key here'}

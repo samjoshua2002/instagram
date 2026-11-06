@@ -294,20 +294,10 @@
   flex-direction: column;
   gap: 10px;
 }
+/* Fields use the shared field styles (globals.css, APPLE-UI-SPEC §9) */
 .spx-form input,
 .spx-form textarea {
   width: 100%;
-  border: 1px solid transparent !important;
-  border-radius: 6px !important;
-  background: var(--spx-field) !important;
-  color: var(--sp-text) !important;
-  font: 400 14px var(--font-sans);
-  padding: 12px 14px !important;
-}
-.spx-form input:focus,
-.spx-form textarea:focus {
-  outline: none;
-  border-color: var(--sp-text) !important;
 }
 .spx-form .spx-play {
   align-self: flex-start;
@@ -483,24 +473,20 @@
   color: var(--sp-text-2);
   pointer-events: none;
 }
+/* Search and sort are capsule fields (APPLE-UI-SPEC §9): thin fill, shared heights */
 .spx-page .people-search input,
 .spx-page .people-sort {
-  height: 40px;
-  min-height: 40px;
   border: none !important;
-  border-radius: 9999px !important;
-  background: var(--spx-field) !important;
-  color: var(--sp-text);
-  font: 400 14px var(--font-sans);
+  border-radius: var(--radius-pill) !important;
 }
 .spx-page .people-search input {
   width: 100%;
-  padding: 0 16px 0 42px !important;
+  padding: 0 1rem 0 2.5rem !important;
 }
 .spx-page .people-sort {
   flex: 0 0 auto;
   width: auto !important;
-  padding: 0 40px 0 16px !important;
+  padding: 0 2.25rem 0 1rem !important;
   font-weight: 600;
   cursor: pointer;
 }
@@ -728,8 +714,6 @@
     flex: 1 1 100%;
     min-width: 0;
   }
-  .spx-page .people-search input,
-  .spx-page .people-sort,
   .spx-page .people-layout-switch {
     height: 36px;
     min-height: 36px;

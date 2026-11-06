@@ -84,27 +84,13 @@
   gap: 6px;
   min-width: 0;
 }
+/* Fields use the shared field styles (globals.css, APPLE-UI-SPEC §9) */
 .vx-page input[type="text"],
 .vx-page input[type="url"],
 .vx-page input[type="search"],
 .vx-page select {
   width: 100%;
-  height: 44px;
-  min-height: 44px;
   margin: 0;
-  border: 1px solid transparent !important;
-  border-radius: 6px !important;
-  background-color: var(--spx-field) !important;
-  color: var(--sp-text) !important;
-  font: 400 14px var(--font-sans);
-  padding: 0 14px !important;
-  box-shadow: none !important;
-}
-.vx-page select { font-weight: 600; cursor: pointer; }
-.vx-page input:focus,
-.vx-page select:focus {
-  outline: none;
-  border-color: var(--sp-text) !important;
 }
 
 /* File drop */
@@ -131,7 +117,7 @@
   color: var(--sp-text-2);
   pointer-events: none;
 }
-.vx-page .vx-search input { flex: 1; padding-left: 40px !important; border-radius: 9999px !important; }
+.vx-page .vx-search input { flex: 1; padding-left: 2.5rem !important; border-radius: var(--radius-pill) !important; }
 .vx-search .spx-play { flex-shrink: 0; height: 44px; }
 .vx-popular { display: flex; align-items: center; gap: 8px; }
 .vx-pill-sm { height: 30px; min-height: 30px; font-size: 13px; }
@@ -148,8 +134,8 @@
 }
 .vx-batch-count { display: flex; align-items: center; gap: 10px; }
 .vx-batch-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.vx-page .vx-batch-form select { width: auto; min-width: 130px; height: 40px; min-height: 40px; }
-.vx-page .vx-batch-form input { width: 200px; height: 40px; min-height: 40px; }
+.vx-page .vx-batch-form select { width: auto; min-width: 130px; }
+.vx-page .vx-batch-form input { width: 200px; }
 
 .vx-pick-grid {
   display: grid;

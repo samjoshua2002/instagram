@@ -20,7 +20,8 @@ const EMPTY_POLICY = {
 };
 
 const labelStyle = { fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'block', marginBottom: '6px' };
-const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '0.86rem', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text-primary)' };
+// Fields take their look from the global field styles (globals.css, APPLE-UI-SPEC §9)
+const inputStyle = {};
 const sectionTitle = { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.95rem', margin: '0 0 12px' };
 
 /**
