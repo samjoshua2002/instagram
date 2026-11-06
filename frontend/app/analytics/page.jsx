@@ -428,7 +428,7 @@ export default function AnalyticsPage() {
               </div>
 
               {/* Search + Refresh */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '340px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 240px', minWidth: '220px', maxWidth: '340px' }}>
                 <div style={{
                   position: 'relative',
                   flex: 1,
@@ -505,14 +505,13 @@ export default function AnalyticsPage() {
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em'
                   }}>
-                    <th style={{ padding: '10px 12px' }}>User / Creator</th>
-                    <th style={{ padding: '10px 12px' }}>Workspace / Business</th>
-                    <th style={{ padding: '10px 12px' }}>Instagram Handle</th>
-                    <th style={{ padding: '10px 12px' }}>Role</th>
-                    <th style={{ padding: '10px 12px' }}>Automation</th>
-                    <th style={{ padding: '10px 12px' }}>Security</th>
-                    <th style={{ padding: '10px 12px' }}>Registered</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Actions</th>
+                    <th style={{ padding: '10px 8px' }}>User / Creator</th>
+                    <th style={{ padding: '10px 8px' }}>Workspace / Business</th>
+                    <th style={{ padding: '10px 8px' }}>Instagram Handle</th>
+                    <th style={{ padding: '10px 8px' }}>Automation</th>
+                    <th style={{ padding: '10px 8px' }}>Security</th>
+                    <th style={{ padding: '10px 8px' }}>Registered</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -533,7 +532,7 @@ export default function AnalyticsPage() {
                             }}
                           >
                             {/* User Identity */}
-                            <td className="ct-title" style={{ padding: '12px' }}>
+                            <td className="ct-title" style={{ padding: '12px 8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
                                   width: '36px',
@@ -556,7 +555,7 @@ export default function AnalyticsPage() {
                                   )}
                                 </div>
                                 <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontWeight: '800', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <div style={{ fontWeight: '800', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px 5px' }}>
                                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                       {acc.firstName ? `${acc.firstName} ${acc.lastName || ''}`.trim() : acc.username}
                                     </span>
@@ -573,8 +572,23 @@ export default function AnalyticsPage() {
                                         YOU
                                       </span>
                                     )}
+                                    {/* Role: only superadmins get a badge (was its own column) */}
+                                    {isSuper && (
+                                      <span style={{
+                                        fontSize: '0.58rem',
+                                        fontWeight: '800',
+                                        fontFamily: "var(--font-label)",
+                                        padding: '1px 5px',
+                                        borderRadius: '3px',
+                                        background: 'var(--color-text-primary)',
+                                        color: 'var(--color-surface)',
+                                        flexShrink: 0
+                                      }}>
+                                        SUPERADMIN
+                                      </span>
+                                    )}
                                   </div>
-                                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div title={`${acc.email} • @${acc.username}`} style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
                                     {acc.email} • @{acc.username}
                                   </div>
                                 </div>
@@ -582,7 +596,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Workspace / Business */}
-                            <td data-label="Workspace" style={{ padding: '12px' }}>
+                            <td data-label="Workspace" style={{ padding: '12px 8px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>
                                   {acc.businessProfile?.businessName || (isBusiness ? 'Creator Studio' : 'Personal')}
@@ -594,7 +608,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Instagram Handle */}
-                            <td data-label="Instagram" style={{ padding: '12px' }}>
+                            <td data-label="Instagram" style={{ padding: '12px 8px' }}>
                               {acc.instagramUsername ? (
                                 <a
                                   href={`https://instagram.com/${acc.instagramUsername}`}
@@ -618,23 +632,8 @@ export default function AnalyticsPage() {
                               )}
                             </td>
 
-                            {/* Role */}
-                            <td data-label="Role" style={{ padding: '12px' }}>
-                              <span style={{
-                                fontSize: '0.62rem',
-                                fontWeight: '800',
-                                fontFamily: "var(--font-label)",
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: isSuper ? 'var(--color-text-primary)' : 'var(--color-surface-hover)',
-                                color: isSuper ? 'var(--color-surface)' : 'var(--color-text-primary)'
-                              }}>
-                                {isSuper ? 'SUPERADMIN' : 'USER'}
-                              </span>
-                            </td>
-
                             {/* Automation Status */}
-                            <td data-label="Automation" style={{ padding: '12px' }}>
+                            <td data-label="Automation" style={{ padding: '12px 8px' }}>
                               {(() => {
                                 const isConnected = Boolean(acc.hasInstagramToken || acc.isInstagramConnected);
                                 const isPending = acc.igApprovalStatus === 'pending';
@@ -659,7 +658,7 @@ export default function AnalyticsPage() {
                                 }
 
                                 return (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <div style={{
                                       width: '7px',
                                       height: '7px',
@@ -680,7 +679,7 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Security */}
-                            <td data-label="Security" style={{ padding: '12px' }}>
+                            <td data-label="Security" style={{ padding: '12px 8px' }}>
                               {acc.hasPasskeys ? (
                                 <span style={{
                                   display: 'inline-flex',
@@ -692,7 +691,8 @@ export default function AnalyticsPage() {
                                   fontSize: '0.68rem',
                                   fontWeight: '700',
                                   padding: '2px 6px',
-                                  borderRadius: '4px'
+                                  borderRadius: '4px',
+                                  whiteSpace: 'nowrap'
                                 }}>
                                   <Lock size={10} />
                                   <span>{acc.passkeyCount || 1} Passkey</span>
@@ -703,13 +703,13 @@ export default function AnalyticsPage() {
                             </td>
 
                             {/* Registered */}
-                            <td data-label="Registered" style={{ padding: '12px', fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
+                            <td data-label="Registered" style={{ padding: '12px 8px', fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
                               {acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : 'Recent'}
                             </td>
 
                             {/* Actions: Impersonate / Approve / Details */}
-                            <td className="ct-actions" style={{ padding: '12px', textAlign: 'right' }}>
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <td className="ct-actions" style={{ padding: '12px 8px', textAlign: 'right' }}>
+                              <div className="an-acc-actions" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '6px' }}>
                                 {!isSelf && !acc.hasInstagramToken && !acc.isInstagramConnected && (
                                   <button
                                     type="button"
@@ -793,6 +793,7 @@ export default function AnalyticsPage() {
                                     onClick={() => handleDeleteAccount(acc)}
                                     disabled={deletingId === acc.id}
                                     title={`Permanently delete @${acc.username}`}
+                                    aria-label={`Delete @${acc.username}`}
                                     style={{
                                       background: 'var(--color-surface)',
                                       border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
@@ -807,8 +808,7 @@ export default function AnalyticsPage() {
                                       gap: '3px'
                                     }}
                                   >
-                                    <Trash2 size={11} />
-                                    <span>{deletingId === acc.id ? '...' : 'Delete'}</span>
+                                    {deletingId === acc.id ? <span>...</span> : <Trash2 size={13} />}
                                   </button>
                                 )}
                               </div>
@@ -818,7 +818,7 @@ export default function AnalyticsPage() {
                           {/* Expanded Drawer */}
                           {isExpanded && (
                             <tr className="ct-detail-row" style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                              <td className="ct-full" colSpan={8} style={{ padding: '16px 20px' }}>
+                              <td className="ct-full" colSpan={7} style={{ padding: '16px 20px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', fontSize: '0.76rem' }}>
                                   <div>
                                     <div style={{ color: 'var(--color-text-secondary)', fontWeight: '700', fontFamily: "var(--font-label)", marginBottom: '3px' }}>USER ID</div>
@@ -849,7 +849,7 @@ export default function AnalyticsPage() {
                     })
                   ) : (
                     <tr>
-                      <td className="ct-full" colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-secondary)' }}>
+                      <td className="ct-full" colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--color-text-secondary)' }}>
                         No accounts found matching your filter criteria.
                       </td>
                     </tr>
