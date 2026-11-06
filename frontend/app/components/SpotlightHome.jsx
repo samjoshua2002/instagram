@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock, Pause, Play, Check, KeyRound } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
@@ -554,6 +555,49 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
   );
 }
 
+/** Notifications bell + list. Rendered in Home's header (desktop) and in the app header (phones). */
+function HomeBell({ alerts, inHeader = false }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = e => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const onKey = e => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className={`sh-bell-wrap${inHeader ? ' sh-bell-hdr' : ''}`}>
+      <button
+        type="button"
+        className={inHeader ? 'mobile-icon-btn sh-hdr-bell' : 'sh-icon-btn'}
+        aria-label={`Notifications${alerts.length ? ` (${alerts.length})` : ''}`}
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <Bell size={inHeader ? 18 : 20} />
+        {alerts.length > 0 && <span className="sh-dot" />}
+      </button>
+      {open && (
+        <div className="sh-alerts" role="dialog" aria-label="Notifications">
+          {alerts.length === 0 && <div className="sh-alerts-empty">You're all caught up.</div>}
+          {alerts.map(a => (
+            <Link key={a.id} href={a.href} className="sh-alert" onClick={() => setOpen(false)}>
+              <span className="sh-alert-icon"><a.icon size={16} /></span>
+              <span className="sh-alert-text">{a.title}</span>
+              <ChevronRight size={15} />
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SpotlightHome() {
   const { nodes, user, routingConfig, isSyncingInitial, setFavourite, toggleGlobalBot, showToast, API_BASE } = useApp();
   const [summary, setSummary, reloadSummary] = useHomeSummary(API_BASE);
@@ -587,7 +631,8 @@ export default function SpotlightHome() {
   const openMenu = useCallback((person, x, y) => setMenu({ person, x, y }), []);
   const pressProps = useLongPress(openMenu);
   const [category, setCategory] = useState('all');
-  const [showAlerts, setShowAlerts] = useState(false);
+  const [headerSlot, setHeaderSlot] = useState(null);
+  useEffect(() => { setHeaderSlot(document.getElementById('mobile-header-slot')); }, []);
 
   const people = useMemo(() => (nodes || []).filter(n => !n.isRoot && n.name), [nodes]);
 
@@ -684,32 +729,11 @@ export default function SpotlightHome() {
             {botOn ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
           </button>
         )}
-        <div className="sh-bell-wrap">
-          <button
-            type="button"
-            className="sh-icon-btn"
-            aria-label={`Notifications${alerts.length ? ` (${alerts.length})` : ''}`}
-            aria-expanded={showAlerts}
-            onClick={() => setShowAlerts(v => !v)}
-          >
-            <Bell size={20} />
-            {alerts.length > 0 && <span className="sh-dot" />}
-          </button>
-          {showAlerts && (
-            <div className="sh-alerts" role="dialog" aria-label="Notifications">
-              {alerts.length === 0 && <div className="sh-alerts-empty">You're all caught up.</div>}
-              {alerts.map(a => (
-                <Link key={a.id} href={a.href} className="sh-alert" onClick={() => setShowAlerts(false)}>
-                  <span className="sh-alert-icon"><a.icon size={16} /></span>
-                  <span className="sh-alert-text">{a.title}</span>
-                  <ChevronRight size={15} />
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        <HomeBell alerts={alerts} />
         </div>
       </header>
+      {/* Phones: the bell sits in the app header; the header's mode chip is the AI switch */}
+      {headerSlot && createPortal(<HomeBell alerts={alerts} inHeader />, headerSlot)}
 
       <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
         <div className="sh-banner-text">

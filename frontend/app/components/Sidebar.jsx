@@ -241,6 +241,8 @@ export default function Sidebar() {
         </Link>
 
         <div className="mobile-header-actions">
+          {/* Home puts its notifications bell here (portal from SpotlightHome) */}
+          <span id="mobile-header-slot" className="mobile-header-slot" />
           {isPureSuperadmin ? (
             <span className="mobile-workspace-chip">
               <span className="sheet-dot on" />
@@ -252,6 +254,7 @@ export default function Sidebar() {
               onClick={toggleGlobalBot}
               className="mobile-workspace-chip"
               aria-label={routingConfig.globalBotActive ? 'Pause automation' : 'Resume automation'}
+              title={routingConfig.globalBotActive ? 'AI is replying to DMs. Tap to pause.' : 'AI replies are paused. Tap to start.'}
             >
               <span className={`sheet-dot${routingConfig.globalBotActive ? ' on' : ''}`} />
               {mode.toUpperCase()}
