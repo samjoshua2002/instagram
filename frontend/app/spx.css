@@ -747,4 +747,34 @@
   .spx-table tbody tr:first-child td {
     border-top: 0;
   }
+  /* Phone card: username + relation on one line, then birthday / chats / reels as three columns */
+  .spx-table td[data-label="Username"],
+  .spx-table td[data-label="Relation"] {
+    flex: 1 1 calc(50% - 5px);
+  }
+  .spx-table td[data-label="Birthday"],
+  .spx-table td[data-label="Chats"],
+  .spx-table td[data-label="Reels"] {
+    flex: 1 1 calc(33.333% - 7px);
+    order: 1;
+  }
+  .spx-table td.spx-num { text-align: left !important; }
+  .spx-table .spx-handle {
+    display: block;
+    max-width: 100%;
+    min-height: 0;
+    height: auto;
+    line-height: 1.4;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .spx-table .spx-rel {
+    max-width: 100%;
+    border-radius: 10px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+  }
 }
