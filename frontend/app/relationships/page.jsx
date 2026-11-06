@@ -1012,7 +1012,7 @@ function RelationshipsPageContent() {
   useHeroCollapse(
     pageRef,
     selectedPerson
-      ? { hero: '.person-hero', media: '.person-hero-avatar', title: '.person-name', fade: '.person-handle, .person-stats, .person-hero-actions, .person-topbar-right', pin: '.person-back' }
+      ? { hero: '.person-hero', media: '.person-hero-avatar', title: '.person-name', fade: '.person-handle, .person-stats, .person-hero-actions, .person-save-state', pin: '.person-back', pinEnd: '.person-menu-wrap' }
       : { hero: '.spx-hero', media: '.spx-cover', title: '.spx-title', fade: '.spx-eyebrow, .spx-desc, .spx-meta', stack: '.people-filters' },
     [motionView]
   );
