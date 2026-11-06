@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink } from 'lucide-react';
+import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
@@ -76,6 +76,115 @@ function daysUntil(dateStr) {
   let next = new Date(now.getFullYear(), Number(m[2]) - 1, Number(m[3]));
   if (next < today) next = new Date(now.getFullYear() + 1, Number(m[2]) - 1, Number(m[3]));
   return Math.round((next - today) / 86400000);
+}
+
+const DAY_MS = 86400000;
+const SNOOZE_KEY = 'chatter_home_followup_snooze';
+const SNOOZE_DAYS = 3;
+
+function daysSince(date) {
+  const t = new Date(date || 0).getTime();
+  return t > 0 ? Math.max(0, Math.floor((Date.now() - t) / DAY_MS)) : null;
+}
+
+/**
+ * Follow-up suggestions built only from real contact data, most urgent first:
+ * birthdays this week, quiet close friends / family, quiet frequent chats,
+ * new chats worth keeping going, then people with no DMs yet.
+ */
+export function followUps(people, birthdays, limit = 6) {
+  const out = [];
+  const seen = new Set();
+  const add = (p, kind, text) => {
+    if (seen.has(p.id)) return;
+    seen.add(p.id);
+    out.push({ p, kind, text });
+  };
+  const withQuiet = people.map(p => ({ p, quiet: daysSince(p.lastInteraction), chats: p.chatsCount || 0 }));
+  const isClose = p => p.category === 'close_friend' || p.category === 'family';
+
+  birthdays.filter(b => b.days <= 7).forEach(({ p, days }) => add(p, 'birthday',
+    days === 0 ? 'Birthday today. Send a wish!' : `Birthday in ${days} day${days === 1 ? '' : 's'}. Plan a wish.`));
+  withQuiet.filter(x => isClose(x.p) && x.chats > 0 && x.quiet >= 7)
+    .sort((a, b) => b.quiet - a.quiet)
+    .forEach(x => add(x.p, 'checkin', `No DMs for ${x.quiet} days. Check in?`));
+  withQuiet.filter(x => x.chats >= 20 && x.quiet >= 14)
+    .sort((a, b) => b.chats - a.chats)
+    .forEach(x => add(x.p, 'quiet', `${fmt(x.chats)} DMs, but quiet for ${x.quiet} days. Follow up?`));
+  withQuiet.filter(x => x.chats > 0 && x.chats <= 5 && x.quiet !== null && x.quiet >= 2 && x.quiet <= 30)
+    .sort((a, b) => a.quiet - b.quiet)
+    .forEach(x => add(x.p, 'keep', `New chat, last DM ${x.quiet} days ago. Keep it going.`));
+  withQuiet.filter(x => x.chats === 0)
+    .forEach(x => add(x.p, 'hello', 'No DMs yet. Say hello?'));
+  return out.slice(0, limit);
+}
+
+const FOLLOW_ICON = { birthday: Cake, checkin: Heart, quiet: AlarmClock, keep: MessageCircle, hello: Hand };
+
+function readSnoozed() {
+  try {
+    const all = JSON.parse(localStorage.getItem(SNOOZE_KEY) || '{}');
+    const now = Date.now();
+    return Object.fromEntries(Object.entries(all).filter(([, until]) => until > now));
+  } catch { return {}; }
+}
+
+/** "Follow up" card list: open the Instagram DM, or hide a suggestion for a few days. */
+function FollowUps({ people, birthdays, pressProps }) {
+  const [snoozed, setSnoozed] = useState({});
+  useEffect(() => { setSnoozed(readSnoozed()); }, []);
+  const items = useMemo(
+    () => followUps(people.filter(p => !snoozed[p.id]), birthdays.filter(b => !snoozed[b.p.id]), 4),
+    [people, birthdays, snoozed]
+  );
+  const later = id => {
+    const next = { ...readSnoozed(), [id]: Date.now() + SNOOZE_DAYS * DAY_MS };
+    try { localStorage.setItem(SNOOZE_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
+    setSnoozed(next);
+  };
+  if (!items.length) return null;
+  return (
+    <section aria-label="Follow up">
+      <div className="sh-row-head">
+        <h2>Follow up</h2>
+        <span className="sh-row-note">Suggested for you</span>
+      </div>
+      <ul className="sh-follow">
+        {items.map(({ p, kind, text }) => {
+          const Icon = FOLLOW_ICON[kind] || MessageCircle;
+          const handle = handleOf(p);
+          return (
+            <li key={p.id} className={`sh-follow-item sh-follow-${kind}`}>
+              <Link href={personHref(p)} className="sh-follow-main sh-pressable" {...pressProps(p)}>
+                <span className="sh-follow-photo-wrap">
+                  <Photo person={p} className="sh-follow-photo" />
+                  <span className="sh-follow-badge" aria-hidden="true"><Icon size={12} /></span>
+                </span>
+                <span className="sh-follow-text">
+                  <span className="sh-follow-name">{p.name}</span>
+                  <span className="sh-follow-why">{text}</span>
+                </span>
+              </Link>
+              <div className="sh-follow-actions">
+                {handle ? (
+                  <a href={`https://ig.me/m/${encodeURIComponent(handle)}`} target="_blank" rel="noreferrer" className="sh-follow-btn" aria-label={`Message ${p.name} on Instagram`}>
+                    <Send size={15} /><span>Message</span>
+                  </a>
+                ) : (
+                  <Link href={personHref(p)} className="sh-follow-btn" aria-label={`Open ${p.name}`}>
+                    <User size={15} /><span>Open</span>
+                  </Link>
+                )}
+                <button type="button" className="sh-follow-later" onClick={() => later(p.id)} aria-label={`Remind me about ${p.name} in ${SNOOZE_DAYS} days`} title={`Remind me in ${SNOOZE_DAYS} days`}>
+                  <Clock size={15} />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 /** Small row of headline numbers; the full dashboard lives at /analytics (Settings > Analytics). */
@@ -271,17 +380,20 @@ export default function SpotlightHome() {
       .slice(0, Math.max(10, pinned.length));
   }, [filtered]);
   const favouriteIds = useMemo(() => new Set(favourites.map(p => p.id)), [favourites]);
-  const reconnect = useMemo(
-    () => [...filtered].filter(p => (p.chatsCount || 0) > 0).sort((a, b) => (a.chatsCount || 0) - (b.chatsCount || 0)).slice(0, 10),
-    [filtered]
-  );
-  const totalChats = filtered.reduce((s, p) => s + (p.chatsCount || 0), 0);
-  const totalReels = filtered.reduce((s, p) => s + (p.reelsCount || 0), 0);
-
   const birthdays = useMemo(() => people
     .map(p => ({ p, days: daysUntil(p.dob || (p.importantDates || []).find(d => /birth|bday/i.test(d?.title || ''))?.date) }))
     .filter(x => x.days !== null && x.days <= 30)
     .sort((a, b) => a.days - b.days), [people]);
+  const followAll = useMemo(() => followUps(people, birthdays, Infinity), [people, birthdays]);
+  // People already suggested under Follow up are not repeated here
+  const reconnect = useMemo(() => {
+    const suggested = new Set(followAll.map(f => f.p.id));
+    return [...filtered].filter(p => (p.chatsCount || 0) > 0 && !suggested.has(p.id))
+      .sort((a, b) => (a.chatsCount || 0) - (b.chatsCount || 0)).slice(0, 10);
+  }, [filtered, followAll]);
+  const totalChats = filtered.reduce((s, p) => s + (p.chatsCount || 0), 0);
+  const totalReels = filtered.reduce((s, p) => s + (p.reelsCount || 0), 0);
+
   const paused = people.filter(p => p.aiEnabled === false);
   const alerts = [
     routingConfig && routingConfig.globalBotActive === false && { id: 'bot', icon: BotOff, title: 'Automation is paused', href: '/controls' },
@@ -296,6 +408,7 @@ export default function SpotlightHome() {
   const coverPhoto = useFreshBanner('home-cover', 'abstract');
   const bannerPhoto = useFreshBanner('home-banner', 'colorful');
   const firstName = (user?.firstName || user?.name || user?.username || '').split(' ')[0];
+  const followCount = followAll.length;
 
   return (
     <div className={`sh-home${coverPhoto ? ' sh-tinted' : ''}`}>
@@ -328,7 +441,28 @@ export default function SpotlightHome() {
         </div>
       </header>
 
-      {chips.length > 2 && (
+      <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
+        <div className="sh-banner-text">
+          <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <h2 className="sh-banner-title">Your circle today</h2>
+          {people.length > 0 ? (
+            <div className="sh-banner-pills">
+              <span className="sh-pill"><b>{fmt(people.length)}</b> people</span>
+              <span className="sh-pill"><b>{fmt(people.reduce((s, p) => s + (p.chatsCount || 0), 0))}</b> DMs</span>
+              <span className="sh-pill"><b>{fmt(followCount)}</b> to follow up</span>
+            </div>
+          ) : (
+            <span className="sh-banner-sub">People appear here once Instagram DMs sync.</span>
+          )}
+        </div>
+        <Link href="/relationships" className="sh-banner-btn" aria-label="Open People">
+          <span>People</span><ChevronRight size={18} />
+        </Link>
+      </UnsplashBanner>
+
+      {people.length > 0 && <FollowUps people={people} birthdays={birthdays} pressProps={pressProps} />}
+
+      {people.length > 0 && chips.length > 2 && (
         <div className="sh-chips" role="tablist" aria-label="Filter by category">
           {chips.map(c => (
             <button
@@ -345,19 +479,6 @@ export default function SpotlightHome() {
           ))}
         </div>
       )}
-
-      <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
-        <div className="sh-banner-text">
-          <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-          <h2 className="sh-banner-title">Your circle today</h2>
-          <span className="sh-banner-sub">
-            {people.length > 0
-              ? `${fmt(people.length)} people · ${fmt(people.reduce((s, p) => s + (p.chatsCount || 0), 0))} DMs · ${alerts.length} alert${alerts.length === 1 ? '' : 's'}`
-              : 'People appear here once Instagram DMs sync.'}
-          </span>
-          <Link href="/relationships" className="sh-banner-btn">Open People</Link>
-        </div>
-      </UnsplashBanner>
 
       {people.length === 0 && isSyncingInitial ? (
         <PageSkeleton variant="home" header={false} bare label="Loading your people" />

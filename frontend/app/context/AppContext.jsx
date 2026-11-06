@@ -12,7 +12,7 @@ const STORAGE_DELETED_KEY = 'chatter_deleted_names_v2';
 const SYNC_COMPARE_FIELDS = [
   'id', 'name', 'handle', 'senderId', 'profilePic', 'category', 'relationship', 'dob', 'age', 'gender', 'personalNotes',
   'chatsCount', 'reelsCount', 'aiEnabled', 'replyToMessages', 'replyToReelsAndPosts', 'roastiness', 'greetingStyle',
-  'isFavourite',
+  'isFavourite', 'lastInteraction',
 ];
 
 // Auth endpoints that answer 401 for a wrong code/password, not for an expired session
@@ -749,6 +749,7 @@ export function AppProvider({ children }) {
               rollingSummary: sn.relationshipToSam || 'Friend in circle',
               conversationStyle: 'Casual banter',
               importantDates: sn.importantDates || [],
+              lastInteraction: sn.lastInteraction || null, // time of the last DM (Home follow-up suggestions)
               facts: sn.facts || (sn.lore || []),
               lore: sn.lore || [],
               connections: (sn.connections || []).map(c => ({

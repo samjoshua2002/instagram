@@ -61,30 +61,41 @@
 }
 .ub-credit a { color: #fff !important; text-decoration: underline; text-underline-offset: 2px; }
 
-/* ── Home: big banner under the greeting ─────────────────────── */
+/* ── Home: compact "today" banner under the greeting ─────────── */
 .sh-banner {
   display: flex;
   align-items: flex-end;
-  min-height: 230px;
-  margin: 22px 0 6px;
-  padding: 26px 28px 34px;
-  border-radius: 24px;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 170px;
+  margin: 18px 0 4px;
+  padding: 22px 24px 28px;
+  border-radius: 22px;
   color: #fff;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
 }
 .sh-banner-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 560px; }
-.sh-banner-eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.9; }
-.sh-banner-title { margin: 0; font-size: clamp(1.6rem, 3.6vw, 2.6rem); font-weight: 900; letter-spacing: -0.5px; line-height: 1.05; }
-.sh-banner-sub { font-size: 0.95rem; opacity: 0.92; }
+.sh-banner-eyebrow { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.9; }
+.sh-banner-title { margin: 0; font-size: clamp(1.4rem, 3vw, 2.2rem); font-weight: 900; letter-spacing: -0.5px; line-height: 1.05; }
+.sh-banner-sub { font-size: 0.9rem; opacity: 0.92; }
+.sh-banner-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.sh-pill {
+  padding: 5px 11px; border-radius: 999px; font-size: 0.8rem; white-space: nowrap;
+  background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.sh-pill b { font-weight: 800; }
 .sh-banner-btn {
-  align-self: flex-start;
-  margin-top: 10px;
-  padding: 10px 20px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 12px 9px 16px;
   border-radius: 999px;
   background: #fff;
   color: #111 !important;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   transition: transform 0.2s ease;
 }
 .sh-banner-btn:hover { transform: scale(1.04); }
@@ -169,6 +180,10 @@
 .person-chat-banner .person-card-title { color: #fff !important; margin: 0 !important; }
 
 @media (max-width: 768px) {
-  .sh-banner { min-height: 200px; padding: 20px 18px 30px; border-radius: 20px; margin-top: 16px; }
+  .sh-banner { min-height: 0; padding: 16px 16px 26px; border-radius: 18px; margin-top: 12px; gap: 10px; }
+  .sh-banner-title { font-size: 1.3rem; }
+  .sh-pill { padding: 4px 9px; font-size: 0.74rem; }
+  .sh-banner-btn { padding: 8px; }
+  .sh-banner-btn span { display: none; } /* phone: just the arrow */
   .person-cover { left: -16px; right: -16px; top: -16px; height: 300px; }
 }

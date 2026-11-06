@@ -25,6 +25,7 @@ const THEME = {
 };
 
 let currentImage = null;
+let currentFallback = null; // page's own artwork colour, used instead of green until (or if) the photo is read
 
 // ── Palette cache ───────────────────────────────────────────────
 // Palettes are computed ahead of time (prefetchAmbientImages) and saved to
@@ -124,12 +125,14 @@ export function usePalette(url) {
   return state.url === url ? state.palette : getCachedPalette(url);
 }
 
-export function setAmbientImage(url) {
+export function setAmbientImage(url, fallbackColor = null) {
   currentImage = url || null;
+  currentFallback = fallbackColor || null;
   if (typeof window === 'undefined') return;
   // Cache hit: paint the new colours right now instead of waiting for the listener
   const cached = currentImage ? getCachedPalette(currentImage) : null;
   if (cached) applyPalette(cached, currentImage);
+  else if (currentFallback) applyPalette(colorPalette(currentFallback), null);
   window.dispatchEvent(new CustomEvent(AMBIENT_EVENT, { detail: currentImage }));
 }
 
@@ -139,14 +142,16 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 /**
  * Tint the page from `url` while the calling component is mounted.
  * `strong` washes the whole screen in the image's colour (Apple Music style).
+ * `fallbackColor` (the page's artwork colour) is used while the photo loads or when it
+ * cannot be read, so the page never drops back to the app green.
  */
-export function useAmbientImage(url, { strong = false } = {}) {
+export function useAmbientImage(url, { strong = false, fallbackColor = null } = {}) {
   useIsoLayoutEffect(() => {
-    setAmbientImage(url);
+    setAmbientImage(url, fallbackColor);
     return () => {
-      if (currentImage === (url || null)) setAmbientImage(null);
+      if (currentImage === (url || null) && currentFallback === (fallbackColor || null)) setAmbientImage(null);
     };
-  }, [url]);
+  }, [url, fallbackColor]);
 
   useIsoLayoutEffect(() => {
     if (!strong) return undefined;
@@ -234,6 +239,18 @@ export function extractPalette(pixels) {
     washLight: hsl(dom.h, clamp(dom.s, 0.35, 0.6), 0.86),
     washDark: hsl(dom.h, clamp(dom.s, 0.3, 0.55), 0.17),
   };
+}
+
+/** Palette from one colour (hex, rgb() or hsl()), built the same way as a photo's palette. */
+export function colorPalette(color) {
+  if (typeof document === 'undefined' || !color) return null;
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#000';
+  ctx.fillStyle = color; // the browser parses any CSS colour; bad input stays black
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return extractPalette(new Uint8ClampedArray([r, g, b, 255])); // a grey colour gives the calm neutral palette
 }
 
 // Instagram CDN images have no CORS headers, so route them through the backend proxy
@@ -334,10 +351,13 @@ export default function AmbientBackground() {
   useEffect(() => {
     const update = async url => {
       const id = ++requestId.current;
-      // No page image: the green theme, straight away
-      if (!url) return applyPalette(null, null);
+      // The page's own artwork colour while the photo loads, or when there is none / it fails
+      const fallback = currentFallback ? colorPalette(currentFallback) : null;
+      // No page image: the page colour, else the green theme, straight away
+      if (!url) return applyPalette(fallback, null);
+      if (fallback && getCachedPalette(url) === undefined) applyPalette(fallback, null);
       const palette = await ensurePalette(url);
-      if (id === requestId.current) applyPalette(palette, url);
+      if (id === requestId.current) applyPalette(palette || fallback, palette ? url : null);
     };
 
     const onChange = e => update(e.detail);
