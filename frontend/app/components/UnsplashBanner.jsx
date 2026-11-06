@@ -9,11 +9,11 @@ import { usePalette } from './AmbientBackground';
  * `matchImage` (a contact's photo link): the banner photo follows that photo's main colour,
  * the same colour that tints the page, so the top of the page matches the profile.
  * Two-colour wave artwork shows first, so there is never an empty or plain green box.
- * `credit` shows the photographer line Unsplash asks for; turn it off only where the
- * banner sits inside a link (cards), where it moves to the tooltip instead.
+ * The "Photo by … on Unsplash" line is not drawn on the photo (it looked like a watermark,
+ * asked 2026-11-06); it shows as the hover tooltip instead. Pass `credit` to draw it again.
  */
 export default function UnsplashBanner({
-  seed, topic = 'abstract', width = 1600, credit = true, matchImage = null, className = '', style, children, as: Tag = 'div',
+  seed, topic = 'abstract', width = 1600, credit = false, matchImage = null, className = '', style, children, as: Tag = 'div',
   photo: chosen, // a photo picked by the page (useFreshBanner); null while it loads
 }) {
   const theme = useBannerTheme();
