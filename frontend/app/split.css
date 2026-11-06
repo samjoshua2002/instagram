@@ -284,6 +284,18 @@
   background: var(--spx-raised);
 }
 .people-split .spx-stat-icon { width: 32px; height: 32px; border-radius: 8px; }
+
+/* Overview icon tiles take their colours from the page photo:
+   the photo's two main colours, plus the main colour turned a third of the way round the colour wheel each way, so all four tiles always look different */
+.people-tone-1 { background: var(--ambient-dominant); }
+.people-tone-2 { background: var(--ambient-secondary); }
+.people-tone-3 { background: color-mix(in srgb, var(--ambient-dominant) 60%, #e8115b); }
+.people-tone-4 { background: color-mix(in srgb, var(--ambient-secondary) 60%, #f59b23); }
+@supports (color: hsl(from red h s l)) {
+  .people-tone-3 { background: hsl(from var(--ambient-dominant) calc(h + 120) s l); }
+  .people-tone-4 { background: hsl(from var(--ambient-dominant) calc(h - 120) s l); }
+}
+.people-split .spx-stat-icon[class*='people-tone-'] { transition: background-color var(--duration-ambient, 0.8s) ease; }
 .people-split .spx-stat-value { font-size: 20px; letter-spacing: -0.5px; }
 .people-split .spx-stat-label { font-size: 11px; font-weight: 600; }
 

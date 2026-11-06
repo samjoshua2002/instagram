@@ -1940,13 +1940,13 @@ function RelationshipsPageContent() {
         <h2>Overview</h2>
         <div className="spx-stats people-stats">
           {[
-            { icon: <Users size={16} />, label: 'People', value: dashboardStats.totalPeople, color: '#1db954' },
-            { icon: <MessageSquare size={16} />, label: 'Chats', value: dashboardStats.totalDMs, color: '#509bf5' },
-            { icon: <Film size={16} />, label: 'Reels', value: dashboardStats.totalReels, color: '#e8115b' },
-            { icon: <Bot size={16} />, label: 'AI on', value: dashboardStats.activeAi, color: '#f59b23' },
-          ].map(({ icon, label, value, color }) => (
+            { icon: <Users size={16} />, label: 'People', value: dashboardStats.totalPeople, tone: 1 },
+            { icon: <MessageSquare size={16} />, label: 'Chats', value: dashboardStats.totalDMs, tone: 2 },
+            { icon: <Film size={16} />, label: 'Reels', value: dashboardStats.totalReels, tone: 3 },
+            { icon: <Bot size={16} />, label: 'AI on', value: dashboardStats.activeAi, tone: 4 },
+          ].map(({ icon, label, value, tone }) => (
             <div key={label} className="spx-stat">
-              <div className="spx-stat-icon" style={{ background: color }}>{icon}</div>
+              <div className={`spx-stat-icon people-tone-${tone}`}>{icon}</div>
               <div style={{ minWidth: 0 }}>
                 <div className="spx-stat-value"><CountUp value={value} /></div>
                 <div className="spx-stat-label">{label}</div>
