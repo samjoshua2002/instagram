@@ -36,6 +36,53 @@ export const PAGE_HERO = {
 
 export const scrollerOf = (el) => el?.closest('.app-main-content') || window;
 
+const HEADER = '.mobile-header';
+
+/** Notch strip the phone header keeps on screen (its safe-area padding); 0 elsewhere. */
+function headerSafeTop() {
+  const h = document.querySelector(HEADER);
+  return h ? parseFloat(getComputedStyle(h).paddingTop) || 0 : 0;
+}
+
+/** Scroll position of `el` inside the scroller's content (padding included). */
+function scrollYOf(el, scroller) {
+  if (scroller === window) return el.getBoundingClientRect().top + window.scrollY;
+  return offsetIn(el, scroller).y;
+}
+
+/**
+ * Phones: the fixed top header slides up 1:1 with the page scroll, so the page's sticky
+ * hero band (or the page itself) takes its place instead of showing two bars.
+ * The scroll box starts at the screen top with the header's height as padding (globals.css).
+ */
+export function useHeaderScrollAway(scrollerRef, deps = []) {
+  useIsoLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const header = document.querySelector(HEADER);
+    if (!scroller || !header) return undefined;
+    const mm = gsap.matchMedia();
+    mm.add(PHONE, () => {
+      const setY = gsap.quickSetter(header, '--hdr-y', 'px');
+      let last = null;
+      const update = () => {
+        const dist = header.offsetHeight - headerSafeTop();
+        const y = -Math.min(Math.max(scroller.scrollTop, 0), dist);
+        if (y !== last) { last = y; setY(y); }
+      };
+      update();
+      scroller.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+      return () => {
+        scroller.removeEventListener('scroll', update);
+        window.removeEventListener('resize', update);
+        gsap.set(header, { '--hdr-y': '0px' });
+      };
+    });
+    return () => mm.revert();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
 /** Offset of `el` inside `ancestor`, ignoring transforms. */
 function offsetIn(el, ancestor) {
   let x = 0;
@@ -111,8 +158,14 @@ export function useHeroCollapse(rootRef, o, deps = []) {
           const H = hero.offsetHeight;
           const W = hero.offsetWidth;
           const yc = H - band / 2; // band centre, in hero coordinates, once fully collapsed
-          m.travel = parseFloat(getComputedStyle(root).paddingTop) + H - band;
-          gsap.set(hero, { top: band - H });
+          // Phones: the header has slid away by the time the band sticks, so the band sits
+          // at the screen top (below the notch strip), where the header was.
+          const safe = phone ? headerSafeTop() : 0;
+          const padS = scroller === window ? 0 : parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+          const rootY = scrollYOf(root, scroller);
+          m.start = Math.max(0, rootY - padS);
+          m.end = rootY + parseFloat(getComputedStyle(root).paddingTop) + H - band - safe;
+          gsap.set(hero, { top: band - H + safe });
 
           let left = 0;
           if (pin) {
@@ -147,8 +200,8 @@ export function useHeroCollapse(rootRef, o, deps = []) {
           scrollTrigger: {
             trigger: root,
             scroller,
-            start: 'top top',
-            end: () => `+=${m.travel}`,
+            start: () => m.start,
+            end: () => Math.max(m.end, m.start + 1),
             // Touch scrolling is already smooth; extra smoothing on phones makes the
             // avatar/title trail behind the (natively sticky) band, which reads as lag.
             scrub: phone ? true : 0.2,
