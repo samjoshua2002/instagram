@@ -227,3 +227,26 @@ test('light theme asks for light photo lists and keeps only bright photos (dark 
   assert.match(decodeURIComponent(b.toneArt('hsl(220 70% 50%)', 'x', 'light')), /hsl\(220 70% 72%\)/);
   assert.equal(b.currentTheme(), 'dark'); // no document in Node
 });
+
+test('theme switch waits for banners: resolves at once with no page, and gives up after the time limit', async () => {
+  const b = await import('../frontend/app/lib/banners.js');
+  await b.bannersReady(50); // no document (server / tests): resolves straight away
+
+  // A page whose banner image never finishes loading: the switch still goes ahead after maxMs
+  const stuck = { complete: false, naturalWidth: 0, classList: { add() {} } };
+  global.document = { querySelectorAll: () => [stuck] };
+  try {
+    const t0 = Date.now();
+    await b.bannersReady(120);
+    assert.ok(Date.now() - t0 >= 110, 'waited for the photo');
+    assert.ok(Date.now() - t0 < 1000, 'but not forever');
+    // Loaded image: marked shown straight away (no wait for React's onLoad render)
+    const added = [];
+    const done = { complete: true, naturalWidth: 10, classList: { add: c => added.push(c) }, parentElement: null };
+    global.document = { querySelectorAll: () => [done] };
+    await b.bannersReady(500);
+    assert.deepEqual(added, ['in']);
+  } finally {
+    delete global.document;
+  }
+});

@@ -231,8 +231,35 @@ export function useFreshBanner(slot, topic = 'abstract') {
       setPhoto(next);
     });
     return () => { alive = false; };
-  }, [slot, topic]);
+  }, [slot, topic, theme]); // theme too: switching theme picks a photo from that theme's list
   return photo;
+}
+
+/**
+ * Resolves once every banner on screen has its photo for the current theme (lists loaded,
+ * images decoded), or after `maxMs`. The theme switch waits on this inside the view
+ * transition, so the reveal shows the final photos instead of swapping them mid-way.
+ */
+export function bannersReady(maxMs = 700) {
+  if (typeof document === 'undefined') return Promise.resolve();
+  return new Promise(resolve => {
+    const end = Date.now() + maxMs;
+    let calm = 0;
+    const check = () => {
+      const imgs = [...document.querySelectorAll('img.ub-img')];
+      const ok = jobs.size === 0 && imgs.every(i => i.complete);
+      calm = ok ? calm + 1 : 0;
+      if (calm < 2 && Date.now() < end) { setTimeout(check, 40); return; }
+      // Show loaded photos now, without waiting for React's onLoad render
+      imgs.forEach(i => {
+        if (!i.complete || !i.naturalWidth) return;
+        i.classList.add('in');
+        i.parentElement?.querySelector(':scope > .ub-tint')?.classList.add('in');
+      });
+      resolve();
+    };
+    check();
+  });
 }
 
 // Colour sets for the abstract artwork shown while a photo loads (or when Unsplash is unavailable)

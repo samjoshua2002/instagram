@@ -26,6 +26,10 @@ export default function UnsplashBanner({
   const photo = given ? chosen : waiting ? null : matched;
   const src = bannerSrc(photo, width);
   const [loadedSrc, setLoadedSrc] = useState(null);
+  // The last photo that finished loading stays under the new one until that one is ready
+  // (theme switch / new pick), so the banner never drops back to the plain artwork in between
+  const [shown, setShown] = useState(null); // { seed, src }
+  const prevSrc = shown && shown.seed === seed && shown.src !== src ? shown.src : null;
   const title = photo && !credit ? `Photo by ${photo.author} on Unsplash` : undefined;
 
   return (
@@ -34,6 +38,7 @@ export default function UnsplashBanner({
       style={{ backgroundImage: color ? toneArt(color, seed, theme) : abstractArt(seed, theme), ...(color ? { '--ub-tint': color } : null), ...style }}
       title={title}
     >
+      {prevSrc && <img key={prevSrc} className="ub-img in" src={prevSrc} alt="" />}
       {src && (
         <img
           key={src}
@@ -41,12 +46,16 @@ export default function UnsplashBanner({
           src={src}
           alt=""
           decoding="async"
-          onLoad={() => setLoadedSrc(src)}
+          onLoad={() => {
+            setLoadedSrc(src);
+            // Drop the old photo only after the new one has faded in over it (0.5s)
+            setTimeout(() => setShown({ seed, src }), prevSrc ? 550 : 0);
+          }}
           onError={() => setLoadedSrc(null)}
         />
       )}
       {/* One colour over every photo (the contact's colour, else the app accent), so all banners match */}
-      {src && <span className={`ub-tint${loadedSrc === src ? ' in' : ''}`} aria-hidden="true" />}
+      {(src || prevSrc) && <span className={`ub-tint${loadedSrc === src || prevSrc ? ' in' : ''}`} aria-hidden="true" />}
       <span className="ub-shade" aria-hidden="true" />
       {children}
       {credit && photo && (
