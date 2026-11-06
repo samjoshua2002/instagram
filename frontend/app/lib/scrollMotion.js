@@ -122,7 +122,8 @@ function watchGeometry(els) {
 /**
  * @param {React.RefObject<HTMLElement>} rootRef page root (the hero's parent)
  * @param {object} o selectors, scoped to the hero: hero, media (avatar/cover), title, fade (secondary bits),
- *   pin (optional control that stays in the band, e.g. a back button); `stack` (scoped to root) is an
+ *   pin (optional control that stays in the band, e.g. a back button), pinEnd (same, at the right end,
+ *   e.g. a ... menu); `stack` (scoped to root) is an
  *   optional sticky row that sits under the band and gets `.is-stuck` while stuck.
  */
 export function useHeroCollapse(rootRef, o, deps = []) {
@@ -144,6 +145,7 @@ export function useHeroCollapse(rootRef, o, deps = []) {
         const media = hero.querySelector(o.media);
         const title = hero.querySelector(o.title);
         const pin = o.pin ? hero.querySelector(o.pin) : null;
+        const pinEnd = o.pinEnd ? hero.querySelector(o.pinEnd) : null;
         const fades = gsap.utils.toArray(o.fade, hero);
         const surface = hero.querySelector('.hero-surface');
         const m = {};
@@ -152,7 +154,7 @@ export function useHeroCollapse(rootRef, o, deps = []) {
         gsap.set(media, { transformOrigin: '0 0' });
         // Own GPU layers for everything that moves: the browser only re-composites each
         // frame instead of re-painting text, shadows and the avatar while scrolling.
-        gsap.set([media, title, pin, surface, ...fades].filter(Boolean), { willChange: 'transform, opacity' });
+        gsap.set([media, title, pin, pinEnd, surface, ...fades].filter(Boolean), { willChange: 'transform, opacity' });
 
         const measure = () => {
           const H = hero.offsetHeight;
@@ -174,6 +176,12 @@ export function useHeroCollapse(rootRef, o, deps = []) {
             m.pinY = yc - (p.y + pin.offsetHeight / 2);
             left = p.x + pin.offsetWidth + 8;
           }
+          let right = W;
+          if (pinEnd) {
+            const p = offsetIn(pinEnd, hero);
+            m.pinEndY = yc - (p.y + pinEnd.offsetHeight / 2);
+            right = p.x - 8;
+          }
 
           const a = band - 16; // compact avatar/cover size
           const mo = offsetIn(media, hero);
@@ -185,7 +193,7 @@ export function useHeroCollapse(rootRef, o, deps = []) {
           const to = offsetIn(title, hero);
           const ink = inkBox(title);
           const fs = parseFloat(getComputedStyle(title).fontSize) || 32;
-          const s = Math.min((phone ? 17 : 20) / fs, (band - 14) / ink.h, (W - left - 8) / ink.w);
+          const s = Math.min((phone ? 17 : 20) / fs, (band - 14) / ink.h, (right - left - 8) / ink.w);
           m.titleS = s;
           m.titleOrigin = `${ink.dx}px ${ink.dy}px`;
           m.titleX = left - (to.x + ink.dx);
@@ -213,6 +221,7 @@ export function useHeroCollapse(rootRef, o, deps = []) {
           .fromTo(media, { x: 0, y: 0, scale: 1 }, { x: () => m.mediaX, y: () => m.mediaY, scale: () => m.mediaS, duration: 1 }, 0)
           .fromTo(title, { x: 0, y: 0, scale: 1 }, { x: () => m.titleX, y: () => m.titleY, scale: () => m.titleS, duration: 1 }, 0);
         if (pin) tl.fromTo(pin, { y: 0 }, { y: () => m.pinY, duration: 1 }, 0);
+        if (pinEnd) tl.fromTo(pinEnd, { y: 0 }, { y: () => m.pinEndY, duration: 1 }, 0);
         if (surface) tl.fromTo(surface, { opacity: 0 }, { opacity: 1, duration: 0.35 }, 0.65);
       }
 
