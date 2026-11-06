@@ -2010,7 +2010,6 @@ body {
 .person-page {
   position: relative;
   isolation: isolate;
-  max-width: 1040px;
   --person-line: color-mix(in srgb, var(--color-text-primary) 9%, transparent);
   --person-well: color-mix(in srgb, var(--color-surface) 70%, transparent);
 }
