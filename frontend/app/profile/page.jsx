@@ -797,7 +797,7 @@ export default function ProfilePage() {
                 fontFamily: "var(--font-label)",
                 fontWeight: 800,
                 background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success-container, color-mix(in srgb, #22c55e 12%, transparent))' : 'var(--danger-container, color-mix(in srgb, #ef4444 14%, transparent))',
-                color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success, #4ade80)' : 'var(--danger, #f87171)',
+                color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--color-success)' : 'var(--color-danger)',
                 padding: '3px 10px',
                 borderRadius: '6px'
               }}>
@@ -842,7 +842,7 @@ export default function ProfilePage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, var(--color-text-secondary))', fontWeight: 700 }}>Security Status</span>
-                <span style={{ fontSize: '0.76rem', color: 'var(--success, #16a34a)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '0.76rem', color: 'var(--color-success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Shield size={13} /> AES-256-GCM Encrypted
                 </span>
               </div>
