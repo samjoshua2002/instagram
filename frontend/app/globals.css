@@ -48,6 +48,23 @@
   --input-bg: rgba(255, 255, 255, 0.055);
   --input-border: rgba(255, 255, 255, 0.12);
 
+  /* Spacing: 4-point grid (APPLE-UI-SPEC §1) */
+  --space-0-5: 0.125rem; --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-12: 3rem;
+
+  /* Fields (APPLE-UI-SPEC §9): thin material, no border at rest, accent ring on focus */
+  --mat-thin: rgba(255, 255, 255, 0.06);
+  --mat-thin-hover: rgba(255, 255, 255, 0.08);
+  --mat-thin-focus: rgba(255, 255, 255, 0.08);
+  --size-control: 2.5rem;
+  --size-control-touch: 3rem;
+  --size-icon-sm: 1rem;
+  --radius-sm: 0.625rem;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', sans-serif;
+  --field-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 0 0 1px var(--accent);
+  --field-ring-error: 0 0 0 3px color-mix(in srgb, var(--color-danger, #f3727f) 35%, transparent), inset 0 0 0 1px var(--color-danger, #f3727f);
+  --field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b3b3b3' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
   /* Geometry & Radius */
   --radius-small: 8px;
   --radius-card: 20px;
@@ -97,6 +114,10 @@
   --glass-highlight: rgba(255, 255, 255, 0.6);
   --input-bg: rgba(0, 0, 0, 0.035);
   --input-border: rgba(0, 0, 0, 0.12);
+  --mat-thin: rgba(0, 0, 0, 0.04);
+  --mat-thin-hover: rgba(0, 0, 0, 0.06);
+  --mat-thin-focus: rgba(0, 0, 0, 0.06);
+  --field-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23535353' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 
   color-scheme: light;
 }
@@ -240,36 +261,101 @@ svg.lucide { flex-shrink: 0; }
   border-color: var(--color-text-secondary);
 }
 
-/* Form Inputs — token-driven only, overrides any inline colour (PLAN.md §15.4) */
-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]),
+/* Form fields (APPLE-UI-SPEC §9 inputs, §17 select trigger). Token-driven only;
+   !important beats any inline colour (PLAN.md §15.4). Thin material fill, no border
+   at rest, 40px high (48px on touch), radius 10, 15px system text (16px on touch). */
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
 textarea,
 select {
-  background: var(--input-bg) !important;
+  background-color: var(--mat-thin) !important;
   color: var(--color-text-primary) !important;
-  border: 1px solid var(--input-border) !important;
-  padding: 9px 12px;
-  border-radius: var(--radius-small);
-  font-family: inherit;
-  font-size: 0.85rem;
+  border: none !important;
+  box-shadow: none;
+  height: var(--size-control);
+  min-height: var(--size-control);
+  padding: 0 var(--space-3, 0.75rem);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0;
   outline: none;
-  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  /* No transition on the way in: the focus ring appears instantly (§9) */
+  transition: background-color 150ms var(--ease-out, ease), box-shadow 150ms var(--ease-out, ease);
   width: 100%;
   box-sizing: border-box;
 }
 
-/* Input that sits inside its own bordered box (e.g. "@ username"): no second border */
-input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+/* Search fields are capsules with 16px side padding */
+input[type="search"]:not(.bare-input) {
+  border-radius: var(--radius-pill) !important;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Text areas: 12px padding all round; short ones (composer, no rows / rows ≤ 2) grow
+   with the text from 40px to 160px, then scroll. Longer ones keep their rows as the
+   minimum and grow up to 320px. No drag handle: they size themselves. */
+textarea {
+  height: auto;
+  padding: var(--space-3, 0.75rem);
+  resize: none !important;
+  field-sizing: content;
+  min-height: var(--size-control);
+  max-height: 10rem;
+  overflow-y: auto;
+}
+textarea[rows="3"] { min-height: calc(3lh + 1.5rem); }
+textarea[rows="4"] { min-height: calc(4lh + 1.5rem); }
+textarea[rows="5"] { min-height: calc(5lh + 1.5rem); }
+textarea[rows="6"] { min-height: calc(6lh + 1.5rem); }
+textarea[rows="7"] { min-height: calc(7lh + 1.5rem); }
+textarea[rows="8"] { min-height: calc(8lh + 1.5rem); }
+textarea[rows="3"], textarea[rows="4"], textarea[rows="5"],
+textarea[rows="6"], textarea[rows="7"], textarea[rows="8"] { max-height: 20rem; }
+
+/* Select trigger looks like an input with a 16px chevron on the right */
+select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--field-chevron) !important;
+  background-repeat: no-repeat !important;
+  background-position: right var(--space-3, 0.75rem) center !important;
+  background-size: var(--size-icon-sm) !important;
+  padding-right: 2.25rem !important;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+@media (hover: hover) {
+  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]):hover:not(:focus):not(:disabled),
+  textarea:hover:not(:focus):not(:disabled),
+  select:hover:not(:focus):not(:disabled) {
+    background-color: var(--mat-thin-hover) !important;
+  }
+}
+
+/* Input that sits inside its own field box (e.g. "@ username"): the box is the field */
+input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]) {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 0 6px;
+  height: auto;
+  padding: 0 var(--space-1);
   min-height: 0;
   align-self: stretch;
+}
+:has(> input.bare-input) {
+  background: var(--mat-thin) !important;
+  border-color: transparent !important;
 }
 
 input::placeholder,
 textarea::placeholder {
   color: var(--color-text-muted);
+  font-style: normal;
+  opacity: 1;
 }
 
 select option {
@@ -293,25 +379,64 @@ input[type="checkbox"] {
   flex-shrink: 0;
 }
 
-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):focus,
+/* Focus: fill +2% and the accent ring, shown instantly (no transition in) */
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]):focus,
 textarea:focus,
 select:focus {
   outline: none !important;
-  border-color: var(--ambient-dominant) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-dominant) 25%, transparent) !important;
+  background-color: var(--mat-thin-focus) !important;
+  box-shadow: var(--field-ring) !important;
+  transition: none;
+}
+
+/* Error: ring in the danger colour (set aria-invalid="true" on the field) */
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"])[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  box-shadow: var(--field-ring-error) !important;
+}
+
+/* Disabled */
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]):disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Bare input: the box around it shows the focus ring instead */
-input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):focus { box-shadow: none !important; }
-:has(> input.bare-input:focus) { border-color: var(--ambient-dominant) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-dominant) 25%, transparent); }
+input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]):focus { box-shadow: none !important; }
+:has(> input.bare-input:focus) { background: var(--mat-thin-focus) !important; border-color: transparent !important; box-shadow: var(--field-ring) !important; }
 
-/* Mobile: 16px text stops iOS Safari zooming on focus; 48px tap targets */
-@media (max-width: 768px) {
-  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]),
+/* More contrast: hairline border at rest (§9, §28) */
+@media (prefers-contrast: more) {
+  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
   textarea,
   select {
-    font-size: 16px !important;
-    min-height: var(--tap-target);
+    box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  }
+}
+
+/* Touch: 48px fields and 16px text (16px also stops iOS Safari zooming on focus) */
+@media (pointer: coarse) {
+  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+  select {
+    height: var(--size-control-touch);
+    min-height: var(--size-control-touch);
+  }
+  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 1rem !important;
+  }
+}
+
+/* Mobile widths: 16px text and tap targets */
+@media (max-width: 768px) {
+  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+  textarea,
+  select {
+    font-size: 1rem !important;
   }
 
   button,
@@ -574,10 +699,6 @@ input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):
     font-size: 0.78rem !important;
   }
 
-  /* AI raw chat textarea */
-  textarea {
-    font-size: 0.8rem !important;
-  }
 }
 
 /* Sidebar: hidden on mobile, shown via toggle */
@@ -2779,13 +2900,17 @@ body {
   border-color: var(--glass-border);
 }
 
+/* Inline label typed on a wire: plain text, not a field box */
 .story-wire-tag input {
   min-width: 0;
-  padding: 2px 0;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 2px 0 !important;
   border: none;
-  background: transparent;
+  background: transparent !important;
+  box-shadow: none !important;
   color: var(--color-text-primary);
-  font: 600 0.7rem var(--font-sans);
+  font: 600 0.7rem var(--font-sans) !important;
   outline: none;
 }
 
@@ -2913,35 +3038,29 @@ body {
   padding: 8px;
 }
 
+/* Node cards are a dense canvas: compact 32px fields, same fill and focus ring as §9 */
 .story-node-body input,
 .story-node-body select,
 .story-node-body textarea {
   width: 100%;
   min-width: 0;
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-fill-subtle);
-  color: var(--color-text-primary);
-  font: 500 0.76rem var(--font-sans);
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 var(--space-2) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 0.8125rem !important;
 }
-
-.story-node-body input:focus,
-.story-node-body select:focus,
-.story-node-body textarea:focus {
-  outline: none;
-  border-color: var(--node-color);
+.story-node-body select { padding-right: 2rem !important; }
+.story-node-body textarea {
+  height: auto !important;
+  min-height: 3.25rem !important;
+  padding: var(--space-2) !important;
+  line-height: 1.35;
 }
 
 .story-node-body .story-node-name {
   font-weight: 700;
   font-size: 0.82rem;
-}
-
-.story-node-body textarea {
-  resize: vertical;
-  min-height: 52px;
-  line-height: 1.35;
 }
 
 .story-node-row {
@@ -3234,16 +3353,12 @@ body {
   border-top: 1px solid var(--glass-border);
 }
 
+/* Composer field: shared field styles, capsule shape */
 .sandbox-form input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--glass-border);
-  background: var(--glass-fill-subtle);
-  color: var(--color-text-primary);
-  font: 500 0.86rem var(--font-sans);
+  padding: 0 var(--space-4) !important;
+  border-radius: var(--radius-pill) !important;
 }
 
 .sandbox-form button {
@@ -3293,8 +3408,7 @@ body {
 .people-search input,
 .people-sort {
   border: none !important;
-  background: var(--color-search) !important;
-  border-radius: 9999px !important;
+  border-radius: var(--radius-pill) !important;
 }
 
 /* People page filters: tidy mobile layout */
@@ -3312,9 +3426,8 @@ body {
   .people-search { flex: 1 1 100% !important; min-width: 0 !important; }
   .people-toolbar { gap: 12px !important; }
   /* Figma: 36px pills, 13px text. Search text stays 16px (stops iPhone zoom); placeholder shrinks */
-  .people-search input { height: 36px !important; min-height: 36px !important; }
-  .people-search input::placeholder { font-size: 13px; }
-  .people-sort { flex: 0 0 124px; min-width: 0; height: 36px !important; min-height: 36px !important; font-size: 13px !important; }
+
+  .people-sort { flex: 0 0 124px; min-width: 0; }
   .people-layout-switch { flex: 1 1 0; min-width: 0; height: 36px !important; }
   .people-layout-btn { flex: 1; justify-content: center; padding: 0 6px !important; font-size: 13px !important; }
   .people-layout-btn svg { display: none; }

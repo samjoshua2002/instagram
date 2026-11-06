@@ -927,7 +927,7 @@ function SettingsPageContent() {
               value={formData.customKnowledge}
               onChange={e => setFormData({ ...formData, customKnowledge: e.target.value })}
               placeholder="e.g.&#10;Account: @username&#10;Creator: Full Name&#10;Topics: Creative projects, tech, photography&#10;Location: City / Country&#10;Inquiries: DMs open for collaborations"
-              style={{ lineHeight: '1.5', resize: 'vertical', fontFamily: 'var(--font-code)', fontSize: '0.82rem' }}
+              style={{ lineHeight: '1.5', fontFamily: 'var(--font-code)' }}
             />
           </div>
         </div>
@@ -1010,7 +1010,7 @@ function SettingsPageContent() {
               value={formData.toneGuidelines}
               onChange={e => setFormData({ ...formData, toneGuidelines: e.target.value })}
               placeholder="1. Talk like a real human on Instagram DM: casual, friendly, relatable, and authentic.&#10;2. NO FORMAL PUNCTUATION...&#10;3. USE NATURAL SHORTCUTS & SLANG..."
-              style={{ lineHeight: '1.5', resize: 'vertical', fontSize: '0.84rem' }}
+              style={{ lineHeight: '1.5' }}
             />
           </div>
         </div>

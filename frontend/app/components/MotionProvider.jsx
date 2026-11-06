@@ -10,10 +10,11 @@ import { installTriggerTracking, PRESS_SCALE, T } from '../lib/motion';
  *  - Trigger tracking: popups grow out of (and shrink back into) the button that opened them.
  *  - Press: every button / link / tab deflates to 0.97 instantly on press and eases back on release.
  *  - Rubber band: horizontal pill rows stretch a little past their ends, then snap back.
+ *  - Text areas grow with their text where CSS `field-sizing: content` is missing.
  */
 export default function MotionProvider({ children }) {
   useEffect(() => {
-    const off = [installTriggerTracking(), installPress(), installRubberBand()];
+    const off = [installTriggerTracking(), installPress(), installRubberBand(), installAutoGrow()];
     return () => off.forEach((f) => f && f());
   }, []);
 
@@ -22,6 +23,26 @@ export default function MotionProvider({ children }) {
       {children}
     </MotionConfig>
   );
+}
+
+/* ───────────── Text area auto-grow (fallback for field-sizing) ───────────── */
+
+// The CSS (globals.css) sets min-height / max-height; this only sets the height to the text.
+function installAutoGrow() {
+  if (typeof window === 'undefined' || window.CSS?.supports?.('field-sizing', 'content')) return null;
+  const grow = (el) => {
+    if (!(el instanceof HTMLTextAreaElement)) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  const onInput = (e) => grow(e.target);
+  const onFocus = (e) => grow(e.target);
+  document.addEventListener('input', onInput, true);
+  document.addEventListener('focusin', onFocus, true);
+  return () => {
+    document.removeEventListener('input', onInput, true);
+    document.removeEventListener('focusin', onFocus, true);
+  };
 }
 
 /* ───────────── Press: scale 0.97 ───────────── */
