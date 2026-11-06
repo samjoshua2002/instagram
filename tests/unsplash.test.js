@@ -188,3 +188,42 @@ test('grey one-colour textures are dropped unless a real colour is named', () =>
   assert.equal(isPlain({ color: '#f3f3f3', alt_description: 'Dynamic blue and white abstract wave pattern' }), false);
   assert.equal(isPlain({ color: '#0c2626', alt_description: 'Abstract teal and black wavy background' }), false);
 });
+
+test('light theme asks for light photo lists and keeps only bright photos (dark theme: dark ones)', async () => {
+  const { TOPICS } = require('../services/unsplashService');
+  const b = await import('../frontend/app/lib/banners.js');
+  for (const t of ['abstract', 'colorful', 'fluid']) {
+    assert.equal(b.themedTopic(t, 'light'), `${t}-light`);
+    assert.equal(b.themedTopic(t, 'dark'), t);
+    assert.ok(Object.hasOwn(TOPICS, `${t}-light`), `server knows ${t}-light`);
+  }
+  assert.equal(b.themedTopic('tone-blue', 'light'), 'tone-blue'); // colour lists are sorted, not swapped
+
+  const photos = [
+    { id: 'night', color: '#0d1426' },
+    { id: 'navy', color: '#1f3a73' },
+    { id: 'wine', color: '#592633' },
+    { id: 'mid', color: '#8c8c40' },
+    { id: 'peach', color: '#f2cbb3' },
+    { id: 'mint', color: '#c9f2e0' },
+    { id: 'snow', color: '#f5f5f5' },
+  ];
+  const ids = list => list.map(p => p.id).sort();
+  assert.deepEqual(ids(b.forTheme(photos, 'light')), ['mint', 'peach', 'snow']);
+  assert.deepEqual(ids(b.forTheme(photos, 'dark')), ['navy', 'night', 'wine']);
+  // Too few fit: the brighter / darker half, never an empty list
+  const mostlyDark = [{ id: 'a', color: '#101010' }, { id: 'b', color: '#202020' }, { id: 'c', color: '#808080' }, { id: 'd', color: '#303030' }];
+  assert.deepEqual(ids(b.forTheme(mostlyDark, 'light')), ['c', 'd']);
+  assert.equal(b.forTheme(null, 'light'), null);
+  assert.deepEqual(b.forTheme([], 'dark'), []);
+  // A pick from the themed list is always one that fits
+  for (const seed of ['x', 'y', 'z', 'Aradhana']) assert.ok(['mint', 'peach', 'snow'].includes(b.pickBanner(b.forTheme(photos, 'light'), seed).id));
+
+  // Placeholder waves: dark wash in dark theme, white wash in light theme
+  const dark = decodeURIComponent(b.abstractArt('x'));
+  const light = decodeURIComponent(b.abstractArt('x', 'light'));
+  assert.match(dark, /fill="#000" fill-opacity="0.35"/);
+  assert.match(light, /fill="#fff" fill-opacity="0.55"/);
+  assert.match(decodeURIComponent(b.toneArt('hsl(220 70% 50%)', 'x', 'light')), /hsl\(220 70% 72%\)/);
+  assert.equal(b.currentTheme(), 'dark'); // no document in Node
+});
