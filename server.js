@@ -3115,6 +3115,15 @@ app.listen(PORT, '0.0.0.0', () => {
   // Seed predefined meme collection in MediaVault so DB always has relevant GIFs ready
   stickerService.seedPredefinedIntoVault().catch(e => console.warn('MediaVault seed warning:', e.message));
 
+  // Render free servers sleep after 15 idle minutes and then take up to a minute to answer,
+  // so the server calls its own public address every 10 minutes to stay awake
+  if (process.env.RENDER_EXTERNAL_URL) {
+    const pingUrl = `${process.env.RENDER_EXTERNAL_URL.replace(/\/+$/, '')}/api/status`;
+    setInterval(() => {
+      require('axios').get(pingUrl, { timeout: 20000 }).catch(e => console.warn('Keep-awake ping failed:', e.message));
+    }, 10 * 60 * 1000).unref();
+  }
+
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
 

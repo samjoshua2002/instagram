@@ -141,13 +141,33 @@ function SettingsPageContent() {
     { role: 'assistant', text: 'appreciate it so much! thanks for reaching out 🙌' }
   ]);
 
+  // Some accounts only carry a username, so it is the last fallback (same as AppContext)
+  const userId = user?._id || user?.id || user?.username;
+  // True once the server's saved settings have arrived; saving waits for it
+  const [loaded, setLoaded] = useState(false);
+  // What the form showed before the user typed, so late-arriving data never wipes their typing
+  const shownRef = useRef(formData);
+  const applyLoaded = (next) => {
+    const shown = shownRef.current;
+    shownRef.current = { ...shown, ...next };
+    setFormData(prev => {
+      const merged = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (prev[k] === shown[k]) merged[k] = next[k];
+      });
+      return merged;
+    });
+  };
+
   // Fetch current persona on mount or when user changes
   useEffect(() => {
-    if (user?._id || user?.id) {
-      setLoading(true);
-      fetchPersona();
-    }
-  }, [user?._id, user?.id]);
+    if (!userId) return;
+    setLoading(true);
+    fetchPersona();
+    // A sleeping server can take up to a minute: show the form after 2.5s instead of a blank skeleton
+    const showForm = setTimeout(() => setLoading(false), 2500);
+    return () => clearTimeout(showForm);
+  }, [userId]);
 
   // A failed load tries again by itself when the tab is shown again, the connection returns, or after 20s
   useEffect(() => {
@@ -164,8 +184,8 @@ function SettingsPageContent() {
   }, [loadFailed]);
 
   const fetchPersona = async () => {
-    if (!user?._id && !user?.id) return;
-    const userCacheKey = `chatter_persona_cached_${user._id || user.id}`;
+    if (!userId) return;
+    const userCacheKey = `chatter_persona_cached_${userId}`;
     // Only show cached persona if strictly scoped to this user ID
     if (typeof window !== 'undefined') {
       try {
@@ -178,7 +198,7 @@ function SettingsPageContent() {
             if (parsed.instagramPageAccessToken !== undefined || parsed.giphyApiKey !== undefined) {
               try { localStorage.setItem(userCacheKey, JSON.stringify(safeCached)); } catch (e) { }
             }
-            setFormData(prev => ({ ...prev, ...safeCached }));
+            applyLoaded(safeCached);
             setLoading(false);
           }
         }
@@ -187,9 +207,13 @@ function SettingsPageContent() {
       }
     }
 
+    // Give up after a minute (the app's fetch keeps retrying a waking server); the failed-load retry takes over
+    const giveUp = new AbortController();
+    const giveUpTimer = setTimeout(() => giveUp.abort(), 60000);
     try {
       const res = await fetch(`${API_BASE}/api/persona`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        signal: giveUp.signal,
       });
       if (res.ok) {
         const data = await res.json();
@@ -217,7 +241,8 @@ function SettingsPageContent() {
           instagram: Boolean(data.hasInstagramToken ?? data.instagramPageAccessToken ?? (user?.hasInstagramToken || user?.isInstagramConnected)),
           giphy: Boolean(data.hasGiphyKey ?? data.giphyApiKey),
         });
-        setFormData(updated);
+        applyLoaded(updated);
+        setLoaded(true);
         setLoadFailed(false);
         // Drop the old "could not load" banner once the settings arrive
         setErrorMsg(prev => (prev.startsWith('Could not load') || prev.startsWith('Could not fetch') ? '' : prev));
@@ -233,6 +258,7 @@ function SettingsPageContent() {
       setLoadFailed(true);
       setErrorMsg('Could not fetch settings from server. Check your connection.');
     } finally {
+      clearTimeout(giveUpTimer);
       setLoading(false);
     }
   };
@@ -269,6 +295,10 @@ function SettingsPageContent() {
       showToast('Settings did not load, so saving is paused to protect your data. Reload the page.', 'error');
       return;
     }
+    if (!loaded) {
+      showToast('Still loading your saved settings (the server is waking up). Try again in a few seconds.', 'info');
+      return;
+    }
     setSaving(true);
     setErrorMsg('');
     try {
@@ -291,7 +321,7 @@ function SettingsPageContent() {
           setFormData(prev => ({ ...prev, instagramPageAccessToken: '', giphyApiKey: '' }));
         }
         if (typeof window !== 'undefined') {
-          const userCacheKey = (user?._id || user?.id) ? `chatter_persona_cached_${user._id || user.id}` : 'chatter_persona_cached';
+          const userCacheKey = userId ? `chatter_persona_cached_${userId}` : 'chatter_persona_cached';
           try {
             localStorage.setItem(userCacheKey, JSON.stringify(stripSecrets(formData)));
           } catch (e) { }
@@ -552,6 +582,23 @@ function SettingsPageContent() {
       </PageHero>
 
       {/* Error alert if any */}
+      {!loaded && !loadFailed && (
+        <div role="status" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'color-mix(in srgb, var(--color-info) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)',
+          padding: '14px 18px',
+          borderRadius: '12px',
+          color: 'var(--color-text)',
+          fontSize: '0.86rem',
+        }}>
+          <RefreshCw size={18} className="animate-spin" />
+          <span>Loading your saved settings. If the server was asleep this can take up to a minute; saving unlocks when it is done.</span>
+        </div>
+      )}
+
       {errorMsg && (
         <div style={{
           display: 'flex',
