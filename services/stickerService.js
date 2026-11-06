@@ -58,10 +58,10 @@ class StickerService {
       },
       {
         id: 'pred_side_eye_monkey',
-        name: 'Awkward Monkey Puppet Look Away',
+        name: 'Side Eye Chloe Kid',
         category: 'side_eye',
-        url: 'https://media.giphy.com/media/cJMlRUCbMMzpC/giphy.gif',
-        keywords: ['awkward', 'puppet', 'sus', 'guilty', 'look away', 'ai', 'oops'],
+        url: 'https://media.giphy.com/media/APqEbxBsVlkWSuFpth/giphy.gif',
+        keywords: ['awkward', 'side eye', 'sus', 'guilty', 'look away', 'ai', 'oops'],
         mediaType: 'gif'
       },
       {
@@ -76,10 +76,10 @@ class StickerService {
       // JOY / LAUGH / HAHA
       {
         id: 'pred_joy_leo_django',
-        name: 'Leonardo DiCaprio Laughing Cheers',
+        name: 'Leonardo DiCaprio Clapping',
         category: 'joy',
-        url: 'https://media.giphy.com/media/WpaVhEcp3nnBAj2LAc/giphy.gif',
-        keywords: ['leo', 'leonardo', 'laugh', 'haha', 'drink', 'cheers', 'smug', 'funny', 'joy'],
+        url: 'https://media.giphy.com/media/YRuFixSNWFVcXaxpmX/giphy.gif',
+        keywords: ['leo', 'leonardo', 'laugh', 'haha', 'clap', 'applause', 'smug', 'funny', 'joy'],
         mediaType: 'gif'
       },
       {
@@ -102,18 +102,18 @@ class StickerService {
       // LOL / ROFL / SKULL
       {
         id: 'pred_lol_skull',
-        name: 'Dying Laughing Tears',
+        name: 'Minions Laughing Hysterically',
         category: 'lol',
-        url: 'https://media.giphy.com/media/vjjCsx3izfRSq4Ze05/giphy.gif',
+        url: 'https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif',
         keywords: ['lol', 'dead', 'skull', 'dying', 'lmao', 'rofl', 'crying laughing'],
         mediaType: 'gif'
       },
       {
         id: 'pred_lol_risitas',
-        name: 'El Risitas Wheezing KEKW',
+        name: 'Muttley Snickering Laugh',
         category: 'lol',
-        url: 'https://media.giphy.com/media/j9mqKgQvkNOziGICfd/giphy.gif',
-        keywords: ['risitas', 'kekw', 'lol', 'wheezing', 'hysterical', 'lmao'],
+        url: 'https://media.giphy.com/media/3oEjHAUOqG3lSS0f1C/giphy.gif',
+        keywords: ['snicker', 'giggle', 'lol', 'wheezing', 'hysterical', 'lmao'],
         mediaType: 'gif'
       },
       {
@@ -182,7 +182,7 @@ class StickerService {
         id: 'pred_happy_gatsby',
         name: 'Great Gatsby Cheers Toast',
         category: 'happy',
-        url: 'https://media.giphy.com/media/GCLlQnV7dXZ2E/giphy.gif',
+        url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif',
         keywords: ['gatsby', 'cheers', 'toast', 'celebrate', 'happy', 'fireworks', 'champagne'],
         mediaType: 'gif'
       },
@@ -204,9 +204,9 @@ class StickerService {
       },
       {
         id: 'pred_happy_cheer',
-        name: 'Kids Cheering High Five',
+        name: 'Office Cheering Celebration',
         category: 'happy',
-        url: 'https://media.giphy.com/media/26BRv0ThflsDTjDUs/giphy.gif',
+        url: 'https://media.giphy.com/media/3o6fJ1BM7R2EBRDnxK/giphy.gif',
         keywords: ['cheer', 'yay', 'party', 'woohoo', 'hype', 'celebrate'],
         mediaType: 'gif'
       },
@@ -232,7 +232,7 @@ class StickerService {
         id: 'pred_confused_math',
         name: 'Math Lady Calculating Confused',
         category: 'confused',
-        url: 'https://media.giphy.com/media/4JVTF9fR99WYo/giphy.gif',
+        url: 'https://media.giphy.com/media/WRQBXSCnEFJIuxktnw/giphy.gif',
         keywords: ['math', 'calculating', 'confused', 'equations', 'what', 'thinking', 'huh'],
         mediaType: 'gif'
       },
@@ -323,20 +323,20 @@ class StickerService {
     this.stickers = {
       joy: [
         'https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif',
-        'https://media.giphy.com/media/WpaVhEcp3nnBAj2LAc/giphy.gif',
+        'https://media.giphy.com/media/YRuFixSNWFVcXaxpmX/giphy.gif',
         'https://media.giphy.com/media/UO5elnTqo4vSg/giphy.gif',
       ],
       laugh: [
         'https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif',
-        'https://media.giphy.com/media/WpaVhEcp3nnBAj2LAc/giphy.gif',
+        'https://media.giphy.com/media/YRuFixSNWFVcXaxpmX/giphy.gif',
       ],
       lol: [
-        'https://media.giphy.com/media/vjjCsx3izfRSq4Ze05/giphy.gif',
-        'https://media.giphy.com/media/j9mqKgQvkNOziGICfd/giphy.gif',
+        'https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif',
+        'https://media.giphy.com/media/3oEjHAUOqG3lSS0f1C/giphy.gif',
         'https://media.giphy.com/media/oubM1tKqnLW5G/giphy.gif',
       ],
       skull: [
-        'https://media.giphy.com/media/vjjCsx3izfRSq4Ze05/giphy.gif',
+        'https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif',
       ],
       wonder: [
         'https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif',
@@ -357,21 +357,21 @@ class StickerService {
         'https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif',
       ],
       happy: [
-        'https://media.giphy.com/media/GCLlQnV7dXZ2E/giphy.gif',
+        'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif',
         'https://media.giphy.com/media/nrXif9YExO9EI/giphy.gif',
         'https://media.giphy.com/media/pa37AAGzKXoek/giphy.gif',
-        'https://media.giphy.com/media/26BRv0ThflsDTjDUs/giphy.gif',
+        'https://media.giphy.com/media/3o6fJ1BM7R2EBRDnxK/giphy.gif',
       ],
       side_eye: [
         'https://media.giphy.com/media/H5C8CevNMbpBqNqFjl/giphy.gif',
         'https://media.giphy.com/media/ANbD1CCdA3iI8/giphy.gif',
-        'https://media.giphy.com/media/cJMlRUCbMMzpC/giphy.gif',
+        'https://media.giphy.com/media/APqEbxBsVlkWSuFpth/giphy.gif',
         'https://media.giphy.com/media/26ghbWoXv3G6ypo8o/giphy.gif',
       ],
       confused: [
         'https://media.giphy.com/media/g01ZnwAUvutuK8GIQn/giphy.gif',
         'https://media.giphy.com/media/l3q2K5jinAlChoCLS/giphy.gif',
-        'https://media.giphy.com/media/4JVTF9fR99WYo/giphy.gif',
+        'https://media.giphy.com/media/WRQBXSCnEFJIuxktnw/giphy.gif',
       ],
       cool: [
         'https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif',
