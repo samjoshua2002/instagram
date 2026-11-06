@@ -217,3 +217,9 @@
 @media (prefers-reduced-motion: reduce) {
   .an * { transition: none !important; }
 }
+
+/* Superadmin user table: action buttons sit two per row so the table fits 1280px; phones keep the full-width card row */
+.an-acc-actions { max-width: 150px; }
+@media (max-width: 640px) {
+  .an-acc-actions { max-width: none; }
+}
