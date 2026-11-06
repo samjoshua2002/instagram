@@ -2475,14 +2475,25 @@ body {
 
 /* ═══ Feature Store + mode switch (PLAN.md §4, §13 Phase 3) ═══ */
 .mode-segment {
-  /* Each column is at least as wide as its label so the active pill never clips. */
-  grid-template-columns: repeat(3, minmax(max-content, 1fr));
+  /* Three equal columns that always fit inside the pill (max-content pushed Hybrid out at 360px) */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   max-width: 100%;
 }
 
 .mode-segment button {
-  padding: 0 16px;
+  min-width: 0;
+  padding: 0 8px;
+  gap: 6px;
   white-space: nowrap;
+}
+
+/* Small phones (320-374px): tighter so all three labels still fit */
+@media (max-width: 374px) {
+  .mode-segment:not(.compact) button {
+    padding: 0 4px;
+    gap: 5px;
+    font-size: 0.82rem;
+  }
 }
 
 .mode-segment button svg {
