@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useHeaderScrollAway } from '../lib/scrollMotion';
 import { usePathname } from 'next/navigation';
 import { useApp } from '../context/AppContext';
 import dynamic from 'next/dynamic';
@@ -50,6 +51,11 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Phones: the top header slides away on scroll and the page's sticky band takes its place.
+  const mainRef = useRef(null);
+  const appShown = mounted && Boolean(token && user);
+  useHeaderScrollAway(mainRef, [appShown]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (user?._id || user?.id)) {
@@ -120,7 +126,7 @@ export default function AuthGate({ children }) {
     <>
       <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', background: 'transparent' }}>
         <Sidebar />
-        <main className="app-main-content">
+        <main ref={mainRef} className="app-main-content">
           <WorkspaceImpersonationBanner />
           {!isInstagramLinked && pathname !== '/settings' && pathname !== '/profile' ? (
             <InstagramConnectFallback
