@@ -243,6 +243,8 @@ app.use('/api/workspace', requireAuth, require('./routes/workspace'));
 app.use('/api/storyboard', requireAuth, require('./routes/storyboard'));
 // Browser notification feed (new DMs, leads, bookings, handoffs)
 app.use('/api/alerts', requireAuth, require('./routes/alerts'));
+// Home dashboard summary (replies, handoffs, Instagram token health)
+app.use('/api/home', requireAuth, require('./routes/home'));
 
 // Contact, chat, graph and media queries only see the signed-in account's records, by ownerId.
 // The superadmin also owns legacy records saved before records had an owner (ownerId null).
