@@ -257,7 +257,9 @@ class MemoryService {
         return;
       }
 
+      // Replies the AI sent are left out: the owner's style is learned only from what they typed
       const formattedChat = messagesToAnalyze
+        .filter(m => !m.sentByAI)
         .map(m => {
           const isOwner = m.role === 'assistant' || owner.botIds.includes(m.senderId);
           const speaker = isOwner ? owner.label : (memory.name || memory.username || 'User');

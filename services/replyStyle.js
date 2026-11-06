@@ -12,6 +12,17 @@ const HUMAN_CHAT_RULES = `HOW TO WRITE EVERY MESSAGE (STRICT, OVERRIDES ANY OTHE
 - NEVER USE BOT PHRASES: "Certainly", "Absolutely", "Great question", "I'd be happy to help", "I understand your concern", "Thank you for reaching out", "Feel free to", "Is there anything else I can help you with", "As an AI", "Hope this helps", "Let me know if you have any other questions".
 - Do not repeat their question back, do not over-explain, and do not end every message with an offer or a question.`;
 
+/**
+ * Personal replies that have the owner's real texting data: the owner's measured style wins,
+ * so emoji are allowed (at the owner's own rate) and no forced lowercase.
+ */
+function humanChatRules({ allowEmoji = false } = {}) {
+  if (!allowEmoji) return HUMAN_CHAT_RULES;
+  return HUMAN_CHAT_RULES
+    .replace(/- NO EMOJI:.*\n/, '- EMOJI: only the way you really use them (see your measured texting style), never more often.\n')
+    .replace(/ short, warm, relaxed, with contractions.*\n/, ' exactly like your real messages shown above: same length, same words, same energy.\n');
+}
+
 // Emoji and their glue characters (skin tones, variation selectors, joiners, keycaps, flags)
 const EMOJI_RE = /[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}️︎‍⃣]/gu;
 // Text emoticons that sit on their own as a word
@@ -25,7 +36,7 @@ function tableRowToText(line) {
 /**
  * Turns a model reply into plain, human DM text.
  */
-function toHumanText(text) {
+function toHumanText(text, { keepEmoji = false } = {}) {
   if (!text) return '';
   const lines = String(text).replace(/\r\n?/g, '\n').split('\n');
   const out = [];
@@ -45,8 +56,8 @@ function toHumanText(text) {
     out.push(line);
   }
   return out.join('\n')
-    .replace(EMOJI_RE, '')
-    .replace(EMOTICON_RE, '$1')
+    .replace(keepEmoji ? /(?!)/g : EMOJI_RE, '')
+    .replace(keepEmoji ? /(?!)/g : EMOTICON_RE, '$1')
     .replace(/\s+—\s+|\s+–\s+/g, ', ')           // spaced dashes read as bot writing
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +([,.!?])/g, '$1')
@@ -55,4 +66,4 @@ function toHumanText(text) {
     .trim();
 }
 
-module.exports = { HUMAN_CHAT_RULES, toHumanText };
+module.exports = { HUMAN_CHAT_RULES, humanChatRules, toHumanText };
