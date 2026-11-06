@@ -27,7 +27,7 @@ const MotionLink = motion.create ? motion.create(Link) : motion(Link);
 /**
  * Mobile Bottom Sheet Drawer (PLAN.md §15.5.3)
  * Opened from the header avatar or the bottom bar "More" tab. Exposes every
- * route for the current workspace, the Personal / Business / Hybrid switch and the
+ * route for the current workspace, the Personal / Business switch and the
  * Light / Dark theme switch.
  */
 export default function MobileFeatureSheet({ open, onClose, items }) {

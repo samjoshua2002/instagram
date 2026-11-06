@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Briefcase, Layers } from 'lucide-react';
+import { User, Briefcase } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { WORKSPACE_MODES, currentMode } from '../lib/workspaceFeatures';
 import { SegIndicator, useSegId } from './ui/motion';
 
-const MODE_ICONS = { personal: User, business: Briefcase, hybrid: Layers };
+const MODE_ICONS = { personal: User, business: Briefcase };
 
 /**
- * Personal <-> Business <-> Hybrid switch (PLAN.md §13 Phase 3). Switching loads
- * that mode's feature preset; the reply voice follows (Hybrid keeps personal).
+ * Personal <-> Business switch (PLAN.md §13 Phase 3). Switching loads
+ * that mode's feature preset; the reply voice follows.
  * `compact` drops the labels to icons + short text for the desktop sidebar.
  */
 export default function WorkspaceModeSwitch({ compact = false }) {

@@ -5,7 +5,6 @@
 export const WORKSPACE_MODES = [
   { key: 'personal', label: 'Personal', hint: 'Your own voice, reel reactions and stickers' },
   { key: 'business', label: 'Business', hint: 'Brand voice, documents, leads and bookings' },
-  { key: 'hybrid', label: 'Hybrid', hint: 'Personal voice plus the business tools' },
 ];
 
 export const FEATURE_GROUPS = [
@@ -38,6 +37,8 @@ export const FEATURE_GROUPS = [
 
 /** Mode for the UI before the store has loaded: falls back to the reply voice. */
 export function currentMode(workspaceFeatures, user) {
+  // Hybrid was removed: old Hybrid workspaces show as Personal (same voice)
+  if (workspaceFeatures?.activeMode === 'hybrid') return 'personal';
   if (workspaceFeatures?.activeMode) return workspaceFeatures.activeMode;
   return ['business', 'agency'].includes(user?.accountType) ? 'business' : 'personal';
 }
