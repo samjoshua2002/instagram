@@ -1,190 +1,23 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import React, { useMemo, useState, useEffect } from 'react';
 import PageSkeleton from '../components/Skeletons';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import {
-  Users, Sliders, Sparkles, ArrowRight,
-  MessageSquare, Film, Bot, Shield,
-  Search, RefreshCw, CheckCircle2, AlertCircle,
-  ExternalLink, ChevronDown, Layers,
-  Lock, Instagram, Smartphone, Calendar, UserCheck, Mail,
-  LogIn, Building2, Briefcase, User as UserIcon, Filter,
-  ChevronLeft, Trash2, Send, Clock, Target, Zap
+  Search, RefreshCw, AlertCircle, ExternalLink, ChevronDown, Layers,
+  Lock, LogIn, Trash2, Send
 } from 'lucide-react';
-import { motion, animate, AnimatePresence } from 'framer-motion';
-import { DUR, EASE_OUT, STAGGER, T, rowMotion } from '../lib/motion';
-import { isAiOnFor } from '../lib/aiReply';
-import BusinessConversionPanel from '../components/BusinessConversionPanel';
+import { motion } from 'framer-motion';
+import { DUR, EASE_OUT, T } from '../lib/motion';
 import WorkspaceModeSwitch from '../components/WorkspaceModeSwitch';
 import PageHero from '../components/PageHero';
-import { WORKSPACE_MODES, FEATURE_GROUPS, currentMode, isFeatureOn } from '../lib/workspaceFeatures';
-
-// Tiny 14-day trend line for the KPI cards (PLAN.md §17.3); flat when there is no data yet
-function Sparkline({ points, width = 96, height = 28 }) {
-  if (!points?.length) return null;
-  const max = Math.max(...points, 1);
-  const step = width / Math.max(points.length - 1, 1);
-  const coords = points.map((v, i) => [i * step, height - 2 - (v / max) * (height - 4)]);
-  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const [lastX, lastY] = coords[coords.length - 1];
-  return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" style={{ color: 'var(--color-text-primary)', overflow: 'visible' }}>
-      <polygon points={`0,${height} ${line} ${width},${height}`} fill="currentColor" opacity="0.08" />
-      <motion.polyline
-        points={line}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-      />
-      <circle cx={lastX} cy={lastY} r="2.4" fill="currentColor" />
-    </svg>
-  );
-}
-
-const timeAgo = date => {
-  const mins = Math.round((Date.now() - new Date(date).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
-  return `${Math.round(mins / 1440)}d ago`;
-};
-
-// Butter-Smooth Framer Motion Animated Number Counter (quintic deceleration curve)
-function AnimatedNumber({ value, duration = 1.6 }) {
-  const numericValue = typeof value === 'number' ? value : parseInt(value, 10) || 0;
-  const [displayValue, setDisplayValue] = useState(0);
-  const prevValueRef = useRef(0);
-
-  useEffect(() => {
-    const start = prevValueRef.current;
-    const controls = animate(start, numericValue, {
-      duration,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate: (latest) => setDisplayValue(Math.round(latest))
-    });
-    prevValueRef.current = numericValue;
-    return () => controls.stop();
-  }, [numericValue, duration]);
-
-  return <span>{displayValue.toLocaleString()}</span>;
-}
-
-// Butter-Smooth Framer Motion Animated SVG Donut Chart
-function DonutChart({ segments, size = 130, stroke = 20 }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
-  let offset = 0;
-
-  return (
-    <motion.svg
-      initial={{ rotate: -90, scale: 0.92, opacity: 0 }}
-      animate={{ rotate: -90, scale: 1, opacity: 1 }}
-      transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      style={{ overflow: 'visible' }}
-    >
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="var(--color-surface-hover)"
-        strokeWidth={stroke}
-      />
-      {segments.map((seg, i) => {
-        const dash = (seg.value / total) * circ;
-        const currentOffset = offset;
-        offset += dash;
-        return (
-          <motion.circle
-            key={i}
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={seg.color}
-            style={{ stroke: seg.color }}
-            strokeWidth={stroke}
-            initial={{ strokeDasharray: `0 ${circ}`, strokeDashoffset: -currentOffset }}
-            animate={{ strokeDasharray: `${dash} ${circ - dash}`, strokeDashoffset: -currentOffset }}
-            transition={{
-              duration: 1.8,
-              delay: 0.2 + i * 0.15,
-              ease: [0.16, 1, 0.3, 1]
-            }}
-            strokeLinecap="butt"
-          />
-        );
-      })}
-    </motion.svg>
-  );
-}
-
-// Horizontal bar row for leaderboards with butter-smooth progress animation
-function BarRow({ label, handle, value, max, index }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  const shades = ['var(--sp-green)', 'var(--sp-green)', 'var(--sp-green)', 'var(--sp-green)', 'var(--sp-green)'];
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: DUR.enter, delay: 0.12 + index * STAGGER, ease: EASE_OUT }}
-      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--color-surface-hover)' }}
-    >
-      <span style={{ width: '16px', fontSize: '0.66rem', color: 'var(--color-text-muted)', fontFamily: "var(--font-label)", fontWeight: '700', textAlign: 'right', flexShrink: 0 }}>
-        {index + 1}
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
-          <span style={{ fontSize: '0.81rem', fontWeight: '700', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>{label}</span>
-          <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--color-text-primary)', fontFamily: "var(--font-label)", flexShrink: 0, marginLeft: '8px' }}>
-            <AnimatedNumber value={value} duration={1.6} />
-          </span>
-        </div>
-        <div style={{ width: '100%', height: '6px', background: 'var(--color-surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.9, delay: 0.2 + index * STAGGER, ease: EASE_OUT }}
-            style={{ height: '100%', background: shades[index] || 'var(--color-border-strong)', borderRadius: '3px' }}
-          />
-        </div>
-        {handle && <div style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: "var(--font-label)", marginTop: '2px' }}>{handle}</div>}
-      </div>
-    </motion.div>
-  );
-}
-
-const statsContainerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: STAGGER,
-      delayChildren: 0.04
-    }
-  }
-};
-
-const statCardVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: T.enter
-  }
-};
+import { currentMode } from '../lib/workspaceFeatures';
+import { useActivity, RangeTabs } from './kit';
+import PersonalView from './PersonalView';
+import BusinessView, { BusinessStrip } from './BusinessView';
+import PlatformView from './PlatformView';
+import './analytics.css';
 
 export default function AnalyticsPage() {
   const { nodes, routingConfig, user, token, enterWorkspace, API_BASE, showToast, workspaceFeatures, isSyncingInitial } = useApp();
@@ -262,14 +95,19 @@ export default function AnalyticsPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
 
-  // KPIs + 14-day trends (and the newest leads for business), refreshed every 30s so they show up live
-  const isBusinessWorkspace = ['business', 'agency'].includes(user?.accountType);
+  // Layout follows the Personal / Business / Hybrid switch; superadmins get the platform layout
+  const mode = currentMode(workspaceFeatures, user);
+  const layout = isSuperadmin ? 'platform' : mode === 'business' ? 'business' : mode === 'hybrid' ? 'hybrid' : 'personal';
+  const [range, setRange] = useState('30d');
+  const activity = useActivity(range, isSuperadmin ? 'platform' : undefined);
+
+  // Overview KPIs (handoffs, leads, bookings, automation), refreshed every 30s so they show up live
   const [bizStats, setBizStats] = useState(null);
   const [bizLoaded, setBizLoaded] = useState(false);
-  const [latestLeads, setLatestLeads] = useState([]);
   useEffect(() => {
+    if (isSuperadmin) return undefined;
     const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
-    if (!activeToken) return;
+    if (!activeToken) return undefined;
     const headers = { Authorization: `Bearer ${activeToken}` };
     const load = () => {
       fetch(`${API_BASE}/api/analytics/overview`, { headers })
@@ -277,12 +115,6 @@ export default function AnalyticsPage() {
         .then(data => { if (data) setBizStats(data); })
         .catch(() => {})
         .finally(() => setBizLoaded(true));
-      if (isBusinessWorkspace) {
-        fetch(`${API_BASE}/api/analytics/leads?limit=4`, { headers })
-          .then(r => (r.ok ? r.json() : null))
-          .then(data => { if (data?.items) setLatestLeads(data.items); })
-          .catch(() => {});
-      }
     };
     load();
     // Skipped while the tab is hidden or offline, like the other pollers
@@ -291,7 +123,7 @@ export default function AnalyticsPage() {
       load();
     }, 30000);
     return () => clearInterval(timer);
-  }, [isBusinessWorkspace, token, API_BASE]);
+  }, [isSuperadmin, token, API_BASE]);
 
   const handleApproveUser = async (targetUser) => {
     const handle = targetUser.instagramUsername || targetUser.username;
@@ -417,83 +249,12 @@ export default function AnalyticsPage() {
     return { total, admins, regular, business, personal, activeInstagram, pendingApproval, notConnected, passkeys, pending };
   }, [adminData]);
 
-  // Personal Bot Analytics (Fallback for regular user or when toggle is switched)
   const friendNodes = useMemo(() => nodes.filter(n => !n.isRoot), [nodes]);
-
-  const breakdown = useMemo(() => {
-    let close = 0, online = 0, offline = 0, relatives = 0, professional = 0;
-    let totalDMs = 0, totalReels = 0, aiActive = 0, aiPaused = 0;
-    friendNodes.forEach(f => {
-      const cat = f.category || 'online_friend';
-      if (cat === 'close_friend') close++;
-      else if (cat === 'online_friend') online++;
-      else if (cat === 'offline_friend') offline++;
-      else if (cat === 'family' || cat === 'relative') relatives++;
-      else professional++;
-      totalDMs += (f.chatsCount || f.messageCount || 0);
-      totalReels += (f.reelsCount || 0);
-      if (isAiOnFor(f, routingConfig)) aiActive++; else aiPaused++;
-    });
-    return { close, online, offline, relatives, professional, totalDMs, totalReels, aiActive, aiPaused };
-  }, [friendNodes, routingConfig]);
-
-  const topChatters = useMemo(() =>
-    [...friendNodes].filter(n => (n.chatsCount || n.messageCount || 0) > 0)
-      .sort((a, b) => (b.chatsCount || b.messageCount || 0) - (a.chatsCount || a.messageCount || 0))
-      .slice(0, 5), [friendNodes]);
-
-  const topReelers = useMemo(() =>
-    [...friendNodes].filter(n => (n.reelsCount || 0) > 0)
-      .sort((a, b) => (b.reelsCount || 0) - (a.reelsCount || 0))
-      .slice(0, 5), [friendNodes]);
-
-  const maxChats = topChatters[0] ? (topChatters[0].chatsCount || topChatters[0].messageCount || 0) : 1;
-  const maxReels = topReelers[0] ? (topReelers[0].reelsCount || 0) : 1;
-
-  const donutSegments = [
-    { label: 'Close Circle', value: breakdown.close, color: 'var(--sp-green)' },
-    { label: 'Online Friends', value: breakdown.online, color: 'var(--sp-green-press)' },
-    { label: 'Offline Friends', value: breakdown.offline, color: '#b3b3b3' },
-    { label: 'Family', value: breakdown.relatives, color: '#727272' },
-    { label: 'Professional', value: breakdown.professional, color: '#535353' },
-  ].filter(s => s.value > 0);
-
-  const activeModeCount = routingConfig.chatMode === 'everyone_except'
-    ? (routingConfig.excludedContactIds || []).length
-    : (routingConfig.chatMode === 'only_selected' ? (routingConfig.includedContactIds || []).length : 0);
-
-  // One-line workspace summary for the command center (PLAN.md §17.1)
-  const mode = WORKSPACE_MODES.find(m => m.key === currentMode(workspaceFeatures, user));
-  const allFeatures = FEATURE_GROUPS.flatMap(g => g.features);
-  const featuresOn = allFeatures.filter(f => isFeatureOn(workspaceFeatures, f.key)).length;
-  const chatRule = routingConfig.chatMode === 'everyone_except'
-    ? `Everyone except ${activeModeCount}`
-    : routingConfig.chatMode === 'only_selected' ? `Only ${activeModeCount} selected` : 'Everyone';
-  const summaryItems = [
-    { label: 'Mode', value: mode?.label, hint: mode?.hint, href: '/settings/features' },
-    { label: 'Features', value: `${featuresOn} of ${allFeatures.length} on`, href: '/settings/features' },
-    { label: 'Chat rule', value: chatRule, href: '/controls' },
-    { label: 'Waiting for you', value: `${bizStats?.openHandoffs || 0} chats`, href: '/relationships' },
-  ];
-
-  const personalStatCards = [
-    { label: 'Total People', value: friendNodes.length, sub: 'Active profiles', icon: <Users size={15} />, href: '/relationships' },
-    { label: 'Total DMs', value: breakdown.totalDMs, sub: 'From contacts', icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
-    { label: 'Reels Shared', value: breakdown.totalReels, sub: 'Reels exchanged', icon: <Film size={15} />, href: '/relationships' },
-    { label: 'AI Active', value: breakdown.aiActive, sub: `${breakdown.aiPaused} paused`, icon: <Bot size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
-  ];
-
-  const businessStatCards = [
-    { label: 'Total Conversations', value: bizStats?.totalConversations || 0, sub: `${bizStats?.openHandoffs || 0} waiting for your team`, icon: <MessageSquare size={15} />, href: '/relationships', trend: bizStats?.trends?.conversations },
-    { label: 'Leads Captured', value: bizStats?.activeLeads || 0, sub: `${bizStats?.leadsLast30d || 0} in the last 30 days`, icon: <Target size={15} />, href: null, trend: bizStats?.trends?.leads },
-    { label: 'Bookings Confirmed', value: bizStats?.confirmedBookings || 0, sub: `${bizStats?.upcomingBookings || 0} upcoming`, icon: <Calendar size={15} />, href: null, trend: bizStats?.trends?.bookings },
-    { label: 'Automation Rate', value: bizStats?.automationRate || 0, sub: `% of replies by AI · ${bizStats?.resolutionRate || 0}% resolved`, icon: <Zap size={15} />, href: '/controls', trend: bizStats?.trends?.aiReplies },
-  ];
 
   // First load: show the dashboard skeleton until the numbers arrive (no empty zeros flash)
   const firstLoad = isSuperadmin
     ? !adminData && !adminError
-    : isBusinessWorkspace
+    : layout === 'business'
       ? !bizLoaded
       : isSyncingInitial && !(nodes || []).some(n => !n.isRoot);
   if (firstLoad) return <PageSkeleton variant="dashboard" label="Loading analytics" />;
@@ -514,9 +275,6 @@ export default function AnalyticsPage() {
           ? 'Multi-tenant management for all registered accounts, connected Instagram workspaces, and automations.'
           : 'Real-time analytics on your contacts, interaction volume, and AI routing.'}
       >
-        {/* Quick mode switch: Personal / Business / Hybrid */}
-        {!isSuperadmin && <WorkspaceModeSwitch />}
-
         {/* Superadmin Quick Actions */}
         {isSuperadmin && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -564,163 +322,20 @@ export default function AnalyticsPage() {
         )}
       </PageHero>
 
+      {/* Mode switch (left) and time range (right) */}
+      <div className="an an-toolbar" style={{ marginBottom: '16px' }}>
+        {!isSuperadmin && <WorkspaceModeSwitch />}
+        <div className="an-toolbar-end"><RangeTabs value={range} onChange={setRange} /></div>
+      </div>
+
       {/* ─────────────────────────────────────────────────────────────
           PRACTICAL SUPERADMIN VIEW FOR 25+ USERS
          ───────────────────────────────────────────────────────────── */}
       {isSuperadmin && activeTab === 'platform' ? (
         <div>
-          {/* 4 HIGH-LEVEL TENANT METRICS */}
-          <motion.div
-            variants={statsContainerVariants}
-            initial="hidden"
-            animate="visible"
-            className="stats-grid"
-            style={{ marginBottom: '24px' }}
-          >
-            {/* 1. Total Registered Accounts */}
-            <motion.div
-              variants={statCardVariants}
-              className="settle"
-              whileHover={{ y: -3, transition: T.dropdown }}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '12px',
-                padding: '18px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Total Creators & Users
-                </span>
-                <div style={{ background: 'var(--color-surface-hover)', padding: '5px', borderRadius: '6px', color: 'var(--color-text-primary)' }}>
-                  <Users size={15} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--color-text-primary)', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={kpiMetrics.total} duration={1.6} />
-                </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '4px', fontFamily: "var(--font-label)" }}>
-                  {kpiMetrics.admins} Superadmin • {kpiMetrics.regular} Users
-                </div>
-              </div>
-              <div />
-            </motion.div>
-
-            {/* 2. Active Webhook Automations */}
-            <motion.div
-              variants={statCardVariants}
-              className="settle"
-              whileHover={{ y: -3, transition: T.dropdown }}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '12px',
-                padding: '18px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Active Automations
-                </span>
-                <div style={{ background: 'var(--color-surface-hover)', padding: '5px', borderRadius: '6px', color: 'var(--color-text-primary)' }}>
-                  <Bot size={15} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--color-text-primary)', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={kpiMetrics.activeInstagram} duration={1.6} />
-                </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '4px', fontFamily: "var(--font-label)" }}>
-                  {kpiMetrics.notConnected} Not connected
-                </div>
-              </div>
-              <div />
-            </motion.div>
-
-            {/* 3. Instagram Connected Workspaces */}
-            <motion.div
-              variants={statCardVariants}
-              className="settle"
-              whileHover={{ y: -3, transition: T.dropdown }}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '12px',
-                padding: '18px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Instagram Workspaces
-                </span>
-                <div style={{ background: 'var(--color-surface-hover)', padding: '5px', borderRadius: '6px', color: 'var(--color-text-primary)' }}>
-                  <Instagram size={15} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--color-text-primary)', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={kpiMetrics.activeInstagram} duration={1.6} />
-                </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '4px', fontFamily: "var(--font-label)" }}>
-                  {kpiMetrics.pendingApproval > 0 ? `${kpiMetrics.pendingApproval} Pending whitelist` : 'Multi-account webhooks live'}
-                </div>
-              </div>
-              <div />
-            </motion.div>
-
-            {/* 4. Portfolio Breakdown */}
-            <motion.div
-              variants={statCardVariants}
-              className="settle"
-              whileHover={{ y: -3, transition: T.dropdown }}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '12px',
-                padding: '18px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '120px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
-                  Account Structure
-                </span>
-                <div style={{ background: 'var(--color-surface-hover)', padding: '5px', borderRadius: '6px', color: 'var(--color-text-primary)' }}>
-                  <Building2 size={15} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--color-text-primary)', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                  <AnimatedNumber value={kpiMetrics.business} duration={1.6} />
-                </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '4px', fontFamily: "var(--font-label)" }}>
-                  Business accounts • {kpiMetrics.personal} Personal
-                </div>
-              </div>
-              <div />
-            </motion.div>
-          </motion.div>
+          <div className="an" style={{ marginBottom: '16px' }}>
+            <PlatformView accounts={adminData?.accounts || []} kpi={kpiMetrics} range={range} activity={activity} onFilter={id => { setFilterType(id); setCurrentPage(1); }} />
+          </div>
 
           {/* MAIN USERS DIRECTORY CONTAINER */}
           <div style={{
@@ -1333,264 +948,16 @@ export default function AnalyticsPage() {
         </div>
       ) : (
         /* ─────────────────────────────────────────────────────────────
-            VIEW B: PERSONAL BOT & DM ANALYTICS
+            VIEW B: PERSONAL / BUSINESS / HYBRID ANALYTICS
            ───────────────────────────────────────────────────────────── */
-        <div>
-          {/* WORKSPACE SUMMARY */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '16px' }}>
-            {summaryItems.map(item => (
-              <Link
-                key={item.label}
-                href={item.href}
-                title={item.hint || ''}
-                className="stat-glass"
-                style={{ padding: '10px 14px', borderRadius: '12px', textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}
-              >
-                <span style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{item.label}</span>
-                <span style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.value}</span>
-              </Link>
-            ))}
-          </div>
-
-          {/* STAT CARDS WITH BUTTER-SMOOTH FRAMER MOTION STAGGER & ANIMATED COUNTERS */}
-          <motion.div
-            variants={statsContainerVariants}
-            initial="hidden"
-            animate="visible"
-            className="stats-grid"
-          >
-            {(isBusinessWorkspace ? businessStatCards : personalStatCards).map((c, i) => (
-              <motion.div
-                key={i}
-                variants={statCardVariants}
-              whileHover={{ y: -3, transition: T.dropdown }}
-                className="stat-card-item stat-glass settle"
-                style={{
-                  padding: '18px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minHeight: '120px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{c.label}</span>
-                  <div style={{ background: 'var(--color-surface-hover)', padding: '5px', borderRadius: '6px', color: 'var(--color-text-primary)' }}>{c.icon}</div>
-                </div>
-                <div>
-                  <div className="stat-card-value" style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--color-text-primary)', letterSpacing: '-1.5px', lineHeight: 1 }}>
-                    <AnimatedNumber value={c.value} duration={1.8} />
-                  </div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '4px', fontFamily: "var(--font-label)" }}>{c.sub}</div>
-                </div>
-                {c.trend && (
-                  <div style={{ marginTop: '10px' }} title="Last 14 days">
-                    <Sparkline points={c.trend} />
-                  </div>
-                )}
-                {c.href ? (
-                  <Link href={c.href} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
-                    <span>View</span><ArrowRight size={10} />
-                  </Link>
-                ) : <span aria-hidden="true" style={{ visibility: 'hidden', fontSize: '0.7rem', fontWeight: '700' }}>View</span>}
-              </motion.div>
-            ))}
-          </motion.div>
-
-          {isBusinessWorkspace && latestLeads.length > 0 && (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 0 3px rgba(22,163,74,0.18)' }} />
-                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>Live leads</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-                <AnimatePresence initial={false}>
-                  {latestLeads.map(lead => (
-                    <motion.div
-                      key={lead._id}
-                      layout
-                      {...rowMotion(0)}
-                      className="stat-glass"
-                      style={{ padding: '14px', borderRadius: '14px' }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'baseline' }}>
-                        <strong style={{ fontSize: '0.85rem', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{(lead.handle || 'unknown').replace(/^@/, '')}</strong>
-                        <span style={{ fontSize: '0.66rem', color: 'var(--color-text-muted)', fontFamily: "var(--font-label)", flexShrink: 0 }}>{timeAgo(lead.updatedAt || lead.createdAt)}</span>
-                      </div>
-                      <p style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {lead.intentSummary || 'Shared contact details'}
-                      </p>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '8px', fontSize: '0.68rem', color: 'var(--color-text-muted)', fontFamily: "var(--font-label)", flexWrap: 'wrap' }}>
-                        {lead.phone && <span>{lead.phone}</span>}
-                        {lead.email && <span>{lead.email}</span>}
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            </div>
+        <div className="an">
+          {layout === 'business' ? (
+            <BusinessView biz={bizStats} routingConfig={routingConfig} range={range} activity={activity} />
+          ) : (
+            <PersonalView friendNodes={friendNodes} routingConfig={routingConfig} bizStats={bizStats} range={range} activity={activity}>
+              {layout === 'hybrid' && <BusinessStrip biz={bizStats} />}
+            </PersonalView>
           )}
-
-          {isBusinessWorkspace && <BusinessConversionPanel refreshKey={bizStats} />}
-
-          {/* MAIN 3-COL CHARTS WITH BUTTER-SMOOTH PROGRESS BARS & ANIMATED COUNTERS */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: DUR.page, delay: 0.16, ease: EASE_OUT }}
-            className="charts-grid"
-          >
-            {/* Donut: Circle Breakdown */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>CIRCLE COMPOSITION</div>
-              <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginBottom: '18px', marginTop: '2px' }}>Relationship Map</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '16px' }}>
-                <DonutChart segments={donutSegments.length > 0 ? donutSegments : [{ value: 1, color: 'var(--color-surface-hover)' }]} size={130} stroke={20} />
-                <div style={{ position: 'absolute', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.7rem', fontWeight: '900', color: 'var(--color-text-primary)', lineHeight: 1 }}>
-                    <AnimatedNumber value={friendNodes.length} duration={1.5} />
-                  </div>
-                  <div style={{ fontSize: '0.58rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>TOTAL</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                {[
-                  { label: 'Close Circle', value: breakdown.close, color: 'var(--sp-green)' },
-                  { label: 'Online Friends', value: breakdown.online, color: 'var(--sp-green-press)' },
-                  { label: 'Offline Friends', value: breakdown.offline, color: '#b3b3b3' },
-                  { label: 'Family', value: breakdown.relatives, color: '#727272' },
-                  { label: 'Professional', value: breakdown.professional, color: '#535353' },
-                ].map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                      <span style={{ color: 'var(--color-text-secondary)' }}>{s.label}</span>
-                    </div>
-                    <span style={{ fontWeight: '800', color: 'var(--color-text-primary)', fontFamily: "var(--font-label)" }}>
-                      <AnimatedNumber value={s.value} duration={1.4} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Bar: Top Chatters */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MESSAGE VOLUME</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>Top Chatters</div>
-                <MessageSquare size={14} style={{ color: 'var(--color-text-muted)' }} />
-              </div>
-              {topChatters.length > 0
-                ? topChatters.map((p, i) => <BarRow key={p.id || p.name} index={i} label={p.name} handle={p.handle || p.instagramHandle} value={p.chatsCount || p.messageCount || 0} max={maxChats} />)
-                : <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>No message data yet</div>
-              }
-              <Link href="/relationships" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
-                <span>View all</span><ArrowRight size={10} />
-              </Link>
-            </div>
-
-            {/* Bar: Top Reel Sharers */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>REEL ACTIVITY</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>Top Reel Sharers</div>
-                <Film size={14} style={{ color: 'var(--color-text-muted)' }} />
-              </div>
-              {topReelers.length > 0
-                ? topReelers.map((p, i) => <BarRow key={p.id || p.name} index={i} label={p.name} handle={p.handle || p.instagramHandle} value={p.reelsCount || 0} max={maxReels} />)
-                : <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>No reel data yet</div>
-              }
-              <Link href="/relationships" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
-                <span>View all</span><ArrowRight size={10} />
-              </Link>
-            </div>
-          </motion.div>
-
-          {/* BOTTOM ROW: AI Status + Routing */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: DUR.page, delay: 0.22, ease: EASE_OUT }}
-            className="bottom-grid"
-          >
-            {/* AI Split */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>AI REPLY STATUS</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>Per-Contact AI Mode</div>
-                <Bot size={14} style={{ color: 'var(--color-text-muted)' }} />
-              </div>
-              <div style={{ height: '8px', background: 'var(--color-surface-hover)', borderRadius: '4px', overflow: 'hidden', marginBottom: '14px' }}>
-                {friendNodes.length > 0 && (
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(breakdown.aiActive / friendNodes.length) * 100}%` }}
-                    transition={{ duration: 1.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    style={{ height: '100%', background: 'var(--color-text-primary)', borderRadius: '4px' }}
-                  />
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {[
-                  { label: 'Full AI Active', value: breakdown.aiActive, color: 'var(--color-text-primary)' },
-                  { label: 'Manual / Paused', value: breakdown.aiPaused, color: 'var(--color-border-strong)' },
-                ].map((s, i) => (
-                  <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: '900', color: 'var(--color-text-primary)', letterSpacing: '-0.5px' }}>
-                        <AnimatedNumber value={s.value} duration={1.5} />
-                      </div>
-                      <div style={{ fontSize: '0.64rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>{s.label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
-                <span>Manage AI controls</span><ArrowRight size={10} />
-              </Link>
-            </div>
-
-            {/* Routing Policy */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ROUTING POLICY</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>Active Chat Mode</div>
-                <Shield size={14} style={{ color: 'var(--color-text-muted)' }} />
-              </div>
-              <div style={{ background: 'var(--sp-green)', borderRadius: '8px', padding: '16px 18px', marginBottom: '12px' }}>
-                <div style={{ fontSize: '0.58rem', color: 'rgba(0,0,0,0.7)', fontFamily: "var(--font-label)", fontWeight: '700', letterSpacing: '0.08em', marginBottom: '5px' }}>CURRENT MODE</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#000000', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
-                  {routingConfig.chatMode.replace(/_/g, ' ')}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(0,0,0,0.7)', marginTop: '3px', fontFamily: "var(--font-label)" }}>
-                  {routingConfig.chatMode === 'everyone_except' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} excluded`}
-                  {routingConfig.chatMode === 'only_selected' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} selected`}
-                  {routingConfig.chatMode === 'everyone' && 'All contacts — global auto-reply'}
-                  {routingConfig.chatMode === 'paused' && 'Silenced — Manual chat active'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1, background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '9px 11px', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '0.58rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '2px' }}>BOT STATUS</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: routingConfig.globalBotActive ? 'var(--color-text-primary)' : 'var(--color-border-strong)' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>{routingConfig.globalBotActive ? 'ONLINE' : 'PAUSED'}</span>
-                  </div>
-                </div>
-                <div style={{ flex: 1, background: 'var(--color-surface-hover)', borderRadius: '8px', padding: '9px 11px', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: '0.58rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '2px' }}>CONTACTS</div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>
-                    <AnimatedNumber value={friendNodes.length} duration={1.5} /> people
-                  </span>
-                </div>
-              </div>
-              <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--color-text-primary)', textDecoration: 'none', fontWeight: '700' }}>
-                <span>Adjust routing</span><ArrowRight size={10} />
-              </Link>
-            </div>
-          </motion.div>
         </div>
       )}
     </motion.div>
