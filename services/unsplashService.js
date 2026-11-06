@@ -11,6 +11,10 @@ const TOPICS = {
   abstract: QUERY,
   colorful: QUERY,
   fluid: QUERY,
+  // Light theme: the same smooth waves in bright pastel colours (frontend asks "<topic>-light")
+  'abstract-light': `pastel ${QUERY}`,
+  'colorful-light': `pastel ${QUERY}`,
+  'fluid-light': `pastel ${QUERY}`,
 };
 
 // One list per Unsplash colour filter ("tone-yellow", ...), so a contact's banner can match
