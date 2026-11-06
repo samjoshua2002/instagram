@@ -149,6 +149,20 @@ function SettingsPageContent() {
     }
   }, [user?._id, user?.id]);
 
+  // A failed load tries again by itself when the tab is shown again, the connection returns, or after 20s
+  useEffect(() => {
+    if (!loadFailed) return;
+    const retry = () => { if (!document.hidden) fetchPersona(); };
+    const timer = setTimeout(retry, 20000);
+    document.addEventListener('visibilitychange', retry);
+    window.addEventListener('online', retry);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', retry);
+      window.removeEventListener('online', retry);
+    };
+  }, [loadFailed]);
+
   const fetchPersona = async () => {
     if (!user?._id && !user?.id) return;
     const userCacheKey = `chatter_persona_cached_${user._id || user.id}`;
@@ -205,6 +219,8 @@ function SettingsPageContent() {
         });
         setFormData(updated);
         setLoadFailed(false);
+        // Drop the old "could not load" banner once the settings arrive
+        setErrorMsg(prev => (prev.startsWith('Could not load') || prev.startsWith('Could not fetch') ? '' : prev));
         try {
           localStorage.setItem(userCacheKey, JSON.stringify(stripSecrets(updated)));
         } catch (e) { }

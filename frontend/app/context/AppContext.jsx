@@ -568,6 +568,17 @@ export function AppProvider({ children }) {
       }
       const isUpload = typeof FormData !== 'undefined' && opts.body instanceof FormData;
       const limitMs = isUpload ? 120000 : 30000;
+      // Reads to our API are retried while the server wakes up (Render cold start answers
+      // 502/503 or drops the connection for up to a minute after it has been idle)
+      const method = String(opts.method || (typeof Request !== 'undefined' && url instanceof Request ? url.method : 'GET')).toUpperCase();
+      const canRetry = Boolean(apiUrl) && (method === 'GET' || method === 'HEAD');
+      const retryDelays = canRetry ? [2000, 4000, 8000, 15000, 20000] : [];
+      const waitOrAbort = (ms) => new Promise((resolve, reject) => {
+        const t = setTimeout(resolve, ms);
+        opts.signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+      });
+      for (let attempt = 0; ; attempt++) {
+      const lastTry = attempt >= retryDelays.length;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort('timeout'), limitMs);
       if (opts.signal) {
@@ -576,6 +587,11 @@ export function AppProvider({ children }) {
       }
       try {
         const res = await originalFetch(url, { ...opts, signal: controller.signal });
+        if (!lastTry && [502, 503, 504].includes(res.status)) {
+          clearTimeout(timer);
+          await waitOrAbort(retryDelays[attempt]);
+          continue;
+        }
         if (
           res.status === 401 && apiUrl && storedToken && !sessionExpiredRef.current &&
           !AUTH_401_EXEMPT.some(p => apiUrl.pathname.includes(p)) &&
@@ -586,7 +602,14 @@ export function AppProvider({ children }) {
         }
         return res;
       } catch (err) {
-        if (controller.signal.reason === 'timeout') {
+        const timedOut = controller.signal.reason === 'timeout';
+        const callerAborted = !timedOut && (err?.name === 'AbortError' || opts.signal?.aborted);
+        if (!callerAborted && !lastTry && navigator.onLine !== false) {
+          clearTimeout(timer);
+          await waitOrAbort(retryDelays[attempt]);
+          continue;
+        }
+        if (timedOut) {
           throw new Error('The server is taking too long to answer. Please try again.');
         }
         if (err?.name === 'AbortError') throw err;
@@ -595,6 +618,7 @@ export function AppProvider({ children }) {
           : 'Could not reach the server. Please try again in a moment.');
       } finally {
         clearTimeout(timer);
+      }
       }
     };
 
