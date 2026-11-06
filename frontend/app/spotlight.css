@@ -147,6 +147,33 @@
 .sh-stat-label { font-size: 0.78rem; color: var(--sh-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 560px) { .sh-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+/* Home KPI row: label, number, 7-day sparkline, change from last week */
+.sh-kpis .sh-stat-label { order: -1; }
+.sh-spark { display: block; width: 100%; height: 28px; color: var(--sh-accent); opacity: 0.85; }
+.sh-kpi-change { font-size: 0.74rem; font-weight: 600; color: var(--sh-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-kpi-change.up { color: var(--sh-action); }
+
+/* Header: AI on / paused switch next to the bell */
+.sh-top-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.sh-ai-pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--sh-border); background: var(--sh-card); color: var(--sh-text);
+  font: 700 0.82rem var(--font-sans); cursor: pointer; white-space: nowrap;
+}
+.sh-ai-pill:hover { background: var(--sh-card-hover); }
+.sh-ai-pill:disabled { opacity: 0.6; cursor: progress; }
+.sh-ai-dot { width: 8px; height: 8px; border-radius: 50%; background: #ffb547; flex: none; }
+.sh-ai-pill.on .sh-ai-dot { background: var(--sh-action); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-action) 30%, transparent); }
+
+/* Needs your attention: handoffs and Instagram sign-in, same rows as Follow up */
+.sh-attn-badge { background: #ffb547; }
+.sh-attn-icon {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: color-mix(in srgb, #ffb547 22%, transparent); color: #ffb547;
+}
+:root[data-theme="light"] .sh-attn-icon { color: #a35f00; }
+button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
+
 /* Favourite people: rounded-square photos */
 .sh-fav-row {
   display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 16px;
@@ -214,6 +241,8 @@
   .sh-home { padding: 16px 16px 28px; border-radius: 0; }
   .sh-hello { font-size: 1.5rem; }
   .sh-icon-btn { width: 38px; height: 38px; }
+  .sh-ai-pill { height: 38px; padding: 0 12px; gap: 6px; }
+  .sh-attn-icon { width: 40px; height: 40px; }
   .sh-dot { top: 8px; right: 9px; }
   .sh-row-head { margin: 22px 0 10px; }
   .sh-row-head h2 { font-size: 1.05rem; }

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock } from 'lucide-react';
+import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock, Pause, Play, Check, KeyRound } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import PageSkeleton from './Skeletons';
@@ -268,6 +268,148 @@ export function StatStrip({ stats }) {
   );
 }
 
+/** GET /api/home/summary (replies, people, handoffs, Instagram token), refreshed every minute. */
+function useHomeSummary(apiBase) {
+  const [data, setData] = useState(null);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/home/summary?tzOffset=${new Date().getTimezoneOffset()}`);
+      if (res.ok) setData(await res.json());
+    } catch { /* offline: keep the last numbers */ }
+  }, [apiBase]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, [load]);
+  return [data, setData, load];
+}
+
+function waitText(mins) {
+  if (mins < 1) return 'Waiting just now';
+  if (mins < 60) return `Waiting ${mins} min`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `Waiting ${h} h${mins % 60 ? ` ${mins % 60} min` : ''}`;
+  const d = Math.floor(h / 24);
+  return `Waiting ${d} day${d === 1 ? '' : 's'}`;
+}
+
+/**
+ * "Needs your attention": chats the AI handed to the owner (oldest first) and an Instagram
+ * token that is expiring. Done turns the AI back on for that chat, which clears the handoff.
+ */
+function NeedsAttention({ summary, people, onDone }) {
+  const bySender = useMemo(() => new Map(people.filter(p => p.senderId).map(p => [String(p.senderId), p])), [people]);
+  if (!summary) return null;
+  const { handoffs, instagram } = summary;
+  const tokenIssue = instagram && instagram.status !== 'green';
+  if (!handoffs.items.length && !tokenIssue) return null;
+  return (
+    <section aria-label="Needs your attention">
+      <div className="sh-row-head">
+        <h2>Needs your attention</h2>
+        {handoffs.total > handoffs.items.length && <Link href="/controls" className="sh-link">All {fmt(handoffs.total)}</Link>}
+      </div>
+      <ul className="sh-follow">
+        {tokenIssue && (
+          <li className="sh-follow-item sh-attn-token">
+            <Link href="/settings" className="sh-follow-main">
+              <span className="sh-attn-icon" aria-hidden="true"><KeyRound size={20} /></span>
+              <span className="sh-follow-text">
+                <span className="sh-follow-name">{instagram.connected ? 'Instagram sign-in is expiring' : 'Instagram is not connected'}</span>
+                <span className="sh-follow-why">
+                  {!instagram.connected ? 'Replies stop until you connect Instagram again.'
+                    : instagram.daysLeft !== null && instagram.daysLeft > 0 ? `${instagram.daysLeft} day${instagram.daysLeft === 1 ? '' : 's'} left. Reconnect in Settings to keep replies going.`
+                      : 'It has expired. Reconnect in Settings to keep replies going.'}
+                </span>
+              </span>
+            </Link>
+            <div className="sh-follow-actions">
+              <Link href="/settings" className="sh-follow-btn" aria-label="Open Settings to reconnect Instagram"><ChevronRight size={15} /><span>Fix</span></Link>
+            </div>
+          </li>
+        )}
+        {handoffs.items.map(h => {
+          const p = bySender.get(String(h.senderId));
+          const name = p?.name || h.name || (h.username ? `@${h.username}` : 'Someone');
+          const href = p ? personHref(p) : '/controls';
+          const why = [waitText(h.waitingMinutes), h.reason].filter(Boolean).join(' · ');
+          return (
+            <li key={h.senderId} className="sh-follow-item">
+              <Link href={href} className="sh-follow-main">
+                <span className="sh-follow-photo-wrap">
+                  <Photo person={p || { name, handle: h.username }} className="sh-follow-photo" />
+                  <span className="sh-follow-badge sh-attn-badge" aria-hidden="true"><Hand size={12} /></span>
+                </span>
+                <span className="sh-follow-text">
+                  <span className="sh-follow-name">{name}</span>
+                  <span className="sh-follow-why">{why}</span>
+                </span>
+              </Link>
+              <div className="sh-follow-actions">
+                <button type="button" className="sh-follow-btn" onClick={() => onDone(h, name)} aria-label={`Done with ${name}: turn AI replies back on`} title="Done: AI replies again">
+                  <Check size={15} /><span>Done</span>
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** Tiny line of daily values; decorative (the tile text carries the numbers). */
+function Sparkline({ values }) {
+  if (!values || values.length < 2) return null;
+  const max = Math.max(1, ...values);
+  const w = 100;
+  const h = 28;
+  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - 2 - (v / max) * (h - 4)).toFixed(1)}`).join(' ');
+  return (
+    <svg className="sh-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/** Week-on-week change: percent for counts, points for a share. */
+function weekChange(now, before, unit = '%') {
+  if (now === null || before === null || now === undefined || before === undefined) return { text: 'No data last week', dir: 0 };
+  if (unit === 'pts') {
+    const d = now - before;
+    return { text: d === 0 ? 'Same as last week' : `${d > 0 ? '+' : '−'}${Math.abs(d)} pts vs last week`, dir: Math.sign(d) };
+  }
+  if (before === 0) return now === 0 ? { text: 'Same as last week', dir: 0 } : { text: 'New this week', dir: 1 };
+  const pct = Math.round(((now - before) / before) * 100);
+  return { text: pct === 0 ? 'Same as last week' : `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% vs last week`, dir: Math.sign(pct) };
+}
+
+/** This week's headline numbers, each with its change from last week and a 7-day sparkline. */
+function KpiRow({ summary }) {
+  const r = summary?.replies;
+  const lastSeven = arr => (arr ? arr.slice(-7) : null);
+  const aiShareDaily = r ? r.ai.slice(-7).map((a, i) => { const t = a + r.human.slice(-7)[i]; return t ? (a / t) * 100 : 0; }) : null;
+  const tiles = [
+    { label: 'AI replies', value: r?.thisWeek.ai, change: r && weekChange(r.thisWeek.ai, r.lastWeek.ai), spark: lastSeven(r?.ai), href: '/analytics' },
+    { label: 'Your replies', value: r?.thisWeek.human, change: r && weekChange(r.thisWeek.human, r.lastWeek.human), spark: lastSeven(r?.human), href: '/analytics' },
+    { label: 'AI share', value: summary?.aiShare.thisWeek, suffix: '%', change: summary && weekChange(summary.aiShare.thisWeek, summary.aiShare.lastWeek, 'pts'), spark: aiShareDaily, href: '/controls' },
+    { label: 'People messaged', value: summary?.people.thisWeek, change: summary && weekChange(summary.people.thisWeek, summary.people.lastWeek), spark: lastSeven(summary?.people.daily), href: '/relationships' },
+  ];
+  return (
+    <div className="sh-stats sh-kpis">
+      {tiles.map(t => (
+        <Link key={t.label} href={t.href} className="sh-stat">
+          <span className="sh-stat-label">{t.label}</span>
+          <span className="sh-stat-num">{t.value === null || t.value === undefined ? '-' : `${fmt(t.value)}${t.suffix || ''}`}</span>
+          <Sparkline values={t.spark} />
+          {t.change && <span className={`sh-kpi-change${t.change.dir > 0 ? ' up' : t.change.dir < 0 ? ' down' : ''}`}>{t.change.text}</span>}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 // General facts shown next to facts built from the user's own contacts
 const GENERAL_FACTS = [
   'Instagram launched on 6 October 2010 and was only on the iPhone at first.',
@@ -412,7 +554,33 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
 }
 
 export default function SpotlightHome() {
-  const { nodes, user, routingConfig, isSyncingInitial, setFavourite } = useApp();
+  const { nodes, user, routingConfig, isSyncingInitial, setFavourite, toggleGlobalBot, showToast, API_BASE } = useApp();
+  const [summary, setSummary, reloadSummary] = useHomeSummary(API_BASE);
+  const botOn = routingConfig?.globalBotActive !== false;
+  const [botBusy, setBotBusy] = useState(false);
+  const flipBot = async () => {
+    if (botBusy) return;
+    setBotBusy(true);
+    try { await toggleGlobalBot(); } finally { setBotBusy(false); }
+  };
+  // Done on a handoff: AI replies again for that chat (the server clears the handoff)
+  const doneHandoff = async (h, name) => {
+    const before = summary;
+    setSummary(s => s && ({ ...s, handoffs: { total: Math.max(0, s.handoffs.total - 1), items: s.handoffs.items.filter(x => x.senderId !== h.senderId) } }));
+    try {
+      const res = await fetch(`${API_BASE}/api/conversations/${encodeURIComponent(h.senderId)}/preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiEnabled: true }),
+      });
+      if (!res.ok) throw new Error(`server answered ${res.status}`);
+      showToast?.(`AI is replying to ${name} again`);
+      reloadSummary();
+    } catch (e) {
+      setSummary(before);
+      showToast?.(`Could not hand ${name} back to the AI: ${e.message}`, 'error');
+    }
+  };
   const [menu, setMenu] = useState(null); // { person, x, y } while the long-press menu is open
   const closeMenu = useCallback(() => setMenu(null), []);
   const openMenu = useCallback((person, x, y) => setMenu({ person, x, y }), []);
@@ -474,8 +642,6 @@ export default function SpotlightHome() {
     return [...filtered].filter(p => (p.chatsCount || 0) > 0 && !suggested.has(p.id))
       .sort((a, b) => (a.chatsCount || 0) - (b.chatsCount || 0)).slice(0, 10);
   }, [filtered, followAll]);
-  const totalChats = filtered.reduce((s, p) => s + (p.chatsCount || 0), 0);
-  const totalReels = filtered.reduce((s, p) => s + (p.reelsCount || 0), 0);
 
   const paused = people.filter(p => p.aiEnabled === false);
   const alerts = [
@@ -497,6 +663,22 @@ export default function SpotlightHome() {
       <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
         <h1 className="sh-hello">{hour === null ? 'Hello' : greeting(hour)}, {firstName || 'there'}!</h1>
+        <div className="sh-top-actions">
+        {routingConfig && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={botOn}
+            className={`sh-ai-pill${botOn ? ' on' : ''}`}
+            onClick={flipBot}
+            disabled={botBusy}
+            title={botOn ? 'AI is replying to DMs. Tap to pause.' : 'AI replies are paused. Tap to start.'}
+          >
+            <span className="sh-ai-dot" aria-hidden="true" />
+            <span className="sh-ai-label">{botOn ? 'AI on' : 'AI paused'}</span>
+            {botOn ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+          </button>
+        )}
         <div className="sh-bell-wrap">
           <button
             type="button"
@@ -521,6 +703,7 @@ export default function SpotlightHome() {
             </div>
           )}
         </div>
+        </div>
       </header>
 
       <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
@@ -544,6 +727,14 @@ export default function SpotlightHome() {
           <span>{people.length > 0 ? story.cta : 'People'}</span><ChevronRight size={18} />
         </Link>
       </UnsplashBanner>
+
+      <NeedsAttention summary={summary} people={people} onDone={doneHandoff} />
+
+      <div className="sh-row-head">
+        <h2>This week</h2>
+        <Link href="/analytics" className="sh-link">Full analytics</Link>
+      </div>
+      <KpiRow summary={summary} />
 
       {people.length > 0 && <FollowUps items={followOpen.slice(0, 4)} later={later} pressProps={pressProps} />}
 
@@ -594,17 +785,6 @@ export default function SpotlightHome() {
           </section>
 
           <FactCard people={people} />
-
-          <div className="sh-row-head">
-            <h2>At a glance</h2>
-            <Link href="/analytics" className="sh-link">Full analytics</Link>
-          </div>
-          <StatStrip stats={[
-            { label: 'People', value: filtered.length, href: '/relationships' },
-            { label: 'DMs', value: totalChats, href: '/analytics' },
-            { label: 'Reels shared', value: totalReels, href: '/analytics' },
-            { label: 'AI replying', value: filtered.filter(p => p.aiEnabled !== false).length, href: '/controls' },
-          ]} />
 
           {favourites.length > 0 && (
             <>
