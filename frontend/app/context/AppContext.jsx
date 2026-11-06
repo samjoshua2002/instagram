@@ -1282,7 +1282,8 @@ export function AppProvider({ children }) {
       });
       routingSaveQueueRef.current = putOperation.catch(() => { });
       await putOperation;
-      showToast(`Saved chat routing! Mode: ${newConfig.chatMode.toUpperCase()}`);
+      const modeName = { everyone: 'Everyone', everyone_except: 'Everyone except people I pick', only_selected: 'Only people I pick' }[newConfig.chatMode] || 'Saved';
+      showToast(`Saved · ${modeName}`, 'success');
     } catch (e) {
       // Not saved on the server: put the old rules back so the screen matches what the bot uses
       rollbackRouting(previousConfig);
