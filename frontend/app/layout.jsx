@@ -44,7 +44,7 @@ export default function RootLayout({ children }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body style={{ color: 'var(--color-text-primary)', margin: 0, padding: 0 }}>
+      <body>
         <AmbientBackground />
         <MotionProvider>
           <AppProvider>

@@ -662,7 +662,7 @@ function SettingsPageContent() {
               <span style={{
                 fontSize: '0.72rem',
                 background: (formData.instagramPageAccessToken || secretsSaved.instagram) ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'color-mix(in srgb, #f59e0b 14%, transparent)',
-                color: (formData.instagramPageAccessToken || secretsSaved.instagram) ? '#34d399' : '#fbbf24',
+                color: (formData.instagramPageAccessToken || secretsSaved.instagram) ? 'var(--color-success)' : 'var(--color-warning)',
                 border: (formData.instagramPageAccessToken || secretsSaved.instagram) ? '1px solid color-mix(in srgb, #22c55e 35%, transparent)' : '1px solid color-mix(in srgb, #f59e0b 35%, transparent)',
                 padding: '2px 8px',
                 borderRadius: '6px',

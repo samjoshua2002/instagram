@@ -387,7 +387,7 @@ export default function Sidebar() {
                 fontSize: '0.62rem',
                 fontWeight: '700',
                 fontFamily: "var(--font-label)",
-                color: routingConfig.globalBotActive ? '#4ade80' : 'var(--color-text-secondary)'
+                color: routingConfig.globalBotActive ? 'var(--color-success)' : 'var(--color-text-secondary)'
               }}>
                 {routingConfig.globalBotActive ? 'LIVE' : 'OFF'}
               </span>
