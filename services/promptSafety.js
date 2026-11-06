@@ -142,7 +142,35 @@ function parseJsonCompletion(response) {
   return parsed;
 }
 
+/**
+ * True when Azure refused the PROMPT (400 content_filter / "content management policy"),
+ * e.g. a slur friends use as banter. Same text to another deployment is refused again.
+ */
+function isContentFilterError(err) {
+  if (!err) return false;
+  const code = err.code || err.error?.code || err.error?.innererror?.code;
+  return code === 'content_filter' || code === 'ResponsibleAIPolicyViolation' ||
+    /content management policy|content_filter/i.test(String(err.message || ''));
+}
+
+// Words Azure's filter rates as hate / sexual / violence / self-harm in casual banter
+const FILTER_WORDS_SLURS = /\b(n+[i1]+g+(?:a+|e+r*|u+h*|az|as|ers?)s?|niggas?|fag+(?:ot)?s?|retard(?:ed)?s?|chinks?|tranny|trannies|kys)\b/gi;
+const FILTER_WORDS_STRONG = /\b(f+u+c*k+\w*|motherf\w*|sh[i1]t+\w*|b[i1]tch\w*|cunts?|assholes?|dicks?|pussy|pussies|slut\w*|whores?|rap(?:e|ed|ing)|suicid\w*|kill(?:ing|ed|s)?|murder\w*|die|dead|bombs?|guns?|sex\w*|porn\w*|nudes?|horny)\b/gi;
+const maskWord = w => (w.length <= 2 ? w[0] + '*' : w[0] + '*'.repeat(w.length - 2) + w[w.length - 1]);
+
+/**
+ * Masks words the content filter rejects, so a blocked prompt can be retried.
+ * level 1 = slurs only; level 2 = slurs plus strong swearing, sexual and violence words.
+ */
+function maskForFilter(text, level = 1) {
+  let out = String(text ?? '').replace(FILTER_WORDS_SLURS, maskWord);
+  if (level >= 2) out = out.replace(FILTER_WORDS_STRONG, maskWord);
+  return out;
+}
+
 module.exports = {
+  isContentFilterError,
+  maskForFilter,
   LEARNED_LIMITS,
   looksLikeInstruction,
   sanitizeLearnedText,
