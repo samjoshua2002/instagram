@@ -10,6 +10,7 @@ import {
   LayoutGrid, List, AlignJustify, Table as TableIcon, Cake, Pencil
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
+import { isAiOnFor } from '../lib/aiReply';
 import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
@@ -115,7 +116,8 @@ function RelationshipsPageContent() {
     showToast,
     isSyncingInitial,
     user,
-    isImpersonating
+    isImpersonating,
+    routingConfig
   } = useApp();
   const confirm = useConfirm();
   const confirmDelete = (name, extra = 'Their contact and saved profile will be removed.') =>
@@ -325,11 +327,11 @@ function RelationshipsPageContent() {
       totalPeople++;
       totalDMs += (n.chatsCount || n.messageCount || 0);
       totalReels += (n.reelsCount || 0);
-      if (n.aiEnabled !== false) activeAi++;
+      if (isAiOnFor(n, routingConfig)) activeAi++;
     });
 
     return { totalPeople, totalDMs, totalReels, activeAi };
-  }, [nodes]);
+  }, [nodes, routingConfig]);
 
   // Unlinked contacts without handle
   const unlinkedFriends = useMemo(() => {
@@ -2117,7 +2119,7 @@ function RelationshipsPageContent() {
                     const dobDisplay = cleanDob(person.dob || person.importantDates?.[0]?.date || '');
                     const chatsCount = person.chatsCount || person.messageCount || 0;
                     const reelsCount = person.reelsCount || 0;
-                    const aiOn = person.aiEnabled !== false;
+                    const aiOn = isAiOnFor(person, routingConfig);
 
                     return (
                       <tr
