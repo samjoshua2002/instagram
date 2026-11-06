@@ -783,6 +783,8 @@ export function AppProvider({ children }) {
               roastStyle: sn.roastStyle || '',
               ...(Number.isFinite(sn.roastiness) ? { roastiness: sn.roastiness } : {}),
               greetingStyle: sn.greetingStyle || '',
+              greetingOptions: Array.isArray(sn.greetingOptions) ? sn.greetingOptions : [],
+              avoidWords: Array.isArray(sn.avoidWords) ? sn.avoidWords : [],
               idleHours: 6,
               reminderEligible: false
             };
@@ -864,8 +866,9 @@ export function AppProvider({ children }) {
   };
 
   // Optimistic Save Node
-  const saveNode = async (accumulatedNode, duplicateNamesToDelete = []) => {
-    if (!accumulatedNode?.name) return;
+  // quiet: no "Saved" toast (profile autosave); returns true once the server has the change
+  const saveNode = async (accumulatedNode, duplicateNamesToDelete = [], { quiet = false } = {}) => {
+    if (!accumulatedNode?.name) return false;
 
     const cleanName = accumulatedNode.name.trim();
     let oldName = (accumulatedNode.oldName || '').trim();
@@ -916,6 +919,8 @@ export function AppProvider({ children }) {
       roastStyle: accumulatedNode.roastStyle || 'Playful natural banter',
       ...(Number.isFinite(accumulatedNode.roastiness) ? { roastiness: accumulatedNode.roastiness } : {}),
       greetingStyle: accumulatedNode.greetingStyle || '',
+      greetingOptions: Array.isArray(accumulatedNode.greetingOptions) ? accumulatedNode.greetingOptions : [],
+      avoidWords: Array.isArray(accumulatedNode.avoidWords) ? accumulatedNode.avoidWords : [],
       aiEnabled: accumulatedNode.aiEnabled !== false,
       replyToMessages: accumulatedNode.replyToMessages !== false,
       replyToReelsAndPosts: accumulatedNode.replyToReelsAndPosts !== false,
@@ -983,6 +988,8 @@ export function AppProvider({ children }) {
           roastStyle: formattedNode.roastStyle,
           roastiness: formattedNode.roastiness,
           greetingStyle: formattedNode.greetingStyle,
+          greetingOptions: formattedNode.greetingOptions,
+          avoidWords: formattedNode.avoidWords,
           connections: formattedNode.connections.map(c => ({
             targetName: c.targetName,
             relationship: c.rel
@@ -993,7 +1000,7 @@ export function AppProvider({ children }) {
         const data = await saveRes.json().catch(() => ({}));
         throw new Error(data.error || `server answered ${saveRes.status}`);
       }
-      showToast(`Saved ${cleanName} to Knowledge Tree & DB!`, 'success');
+      if (!quiet) showToast(`Saved ${cleanName} to Knowledge Tree & DB!`, 'success');
 
       const failedDups = [];
       for (const dup of toDelete) {
@@ -1014,9 +1021,11 @@ export function AppProvider({ children }) {
       }
       // Pull the saved record (profile pic, Instagram link) right away instead of waiting for the next poll
       syncBackend();
+      return true;
     } catch (err) {
       console.warn('Backend node save error:', err.message);
       showToast(`Could not save ${cleanName}: ${err.message}`, 'error');
+      return false;
     } finally {
       // Keep the local copy protected until a sync that started after the save has landed
       setTimeout(() => {

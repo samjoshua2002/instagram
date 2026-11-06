@@ -98,6 +98,16 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Your own greetings added on the profile, shown next to the built-in ones
+  greetingOptions: {
+    type: [String],
+    default: [],
+  },
+  // Words the AI must never call this person, e.g. "da", "bro"
+  avoidWords: {
+    type: [String],
+    default: [],
+  },
   chatsCount: {
     type: Number,
     default: 0,

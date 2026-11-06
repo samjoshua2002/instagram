@@ -332,6 +332,9 @@ class SocialGraphService {
         if (senderNode.greetingStyle) {
           lines.push(`  - Greet / open chats with them like: "${clean(senderNode.greetingStyle, 80)}"`);
         }
+        if (Array.isArray(senderNode.avoidWords) && senderNode.avoidWords.length > 0) {
+          lines.push(`  - NEVER call them: ${senderNode.avoidWords.slice(0, 30).map(w => `"${clean(w, 40)}"`).join(', ')}`);
+        }
       }
 
       if (mentionedNodes.size > 0) {
