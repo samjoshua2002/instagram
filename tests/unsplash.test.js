@@ -118,7 +118,7 @@ test('unknown topic falls back to abstract; bad image hosts are dropped', async 
   const s = setup({ responses: [{ status: 200, results: [bad, apiPhoto('ok')] }] });
   const photos = await s.cache.getPhotos('nope');
   assert.deepEqual(photos.map(p => p.id), ['ok']);
-  assert.match(s.calls[0], /query=abstract\+wave\+pattern/);
+  assert.match(s.calls[0], /query=smooth\+abstract\+waves/);
 });
 
 test('empty Unsplash result keeps the old list instead of wiping it', async () => {
@@ -133,7 +133,7 @@ test('colour topics ask Unsplash for that colour only', async () => {
   assert.deepEqual(photos.map(p => p.id), ['y']);
   const url = new URL(s.calls[0]);
   assert.equal(url.searchParams.get('color'), 'yellow');
-  assert.equal(url.searchParams.get('query'), 'wavy lines');
+  assert.equal(url.searchParams.get('query'), 'smooth abstract waves');
   // Normal topics send no colour filter
   await s.cache.getPhotos('fluid');
   assert.equal(new URL(s.calls[1]).searchParams.get('color'), null);

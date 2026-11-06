@@ -31,7 +31,7 @@ export default function UnsplashBanner({
   return (
     <Tag
       className={`ub ${className}`}
-      style={{ backgroundImage: color ? toneArt(color, seed, theme) : abstractArt(seed, theme), ...style }}
+      style={{ backgroundImage: color ? toneArt(color, seed, theme) : abstractArt(seed, theme), ...(color ? { '--ub-tint': color } : null), ...style }}
       title={title}
     >
       {src && (

@@ -12,7 +12,7 @@ import { usePathname } from 'next/navigation.js'; // .js so plain Node (the test
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
-const STORE_KEY = 'chatter_banners_v3'; // v3: no grey one-colour photos (v2 had them, v1 plain gradients)
+const STORE_KEY = 'chatter_banners_v4'; // v4: one calm 'smooth abstract waves' search (v3 mixed busy marble photos)
 const TTL = 6 * 60 * 60 * 1000;
 export const UTM = 'utm_source=chatter_box&utm_medium=referral';
 
