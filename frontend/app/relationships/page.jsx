@@ -7,7 +7,8 @@ import {
   Search, Sparkles, Filter, Link2, AlertCircle, ArrowLeft, ArrowRight,
   Trash2, Calendar, Bot, Film, Pause, Check, Save, User,
   Plus, RefreshCw, MessageSquare, Shield, X, Users,
-  LayoutGrid, List, AlignJustify, Table as TableIcon, Cake, Pencil
+  LayoutGrid, List, AlignJustify, Table as TableIcon, Cake, Pencil,
+  ChevronLeft, MoreHorizontal
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { isAiOnFor } from '../lib/aiReply';
@@ -60,6 +61,34 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+// Person page: built-in greeting chips, labels for the Details grid, and the People-in-their-life groups
+const DEFAULT_GREETINGS = ['hey', 'heyy', 'oyy', 'hii', 'yo'];
+const CATEGORY_LABELS = {
+  close_friend: 'Close friend',
+  online_friend: 'Online friend',
+  offline_friend: 'Offline friend',
+  family: 'Family',
+  professional: 'Professional / creator',
+  business: 'Business / client',
+};
+const GENDER_LABELS = { female: 'Female', male: 'Male', neutral: 'Neutral', unknown: 'Not set' };
+const PEOPLE_GROUPS = [
+  { id: 'friends', label: 'Friends', rel: 'friend' },
+  { id: 'family', label: 'Family', rel: 'family' },
+  { id: 'mentioned', label: 'Mentioned', rel: 'mentioned' },
+];
+const FAMILY_REL = /\b(sis|sister|brother|mom|mum|mother|amma|dad|father|appa|parent|cousin|aunt|aunty|uncle|grand\w*|niece|nephew|family|relative|wife|husband|son|daughter|in-law)\b/i;
+function connectionGroup(c) {
+  const rel = String(c?.rel || c?.relationship || '').trim();
+  if (!rel || /^(connected|mentioned|unknown)$/i.test(rel)) return 'mentioned';
+  return FAMILY_REL.test(rel) ? 'family' : 'friends';
+}
+function connectionLabel(c) {
+  const rel = String(c?.rel || c?.relationship || '').trim();
+  if (!rel || /^(connected|unknown)$/i.test(rel)) return 'Mentioned';
+  return rel.charAt(0).toUpperCase() + rel.slice(1);
+}
 
 // Drop broken years (e.g. "0002" from a half-typed date picker) so only day + month show
 function cleanDob(dob) {
@@ -163,12 +192,28 @@ function RelationshipsPageContent() {
     roastStyle: '',
     roastiness: 40,
     greetingStyle: '',
+    greetingOptions: [],
+    avoidWords: [],
     chatsCount: 0,
     reelsCount: 0
   });
 
-  // Spotify-style inner profile tabs (PLAN.md §15.3)
-  const [profileTab, setProfileTab] = useState('identity');
+  // Person page UI (one scrolling page, no tabs)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const [saveState, setSaveState] = useState('saved'); // saved | pending | saving | error
+  const [saveTick, setSaveTick] = useState(0);
+  const autosaveTimer = useRef(null);
+  const [factSearch, setFactSearch] = useState('');
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [peopleTab, setPeopleTab] = useState('friends');
+  const [showAllPeople, setShowAllPeople] = useState(false);
+  const [isAddingPerson, setIsAddingPerson] = useState(false);
+  const [newGreeting, setNewGreeting] = useState('');
+  const [newAvoidWord, setNewAvoidWord] = useState('');
+  const [isAddingAvoid, setIsAddingAvoid] = useState(false);
+  const [editingField, setEditingField] = useState(null);
+  const [editDraft, setEditDraft] = useState({ value: '', month: '', day: '', year: '' });
   const [dmPreview, setDmPreview] = useState({ loading: false, messages: [] });
 
   const [isAutofilling, setIsAutofilling] = useState(false);
@@ -241,10 +286,22 @@ function RelationshipsPageContent() {
         roastStyle: selectedPerson.roastStyle || '',
         roastiness: Number.isFinite(selectedPerson.roastiness) ? selectedPerson.roastiness : 40,
         greetingStyle: selectedPerson.greetingStyle || '',
+        greetingOptions: Array.isArray(selectedPerson.greetingOptions) ? selectedPerson.greetingOptions : [],
+        avoidWords: Array.isArray(selectedPerson.avoidWords) ? selectedPerson.avoidWords : [],
         chatsCount: selectedPerson.chatsCount ?? selectedPerson.messageCount ?? 0,
         reelsCount: selectedPerson.reelsCount ?? 0
       });
-      setProfileTab('identity');
+      // Open on the first group that has anyone in it
+      const groups = (selectedPerson.connections || []).map(connectionGroup);
+      setPeopleTab(PEOPLE_GROUPS.find(g => groups.includes(g.id))?.id || 'friends');
+      setFactSearch('');
+      setPeopleSearch('');
+      setShowAllPeople(false);
+      setIsAddingPerson(false);
+      setIsAddingAvoid(false);
+      setEditingField(null);
+      setIsMenuOpen(false);
+      setSaveState('saved');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id]);
@@ -510,9 +567,10 @@ function RelationshipsPageContent() {
   };
 
   // Save changes from inner page
-  const handleSaveInnerForm = async (e) => {
-    e?.preventDefault();
+  const handleSaveInnerForm = async (e, { quiet = false } = {}) => {
+    e?.preventDefault?.();
     if (!formData.name.trim()) {
+      setSaveState('error');
       showToast('Name cannot be empty');
       return;
     }
@@ -540,14 +598,133 @@ function RelationshipsPageContent() {
       roastStyle: formData.roastStyle.trim(),
       roastiness: Number(formData.roastiness),
       greetingStyle: formData.greetingStyle.trim(),
+      greetingOptions: formData.greetingOptions || [],
+      avoidWords: formData.avoidWords || [],
       chatsCount: parseInt(formData.chatsCount, 10) || 0,
       reelsCount: parseInt(formData.reelsCount, 10) || 0,
       messageCount: parseInt(formData.chatsCount, 10) || 0
     };
 
-    await saveNode(updated, isRenamed ? [oldName] : []);
+    setSaveState('saving');
+    const ok = await saveNode(updated, isRenamed ? [oldName] : [], { quiet: true });
     setSelectedPerson(updated);
-    showToast(`Saved details for ${updated.name}`);
+    // A newer edit waiting in the autosave timer keeps the label on "Unsaved changes"
+    if (!autosaveTimer.current) setSaveState(ok === false ? 'error' : 'saved');
+    if (!quiet && ok !== false) showToast(`Saved details for ${updated.name}`);
+  };
+
+  // Every change on the person page saves itself (short wait so a dragged slider saves once)
+  const editProfile = (patch, delay = 700) => {
+    setFormData(prev => ({ ...prev, ...patch }));
+    setSaveState('pending');
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      autosaveTimer.current = null;
+      setSaveTick(t => t + 1);
+    }, delay);
+  };
+
+  useEffect(() => {
+    if (!saveTick || !selectedPerson) return;
+    handleSaveInnerForm(null, { quiet: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveTick]);
+
+  // Save a waiting change before leaving the page or opening someone else
+  const flushAutosave = async () => {
+    if (!autosaveTimer.current) return;
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = null;
+    await handleSaveInnerForm(null, { quiet: true });
+  };
+  const leavePerson = async () => {
+    await flushAutosave();
+    setSelectedPerson(null);
+  };
+  const openPerson = async (node) => {
+    await flushAutosave();
+    setSelectedPerson(node);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
+  };
+
+  useEffect(() => () => clearTimeout(autosaveTimer.current), []);
+
+  // The ... menu closes on an outside click or Escape
+  useEffect(() => {
+    if (!isMenuOpen) return undefined;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setIsMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setIsMenuOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isMenuOpen]);
+
+  const handleAddGreeting = (e) => {
+    e.preventDefault();
+    const g = newGreeting.trim();
+    if (!g) return;
+    const known = [...DEFAULT_GREETINGS, ...(formData.greetingOptions || [])].find(x => x.toLowerCase() === g.toLowerCase());
+    editProfile({
+      greetingStyle: known || g,
+      ...(known ? {} : { greetingOptions: [...(formData.greetingOptions || []), g].slice(-20) }),
+    }, 0);
+    setNewGreeting('');
+  };
+
+  const handleAddAvoidWord = (e) => {
+    e.preventDefault();
+    const current = formData.avoidWords || [];
+    const words = newAvoidWord.split(',').map(w => w.trim()).filter(Boolean)
+      .filter((w, i, arr) => arr.findIndex(x => x.toLowerCase() === w.toLowerCase()) === i)
+      .filter(w => !current.some(x => x.toLowerCase() === w.toLowerCase()));
+    if (words.length) editProfile({ avoidWords: [...current, ...words].slice(0, 30) }, 0);
+    setNewAvoidWord('');
+    setIsAddingAvoid(false);
+  };
+
+  const startEditDetail = (key) => {
+    if (key === 'dob') {
+      const dob = formData.dob || '';
+      const iso = formatDobForInput(dob);
+      let month = '';
+      let day = '';
+      let year = '';
+      if (iso) {
+        const [y, m, d] = iso.split('-');
+        month = MONTH_NAMES[parseInt(m, 10) - 1] || '';
+        day = String(parseInt(d, 10));
+        // Browsers invent a year (2001) for "May 30": keep a year only when the saved date has one
+        year = /\b(19|20)\d{2}\b/.test(dob) && parseInt(y, 10) >= 1900 ? y : '';
+      } else if (dob) {
+        month = MONTH_NAMES.find(m => dob.toLowerCase().includes(m.slice(0, 3).toLowerCase())) || '';
+        day = (dob.match(/\b([1-9]|[12]\d|3[01])\b/) || [])[0] || '';
+      }
+      setEditDraft({ value: '', month, day, year });
+    } else {
+      setEditDraft({ value: formData[key] ?? '', month: '', day: '', year: '' });
+    }
+    setEditingField(key);
+  };
+
+  const saveDetail = (e) => {
+    e?.preventDefault();
+    const key = editingField;
+    if (!key) return;
+    if (key === 'dob') {
+      const { month, day, year } = editDraft;
+      if (!month || !day) { showToast('Pick a month and a day'); return; }
+      if (year && !/^(19|20)\d{2}$/.test(year)) { showToast('Year should look like 2002, or leave it empty'); return; }
+      editProfile({ dob: year ? `${month} ${day}, ${year}` : `${month} ${day}` }, 0);
+    } else if (key === 'name') {
+      if (!String(editDraft.value).trim()) { showToast('Name cannot be empty'); return; }
+      editProfile({ name: String(editDraft.value).trim() }, 0);
+    } else {
+      editProfile({ [key]: typeof editDraft.value === 'string' ? editDraft.value.trim() : editDraft.value }, 0);
+    }
+    setEditingField(null);
   };
 
   // AI Autofill fields from chat logs
@@ -759,7 +936,7 @@ function RelationshipsPageContent() {
 
     const newConn = {
       targetName: newConnTarget.trim(),
-      rel: newConnRel.trim() || 'connected'
+      rel: newConnRel.trim() || PEOPLE_GROUPS.find(g => g.id === peopleTab)?.rel || 'friend'
     };
 
     const updatedConns = [...(selectedPerson.connections || []), newConn];
@@ -772,7 +949,16 @@ function RelationshipsPageContent() {
     setSelectedPerson(updated);
     setNewConnTarget('');
     setNewConnRel('');
+    setIsAddingPerson(false);
+    setPeopleTab(connectionGroup(newConn));
     showToast(`Connected ${selectedPerson.name} with ${newConn.targetName}`);
+  };
+
+  const handleRemoveConnection = async (index) => {
+    if (!selectedPerson) return;
+    const updated = { ...selectedPerson, connections: (selectedPerson.connections || []).filter((_, i) => i !== index) };
+    setSelectedPerson(updated);
+    await saveNode(updated, [], { quiet: true });
   };
 
   // Load the recent DM transcript for the profile's history tab and last-contact stat
@@ -822,13 +1008,13 @@ function RelationshipsPageContent() {
   useHeroCollapse(
     pageRef,
     selectedPerson
-      ? { hero: '.person-hero', media: '.person-hero-avatar', title: '.person-name', fade: '.person-tag, .person-handle, .person-stats', pin: '.person-back' }
+      ? { hero: '.person-hero', media: '.person-hero-avatar', title: '.person-name', fade: '.person-handle, .person-stats, .person-hero-actions, .person-topbar-right', pin: '.person-back' }
       : { hero: '.spx-hero', media: '.spx-cover', title: '.spx-title', fade: '.spx-eyebrow, .spx-desc, .spx-meta', stack: '.people-filters' },
     [motionView]
   );
   useRevealOnce(
     pageRef,
-    selectedPerson ? [{ sel: '.person-actionbar' }] : [{ sel: '.spx-stats', children: true }, { sel: '.people-results' }],
+    selectedPerson ? [{ sel: '.person-ai-bar' }] : [{ sel: '.spx-stats', children: true }, { sel: '.people-results' }],
     [motionView]
   );
 
@@ -843,117 +1029,148 @@ function RelationshipsPageContent() {
     const isPaused = currentAiMode === 'paused';
     const isFullAi = currentAiMode === 'full_ai';
 
+    const personName = formData.name || selectedPerson.name;
+    const pron = formData.gender === 'female' ? 'her' : formData.gender === 'male' ? 'him' : 'them';
+    const pronPos = formData.gender === 'female' ? 'her' : formData.gender === 'male' ? 'his' : 'their';
+    const toneValue = Number(formData.roastiness) || 0;
+    const toneName = toneValue >= 67 ? 'Savage' : toneValue >= 34 ? 'Playful' : 'Sweet';
+    const activeGreeting = formData.greetingStyle.trim();
+    const greetingChoices = [...new Set([...DEFAULT_GREETINGS, ...(formData.greetingOptions || []), ...(activeGreeting ? [activeGreeting] : [])])];
+    const sampleOpen = activeGreeting || 'heyy';
+    const sampleReply = toneName === 'Savage'
+      ? `${sampleOpen} so impatient, fine I'm here`
+      : toneName === 'Playful'
+        ? `${sampleOpen} relax relax, I'm here now`
+        : `${sampleOpen} sorry sorry, I'm here now`;
+    const allFacts = selectedPerson.facts || selectedPerson.lore || [];
+    const factQuery = factSearch.trim().toLowerCase();
+    const shownFacts = factQuery ? allFacts.filter(f => String(f).toLowerCase().includes(factQuery)) : allFacts;
+    const connections = selectedPerson.connections || [];
+    const groupCounts = connections.reduce((acc, c) => { acc[connectionGroup(c)] += 1; return acc; }, { friends: 0, family: 0, mentioned: 0 });
+    const peopleQuery = peopleSearch.trim().toLowerCase();
+    const groupPeople = connections
+      .map((c, index) => ({ ...c, index }))
+      .filter(c => connectionGroup(c) === peopleTab)
+      .filter(c => !peopleQuery || (c.targetName || '').toLowerCase().includes(peopleQuery) || connectionLabel(c).toLowerCase().includes(peopleQuery));
+    const visiblePeople = showAllPeople ? groupPeople : groupPeople.slice(0, 8);
+    const saveLabel = saveState === 'saving' ? 'Saving…' : saveState === 'pending' ? 'Unsaved changes' : saveState === 'error' ? 'Not saved' : 'All changes saved';
+    const birthdayLabel = formData.dob
+      ? (birthday ? `${birthday.label}${birthday.days === 0 ? ' · today' : ` · in ${birthday.days} day${birthday.days === 1 ? '' : 's'}`}` : formData.dob)
+      : 'Not set';
+    const detailRows = [
+      { key: 'name', label: 'Name', value: personName },
+      { key: 'handle', label: 'Instagram', value: formData.handle || 'Not set' },
+      { key: 'dob', label: 'Birthday', value: birthdayLabel },
+      { key: 'relationship', label: 'Relationship to you', value: formData.relationship || 'Not set' },
+      { key: 'category', label: `Show ${pron} under`, value: CATEGORY_LABELS[formData.category] || 'Not set' },
+      { key: 'gender', label: 'Gender', value: GENDER_LABELS[formData.gender] || 'Not set' },
+    ];
+
     return (
       <div ref={pageRef} className="page-container person-page">
-        {/* ================= SPOTIFY ARTIST-STYLE HERO (PLAN.md §15.3) ================= */}
+        {/* ================= HERO: Unsplash cover, name, stats, two actions ================= */}
         <div className="person-hero">
           <UnsplashBanner seed={selectedPerson.name || selectedPerson.id} matchImage={personArt} className="person-cover" />
           <span className="hero-surface" aria-hidden="true" />
-          <button type="button" className="person-back" onClick={() => setSelectedPerson(null)} aria-label="Back to directory">
-            <ArrowLeft size={22} />
-          </button>
+
+          <div className="person-topbar">
+            <button type="button" className="person-back" onClick={leavePerson} aria-label="Back to People">
+              <ChevronLeft size={18} />
+              <span>People</span>
+            </button>
+            <div className="person-topbar-right">
+              <span className={`person-save-state${saveState === 'error' ? ' is-error' : ''}`} aria-live="polite">{saveLabel}</span>
+              <div className="person-menu-wrap" ref={menuRef}>
+                <button
+                  type="button"
+                  className="person-more"
+                  aria-label="More options"
+                  aria-haspopup="menu"
+                  aria-expanded={isMenuOpen}
+                  onClick={() => setIsMenuOpen(o => !o)}
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {isMenuOpen && (
+                  <div className="person-menu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setIsMenuOpen(false); setLinkingTargetPerson(selectedPerson); }}>
+                      <Link2 size={15} />
+                      <span>{selectedPerson.senderId ? 'Relink Instagram' : 'Link Instagram'}</span>
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => { setIsMenuOpen(false); setIsRawChatModalOpen(true); }}>
+                      <MessageSquare size={15} />
+                      <span>Paste a chat for the AI</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="danger"
+                      onClick={async () => {
+                        setIsMenuOpen(false);
+                        if (await confirmDelete(selectedPerson.name)) {
+                          deleteNode(selectedPerson);
+                          setSelectedPerson(null);
+                        }
+                      }}
+                    >
+                      <Trash2 size={15} />
+                      <span>Delete contact</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="person-hero-body">
             <div className="person-hero-avatar">
-              <ContactAvatar contact={{ ...selectedPerson, name: formData.name, handle: formData.handle }} size={120} showStatus={false} />
+              <ContactAvatar contact={{ ...selectedPerson, name: formData.name, handle: formData.handle }} size={104} showStatus={false} />
             </div>
 
             <div className="person-hero-text">
-              <span className="person-tag">
-                <span className="person-tag-dot" />
-                {formData.relationship || formData.category.replace('_', ' ')}
-              </span>
-              <h1 className="person-name">{formData.name || selectedPerson.name}</h1>
+              <h1 className="person-name">{personName}</h1>
               <div className="person-handle">
-                {formData.handle || 'No handle set'}
-                {selectedPerson.senderId ? ' · Instagram linked' : ' · Not linked'}
+                {[formData.handle || (selectedPerson.senderId ? 'Instagram linked' : 'Instagram not linked'), formData.relationship].filter(Boolean).join(' · ')}
               </div>
+              <div className="person-hero-actions">
+                <button type="button" className="person-cta" onClick={() => startAiInterview(selectedPerson)}>
+                  <Sparkles size={15} />
+                  <span>Start AI interview</span>
+                </button>
+                <button type="button" className="person-ghost-btn" onClick={handleForceLearn} disabled={isLearning}>
+                  <RefreshCw size={15} className={isLearning ? 'animate-spin' : ''} />
+                  <span>{isLearning ? 'Learning…' : 'Learn from DMs'}</span>
+                </button>
+              </div>
+            </div>
 
-              <div className="person-stats">
-                <div>
-                  <CountUp value={formData.chatsCount} className="person-stat-value" />
-                  <span className="person-stat-label">Total DMs</span>
-                </div>
-                <div>
-                  <CountUp value={formData.reelsCount} className="person-stat-value" />
-                  <span className="person-stat-label">Shared Reels</span>
-                </div>
-                <div>
-                  <span className="person-stat-value">{lastContactLabel}</span>
-                  <span className="person-stat-label">Last Contact</span>
-                </div>
+            <div className="person-stats">
+              <div>
+                <CountUp value={formData.chatsCount} className="person-stat-value" />
+                <span className="person-stat-label">Messages</span>
+              </div>
+              <div>
+                <CountUp value={formData.reelsCount} className="person-stat-value" />
+                <span className="person-stat-label">Reels shared</span>
+              </div>
+              <div>
+                <span className="person-stat-value">{lastContactLabel}</span>
+                <span className="person-stat-label">Last talked</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Floating glass action bar */}
-        <div className="person-actionbar">
-          <motion.button
-            type="button"
-            className="person-cta"
-            whileHover={{ scale: 1.04 }}
-            onClick={() => startAiInterview(selectedPerson)}
-          >
-            <Sparkles size={16} />
-            <span>Start AI Interview</span>
-          </motion.button>
-
-          <div className="person-actions">
-            <button type="button" className="person-action" onClick={handleForceLearn} disabled={isLearning}>
-              <RefreshCw size={15} className={isLearning ? 'animate-spin' : ''} />
-              <span>{isLearning ? 'Learning…' : 'Force Learn DMs'}</span>
-            </button>
-            <button type="button" className="person-action" onClick={() => setLinkingTargetPerson(selectedPerson)}>
-              <Link2 size={15} />
-              <span>{selectedPerson.senderId ? 'Relink Instagram' : 'Link Instagram'}</span>
-            </button>
-            <button type="button" className="person-action" onClick={() => setIsRawChatModalOpen(true)}>
-              <MessageSquare size={15} />
-              <span>Raw Chat AI Extract</span>
-            </button>
-            <button type="button" className="person-action" onClick={handleSaveInnerForm}>
-              <Save size={15} />
-              <span>Save</span>
-            </button>
-            <button
-              type="button"
-              className="person-action danger"
-              aria-label="Delete contact"
-              onClick={async () => {
-                if (await confirmDelete(selectedPerson.name)) {
-                  deleteNode(selectedPerson);
-                  setSelectedPerson(null);
-                }
-              }}
-            >
-              <Trash2 size={15} />
-              <span>Delete</span>
-            </button>
+        {/* ================= AI REPLY MODE ================= */}
+        <div className="person-ai-bar">
+          <div className="person-ai-text">
+            <div className="person-ai-title">{isPaused ? `AI is off for ${personName}` : `AI is replying to ${personName}`}</div>
+            <div className="person-ai-sub">{isPaused ? 'You reply yourself. The AI stays quiet.' : 'Replies go out automatically in your voice.'}</div>
           </div>
-        </div>
-
-        {/* Segmented glass tabs */}
-        <div className="person-tabs" role="tablist">
-          {[
-            { id: 'identity', label: 'Identity & Lore', icon: User },
-            { id: 'routing', label: 'AI Routing & Modes', icon: Bot },
-            { id: 'memories', label: 'Memories & Facts', icon: Sparkles },
-            { id: 'history', label: 'DM History & Tone', icon: MessageSquare },
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={profileTab === id}
-              className={`person-tab${profileTab === id ? ' active' : ''}`}
-              onClick={() => setProfileTab(id)}
-            >
-              {profileTab === id && <SegIndicator id="seg-person-tab" className="seg-underline" />}
-              <Icon size={15} />
-              <span>{label}</span>
-            </button>
-          ))}
+          <div className="person-seg" role="radiogroup" aria-label="AI reply mode">
+            <button type="button" role="radio" aria-checked={isFullAi} className={isFullAi ? 'active' : ''} onClick={() => handleSetAiMode('full_ai')}>Full AI</button>
+            <button type="button" role="radio" aria-checked={isPaused} className={isPaused ? 'active' : ''} onClick={() => handleSetAiMode('paused')}>Off</button>
+          </div>
         </div>
 
         {/* ================= MODAL: AI RAW CHAT EXTRACTION & CLARIFICATION ================= */}
@@ -1139,778 +1356,317 @@ function RelationshipsPageContent() {
           </div>
         )}
 
-        {profileTab === 'routing' && (
-          <>
-        {/* ================= CARD 1: KNOWLEDGE SCORE & COMPLETENESS ================= */}
-        <div className="person-glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-                INTEL DEPTH
-              </div>
-              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '2px' }}>
-                {knowledgeBreakdown.score}% Knowledge Score
-              </div>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem', marginTop: '2px' }}>
-                Completeness index measuring how well Chatter OS AI understands {formData.name}&apos;s identity, lore, and relationships.
-              </p>
-            </div>
+        <div className="person-grid">
+          {/* ================= HOW THE AI TALKS ================= */}
+          <section className="person-glass-card">
+            <h2 className="person-card-title">How the AI talks to {pron}</h2>
 
-            <div style={{ background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '700', fontFamily: "var(--font-label)" }}>
-              {knowledgeBreakdown.score >= 80 ? 'HIGH INTEL' : (knowledgeBreakdown.score >= 50 ? 'MEDIUM INTEL' : 'NEEDS DATA')}
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div style={{ width: '100%', height: '8px', background: 'var(--color-surface-hover)', borderRadius: '4px', overflow: 'hidden', marginBottom: '18px' }}>
-            <div
-              style={{
-                width: `${knowledgeBreakdown.score}%`,
-                height: '100%',
-                background: 'var(--color-text-primary)',
-                borderRadius: '4px',
-                transition: 'width 0.4s ease'
-              }}
+            <label className="person-field-label person-tone-label" htmlFor="roastiness">
+              <span>Tone</span>
+              <span className="person-range-value">{toneName} · {toneValue}%</span>
+            </label>
+            <input
+              id="roastiness"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={toneValue}
+              onChange={e => editProfile({ roastiness: Number(e.target.value) })}
+              className="person-range"
+              style={{ '--range-fill': `${toneValue}%` }}
             />
-          </div>
-
-          {/* Checklist Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-            {knowledgeBreakdown.items.map((item) => (
-              <div
-                key={item.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: item.complete ? 'var(--color-surface-hover)' : 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  fontSize: '0.78rem',
-                  color: item.complete ? 'var(--color-text-primary)' : 'var(--color-text-muted)'
-                }}
-              >
-                <div
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '4px',
-                    background: item.complete ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                    border: '1px solid',
-                    borderColor: item.complete ? 'var(--color-text-primary)' : 'var(--color-border-strong)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--color-surface)'
-                  }}
-                >
-                  {item.complete && <Check size={11} strokeWidth={3} />}
-                </div>
-                <span style={{ fontWeight: item.complete ? '600' : '400' }}>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ================= CARD 2: CHAT AUTOMATION CONTROL ================= */}
-        <div className="person-glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-                DIRECT MESSAGE AUTOMATION
-              </div>
-              <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '2px' }}>
-                AI Reply Rules for {formData.name}
-              </div>
+            <div className="person-range-scale">
+              <span>Sweet</span>
+              <span>Playful</span>
+              <span>Savage</span>
             </div>
-            <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '3px 8px', borderRadius: '4px', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-              CURRENT: {isPaused ? 'MANUAL' : 'FULL AI'}
-            </span>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={() => handleSetAiMode('full_ai')}
-              style={{
-                padding: '12px 14px',
-                borderRadius: '8px',
-                border: '1px solid',
-                borderColor: isFullAi ? 'var(--color-text-primary)' : 'var(--color-border)',
-                background: isFullAi ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                color: isFullAi ? 'var(--color-surface)' : 'var(--color-text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                textAlign: 'left',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Bot size={18} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: '800' }}>Full AI Auto-Reply</div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '1px' }}>AI replies to messages</div>
-              </div>
-            </button>
+            <div className="person-tone-preview" aria-label="Example of how the AI replies">
+              <div className="person-bubble in">oyy please reply</div>
+              <div className="person-bubble out">{sampleReply}</div>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => handleSetAiMode('paused')}
-              style={{
-                padding: '12px 14px',
-                borderRadius: '8px',
-                border: '1px solid',
-                borderColor: isPaused ? 'var(--color-text-primary)' : 'var(--color-border)',
-                background: isPaused ? 'var(--color-text-primary)' : 'var(--color-surface)',
-                color: isPaused ? 'var(--color-surface)' : 'var(--color-text-primary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                textAlign: 'left',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Pause size={18} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: '800' }}>Stop AI (Manual Chat)</div>
-                <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '1px' }}>AI silenced for manual chatting</div>
-              </div>
-            </button>
-          </div>
-        </div>
-        </>
-        )}
+            <div className="person-field-label person-sub-label">Greets {pron} with</div>
+            <div className="person-chip-row" role="radiogroup" aria-label="Greeting">
+              {greetingChoices.map(g => (
+                <button
+                  key={g}
+                  type="button"
+                  role="radio"
+                  aria-checked={activeGreeting === g}
+                  className={`person-chip${activeGreeting === g ? ' active' : ''}`}
+                  onClick={() => editProfile({ greetingStyle: activeGreeting === g ? '' : g }, 0)}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+            <form className="person-inline-form" onSubmit={handleAddGreeting}>
+              <input
+                type="text"
+                maxLength={40}
+                placeholder="Add your own, e.g. macha"
+                aria-label="Add your own greeting"
+                value={newGreeting}
+                onChange={e => setNewGreeting(e.target.value)}
+              />
+              <button type="submit" className="person-soft-btn" disabled={!newGreeting.trim()}>Add</button>
+            </form>
 
-        {profileTab === 'identity' && (
-          <>
-          {/* Birthday countdown */}
-          <div className="person-glass-card person-birthday">
-            <div className="person-birthday-icon"><Cake size={22} /></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="person-card-eyebrow">BIRTHDAY</div>
-              {birthday ? (
-                <div className="person-card-title">
-                  {birthday.days === 0
-                    ? `It's ${formData.name || selectedPerson.name}'s birthday today`
-                    : `${birthday.days} day${birthday.days === 1 ? '' : 's'} to go`}
-                </div>
+            <div className="person-field-label person-sub-label">Never calls {pron}</div>
+            <div className="person-chip-row">
+              {(formData.avoidWords || []).map(w => (
+                <button
+                  key={w}
+                  type="button"
+                  className="person-chip avoid"
+                  title={`Remove "${w}"`}
+                  aria-label={`Remove ${w}`}
+                  onClick={() => editProfile({ avoidWords: formData.avoidWords.filter(x => x !== w) }, 0)}
+                >
+                  <span>{w}</span>
+                  <X size={12} />
+                </button>
+              ))}
+              {isAddingAvoid ? (
+                <form className="person-chip-form" onSubmit={handleAddAvoidWord}>
+                  <input
+                    autoFocus
+                    type="text"
+                    maxLength={40}
+                    placeholder="e.g. bro"
+                    aria-label="Word the AI should never use"
+                    value={newAvoidWord}
+                    onChange={e => setNewAvoidWord(e.target.value)}
+                    onBlur={() => { if (!newAvoidWord.trim()) setIsAddingAvoid(false); }}
+                    onKeyDown={e => { if (e.key === 'Escape') { setNewAvoidWord(''); setIsAddingAvoid(false); } }}
+                  />
+                </form>
               ) : (
-                <div className="person-card-title" style={{ color: 'var(--color-text-secondary)' }}>
-                  {Number.isFinite(selectedPerson.age) ? `${selectedPerson.age} years old` : 'No birthday saved yet'}
-                </div>
+                <button type="button" className="person-chip dashed" onClick={() => setIsAddingAvoid(true)}>+ Add</button>
               )}
-              <div className="person-card-sub">
-                {birthday
-                  ? `${birthday.label}${birthday.turning ? ` · turning ${birthday.turning}` : ''}`
-                  : Number.isFinite(selectedPerson.age)
-                    ? 'Age told in DMs · birthday not known yet'
-                    : 'Add a date of birth in the fields below'}
-              </div>
             </div>
-          </div>
+          </section>
 
-        {/* ================= CARD 3: PREDEFINED NECESSARY FIELDS ================= */}
-        <div className="person-glass-card">
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '4px' }}>
-            PROFILE FIELDS
-          </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginBottom: '16px' }}>
-            Essential Identity & Relationship Attributes
-          </div>
-
-          <form onSubmit={handleSaveInnerForm} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Row 1: Name, Handle */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Bhavani"
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                  Instagram Handle
-                </label>
-                <input
-                  type="text"
-                  value={formData.handle}
-                  onChange={(e) => setFormData({ ...formData, handle: e.target.value })}
-                  placeholder="@username"
-                />
-              </div>
+          {/* ================= WHAT THE AI KNOWS ================= */}
+          <section className="person-glass-card">
+            <h2 className="person-card-title">What the AI knows</h2>
+            <div className="person-card-sub person-live">
+              <span className="person-live-dot" aria-hidden="true" />
+              {allFacts.length.toLocaleString()} fact{allFacts.length === 1 ? '' : 's'} · auto-syncing
             </div>
 
-            {/* Row 2: Date of Birth, Gender, Category */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
-                    Birthday Calendar
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !knowBirthYear;
-                      setKnowBirthYear(next);
-                      if (!next && formData.dob) {
-                        const cleaned = formData.dob.replace(/,?\s*(19|20)\d{2}/, '').replace(/^\d{4}-/, '').trim();
-                        setFormData(prev => ({ ...prev, dob: cleaned }));
-                      }
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '0.68rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    {knowBirthYear ? "Don't know birth year?" : "Know birth year?"}
-                  </button>
-                </div>
+            <input
+              type="search"
+              className="person-search"
+              placeholder={`Search ${allFacts.length.toLocaleString()} facts`}
+              aria-label="Search facts"
+              value={factSearch}
+              onChange={e => setFactSearch(e.target.value)}
+            />
 
-                {knowBirthYear ? (
-                  <div>
-                    <input
-                      // Safari paints today's date in an empty date box, which looked like a fake birthday;
-                      // show a plain "not known" box until a date exists or the box is clicked
-                      type={formData.dob || dobFocused ? 'date' : 'text'}
-                      placeholder="Not known yet · click to pick"
-                      onFocus={() => setDobFocused(true)}
-                      onBlur={() => setDobFocused(false)}
-                      value={formatDobForInput(formData.dob)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) {
-                          setFormData({ ...formData, dob: '' });
-                          return;
-                        }
-                        const [y, m, d] = val.split('-');
-                        const monthName = MONTH_NAMES[parseInt(m, 10) - 1] || m;
-                        const validYear = parseInt(y, 10) >= 1900;
-                        setFormData({ ...formData, dob: validYear ? `${monthName} ${parseInt(d, 10)}, ${y}` : `${monthName} ${parseInt(d, 10)}` });
-                      }}
-                      style={{ width: '100%' }}
-                    />
-                    {formData.dob && (
-                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', display: 'block', marginTop: '4px' }}>
-                        Selected: <b>{formData.dob}</b>
-                      </span>
-                    )}
+            <div className="person-facts">
+              {allFacts.length === 0 ? (
+                <div className="person-empty">No facts yet. The AI learns them from your DMs, or add one below.</div>
+              ) : shownFacts.length === 0 ? (
+                <div className="person-empty">No facts match “{factSearch.trim()}”.</div>
+              ) : (
+                shownFacts.map((fact, i) => (
+                  <div key={`${i}-${fact}`} className="person-fact">
+                    <span>{fact}</span>
+                    <button type="button" className="person-x" onClick={() => handleRemoveFact(fact)} aria-label="Remove this fact" title="Remove this fact">
+                      <X size={14} />
+                    </button>
                   </div>
-                ) : (
-                  <div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <select
-                        value={(() => {
-                          const match = MONTH_NAMES.find(m => formData.dob.toLowerCase().includes(m.toLowerCase()));
-                          return match || 'January';
-                        })()}
-                        onChange={(e) => {
-                          const m = e.target.value;
-                          const currentDay = (formData.dob.match(/\b([1-9]|[12]\d|3[01])\b/) || [])[0] || '1';
-                          setFormData({ ...formData, dob: `${m} ${currentDay}` });
-                        }}
-                        style={{ flex: 1.2 }}
-                      >
-                        {MONTH_NAMES.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={(() => {
-                          const match = (formData.dob.match(/\b([1-9]|[12]\d|3[01])\b/) || [])[0];
-                          return match || '1';
-                        })()}
-                        onChange={(e) => {
-                          const d = e.target.value;
-                          const currentMonth = MONTH_NAMES.find(m => formData.dob.toLowerCase().includes(m.toLowerCase())) || 'January';
-                          setFormData({ ...formData, dob: `${currentMonth} ${d}` });
-                        }}
-                        style={{ flex: 0.8 }}
-                      >
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                          <option key={day} value={day}>{day}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', display: 'block', marginTop: '4px' }}>
-                      Remembering date & month: <b>{formData.dob || 'Not set'}</b>
-                    </span>
-                  </div>
-                )}
-              </div>
-
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                  Gender
-                </label>
-                <select
-                  value={formData.gender}
-                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                >
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
-                  <option value="neutral">Neutral</option>
-                  <option value="unknown">Unknown</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                  Category Filter
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  <option value="close_friend">Close Circle / Family</option>
-                  <option value="online_friend">Online Friend</option>
-                  <option value="offline_friend">Offline Friend</option>
-                  <option value="family">Family / Relatives</option>
-                  <option value="professional">Professional / Creator</option>
-                  <option value="business">Business / Client</option>
-                </select>
-              </div>
+                ))
+              )}
             </div>
 
-            {/* Row 3: Relationship */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                Specific Relationship To You
-              </label>
+            <form className="person-inline-form" onSubmit={handleAddFact}>
               <input
                 type="text"
-                value={formData.relationship}
-                onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
-                placeholder="e.g. Closest Online Friend / 3rd Year Medicine Student"
+                placeholder={`Tell the AI something new about ${personName}`}
+                aria-label="New fact"
+                value={newFactInput}
+                onChange={e => setNewFactInput(e.target.value)}
               />
-            </div>
-
-            {/* Row 4: Personal Notes & Highlights (Linked to facts!) */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)" }}>
-                  Personal Lore, Habits & Synthesized DM Notes
-                </label>
-                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>Linked to DM Intel</span>
-              </div>
-              <textarea
-                rows={5}
-                value={formData.personalNotes}
-                onChange={(e) => setFormData({ ...formData, personalNotes: e.target.value })}
-                placeholder="Write detailed background information, habits, exams, Netflix shows, inside jokes, and life updates..."
-              />
-            </div>
-
-            {/* Row 5: Banter Style */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                Banter & Conversation Style
-              </label>
-              <input
-                type="text"
-                value={formData.roastStyle}
-                onChange={(e) => setFormData({ ...formData, roastStyle: e.target.value })}
-                placeholder="e.g. Playful teasing, Hindi bro banter, sweet concise shortcuts..."
-              />
-            </div>
-
-            {/* Row 6: Lifetime Interaction Statistics (Chats & Reels) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', paddingTop: '10px', borderTop: '1px solid var(--color-surface-hover)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                  Total DMs Exchanged
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.chatsCount}
-                  onChange={(e) => setFormData({ ...formData, chatsCount: parseInt(e.target.value, 10) || 0 })}
-                  placeholder="0"
-                  style={{ fontFamily: "var(--font-label)", fontWeight: '700' }}
-                />
-                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '3px', display: 'block' }}>
-                  Cumulative lifetime chats (preserved across message cleanups)
-                </span>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: "var(--font-label)" }}>
-                  Total Reels Shared
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.reelsCount}
-                  onChange={(e) => setFormData({ ...formData, reelsCount: parseInt(e.target.value, 10) || 0 })}
-                  placeholder="0"
-                  style={{ fontFamily: "var(--font-label)", fontWeight: '700' }}
-                />
-                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '3px', display: 'block' }}>
-                  Cumulative reels shared by this contact
-                </span>
-              </div>
-            </div>
-
-          </form>
+              <button type="submit" className="person-light-btn" disabled={!newFactInput.trim()}>Add</button>
+            </form>
+          </section>
         </div>
 
-        {/* ================= CARD 4: SOCIAL CONNECTIONS (WITH SUGGESTIONS) ================= */}
-        <div className="person-glass-card">
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700', marginBottom: '4px' }}>
-            SOCIAL GRAPH
-          </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginBottom: '14px' }}>
-            Interlinked Friends in Circle ({selectedPerson.connections?.length || 0})
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-            {(selectedPerson.connections || []).length > 0 ? (
-              selectedPerson.connections.map((c, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: 'var(--color-surface-hover)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
+        {/* ================= PEOPLE IN THEIR LIFE ================= */}
+        <section className="person-glass-card person-people">
+          <div className="person-card-head">
+            <div>
+              <h2 className="person-card-title">People in {pronPos} life</h2>
+              <div className="person-card-sub">Found in your DMs. The AI uses these names when they come up.</div>
+            </div>
+            <div className="person-seg small" role="tablist" aria-label="Group">
+              {PEOPLE_GROUPS.map(g => (
+                <button
+                  key={g.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={peopleTab === g.id}
+                  className={peopleTab === g.id ? 'active' : ''}
+                  onClick={() => { setPeopleTab(g.id); setShowAllPeople(false); }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Link2 size={14} style={{ color: 'var(--color-text-primary)' }} />
-                    <span style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>{c.targetName}</span>
-                  </div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
-                    {c.rel || c.relationship}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.82rem', background: 'var(--color-surface-hover)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-                No connected friends registered. Link someone below.
-              </div>
-            )}
+                  {g.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Add Friend Connection Form with Suggestions */}
-          <div style={{ position: 'relative' }}>
-            <form onSubmit={handleAddConnection} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
-                <input
-                  type="text"
-                  placeholder="Friend Name (e.g. Annie, Rajveer, Moksha)"
-                  value={newConnTarget}
-                  onChange={(e) => setNewConnTarget(e.target.value)}
-                  style={{ width: '100%' }}
-                />
+          <input
+            type="search"
+            className="person-search"
+            placeholder={`Search ${connections.length.toLocaleString()} ${connections.length === 1 ? 'person' : 'people'}`}
+            aria-label="Search people"
+            value={peopleSearch}
+            onChange={e => setPeopleSearch(e.target.value)}
+          />
 
-                {/* Suggestions Dropdown */}
+          {visiblePeople.length === 0 ? (
+            <div className="person-empty">
+              {peopleQuery ? `No one matches “${peopleSearch.trim()}”.` : `No ${PEOPLE_GROUPS.find(g => g.id === peopleTab)?.label.toLowerCase()} yet.`}
+            </div>
+          ) : (
+            <div className="person-people-grid">
+              {visiblePeople.map(c => {
+                const match = (nodes || []).find(n => !n.isRoot && (n.name || '').toLowerCase() === (c.targetName || '').toLowerCase());
+                return (
+                  <div key={`${c.index}-${c.targetName}`} className="person-mini">
+                    <button
+                      type="button"
+                      className="person-mini-main"
+                      disabled={!match}
+                      onClick={() => match && openPerson(match)}
+                      title={match ? `Open ${c.targetName}` : undefined}
+                    >
+                      <span className="person-mini-avatar" aria-hidden="true">{(c.targetName || '?').trim().charAt(0).toUpperCase()}</span>
+                      <span className="person-mini-text">
+                        <span className="person-mini-name">{c.targetName}</span>
+                        <span className="person-mini-rel">{connectionLabel(c)}</span>
+                      </span>
+                    </button>
+                    <button type="button" className="person-x" onClick={() => handleRemoveConnection(c.index)} aria-label={`Remove ${c.targetName}`} title="Remove">
+                      <X size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {isAddingPerson && (
+            <form className="person-add-person" onSubmit={handleAddConnection}>
+              <div className="person-add-name">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Name, e.g. Rajveer"
+                  aria-label="Name"
+                  value={newConnTarget}
+                  onChange={e => setNewConnTarget(e.target.value)}
+                />
                 {friendSuggestions.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      background: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: '8px',
-                      marginTop: '4px',
-                      zIndex: 20,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {friendSuggestions.map((sug) => (
-                      <div
-                        key={sug.id || sug.name}
-                        onClick={() => {
-                          setNewConnTarget(sug.name);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          fontSize: '0.82rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          borderBottom: '1px solid var(--color-surface-hover)'
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-surface)')}
-                      >
-                        <span style={{ fontWeight: '700', color: 'var(--color-text-primary)' }}>{sug.name}</span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
-                          {sug.handle || sug.relationship}
-                        </span>
-                      </div>
+                  <div className="person-suggest" role="listbox">
+                    {friendSuggestions.map(sug => (
+                      <button key={sug.id || sug.name} type="button" role="option" aria-selected="false" onClick={() => setNewConnTarget(sug.name)}>
+                        <span>{sug.name}</span>
+                        <small>{sug.handle || sug.relationship}</small>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
-
               <input
                 type="text"
-                placeholder="How they know each other (e.g. Sister, Homie, Classmate)"
+                placeholder={`How they know ${pron}, e.g. ${peopleTab === 'family' ? 'Sister' : 'Friend'}`}
+                aria-label="Relationship"
                 value={newConnRel}
-                onChange={(e) => setNewConnRel(e.target.value)}
-                style={{ flex: 1, minWidth: '180px' }}
+                onChange={e => setNewConnRel(e.target.value)}
               />
-
-              <button
-                type="submit"
-                disabled={!newConnTarget.trim()}
-                style={{
-                  background: 'var(--color-text-primary)',
-                  color: 'var(--color-surface)',
-                  border: 'none',
-                  padding: '9px 16px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: '700',
-                  cursor: !newConnTarget.trim() ? 'not-allowed' : 'pointer',
-                  opacity: !newConnTarget.trim() ? 0.5 : 1
-                }}
-              >
-                + Link Friend
-              </button>
+              <button type="submit" className="person-light-btn" disabled={!newConnTarget.trim()}>Add</button>
+              <button type="button" className="person-soft-btn" onClick={() => { setIsAddingPerson(false); setNewConnTarget(''); setNewConnRel(''); }}>Cancel</button>
             </form>
-          </div>
-        </div>
-        </>
-        )}
+          )}
 
-        {profileTab === 'memories' && (
-          <>
-        {/* ================= CARD 5: SYNTHESIZED INTEL (LINKED TO LORE) ================= */}
-        <div className="person-glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontFamily: "var(--font-label)", fontWeight: '700' }}>
-                LEARNED INTEL
-              </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--color-text-primary)', marginTop: '2px' }}>
-                Facts Synthesized from Live Instagram DMs
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700', fontFamily: "var(--font-label)" }}>
-                {(selectedPerson.facts || selectedPerson.lore || []).length} Facts Captured
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
-                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>AUTO-SYNCING</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Optimized Scrollable Intel Container */}
-          <div className="facts-scroll-container" style={{ maxHeight: '250px', overflowY: 'auto', marginBottom: '16px' }}>
-            {((selectedPerson.facts || selectedPerson.lore || []).length === 0) ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '0.8rem', border: '1px dashed var(--color-border)', borderRadius: '8px', background: 'var(--color-surface-elevated)' }}>
-                No facts captured yet. Chatter OS automatically synthesizes profile intel as you chat in live Instagram DMs.
-              </div>
-            ) : (
-              (selectedPerson.facts || selectedPerson.lore || []).map((fact, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: 'var(--color-surface-hover)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    fontSize: '0.82rem',
-                    color: 'var(--color-text-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '10px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--color-text-primary)', flexShrink: 0 }} />
-                    <span style={{ wordBreak: 'break-word', lineHeight: '1.4' }}>{fact}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFact(fact)}
-                    title="Remove this fact from memory"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-text-muted)',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: '4px',
-                      flexShrink: 0
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              ))
+          <div className="person-people-foot">
+            {groupPeople.length > 8 ? (
+              <button type="button" className="person-link-btn" onClick={() => setShowAllPeople(s => !s)}>
+                {showAllPeople ? 'Show less' : `Show all ${groupPeople.length.toLocaleString()}`}
+              </button>
+            ) : <span />}
+            {!isAddingPerson && (
+              <button type="button" className="person-chip dashed" onClick={() => setIsAddingPerson(true)}>+ Add someone</button>
             )}
           </div>
+        </section>
 
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <form onSubmit={handleAddFact} style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '240px' }}>
-              <input
-                type="text"
-                placeholder="Add custom remembered fact (automatically syncs with personal notes)..."
-                value={newFactInput}
-                onChange={(e) => setNewFactInput(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <button
-                type="submit"
-                style={{
-                  background: 'var(--color-text-primary)',
-                  color: 'var(--color-surface)',
-                  border: 'none',
-                  padding: '9px 18px',
-                  borderRadius: '6px',
-                  fontSize: '0.82rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Add Fact
-              </button>
-            </form>
-
-            <button
-              type="button"
-              onClick={handleForceLearn}
-              disabled={isLearning}
-              style={{
-                background: 'var(--color-surface)',
-                color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border)',
-                padding: '9px 14px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Sparkles size={13} />
-              <span>{isLearning ? 'Learning...' : 'Sync DM Memory'}</span>
-            </button>
-          </div>
-        </div>
-        </>
-        )}
-
-        {profileTab === 'history' && (
-          <>
-            {/* Tone controls */}
-            <div className="person-glass-card">
-              <div className="person-card-eyebrow">TONE</div>
-              <div className="person-card-title" style={{ marginBottom: '18px' }}>How the AI talks to {formData.name || selectedPerson.name}</div>
-
-              <label className="person-field-label" htmlFor="roastiness">
-                <span>Roastiness</span>
-                <span className="person-range-value">{formData.roastiness}%</span>
-              </label>
-              <input
-                id="roastiness"
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={formData.roastiness}
-                onChange={e => setFormData(prev => ({ ...prev, roastiness: Number(e.target.value) }))}
-                className="person-range"
-                style={{ '--range-fill': `${formData.roastiness}%` }}
-              />
-              <div className="person-range-scale">
-                <span>Kind</span>
-                <span>Playful</span>
-                <span>Savage</span>
-              </div>
-
-              <label className="person-field-label" htmlFor="greetingStyle" style={{ marginTop: '20px' }}>
-                <span>Greeting style</span>
-              </label>
-              <input
-                id="greetingStyle"
-                type="text"
-                maxLength={120}
-                placeholder='e.g. "yo", "heyy", "macha enna da"'
-                value={formData.greetingStyle}
-                onChange={e => setFormData(prev => ({ ...prev, greetingStyle: e.target.value }))}
-              />
-              <div className="person-chip-row">
-                {['hey', 'yo', 'heyy', 'wassup', 'bro', 'macha'].map(g => (
-                  <button
-                    key={g}
-                    type="button"
-                    className={`person-chip${formData.greetingStyle === g ? ' active' : ''}`}
-                    onClick={() => setFormData(prev => ({ ...prev, greetingStyle: g }))}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-
-              <button type="button" className="person-cta" style={{ marginTop: '20px' }} onClick={handleSaveInnerForm}>
-                <Save size={15} />
-                <span>Save tone</span>
-              </button>
-            </div>
-
-            {/* DM transcript preview */}
-            <div className="person-glass-card">
-              <UnsplashBanner seed={`chat-${selectedPerson.name || selectedPerson.id}`} topic="fluid" width={900} matchImage={personArt} className="chat-banner person-chat-banner">
-                <div>
-                  <div className="person-card-eyebrow">RECENT DMS</div>
-                  <div className="person-card-title">Conversation preview</div>
-                </div>
-              </UnsplashBanner>
-              {!selectedPerson.senderId ? (
-                <div className="person-card-sub">Link their Instagram to see the DM history here.</div>
-              ) : dmPreview.loading ? (
-                <div className="person-card-sub">Loading messages…</div>
-              ) : dmPreview.messages.length === 0 ? (
-                <div className="person-card-sub">No messages yet.</div>
-              ) : (
-                <div className="person-transcript">
-                  {dmPreview.messages.map((m, i) => (
-                    <div key={m.mid || i} className={`person-bubble ${m.role === 'assistant' ? 'out' : 'in'}`}>
-                      {m.text}
+        {/* ================= DETAILS ================= */}
+        <h2 className="person-details-title">Details</h2>
+        <div className="person-details">
+          {detailRows.map(row => (
+            <div key={row.key} className={`person-detail${editingField === row.key ? ' is-editing' : ''}`}>
+              {editingField === row.key ? (
+                <form className="person-detail-form" onSubmit={saveDetail} onKeyDown={e => { if (e.key === 'Escape') setEditingField(null); }}>
+                  <label className="person-detail-label" htmlFor={`detail-${row.key}`}>{row.label}</label>
+                  {row.key === 'gender' ? (
+                    <select id={`detail-${row.key}`} autoFocus value={editDraft.value} onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}>
+                      {Object.entries(GENDER_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  ) : row.key === 'category' ? (
+                    <select id={`detail-${row.key}`} autoFocus value={editDraft.value} onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}>
+                      {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  ) : row.key === 'dob' ? (
+                    <div className="person-dob-edit">
+                      <select id={`detail-${row.key}`} autoFocus aria-label="Month" value={editDraft.month} onChange={e => setEditDraft({ ...editDraft, month: e.target.value })}>
+                        <option value="">Month</option>
+                        {MONTH_NAMES.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      <select aria-label="Day" value={editDraft.day} onChange={e => setEditDraft({ ...editDraft, day: e.target.value })}>
+                        <option value="">Day</option>
+                        {Array.from({ length: 31 }, (_, i) => String(i + 1)).map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input type="text" inputMode="numeric" maxLength={4} placeholder="Year" aria-label="Year (optional)" value={editDraft.year} onChange={e => setEditDraft({ ...editDraft, year: e.target.value.replace(/\D/g, '') })} />
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <input
+                      id={`detail-${row.key}`}
+                      autoFocus
+                      type="text"
+                      maxLength={row.key === 'relationship' ? 80 : 60}
+                      placeholder={row.key === 'handle' ? '@username' : row.key === 'relationship' ? 'e.g. Very close friend' : ''}
+                      value={editDraft.value}
+                      onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}
+                    />
+                  )}
+                  <div className="person-detail-actions">
+                    {row.key === 'dob' && formData.dob && (
+                      <button type="button" className="person-link-btn" onClick={() => { editProfile({ dob: '' }, 0); setEditingField(null); }}>Clear</button>
+                    )}
+                    <button type="button" className="person-soft-btn" onClick={() => setEditingField(null)}>Cancel</button>
+                    <button type="submit" className="person-light-btn">Save</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="person-detail-text">
+                    <div className="person-detail-label">{row.label}</div>
+                    <div className={`person-detail-value${row.value === 'Not set' ? ' muted' : ''}`}>{row.value}</div>
+                  </div>
+                  <button type="button" className="person-soft-btn" onClick={() => startEditDetail(row.key)} aria-label={`Edit ${row.label}`}>
+                    {row.value === 'Not set' ? 'Add' : 'Edit'}
+                  </button>
+                </>
               )}
             </div>
-          </>
-        )}
+          ))}
+        </div>
       </div>
     );
   }
