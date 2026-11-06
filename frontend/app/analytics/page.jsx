@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import { DUR, EASE_OUT, STAGGER, T, rowMotion } from '../lib/motion';
+import { isAiOnFor } from '../lib/aiReply';
 import BusinessConversionPanel from '../components/BusinessConversionPanel';
 import WorkspaceModeSwitch from '../components/WorkspaceModeSwitch';
 import PageHero from '../components/PageHero';
@@ -431,10 +432,10 @@ export default function AnalyticsPage() {
       else professional++;
       totalDMs += (f.chatsCount || f.messageCount || 0);
       totalReels += (f.reelsCount || 0);
-      if (f.aiEnabled !== false) aiActive++; else aiPaused++;
+      if (isAiOnFor(f, routingConfig)) aiActive++; else aiPaused++;
     });
     return { close, online, offline, relatives, professional, totalDMs, totalReels, aiActive, aiPaused };
-  }, [friendNodes]);
+  }, [friendNodes, routingConfig]);
 
   const topChatters = useMemo(() =>
     [...friendNodes].filter(n => (n.chatsCount || n.messageCount || 0) > 0)
