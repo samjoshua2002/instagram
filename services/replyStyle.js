@@ -16,9 +16,13 @@ const HUMAN_CHAT_RULES = `HOW TO WRITE EVERY MESSAGE (STRICT, OVERRIDES ANY OTHE
  * Personal replies that have the owner's real texting data: the owner's measured style wins,
  * so emoji are allowed (at the owner's own rate) and no forced lowercase.
  */
-function humanChatRules({ allowEmoji = false } = {}) {
-  if (!allowEmoji) return HUMAN_CHAT_RULES;
-  return HUMAN_CHAT_RULES
+function humanChatRules({ allowEmoji = false, allowTanglish = false } = {}) {
+  let rules = HUMAN_CHAT_RULES;
+  if (allowTanglish) {
+    rules = rules.replace(/- ENGLISH ONLY:.*\n/, `- LANGUAGE: they wrote in Tanglish, so answer the way you really do with them: mostly English with a few Tamil words typed in English letters. Never Tamil script.\n`);
+  }
+  if (!allowEmoji) return rules;
+  return rules
     .replace(/- NO EMOJI:.*\n/, '- EMOJI: only the way you really use them (see your measured texting style), never more often.\n')
     .replace(/ short, warm, relaxed, with contractions.*\n/, ' exactly like your real messages shown above: same length, same words, same energy.\n');
 }

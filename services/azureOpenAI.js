@@ -9,7 +9,7 @@ const llmAdapter = require('./llmAdapter');
 const storyboardService = require('./storyboardService');
 const voiceService = require('./voiceService');
 const { HUMAN_CHAT_RULES, humanChatRules, toHumanText } = require('./replyStyle');
-const { untrustedContactBlock, sanitizeFewShotExchanges, sanitizeLearnedText, getCompletionText, parseJsonCompletion } = require('./promptSafety');
+const { untrustedContactBlock, sanitizeFewShotExchanges, sanitizeLearnedText, getCompletionText, parseJsonCompletion, isContentFilterError, maskForFilter } = require('./promptSafety');
 
 // gpt-5.x and o-series deployments are reasoning models (they spend tokens thinking before the reply)
 const isReasoningModel = (model) => /^(gpt-5|o\d)/i.test(String(model || ''));
@@ -22,6 +22,8 @@ class AzureOpenAIService {
     this.apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview";
     this.defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
     this.clients = {};
+    // Dice for emoji / Tanglish at the owner's real rate (tests swap it for a fixed value)
+    this.random = Math.random;
   }
 
   /**
@@ -74,11 +76,40 @@ class AzureOpenAIService {
       if (first.ok) return first.text;
       console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" returned no usable text (finish_reason: ${first.finishReason || 'unknown'}). Falling back to "gpt-4o"...`);
     } catch (modelErr) {
+      // A blocked prompt is blocked on every deployment: let the caller retry it masked
+      if (isContentFilterError(modelErr)) throw modelErr;
       console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
     }
     const second = getCompletionText(await this.getClient('gpt-4o').chat.completions.create(params('gpt-4o')));
     if (second.ok) return second.text;
-    throw new Error(`AI returned an empty reply (finish_reason: ${second.finishReason || 'unknown'})`);
+    const emptyErr = new Error(`AI returned an empty reply (finish_reason: ${second.finishReason || 'unknown'})`);
+    if (second.finishReason === 'content_filter') emptyErr.code = 'content_filter';
+    throw emptyErr;
+  }
+
+  /**
+   * completeWithFallback, but when Azure's content filter blocks the prompt or the answer
+   * (friends' banter with slurs or swearing), retry instead of giving up:
+   *   1. slurs masked everywhere ("n***a")
+   *   2. swearing, sexual and violence words masked too, and only the last 4 chat messages
+   */
+  async completeWithFilterRetry(selectedModel, messages, opts) {
+    const steps = [
+      msgs => msgs,
+      msgs => msgs.map(m => ({ ...m, content: maskForFilter(m.content, 1) })),
+      msgs => [msgs[0], ...msgs.slice(1).slice(-4)].map(m => ({ ...m, content: maskForFilter(m.content, 2) })),
+    ];
+    let lastErr;
+    for (let i = 0; i < steps.length; i++) {
+      try {
+        return await this.completeWithFallback(selectedModel, steps[i](messages), opts);
+      } catch (err) {
+        if (!isContentFilterError(err)) throw err;
+        lastErr = err;
+        if (i + 1 < steps.length) console.warn(`⚠️ [Content Filter]: prompt blocked, retrying masked (step ${i + 2}/${steps.length})...`);
+      }
+    }
+    throw lastErr;
   }
 
   /**
@@ -126,6 +157,10 @@ class AzureOpenAIService {
     // Real texting data wins over generic style rules (emoji rate, capitals, length)
     const realVoice = voice?.fingerprint ? voice : null;
     const allowEmoji = !!(realVoice && realVoice.fingerprint.emojiShare >= 3);
+    // They wrote Tanglish: answer in Tanglish only as often as the owner really did with them
+    const tanglishHabit = realVoice?.tanglish;
+    const allowTanglish = !!(tanglishHabit && tanglishHabit.rate > 0 && voiceService.isTanglish(incomingText) &&
+      this.random() < tanglishHabit.rate);
 
     let personalKnowledgeSection = '';
     if (knowledge?.context) {
@@ -323,7 +358,7 @@ ${personalStoryboard}
 ${hybridPlaybook ? `${hybridPlaybook}- Use this playbook only when the person is asking about your products, services or bookings; keep your personal voice.
 ` : ''}
 ACTIVE CEL DIRECTIVE FOR THIS EXACT CONVERSATION:
-${directives.modeInstruction}
+${allowTanglish ? directives.modeInstruction.replace(/ \(IN ENGLISH\)/, '').replace(/^.*reply in casual English.*$\n?/m, '') : directives.modeInstruction}
 ${directives.lengthInstruction}
 ${directives.factInstruction}
 
@@ -365,7 +400,9 @@ BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - Do NOT use cringe AI phrases. Never say "chose violence" or any variant.
 
 LANGUAGE RULE:
-- ALWAYS reply in casual English, even if they text in Tamil, Tanglish or another language.
+${allowTanglish
+  ? `- They wrote in Tanglish. Reply the way YOU really do with them: mostly English with a few Tamil words in English letters (never Tamil script). Your real Tanglish lines with them: ${tanglishHabit.lines.map(l => `"${l}"`).join(', ') || '(none saved)'}`
+  : '- ALWAYS reply in casual English, even if they text in Tamil, Tanglish or another language.'}
 
 HANDLING USER CORRECTIONS & PASSIVE LEARNING:
 - If the user corrects any detail (e.g. "no my bday is actually June 10", "no that's not my school", "i don't live in chennai"):
@@ -410,7 +447,7 @@ HUMAN TEXTING & AUTHENTIC TONE RULES:
 ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WORDS/PHRASES (NEVER SAY THESE): ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
 
 ${realVoice ? `HOW YOU REALLY TEXT (LEARNED FROM YOUR OWN CHAT HISTORY; THIS BEATS EVERY STYLE RULE ABOVE):\n${realVoice.block}\n` : ''}
-${humanChatRules({ allowEmoji })}
+${humanChatRules({ allowEmoji, allowTanglish })}
 - Only return the raw message text. No quotation marks, no name prefix.${realVoice ? ' Several short messages go on separate lines.' : ''}`;
 
     // 8. Build Messages array
@@ -455,8 +492,9 @@ ${humanChatRules({ allowEmoji })}
         ? null
         : await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 220, temperature: 0.90 });
       if (reply === null) {
-        // Empty content / errors fall back to gpt-4o; reasoning deployments get a 1200-token cap
-        reply = await this.completeWithFallback(selectedModel, messages, {
+        // Empty content / errors fall back to gpt-4o; reasoning deployments get a 1200-token cap.
+        // A prompt Azure's filter blocks (slurs friends use as banter) is retried masked.
+        reply = await this.completeWithFilterRetry(selectedModel, messages, {
           maxTokens: 220,
           temperature: 0.90,
           extra: { frequency_penalty: 0.35, presence_penalty: 0.35 },
@@ -501,7 +539,7 @@ ${humanChatRules({ allowEmoji })}
       // Emoji kept only at the owner's real rate (models overuse them); an emoji-only reply stays
       const body = tag ? reply.slice(0, -tag.length) : reply;
       const keepEmoji = allowEmoji && (!/[\p{L}\p{N}]/u.test(body) ||
-        Math.random() < Math.min(1, realVoice.fingerprint.emojiShare / 100));
+        this.random() < Math.min(1, realVoice.fingerprint.emojiShare / 100));
       reply = toHumanText(body, { keepEmoji }) + tag;
 
       return reply;
@@ -595,7 +633,7 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
       ? null
       : await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 300, temperature: 0.4 });
     if (content === null) {
-      content = await this.completeWithFallback(selectedModel, messages, { maxTokens: 300, temperature: 0.4 });
+      content = await this.completeWithFilterRetry(selectedModel, messages, { maxTokens: 300, temperature: 0.4 });
     }
 
     // Strip quotes, name prefixes and any sticker/attachment tags (never sent for business)
@@ -635,7 +673,7 @@ ${HUMAN_CHAT_RULES}
       for (const msg of messageHistory) {
         messages.push({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
-          content: msg.text,
+          content: maskForFilter(msg.text, 1), // slurs masked so the content filter does not block it
         });
       }
     }

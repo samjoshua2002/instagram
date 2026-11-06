@@ -4,7 +4,8 @@
  * the contact sent and writes a reply; that is compared with what the owner really sent back.
  * The real reply (and everything after it) is hidden from the AI.
  *
- *   node scripts/voice_eval.js [--owner samjoshua] [--contacts 4] [--per 4]
+ *   node scripts/voice_eval.js [--owner samjoshua] [--contacts 4] [--per 4] [--contact a,b] [--match rough|tanglish|<regex>]
+ *   --match keeps only test points where the contact's message matches (rough = slurs / swearing)
  *
  * Calls the AI once per test point (contacts x per).
  */
@@ -15,6 +16,7 @@ const UserMemory = require('../models/UserMemory');
 const User = require('../models/User');
 const PersonaConfig = require('../models/PersonaConfig');
 const azureOpenAI = require('../services/azureOpenAI');
+const { isTanglish } = require('../services/voiceService');
 
 const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -23,6 +25,8 @@ const arg = (name, def) => {
 const EMOJI = /\p{Extended_Pictographic}/u;
 const words = t => String(t || '').trim().split(/\s+/).filter(Boolean).length;
 const isPlaceholder = t => /^\[/.test(String(t || '').trim());
+const ROUGH = /\b(n+[i1]+g+\w*|f+u+c*k+\w*|b[i1]tch\w*|sh[i1]t\w*|ass(hole)?|dick|pussy|stfu|sybau|kill|die)\b/i;
+const matcher = m => (!m ? () => true : m === 'tanglish' ? isTanglish : m === 'rough' ? t => ROUGH.test(t) : t => new RegExp(m, 'i').test(t));
 const isRealOwner = m => m.role === 'assistant' && !m.sentByAI && !isPlaceholder(m.text);
 
 function stats(list) {
@@ -33,6 +37,7 @@ function stats(list) {
     short: pct(t => words(t) <= 4),
     emoji: pct(t => EMOJI.test(t)),
     capStart: pct(t => /^[A-Z]/.test(t)),
+    tanglish: pct(isTanglish),
   };
 }
 
@@ -50,8 +55,19 @@ async function run() {
     { $group: { _id: '$recipientId', n: { $sum: 1 } } },
     { $sort: { n: -1 } }, { $limit: nContacts },
   ]);
+  // One named contact instead of the busiest ones
+  if (arg('contact')) {
+    top.splice(0, top.length);
+    for (const username of arg('contact').split(',')) {
+      const one = await UserMemory.findOne({ ownerId: owner._id, username });
+      if (!one) throw new Error(`contact not found: ${username}`);
+      top.push({ _id: one.senderId });
+    }
+  }
+  const wanted = matcher(arg('match'));
+  let failed = 0;
 
-  const real = [], ai = [];
+  const real = [], ai = [], realBursts = [];
   for (const { _id: contactId } of top) {
     const userMemory = await UserMemory.findOne({ ownerId: owner._id, senderId: contactId });
     if (!userMemory) continue;
@@ -61,7 +77,10 @@ async function run() {
     // Test points: a run of contact messages followed by a real owner reply, spread over the chat
     const points = [];
     for (let i = 1; i < chat.length; i++) {
-      if (isRealOwner(chat[i]) && chat[i - 1].role === 'user' && !isPlaceholder(chat[i - 1].text)) points.push(i);
+      if (!(isRealOwner(chat[i]) && chat[i - 1].role === 'user' && !isPlaceholder(chat[i - 1].text))) continue;
+      let s0 = i - 1;
+      while (s0 > 0 && chat[s0 - 1].role === 'user') s0--;
+      if (wanted(chat.slice(s0, i).map(m => m.text).join('\n'))) points.push(i);
     }
     const step = Math.max(1, Math.floor(points.length / per));
     const picked = points.filter((_, k) => k % step === step - 1).slice(-per);
@@ -84,10 +103,13 @@ async function run() {
           features: null, asOf: chat[i].createdAt,
         });
       } catch (err) {
-        reply = `(error: ${err.message})`;
+        const cf = err.error?.innererror?.content_filter_result;
+        failed++;
+        reply = `(error: ${err.message.slice(0, 40)}${cf ? ' ' + Object.keys(cf).filter(k => cf[k]?.filtered).join(',') : ''})`;
       }
       reply = String(reply).replace(/\s*\[(?:STICKER|ATTACHMENT):[^\]]*\]/gi, '').trim();
       real.push(chat[i].text);
+      realBursts.push(realReply);
       ai.push(reply);
       console.log(`  them: ${incomingText.replace(/\n/g, ' / ').slice(0, 90)}`);
       console.log(`  REAL: ${realReply.slice(0, 90)}`);
@@ -96,8 +118,9 @@ async function run() {
   }
 
   console.log('================ SCORE ================');
-  console.log('REAL owner:', stats(real));
-  console.log('AI reply  :', stats(ai));
+  console.log(`test points: ${ai.length}, failed (error / blocked): ${failed}`);
+  console.log('REAL owner:', { ...stats(real), tanglish: stats(realBursts).tanglish });
+  console.log('AI reply  :', stats(ai.filter(t => !t.startsWith('(error'))));
   process.exit(0);
 }
 

@@ -20,6 +20,10 @@ const CACHE_MS = 60 * 60 * 1000;
 const words = t => String(t || '').trim().split(/\s+/).filter(Boolean).length;
 const isPlaceholder = t => /^\s*\[/.test(String(t || ''));
 const isRealOwner = m => m.role === 'assistant' && !m.sentByAI && !isPlaceholder(m.text);
+// Tamil words typed in English letters (Tanglish). Only words that are not also common English.
+// Spelling varies a lot ("enaku" / "ennaku", "iruku" / "irrukum"), so repeated letters are allowed.
+const TANGLISH_RE = /\b(da|dei|dey|machan|machi|enna+|ennada|epdi|eppadi|illa+|illai|i+r+u+k+\w*|pannu|pannalam|panra|panna|pannen|seri|podhum|pothum|semma|u+n+a+k+u|e+n+a+k+u|theriyum|theriyala|therija|sollu|solla|poda|podi|aama|saptiya|thambi|chellam|ponnu|pulla|kutt+i+|mokka|gethu|summa|romba+|konjam|nalla+|apdi|ippo|ennachu|aachu|varen|poren|pesu|pesalam|loosu|venum|vendam|vena|mudiyum|mudiyala|thappu|kitta|kooda|thaan|kootitu|varinga|sonnaru|avan|aval|iru|vangi|kodu|aiyayo|adra|porathu|vekkaalam|muttai)\b/i;
+const isTanglish = t => TANGLISH_RE.test(String(t || ''));
 const clip = (t, n = 160) => sanitizeLearnedText(String(t || ''), n).replace(/\n/g, ' ');
 
 /** Measures how someone texts from a list of their messages. Pure, so it is unit tested. */
@@ -78,6 +82,21 @@ function extractExchanges(chat, max = MAX_PAIRS) {
     if (theirText.length && myText.length) out.push({ them: theirText, me: myText });
   }
   return out.slice(-max);
+}
+
+/**
+ * How the owner answers Tanglish from this contact: of the exchanges where they wrote Tanglish,
+ * the share the owner answered in Tanglish (falls back to the owner's overall Tanglish share
+ * with them when there are under 3 such exchanges), plus the owner's real Tanglish lines.
+ */
+function tanglishHabit(chat, exchanges) {
+  const mine = (chat || []).filter(isRealOwner).map(m => m.text);
+  const share = mine.length ? mine.filter(isTanglish).length / mine.length : 0;
+  const asked = (exchanges || []).filter(e => e.them.some(isTanglish));
+  const answered = asked.filter(e => e.me.some(isTanglish)).length;
+  const rate = asked.length >= 3 ? answered / asked.length : share;
+  const lines = [...new Set(mine.filter(isTanglish).map(t => clip(t, 80)))].slice(-6);
+  return { share: +share.toFixed(3), rate: +rate.toFixed(3), samples: asked.length, lines };
 }
 
 /** The fingerprint as plain targets the model can follow. */
@@ -141,9 +160,10 @@ async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = n
         ...(asOf ? { createdAt: { $lt: asOf } } : {}),
       }).sort({ createdAt: -1 }).limit(CONTACT_WINDOW).select('role text sentByAI').lean(),
     ]);
-    if (!fp) return { block: '', fingerprint: null, exchanges: 0 };
+    if (!fp) return { block: '', fingerprint: null, exchanges: 0, tanglish: null };
     chat.reverse();
     const exchanges = extractExchanges(chat);
+    const tanglish = tanglishHabit(chat, extractExchanges(chat, Infinity));
 
     const parts = [describeFingerprint(fp, creatorName)];
     if (exchanges.length) {
@@ -160,11 +180,11 @@ async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = n
         parts.push(`\nMORE OF YOUR REAL MESSAGES FROM OTHER CHATS (style only; never mention their content or names here):\n${others.join('\n')}`);
       }
     }
-    return { block: parts.join('\n'), fingerprint: fp, exchanges: exchanges.length };
+    return { block: parts.join('\n'), fingerprint: fp, exchanges: exchanges.length, tanglish };
   } catch (err) {
     console.warn('⚠️ [Voice] Could not load owner voice:', err.message);
-    return { block: '', fingerprint: null, exchanges: 0 };
+    return { block: '', fingerprint: null, exchanges: 0, tanglish: null };
   }
 }
 
-module.exports = { getVoiceBlock, fingerprint, extractExchanges, describeFingerprint, _cache: cache };
+module.exports = { getVoiceBlock, fingerprint, extractExchanges, describeFingerprint, tanglishHabit, isTanglish, _cache: cache };
