@@ -702,8 +702,15 @@ select:focus {
        (useHeaderScrollAway) and the page's sticky hero band takes its place. */
     margin-top: 0 !important;
     height: 100dvh !important;
-    padding-top: calc(54px + env(safe-area-inset-top, 0px)) !important;
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Room for the header at the top of the page. A spacer, not padding: sticky bars
+     measure from the scroll box's padding edge and must stick at the very top. */
+  .app-main-content::before {
+    content: '';
+    display: block;
+    height: calc(54px + env(safe-area-inset-top, 0px));
   }
 }
 
