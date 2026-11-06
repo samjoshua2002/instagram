@@ -663,7 +663,11 @@ export default function SpotlightHome() {
     <div className={`sh-home${coverPhoto ? ' sh-tinted' : ''}`}>
       <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
-        <h1 className="sh-hello">{hour === null ? 'Hello' : greeting(hour)}, {firstName || 'there'}!</h1>
+        {/* Two parts so a narrow phone breaks only after the comma, never inside "Good afternoon" */}
+        <h1 className="sh-hello">
+          <span className="sh-hello-greet">{hour === null ? 'Hello' : greeting(hour)},</span>{' '}
+          <span className="sh-hello-name">{firstName || 'there'}!</span>
+        </h1>
         <div className="sh-top-actions">
         {routingConfig && (
           <button

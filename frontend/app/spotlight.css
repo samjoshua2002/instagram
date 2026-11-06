@@ -37,7 +37,9 @@
 .sh-home a { color: inherit; text-decoration: none; }
 
 .sh-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.sh-hello { margin: 0; font-size: clamp(1.7rem, 3.4vw, 2.4rem); font-weight: 800; letter-spacing: -0.5px; }
+.sh-hello { margin: 0; min-width: 0; font-size: clamp(1.7rem, 3.4vw, 2.4rem); font-weight: 800; letter-spacing: -0.5px; }
+.sh-hello-greet { white-space: nowrap; }
+.sh-hello-name { display: inline-block; max-width: 100%; vertical-align: bottom; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .sh-bell-wrap { position: relative; }
 .sh-icon-btn {
@@ -172,7 +174,10 @@
   background: color-mix(in srgb, #ffb547 22%, transparent); color: #ffb547;
 }
 :root[data-theme="light"] .sh-attn-icon { color: #a35f00; }
+.sh-attn-token .sh-follow-name { white-space: normal; line-height: 1.25; } /* a warning wraps, never cut off */
 button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
+/* Touch tablets: Fix (a link) and Done (a button) the same 44px tall */
+@media (pointer: coarse) { .sh-follow-btn { min-height: 44px; justify-content: center; } }
 
 /* Favourite people: rounded-square photos */
 .sh-fav-row {
@@ -241,7 +246,9 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
   .sh-home { padding: 16px 16px 28px; border-radius: 0; }
   .sh-hello { font-size: 1.5rem; }
   .sh-icon-btn { width: 38px; height: 38px; }
-  .sh-ai-pill { height: 38px; padding: 0 12px; gap: 6px; }
+  /* Header buttons 44px round (the global 48px touch min-height made the bell an oval) */
+  .sh-top .sh-icon-btn { width: 44px; height: 44px; min-height: 44px; }
+  .sh-ai-pill { height: 44px; min-height: 44px; padding: 0 12px; gap: 6px; }
   .sh-attn-icon { width: 40px; height: 40px; }
   .sh-dot { top: 8px; right: 9px; }
   .sh-row-head { margin: 22px 0 10px; }
@@ -263,8 +270,9 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
   .sh-follow { grid-template-columns: 1fr; gap: 8px; }
   .sh-follow-item { padding: 8px 8px 8px 10px; border-radius: 14px; }
   .sh-follow-photo { width: 40px; height: 40px; }
-  .sh-follow-btn { padding: 8px 10px; }
+  .sh-follow-btn { padding: 8px 10px; min-width: 44px; min-height: 44px; justify-content: center; }
   .sh-follow-btn span { display: none; } /* icon only, so the reason has room */
+  .sh-follow-later { width: 44px; height: 44px; min-height: 44px; }
   .sh-fav-row { grid-auto-columns: 84px; gap: 12px; }
   .sh-fav-photo { width: 84px; height: 84px; border-radius: 20px; font-size: 1.4rem; }
   .sh-fav-name { font-size: 0.85rem; }
@@ -272,6 +280,14 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
   .sh-list { grid-template-columns: 1fr; }
   .sh-list-photo { width: 42px; height: 42px; }
   .sh-quicknav { margin-top: 26px; }
+}
+/* Small phones (under 375px, e.g. 320 and 360): "Good afternoon," must fit beside the AI switch and bell */
+@media (max-width: 374px) {
+  .sh-top { gap: 8px; }
+  .sh-hello { font-size: 1.3rem; letter-spacing: -0.3px; }
+  .sh-top-actions { gap: 6px; }
+  .sh-ai-pill { padding: 0 10px; }
+  .sh-ai-pill svg { display: none; } /* the dot and "AI on / AI paused" still show the state */
 }
 
 /* ── Login: same maroon + coral accent (dark theme) ─────────────────── */
