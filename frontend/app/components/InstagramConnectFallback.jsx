@@ -504,14 +504,15 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 <p style={{ margin: '0 0 12px 0', lineHeight: 1.5, color: 'var(--color-text-secondary)' }}>
                   Since Chatter OS is running in Meta Sandbox mode, your Instagram account must be manually added to <strong>Meta App Roles &rarr; Instagram Testers</strong> before token authorization can succeed. Request access below:
                 </p>
-                <form onSubmit={handleRequestAccess} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <form onSubmit={handleRequestAccess} style={{ display: 'flex', alignItems: 'stretch', gap: '8px', flexWrap: 'wrap' }}>
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     background: 'var(--color-surface)',
                     border: '1px solid var(--color-border-strong)',
                     borderRadius: '8px',
-                    padding: '6px 10px',
+                    padding: '0 4px 0 10px',
+                    minHeight: '44px',
                     flex: '1 1 220px',
                     maxWidth: '360px'
                   }}>
@@ -521,8 +522,12 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       value={requestHandle}
                       onChange={(e) => setRequestHandle(e.target.value)}
                       placeholder="instagram_username"
+                      className="bare-input"
                       style={{
                         border: 'none',
+                        borderColor: 'transparent',
+                        background: 'transparent',
+                        boxShadow: 'none',
                         outline: 'none',
                         fontSize: '0.82rem',
                         width: '100%',
@@ -539,12 +544,14 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                       border: '1px solid var(--color-text-primary)',
                       color: 'var(--color-surface)',
                       borderRadius: '8px',
-                      padding: '8px 14px',
+                      padding: '0 16px',
+                      minHeight: '44px',
                       fontSize: '0.78rem',
                       fontWeight: '700',
                       cursor: requestingAccess ? 'wait' : 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
+                      justifyContent: 'center',
                       gap: '5px'
                     }}
                   >
@@ -609,11 +616,12 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px'
+                  flexWrap: 'wrap',
+                  gap: '4px 6px'
                 }}
               >
                 <Zap size={14} color={setupTab === 'oauth' ? 'var(--ambient-dominant)' : 'var(--color-text-secondary)'} />
-                <span>1-Click Meta Login</span>
+                <span style={{ whiteSpace: 'nowrap' }}>Meta login</span>
                 <span style={{
                   fontSize: '0.62rem',
                   background: 'color-mix(in srgb, #22c55e 14%, transparent)',
@@ -646,7 +654,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 }}
               >
                 <Sliders size={14} />
-                <span>Manual Token Setup</span>
+                <span style={{ whiteSpace: 'nowrap' }}>Manual token</span>
               </button>
             </div>
 
@@ -665,16 +673,16 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   marginBottom: '20px'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#4ade80" />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <CheckCircle2 size={16} color="#4ade80" style={{ marginTop: 1 }} />
                       <span>Automatic Instagram Business ID resolution</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#4ade80" />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <CheckCircle2 size={16} color="#4ade80" style={{ marginTop: 1 }} />
                       <span>60-day auto-refreshing encrypted Page Access Token</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#4ade80" />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <CheckCircle2 size={16} color="#4ade80" style={{ marginTop: 1 }} />
                       <span>Instant webhook routing for real-time AI responses</span>
                     </div>
                   </div>
@@ -953,6 +961,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
+                    minHeight: '44px',
                     fontSize: '0.78rem',
                     fontWeight: '700',
                     color: 'var(--color-text-primary)',

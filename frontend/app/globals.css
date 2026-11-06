@@ -204,6 +204,9 @@ a.btn svg.lucide:not(.icon-keep) {
   flex-shrink: 0;
 }
 
+/* Icons never squash when the text next to them wraps (tiny / uneven icons on phones) */
+svg.lucide { flex-shrink: 0; }
+
 /* Shadcn-Style Button Utilities */
 .btn {
   background: var(--color-surface);
@@ -254,6 +257,16 @@ select {
   box-sizing: border-box;
 }
 
+/* Input that sits inside its own bordered box (e.g. "@ username"): no second border */
+input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 6px;
+  min-height: 0;
+  align-self: stretch;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--color-text-muted);
@@ -287,6 +300,10 @@ select:focus {
   border-color: var(--ambient-dominant) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-dominant) 25%, transparent) !important;
 }
+
+/* Bare input: the box around it shows the focus ring instead */
+input.bare-input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]):not([type="color"]):focus { box-shadow: none !important; }
+:has(> input.bare-input:focus) { border-color: var(--ambient-dominant) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-dominant) 25%, transparent); }
 
 /* Mobile: 16px text stops iOS Safari zooming on focus; 48px tap targets */
 @media (max-width: 768px) {

@@ -717,9 +717,9 @@ function SettingsPageContent() {
 
           {/* Instagram API & Page Access Token Card */}
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Key size={18} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.3, margin: 0 }}>
+                <Key size={18} style={{ marginTop: 2 }} />
                 <span>Instagram API &amp; Direct Message Credentials</span>
               </h3>
               <span style={{
@@ -749,9 +749,10 @@ function SettingsPageContent() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
               gap: '12px'
             }}>
-              <div>
+              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Instagram size={15} />
                   <span>Automatic Token Generation</span>
@@ -839,12 +840,16 @@ function SettingsPageContent() {
                         border: 'none',
                         color: 'var(--color-text-secondary)',
                         cursor: 'pointer',
-                        padding: '4px 6px',
+                        padding: 0,
+                        width: '40px',
+                        height: '40px',
                         display: 'flex',
                         alignItems: 'center',
-                        borderRadius: '4px'
+                        justifyContent: 'center',
+                        borderRadius: '8px'
                       }}
                       title={showAccessToken ? 'Hide Token' : 'Show Token'}
+                      aria-label={showAccessToken ? 'Hide token' : 'Show token'}
                     >
                       <IconSwap k={showAccessToken ? 'eyeoff' : 'eye'}>{showAccessToken ? <EyeOff size={15} /> : <Eye size={15} />}</IconSwap>
                     </button>
@@ -885,9 +890,9 @@ function SettingsPageContent() {
 
           {/* Deep About Me Card */}
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <BookOpen size={18} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.3, margin: 0 }}>
+                <BookOpen size={18} style={{ marginTop: 2 }} />
                 <span>About Me & Life Background</span>
               </h3>
               <span style={{ fontSize: '0.72rem', background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
@@ -909,8 +914,8 @@ function SettingsPageContent() {
 
           {/* Custom Knowledge & FAQs Card */}
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Info size={18} />
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.3 }}>
+              <Info size={18} style={{ marginTop: 2 }} />
               <span>My Knowledge Base & Frequent Questions</span>
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '14px' }}>
@@ -1432,9 +1437,9 @@ function SettingsPageContent() {
       {activeTab === 'simulator' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Send size={18} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.3, margin: 0 }}>
+                <Send size={18} style={{ marginTop: 2 }} />
                 <span>Test How AI Talks As You</span>
               </h3>
               <span style={{ fontSize: '0.74rem', background: 'var(--color-surface-hover)', color: 'var(--color-text-primary)', padding: '3px 8px', borderRadius: '4px', fontWeight: '700' }}>
