@@ -1,4 +1,5 @@
 const { AzureOpenAI } = require('openai');
+const { traceOpenAI } = require('./langfuse');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -32,14 +33,17 @@ class AzureOpenAIService {
   getClient(deploymentName) {
     const deployment = deploymentName || this.defaultDeployment;
     if (!this.clients[deployment]) {
-      this.clients[deployment] = new AzureOpenAI({
-        endpoint: this.endpoint,
-        apiKey: this.apiKey,
-        apiVersion: this.apiVersion,
-        deployment: deployment,
-        timeout: 30000,
-        maxRetries: 1,
-      });
+      this.clients[deployment] = traceOpenAI(
+        new AzureOpenAI({
+          endpoint: this.endpoint,
+          apiKey: this.apiKey,
+          apiVersion: this.apiVersion,
+          deployment: deployment,
+          timeout: 30000,
+          maxRetries: 1,
+        }),
+        { generationName: `azure-${deployment}`, tags: ['azure-openai'] },
+      );
     }
     return this.clients[deployment];
   }

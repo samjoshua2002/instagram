@@ -6,6 +6,7 @@ const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/cli
 const { SSEClientTransport } = require('@modelcontextprotocol/sdk/client/sse.js');
 const { WebSocketClientTransport } = require('@modelcontextprotocol/sdk/client/websocket.js');
 const cryptoService = require('./cryptoService');
+const { traceOpenAI, traceGeneration } = require('./langfuse');
 
 /**
  * BYO-LLM adapter. A tenant's user.aiProviderConfig picks the provider; 'azure' (the default)
@@ -193,7 +194,7 @@ async function completeOpenAICompatible(messages, cfg, apiKey, { maxTokens, temp
     if (!ping.ok) throw new Error(`Local model server answered ${ping.status}`);
   }
 
-  const client = new OpenAI({ apiKey: apiKey || 'not-needed', baseURL, timeout: REQUEST_TIMEOUT_MS, maxRetries: 0 });
+  const client = traceOpenAI(new OpenAI({ apiKey: apiKey || 'not-needed', baseURL, timeout: REQUEST_TIMEOUT_MS, maxRetries: 0 }), { generationName: `${cfg.provider}-chat`, tags: [cfg.provider] });
   const response = await client.chat.completions.create(
     buildOpenAIParams(cfg.model || defaults.model, messages, { maxTokens, temperature })
   );
@@ -211,9 +212,17 @@ async function completeAnthropic(messages, cfg, apiKey, { maxTokens }) {
   while (turns.length && turns[0].role !== 'user') turns.shift(); // first turn must be the user's
 
   const params = buildAnthropicParams(model, system, turns, maxTokens);
-  const response = ANTHROPIC_FALLBACK_MODELS.includes(model)
-    ? await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
-    : await client.messages.create(params);
+  const response = await traceGeneration('anthropic-chat', { model, input: messages, modelParameters: { max_tokens: params.max_tokens } }, async (gen) => {
+    const res = ANTHROPIC_FALLBACK_MODELS.includes(model)
+      ? await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
+      : await client.messages.create(params);
+    gen.update({
+      model: res.model || model,
+      output: res.content,
+      usageDetails: res.usage ? { input: res.usage.input_tokens || 0, output: res.usage.output_tokens || 0 } : undefined,
+    });
+    return res;
+  });
 
   if (response.stop_reason === 'refusal') throw new Error('Anthropic model declined the request');
   return response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();

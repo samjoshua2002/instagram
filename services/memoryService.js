@@ -1,4 +1,5 @@
 const { AzureOpenAI } = require('openai');
+const { traceOpenAI } = require('./langfuse');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const redisService = require('./redisService');
@@ -91,14 +92,17 @@ const DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
 
 class MemoryService {
   constructor() {
-    this.client = new AzureOpenAI({
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
-      deployment: DEPLOYMENT,
-      timeout: 30000,
-      maxRetries: 1,
-    });
+    this.client = traceOpenAI(
+      new AzureOpenAI({
+        endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+        apiKey: process.env.AZURE_OPENAI_API_KEY,
+        apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
+        deployment: DEPLOYMENT,
+        timeout: 30000,
+        maxRetries: 1,
+      }),
+      { generationName: "memory", tags: ["memory"] },
+    );
   }
 
   /**
