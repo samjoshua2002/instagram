@@ -84,18 +84,61 @@ test('waitForSends gives up after the time limit', async () => {
 });
 
 test('a send that timed out on our side but was delivered: its echo is matched by text', async () => {
-  await instagramService.trackSend('c10', async () => ({ success: false, error: 'timeout' }), 'see you at 6');
+  await instagramService.trackSend('c10', async () => ({ success: false, error: 'timeout', maybeDelivered: true }), 'see you at 6');
   assert.equal(await instagramService.isAppEcho('c10', 'mid_unknown_1', 'see you at 6'), true);
   // only once: the same text typed again by the creator later is theirs
   assert.equal(await instagramService.isAppEcho('c10', 'mid_unknown_2', 'see you at 6'), false);
 });
 
 test('text fallback never swallows a different message from the creator', async () => {
-  await instagramService.trackSend('c11', async () => ({ success: false }), 'bot text');
+  await instagramService.trackSend('c11', async () => ({ success: false, maybeDelivered: true }), 'bot text');
   assert.equal(await instagramService.isAppEcho('c11', 'mid_phone_5', 'creator text'), false);
 });
 
 test('a send with a confirmed id leaves nothing for the text fallback', async () => {
   await instagramService.trackSend('c12', async () => ({ success: true, data: { message_id: 'mid_app_8' } }), 'hello');
   assert.equal(await instagramService.isAppEcho('c12', 'mid_phone_6', 'hello'), false);
+});
+
+test('a send Meta clearly rejected is not remembered, so the creator typing the same words counts', async () => {
+  await instagramService.trackSend('c13', async () => ({ success: false, error: { message: 'outside window' }, maybeDelivered: false }), 'ok');
+  assert.equal(await instagramService.isAppEcho('c13', 'mid_phone_7', 'ok'), false);
+});
+
+test('a sticker send that timed out but was delivered: its text-less echo is ours', async () => {
+  await instagramService.sendImageMessage.call(
+    Object.assign(Object.create(instagramService), { postImageMessage: async () => ({ success: false, maybeDelivered: true }) }),
+    'c14', 'https://example.com/s.gif');
+  assert.equal(await instagramService.isAppEcho('c14', 'mid_unknown_3', undefined, true), true);
+  // only once: a sticker the creator sends later is theirs
+  assert.equal(await instagramService.isAppEcho('c14', 'mid_unknown_4', undefined, true), false);
+});
+
+test('a text echo never matches an unconfirmed sticker send', async () => {
+  await instagramService.sendImageMessage.call(
+    Object.assign(Object.create(instagramService), { postImageMessage: async () => ({ success: false, maybeDelivered: true }) }),
+    'c15', 'https://example.com/s.gif');
+  assert.equal(await instagramService.isAppEcho('c15', 'mid_phone_8', 'hey', false), false);
+});
+
+test('failed sends report maybeDelivered only when Meta never answered', async () => {
+  const axios = require('axios');
+  const realPost = axios.post;
+  const cases = [
+    [Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }), true],
+    [Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }), false],
+    [Object.assign(new Error('400'), { response: { status: 400, data: { error: 'window' } } }), false],
+  ];
+  try {
+    for (const [err, expected] of cases) {
+      axios.post = async () => { throw err; };
+      const r = await instagramService.postTextMessage('c16', 'hi', 'IGtoken');
+      assert.equal(r.success, false);
+      assert.equal(r.maybeDelivered, expected, err.message);
+      const img = await instagramService.postImageMessage('c16', 'https://example.com/s.gif', 'IGtoken');
+      assert.equal(img.maybeDelivered, expected, 'image ' + err.message);
+    }
+  } finally {
+    axios.post = realPost;
+  }
 });
