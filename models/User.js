@@ -95,6 +95,7 @@ const UserSchema = new mongoose.Schema({
     businessName: { type: String, default: '' },
     category: { type: String, default: '' },
     description: { type: String, default: '' },
+    website: { type: String, default: '' },
   },
   address: {
     street: { type: String, default: '' },
