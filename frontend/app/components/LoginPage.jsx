@@ -492,11 +492,12 @@ export default function LoginPage({ onLoginSuccess }) {
   };
 
   // Unverified account (403 needsVerification): jump to the registration email-code step
-  const moveToEmailVerification = async (email, message) => {
+  // knownPassword: the password just accepted by /login (the code check needs it)
+  const moveToEmailVerification = async (email, message, knownPassword) => {
     setError(message || 'Please verify your email address before signing in.');
     if (!email || !String(email).includes('@')) return;
     setAuthMode('register');
-    setRegForm(prev => ({ ...prev, email: String(email).trim() }));
+    setRegForm(prev => ({ ...prev, email: String(email).trim(), ...(knownPassword ? { password: knownPassword } : {}) }));
     setRegOtpCode('');
     setRegStage('otp');
     setRegError('');
@@ -548,7 +549,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       const data = await res.json().catch(() => ({}));
       if (res.status === 403 && data.needsVerification) {
-        await moveToEmailVerification(data.email || loginId, data.error);
+        await moveToEmailVerification(data.email || loginId, data.error, password);
         return;
       }
       if (!res.ok) {
