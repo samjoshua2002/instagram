@@ -109,9 +109,7 @@ function RelationshipsPageInner() {
     category: 'online_friend',
     relationship: '',
     personalNotes: '',
-    roastStyle: '',
-    chatsCount: 0,
-    reelsCount: 0
+    roastStyle: ''
   });
 
   const [isAutofilling, setIsAutofilling] = useState(false);
@@ -153,6 +151,13 @@ function RelationshipsPageInner() {
   const [userClarification, setUserClarification] = useState('');
   const [knowBirthYear, setKnowBirthYear] = useState(true);
 
+  const closeRawChatModal = () => {
+    setIsRawChatModalOpen(false);
+    setExtractedData(null);
+    setRawChatText('');
+    setUserClarification('');
+  };
+
   // Initialize form data ONLY when switching to a different person (not on every node poll)
   // This prevents typing from being reset by the 4s background sync
   useEffect(() => {
@@ -170,11 +175,13 @@ function RelationshipsPageInner() {
         category: selectedPerson.category || 'online_friend',
         relationship: selectedPerson.relationship || selectedPerson.relationshipToSam || '',
         personalNotes: selectedPerson.personalNotes || (selectedPerson.lore || []).join('\n'),
-        roastStyle: selectedPerson.roastStyle || '',
-        chatsCount: selectedPerson.chatsCount ?? selectedPerson.messageCount ?? 0,
-        reelsCount: selectedPerson.reelsCount ?? 0
+        roastStyle: selectedPerson.roastStyle || ''
       });
     }
+    // A different person: drop any half-finished raw chat extraction
+    setExtractedData(null);
+    setRawChatText('');
+    setUserClarification('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id, selectedPerson?.name]);
 
@@ -395,9 +402,6 @@ function RelationshipsPageInner() {
       personalNotes: formData.personalNotes.trim(),
       lore: formData.personalNotes.trim().split('\n').map(l => l.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean),
       roastStyle: formData.roastStyle.trim(),
-      chatsCount: parseInt(formData.chatsCount, 10) || 0,
-      reelsCount: parseInt(formData.reelsCount, 10) || 0,
-      messageCount: parseInt(formData.chatsCount, 10) || 0,
       ...(extraFields || {})
     };
 
@@ -432,7 +436,7 @@ function RelationshipsPageInner() {
         showToast('No new conversation logs found to extract');
       }
     } catch (e) {
-      showToast(`Autofill error: ${e.message}`);
+      showToast(`Autofill error: ${e.message}`, 'error');
     } finally {
       setIsAutofilling(false);
     }
@@ -456,7 +460,7 @@ function RelationshipsPageInner() {
         showToast('Failed to analyze chat text. Check server.');
       }
     } catch (err) {
-      showToast(`Extraction error: ${err.message}`);
+      showToast(`Extraction error: ${err.message}`, 'error');
     } finally {
       setIsExtracting(false);
     }
@@ -470,7 +474,8 @@ function RelationshipsPageInner() {
     }
     try {
       const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/messages`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.messages && data.messages.length > 0) {
         const ownerLabel = user?.firstName || 'You';
         const text = data.messages.map(m => `${m.role === 'assistant' ? ownerLabel : selectedPerson.name}: ${m.text}`).join('\n');
@@ -480,7 +485,7 @@ function RelationshipsPageInner() {
         showToast('No messages found in history');
       }
     } catch (e) {
-      showToast('Could not fetch messages');
+      showToast(`Could not fetch messages: ${e.message}`, 'error');
     }
   };
 
@@ -594,14 +599,13 @@ function RelationshipsPageInner() {
       const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/learn`, {
         method: 'POST'
       });
-      const data = await res.json();
-      if (data.success && data.memory) {
-        showToast('Memory synthesized from recent messages');
-      } else {
-        showToast('Messages reviewed. Memory up to date');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
+      showToast(data.memory ? 'Memory synthesized from recent messages' : 'Messages reviewed, no new memory found', 'success');
     } catch (e) {
-      showToast('Memory verified');
+      showToast(`Could not refresh memory: ${e.message}`, 'error');
     } finally {
       setIsLearning(false);
     }
@@ -795,7 +799,7 @@ function RelationshipsPageInner() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setIsRawChatModalOpen(false)}
+                  onClick={closeRawChatModal}
                   style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer' }}
                 >
                   <X size={18} />
@@ -813,7 +817,7 @@ function RelationshipsPageInner() {
                   rows={6}
                   value={rawChatText}
                   onChange={(e) => setRawChatText(e.target.value)}
-                  placeholder="Paste Instagram DM conversation here (e.g. 'Sam: hey did you finish your exam? Bhavani: yeah 3rd year medicine exam done, going back to hostel...')..."
+                  placeholder="Paste Instagram DM conversation here (e.g. 'You: hey did you finish your exam? Friend: yeah exam done, going back to hostel...')..."
                   style={{ width: '100%', fontSize: '0.82rem' }}
                 />
               </div>
@@ -1121,7 +1125,7 @@ function RelationshipsPageInner() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Bhavani"
+                  placeholder="e.g. Priya"
                   required
                 />
               </div>
@@ -1322,8 +1326,8 @@ function RelationshipsPageInner() {
                 <input
                   type="number"
                   min="0"
-                  value={formData.chatsCount}
-                  onChange={(e) => setFormData({ ...formData, chatsCount: parseInt(e.target.value, 10) || 0 })}
+                  value={selectedPerson.chatsCount ?? selectedPerson.messageCount ?? 0}
+                  readOnly
                   placeholder="0"
                   style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}
                 />
@@ -1339,8 +1343,8 @@ function RelationshipsPageInner() {
                 <input
                   type="number"
                   min="0"
-                  value={formData.reelsCount}
-                  onChange={(e) => setFormData({ ...formData, reelsCount: parseInt(e.target.value, 10) || 0 })}
+                  value={selectedPerson.reelsCount ?? 0}
+                  readOnly
                   placeholder="0"
                   style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}
                 />
