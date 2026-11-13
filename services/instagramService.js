@@ -71,6 +71,14 @@ function findAdminConfig() {
 // Echo webhooks for messages this app sent must not be read as the creator typing by hand
 const APP_SENT_MID_LIMIT = 2000;
 const UNCONFIRMED_TTL_MS = 2 * 60 * 1000;
+// Stand-in "text" for a sticker/image send, so its echo (which has no text) can be matched too
+const IMAGE_ECHO_KEY = '\u0000image';
+
+/**
+ * Did a failed send maybe reach Meta anyway? Only when no answer came back after the request was
+ * on its way (timeout, reset). Meta's own error replies and errors before sending mean "not sent".
+ */
+const maybeDelivered = (err) => !!err && !err.response && !PRE_SEND_CODES.has(err.code);
 
 class InstagramService {
   constructor() {
@@ -82,20 +90,23 @@ class InstagramService {
     this.unconfirmedTexts = new Map(); // recipientId -> [{ text, at }]
   }
 
+  // text: what an echo of this send will carry (IMAGE_ECHO_KEY for stickers/images)
   async trackSend(recipientId, send, text = '') {
     this.sendingTo.set(recipientId, (this.sendingTo.get(recipientId) || 0) + 1);
-    let gotMid = false;
+    let unsure = false;
     try {
       const result = await send();
       const mid = result?.data?.message_id;
       if (mid) {
-        gotMid = true;
         this.appSentMids.add(mid);
         if (this.appSentMids.size > APP_SENT_MID_LIMIT) this.appSentMids.delete(this.appSentMids.values().next().value);
       }
+      // No id: remember the text only when the send may still have arrived (e.g. timed out),
+      // never for a clear failure, or the creator typing the same words would be swallowed
+      unsure = !mid && !!result?.maybeDelivered;
       return result;
     } finally {
-      if (!gotMid && text) this.rememberUnconfirmed(recipientId, text);
+      if (unsure && text) this.rememberUnconfirmed(recipientId, text);
       const left = (this.sendingTo.get(recipientId) || 1) - 1;
       if (left > 0) {
         this.sendingTo.set(recipientId, left);
@@ -148,7 +159,7 @@ class InstagramService {
    * returned its message id, so while a send to this contact is in flight we wait for it to finish
    * and then compare ids: the creator typing on the phone at the same moment is NOT our echo.
    */
-  async isAppEcho(recipientId, mid, text = '') {
+  async isAppEcho(recipientId, mid, text = '', hasAttachment = false) {
     if (mid && this.appSentMids.has(mid)) return true;
     if (this.sendingTo.has(recipientId)) {
       if (!mid) return true; // no id to compare: keep the old safe answer
@@ -156,7 +167,8 @@ class InstagramService {
       if (this.appSentMids.has(mid)) return true;
     }
     // A send of ours that ended without an id but was delivered anyway: match it by its text
-    return this.takeUnconfirmed(recipientId, text);
+    // (a sticker/image echo has no text, so match it against our unconfirmed image sends)
+    return this.takeUnconfirmed(recipientId, text || (hasAttachment ? IMAGE_ECHO_KEY : ''));
   }
 
   /**
@@ -243,21 +255,24 @@ class InstagramService {
           console.log(`📤 Standard message sent successfully (fallback):`, retryRes.data);
           return { success: true, data: retryRes.data };
         } catch (retryErr) {
-          // fall through to final error
+          return this.sendFailed(recipientId, retryErr);
         }
       }
-
-      const errDetails = error.response ? error.response.data : error.message;
-      console.error(`❌ Failed to send Instagram message to ${recipientId}:`, errDetails);
-      return { success: false, error: errDetails };
+      return this.sendFailed(recipientId, error);
     }
+  }
+
+  sendFailed(recipientId, error) {
+    const errDetails = error.response ? error.response.data : error.message;
+    console.error(`❌ Failed to send Instagram message to ${recipientId}:`, errDetails);
+    return { success: false, error: errDetails, maybeDelivered: maybeDelivered(error) };
   }
 
   /**
    * Send a sticker or meme image attachment
    */
   sendImageMessage(recipientId, imageUrl, customToken = null, replyToMid = null) {
-    return this.trackSend(recipientId, () => this.postImageMessage(recipientId, imageUrl, customToken, replyToMid));
+    return this.trackSend(recipientId, () => this.postImageMessage(recipientId, imageUrl, customToken, replyToMid), IMAGE_ECHO_KEY);
   }
 
   async postImageMessage(recipientId, imageUrl, customToken = null, replyToMid = null) {
@@ -304,9 +319,11 @@ class InstagramService {
             `sendImageMessage fallback → ${recipientId}`
           );
           return { success: true, data: r2.data };
-        } catch (e2) {}
+        } catch (e2) {
+          return { success: false, error: e2.response?.data || e2.message, maybeDelivered: maybeDelivered(e2) };
+        }
       }
-      return { success: false, error: err.response?.data || err.message };
+      return { success: false, error: err.response?.data || err.message, maybeDelivered: maybeDelivered(err) };
     }
   }
 

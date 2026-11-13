@@ -586,12 +586,15 @@ function handleCreatorEcho(event, accountId) {
   // Save the reply and update the creator-scoped SocialGraph contact node
   (async () => {
     try {
+      // Owner lookup starts now, so a takeover can cancel the bot's next bubble without a DB wait
+      const ownerLookup = findOwnerByInstagramAccountId(senderAccountId);
+      ownerLookup.catch(() => {}); // awaited below; never an unhandled rejection if we return early
       // Echo of a reply this app just sent: already saved, and it must not cancel the next AI reply.
       // (Waits for an in-flight send to finish, so the creator typing at the same moment still counts.)
-      if (await instagramService.isAppEcho(contactId, event.message?.mid, event.message?.text)) return;
+      if (await instagramService.isAppEcho(contactId, event.message?.mid, event.message?.text, !!event.message?.attachments?.length)) return;
       console.log(`📱 [Creator Echo]: Creator manually replied to ${contactId} (${text.length} chars)`);
 
-      const { user: ownerUser, ambiguous } = await findOwnerByInstagramAccountId(senderAccountId);
+      const { user: ownerUser, ambiguous } = await ownerLookup;
       if (ambiguous) return;
       const key = contactKey(ownerUser?._id, contactId);
 
