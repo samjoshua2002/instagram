@@ -640,16 +640,21 @@ async function handleCreatorEchoAsync(event, accountId) {
 }
 
 // POST /webhook: Incoming Instagram Events (DMs, echoes, reels, etc.)
-// Verifies Meta's X-Hub-Signature-256 against the app secret(s). Without any secret configured
-// verification cannot run (logged loudly) so existing deployments keep working.
+// Verifies Meta's X-Hub-Signature-256 against the app secret(s). Without a secret, events can't be
+// verified: in production they are refused (anyone could forge DMs and make the bot reply), unless
+// ALLOW_UNSIGNED_WEBHOOKS=true. Local development still accepts them, with a warning.
 function verifyMetaSignature(req) {
   const secrets = [process.env.META_APP_SECRET, process.env.INSTAGRAM_APP_SECRET].filter(Boolean);
   if (secrets.length === 0) {
+    const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+    const allowUnsigned = !isProduction || process.env.ALLOW_UNSIGNED_WEBHOOKS === 'true';
     if (!verifyMetaSignature.warned) {
-      console.warn('⚠️ [Webhook] META_APP_SECRET is not set: webhook signatures are NOT verified. Set it to block forged events.');
+      console.warn(allowUnsigned
+        ? '⚠️ [Webhook] META_APP_SECRET is not set: webhook signatures are NOT verified. Set it to block forged events.'
+        : '🚫 [Webhook] META_APP_SECRET is not set in production: all webhook events are refused until it is set.');
       verifyMetaSignature.warned = true;
     }
-    return true;
+    return allowUnsigned;
   }
   const header = req.get('x-hub-signature-256') || '';
   if (!header.startsWith('sha256=') || !req.rawBody) return false;
