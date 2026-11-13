@@ -118,7 +118,7 @@
   border: none;
   border-radius: 9999px;
   background: var(--sp-green-press);
-  color: #000;
+  color: var(--sp-on-green-press, #000);
   font: 800 15px var(--font-sans);
   cursor: pointer;
   transition: transform 0.12s ease, background 0.12s ease;
@@ -181,7 +181,7 @@
 }
 .spx-pill.active {
   background: var(--sp-green-press);
-  color: #000;
+  color: var(--sp-on-green-press, #000);
   font-weight: 700;
 }
 .spx-pill-count {
@@ -190,7 +190,7 @@
   color: var(--sp-text-2);
 }
 .spx-pill.active .spx-pill-count {
-  color: #000;
+  color: var(--sp-on-green-press, #000);
   opacity: 0.7;
 }
 .spx-chip {

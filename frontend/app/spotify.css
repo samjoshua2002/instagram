@@ -16,7 +16,8 @@
   --sp-tile-hover: #3e3e3e;
   --sp-green: var(--spotify-green, #1ed760);
   --sp-green-press: var(--spotify-green-dark, #1db954);
-  --sp-on-green: #000000;
+  --sp-on-green: var(--on-ambient-accent, #000000);
+  --sp-on-green-press: var(--on-ambient-dominant, #000000);
   --sp-text: #ffffff;
   --sp-text-2: #b3b3b3;
   --sp-gap: 8px;
@@ -41,6 +42,9 @@
   --sp-text-2: #535353;
   --sp-green: color-mix(in srgb, var(--ambient-dominant, #1db954) 85%, #000);
   --sp-green-press: color-mix(in srgb, var(--ambient-dominant, #1db954) 70%, #000);
+  /* text on those darkened accents: picked per photo (AmbientBackground.jsx) */
+  --sp-on-green: var(--on-ambient-dominant-85, #000000);
+  --sp-on-green-press: var(--on-ambient-dominant-70, #ffffff);
   --glass-fill-subtle: #f7f7f7;
   --glass-fill-standard: #f4f4f4;
   --glass-border: rgba(0, 0, 0, 0.08);
