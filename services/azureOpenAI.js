@@ -1,4 +1,5 @@
 const { AzureOpenAI } = require('openai');
+const { creatorIdentity, personalize } = require('./creatorIdentity');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -20,10 +21,8 @@ class AzureOpenAIService {
   async loadPersonaForOwner(ownerId = null) {
     let config = await redisService.getCachedPersonaConfig(ownerId);
     if (!config) {
-      config = await PersonaConfig.findOne({ ownerId: ownerId || null });
-      if (!config) {
-        config = await PersonaConfig.create({ ownerId: ownerId || null });
-      }
+      config = ownerId ? await PersonaConfig.forOwner(ownerId) : await PersonaConfig.findOne({ ownerId: null });
+      if (!config) config = new PersonaConfig({ ownerId: null });
       await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600, ownerId);
     }
     return config;
@@ -46,7 +45,7 @@ class AzureOpenAIService {
   }
 
   /**
-   * Generates a reply mimicking Sam Joshua's exact tone, adapting to the user's conversation style,
+   * Generates a reply mimicking the creator's exact tone, adapting to the user's conversation style,
    * referencing remembered facts, and drawing upon the social graph network of friends.
    */
   async generateReply({ userMemory, messageHistory, incomingText, config: passedConfig }) {
@@ -552,7 +551,7 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
   "summary": "Short 1-sentence recap of who this person is or what DB change was made"
 }`;
 
-    const messages = [{ role: 'system', content: systemPrompt }];
+    const messages = [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }];
 
     // Append prior conversation history
     if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -588,7 +587,7 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
    * Analyzes raw direct message chat logs or pasted conversation text,
    * extracts all necessary profile attributes, and identifies any clarifying questions.
    */
-  async extractPersonFromRawChat({ chatText, currentPerson = {}, userClarifications = '' }) {
+  async extractPersonFromRawChat({ chatText, currentPerson = {}, userClarifications = '', ownerId = null }) {
     const systemPrompt = `You are an expert personal intelligence architect for Sam Joshua's Instagram OS.
 Analyze the provided raw direct message chat or conversation notes between Sam and a friend/contact.
 Extract comprehensive attributes for this person so Sam's AI clone can understand who they are, their life lore, how they talk, and mutual friends.
@@ -624,7 +623,7 @@ Return a STRICT JSON object in this exact format:
     try {
       const client = this.getClient('gpt-5.6-luna');
       const response = await client.chat.completions.create({
-        messages: [{ role: 'system', content: systemPrompt }],
+        messages: [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }],
         temperature: 0.3,
         response_format: { type: 'json_object' }
       });
