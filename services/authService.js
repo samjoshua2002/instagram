@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
@@ -11,7 +12,11 @@ const {
 } = require('@simplewebauthn/server');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'chatter_jwt_secret_samjoshua_auth_2026_super_secure_key_99';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  JWT_SECRET = crypto.randomBytes(64).toString('hex');
+  console.warn('⚠️⚠️⚠️ [AuthService] JWT_SECRET is NOT set! Using a random secret generated at startup. All sessions will be invalidated on every restart. Set JWT_SECRET in the environment.');
+}
 const RP_NAME = process.env.RP_NAME || 'Chatter OS';
 
 class AuthService {
@@ -59,8 +64,9 @@ class AuthService {
       const totpSecret = generateSecret();
 
       if (!user) {
-        // Initial default password: SamJoshua@2026!
-        const initialHash = await User.hashPassword('SamJoshua@2026!');
+        // Initial password: OWNER_INITIAL_PASSWORD env var, or a random one (reset via email OTP / OneAuth)
+        const initialPassword = process.env.OWNER_INITIAL_PASSWORD || crypto.randomBytes(24).toString('base64url');
+        const initialHash = await User.hashPassword(initialPassword);
         user = new User({
           username: 'samjoshua2002',
           email: superadminEmail,
@@ -141,7 +147,26 @@ class AuthService {
    */
   verifyToken(token) {
     try {
-      return jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET);
+      // Never accept special-purpose tokens (e.g. OAuth state) as session tokens
+      if (decoded && decoded.purpose) return null;
+      return decoded;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
+   * Sign / verify a short-lived OAuth `state` value (10 minutes, tamper-proof)
+   */
+  signOAuthState(payload) {
+    return jwt.sign({ ...payload, purpose: 'ig_oauth_state' }, JWT_SECRET, { expiresIn: '10m' });
+  }
+
+  verifyOAuthState(state) {
+    try {
+      const decoded = jwt.verify(state, JWT_SECRET);
+      return decoded && decoded.purpose === 'ig_oauth_state' ? decoded : null;
     } catch (err) {
       return null;
     }
@@ -416,10 +441,18 @@ class AuthService {
     const cleanToken = (token || '').toString().trim();
     if (!/^\d{6}$/.test(cleanToken)) return false;
 
-    // Check with TOTP (support ±35s window for device clock drift)
+    // Check with TOTP (support ±30s / ±1 step window for device clock drift)
     try {
-      const result = verifySync({ token: cleanToken, secret: user.twoFactor.secret, epochTolerance: 35 });
-      return !!result?.valid;
+      const result = verifySync({ token: cleanToken, secret: user.twoFactor.secret, epochTolerance: 30 });
+      if (!result?.valid) return false;
+      // Replay protection: reject a code whose time-step was already used
+      const step = typeof result.timeStep === 'number'
+        ? result.timeStep
+        : Math.floor(Date.now() / 30000) + (result.delta || 0);
+      const lastUsedStep = user.twoFactor.lastUsedStep || 0;
+      if (step <= lastUsedStep) return false;
+      user.twoFactor.lastUsedStep = step;
+      return true;
     } catch (err) {
       console.warn('⚠️ [AuthService] TOTP verify error:', err.message);
       return false;
@@ -550,20 +583,20 @@ class AuthService {
       userVerification: 'preferred',
     });
 
-    if (user) {
-      user.currentChallenge = options.challenge;
-      await user.save();
-    }
+    // Login challenges are stored server-side by the caller (not on the user document),
+    // so anonymous callers cannot overwrite a user's registration challenge.
     return options;
   }
 
-  async verifyPasskeyAuthentication(user, response, req) {
+  async verifyPasskeyAuthentication(user, response, req, expectedChallenge) {
     const passkey = (user.passkeys || []).find(p => p.credentialId === response.id);
     if (!passkey) {
       throw new Error('Passkey not registered on this account.');
     }
+    if (!expectedChallenge) {
+      throw new Error('Passkey challenge expired. Please try again.');
+    }
 
-    const expectedChallenge = user.currentChallenge;
     const expectedOrigin = this.getOrigin(req);
     const expectedRPID = this.getRpID(req);
 
@@ -583,7 +616,6 @@ class AuthService {
 
     if (verification.verified) {
       passkey.counter = verification.authenticationInfo.newCounter;
-      user.currentChallenge = '';
       user.lastLogin = new Date();
       await user.save();
       return true;

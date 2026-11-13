@@ -1,8 +1,145 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const crypto = require('crypto');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const authService = require('../services/authService');
+
+// --- Small helpers ---------------------------------------------------------
+
+// Secure 6-digit OTP
+const generateOtp = () => crypto.randomInt(100000, 1000000).toString();
+
+const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
+
+// Coerce an OTP code (may arrive as number) to a trimmed string, or '' if invalid type
+const cleanOtpInput = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v).trim() : '';
+
+const MAX_OTP_ATTEMPTS = 5;
+
+/**
+ * Checks an OTP sub-document ('verificationOtp' | 'resetOtp') against the supplied code.
+ * Counts wrong attempts, invalidates after MAX_OTP_ATTEMPTS, and clears the code on success.
+ * Returns null on success, or { status, error } on failure. Caller must save the user on success.
+ */
+async function checkOtp(user, field, code, messages = {}) {
+  const otp = user && user[field];
+  if (!otp || !otp.code) {
+    return { status: 400, error: messages.missing || 'Invalid or expired verification request' };
+  }
+  if (!otp.expiresAt || new Date() > new Date(otp.expiresAt)) {
+    user[field] = { code: '', expiresAt: null, attempts: 0 };
+    await user.save();
+    return { status: 400, error: messages.expired || 'Verification code has expired. Please request a new one.' };
+  }
+  const a = Buffer.from(String(otp.code));
+  const b = Buffer.from(String(code || ''));
+  const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  if (!ok) {
+    const attempts = (otp.attempts || 0) + 1;
+    if (attempts >= MAX_OTP_ATTEMPTS) {
+      user[field] = { code: '', expiresAt: null, attempts: 0 };
+      await user.save();
+      return { status: 400, error: 'Too many attempts, request a new code' };
+    }
+    user[field] = { code: otp.code, expiresAt: otp.expiresAt, attempts };
+    await user.save();
+    return { status: 400, error: messages.invalid || 'Invalid verification code' };
+  }
+  // Success: OTP is single-use
+  user[field] = { code: '', expiresAt: null, attempts: 0 };
+  return null;
+}
+
+// Tiny in-memory rate limiter (per IP + route), no dependency
+const rateBuckets = new Map();
+const rateLimit = (max = 20, windowMs = 10 * 60 * 1000) => (req, res, next) => {
+  const now = Date.now();
+  const key = `${req.ip || req.socket?.remoteAddress || 'unknown'}|${req.baseUrl || ''}${req.route?.path || req.path}`;
+  let bucket = rateBuckets.get(key);
+  if (!bucket || now > bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    rateBuckets.set(key, bucket);
+  }
+  bucket.count += 1;
+  if (bucket.count > max) {
+    res.set('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
+  }
+  next();
+};
+const authLimiter = rateLimit(20, 10 * 60 * 1000);
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateBuckets) if (now > v.resetAt) rateBuckets.delete(k);
+  for (const [k, v] of passkeyChallenges) if (now > v.expiresAt) passkeyChallenges.delete(k);
+}, 60 * 1000).unref();
+
+// Server-side store for passkey LOGIN challenges (keyed by the challenge itself, 5-minute expiry)
+const passkeyChallenges = new Map();
+const PASSKEY_CHALLENGE_TTL = 5 * 60 * 1000;
+
+// Escape a value for safe use inside HTML markup
+const escapeHtml = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+// JSON-encode a value for safe embedding inside an inline <script>
+const jsonForScript = (v) => JSON.stringify(v === undefined ? null : v)
+  .replace(/</g, '\\u003c')
+  .replace(/>/g, '\\u003e')
+  .replace(/&/g, '\\u0026')
+  .replace(/\u2028/g, '\\u2028')
+  .replace(/\u2029/g, '\\u2029');
+
+// OAuth origin allow-list
+const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3998'];
+function getAllowedOrigins() {
+  const fromEnv = (process.env.FRONTEND_ORIGINS || '').split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  return Array.from(new Set([...fromEnv, ...DEFAULT_ALLOWED_ORIGINS]));
+}
+function resolveAllowedOrigin(raw) {
+  const allowed = getAllowedOrigins();
+  if (typeof raw === 'string' && raw) {
+    try {
+      const u = new URL(raw);
+      const normalized = `${u.protocol}//${u.host}`;
+      if (allowed.includes(normalized)) return normalized;
+      if (u.protocol === 'https:' && /\.vercel\.app$/i.test(u.hostname)) return normalized;
+    } catch (e) {}
+  }
+  return allowed[0];
+}
+
+// Public user shape (includes both id and _id)
+function serializeUser(user, extra = {}) {
+  const isSuper = user.role === 'superadmin';
+  return {
+    id: user._id,
+    _id: user._id,
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    mobileNumber: user.mobileNumber,
+    whatsappNumber: user.whatsappNumber,
+    instagramUsername: user.instagramUsername,
+    instagramId: user.instagramId || '',
+    role: isSuper ? 'superadmin' : 'user',
+    accountType: user.accountType,
+    isOnboarded: user.isOnboarded ?? false,
+    businessProfile: user.businessProfile || null,
+    profilePicUrl: user.profilePicUrl || '',
+    hasPasskeys: (user.passkeys || []).length > 0,
+    hasInstagramToken: Boolean(user.instagramPageAccessToken),
+    isInstagramConnected: Boolean(user.instagramPageAccessToken),
+    ...extra,
+  };
+}
 
 // Middleware to protect routes with JWT Bearer Token
 const requireAuth = async (req, res, next) => {
@@ -31,7 +168,7 @@ const requireAuth = async (req, res, next) => {
  * POST /api/auth/register/request-otp
  * Step 1: Validate registration details and dispatch 6-digit email verification OTP
  */
-router.post('/register/request-otp', async (req, res) => {
+router.post('/register/request-otp', authLimiter, async (req, res) => {
   try {
     const {
       email,
@@ -43,7 +180,13 @@ router.post('/register/request-otp', async (req, res) => {
       whatsappNumber,
       instagramUsername,
       instagramId,
-    } = req.body;
+    } = req.body || {};
+
+    const optionalFields = { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, instagramId };
+    if (typeof email !== 'string' || typeof username !== 'string' || typeof password !== 'string' ||
+        Object.values(optionalFields).some(v => v !== undefined && v !== null && typeof v !== 'string')) {
+      return res.status(400).json({ error: 'Invalid registration details.' });
+    }
 
     if (!email || !email.includes('@')) {
       return res.status(400).json({ error: 'A valid email address is required.' });
@@ -64,11 +207,22 @@ router.post('/register/request-otp', async (req, res) => {
       $or: [{ email: cleanEmail }, { username: cleanUsername }]
     });
 
-    if (existing && existing.isVerified !== false) {
-      if (existing.email === cleanEmail) {
-        return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
-      }
+    if (cleanUsername.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+    }
+
+    if (existing && existing.isVerified !== false && existing.email === cleanEmail) {
+      return res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
+    }
+    // Only an UNVERIFIED record with the SAME email may be overwritten
+    if (existing && existing.email !== cleanEmail) {
       return res.status(409).json({ error: 'This username is already taken. Please choose another.' });
+    }
+    if (existing) {
+      const usernameOwner = await User.findOne({ username: cleanUsername, _id: { $ne: existing._id } });
+      if (usernameOwner) {
+        return res.status(409).json({ error: 'This username is already taken. Please choose another.' });
+      }
     }
 
     // Check if Instagram handle is already registered by another verified user
@@ -84,7 +238,7 @@ router.post('/register/request-otp', async (req, res) => {
     }
 
     // Generate 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = generateOtp();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     const passwordHash = await User.hashPassword(password);
@@ -107,6 +261,7 @@ router.post('/register/request-otp', async (req, res) => {
         verificationOtp: {
           code: otpCode,
           expiresAt: otpExpires,
+          attempts: 0,
         },
         twoFactor: {
           enabled: true,
@@ -127,6 +282,7 @@ router.post('/register/request-otp', async (req, res) => {
       user.verificationOtp = {
         code: otpCode,
         expiresAt: otpExpires,
+        attempts: 0,
       };
       if (!user.twoFactor?.secret) {
         user.twoFactor = {
@@ -151,11 +307,14 @@ router.post('/register/request-otp', async (req, res) => {
       });
     } catch (mailErr) {
       console.error('❌ [Register OTP] Email sending failed:', mailErr.message);
-      return res.status(500).json({ error: 'Failed to send verification email: ' + mailErr.message });
+      return res.status(503).json({ error: 'Could not send the verification email right now. Please try again later.' });
     }
   } catch (err) {
     console.error('❌ Registration Request OTP error:', err.message);
-    res.status(500).json({ error: err.message });
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'This username or email is already taken.' });
+    }
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
   }
 });
 
@@ -163,50 +322,44 @@ router.post('/register/request-otp', async (req, res) => {
  * POST /api/auth/register/resend-otp
  * Resend OTP to email address for pending unverified accounts
  */
-router.post('/register/resend-otp', async (req, res) => {
+router.post('/register/resend-otp', authLimiter, async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
+    const { email } = req.body || {};
+    if (!isNonEmptyString(email)) {
       return res.status(400).json({ error: 'Email is required.' });
     }
     const cleanEmail = email.trim().toLowerCase();
+    const genericResponse = {
+      success: true,
+      message: `If a pending account exists for ${cleanEmail}, a fresh 6-digit verification code has been sent. Please check your inbox.`,
+      email: cleanEmail,
+    };
     const user = await User.findOne({ email: cleanEmail });
-    if (!user) {
-      return res.status(404).json({ error: 'No account found with this email.' });
+    if (!user || user.isVerified !== false) {
+      return res.json(genericResponse);
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = generateOtp();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     user.verificationOtp = {
       code: otpCode,
       expiresAt: otpExpires,
+      attempts: 0,
     };
     await user.save();
 
     try {
-      const sendResult = await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
-      const targetMsg = sendResult.forwarded
-        ? `A fresh 6-digit verification code was sent to ${sendResult.deliveredTo} (Resend sandbox for ${cleanEmail}).`
-        : `A fresh 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox.`;
-      res.json({
-        success: true,
-        message: targetMsg,
-        email: cleanEmail,
-      });
+      await authService.sendOtpEmail(cleanEmail, otpCode, 'Account Verification');
     } catch (mailErr) {
       console.error('❌ [Resend OTP] Email sending failed:', mailErr.message);
-      return res.status(500).json({ error: 'Failed to resend verification email: ' + mailErr.message });
+      return res.status(503).json({ error: 'Could not send the verification email right now. Please try again later.' });
     }
 
-    res.json({
-      success: true,
-      message: `A fresh 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox.`,
-      email: cleanEmail,
-    });
+    return res.json(genericResponse);
   } catch (err) {
     console.error('❌ Resend OTP error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Could not resend the verification code. Please try again.' });
   }
 });
 
@@ -214,63 +367,44 @@ router.post('/register/resend-otp', async (req, res) => {
  * POST /api/auth/register/verify-otp
  * Step 1.5: Confirm OTP, mark account as verified, and return authenticated session
  */
-router.post('/register/verify-otp', async (req, res) => {
+router.post('/register/verify-otp', authLimiter, async (req, res) => {
   try {
-    const { email, otpCode } = req.body;
-    if (!email || !otpCode) {
+    const { email } = req.body || {};
+    const otpCode = cleanOtpInput((req.body || {}).otpCode);
+    if (typeof email !== 'string') {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+    }
+    if (!email.trim() || !otpCode) {
       return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: cleanEmail });
 
-    if (!user || !user.verificationOtp?.code) {
-      return res.status(400).json({ error: 'No pending verification request found for this email.' });
-    }
-
-    if (new Date() > new Date(user.verificationOtp.expiresAt)) {
-      return res.status(400).json({ error: 'Verification code expired. Please request a new code.' });
-    }
-
-    if (user.verificationOtp.code !== otpCode.trim()) {
-      return res.status(400).json({ error: 'Invalid 6-digit verification code.' });
+    const otpErr = await checkOtp(user, 'verificationOtp', otpCode, {
+      missing: 'No pending verification request found for this email.',
+      expired: 'Verification code expired. Please request a new code.',
+      invalid: 'Invalid 6-digit verification code.',
+    });
+    if (otpErr) {
+      return res.status(otpErr.status).json({ error: otpErr.error });
     }
 
     user.isVerified = true;
-    user.verificationOtp = { code: '', expiresAt: null };
     user.lastLogin = new Date();
     await user.save();
 
     const token = authService.generateToken(user);
-    const isSuper = user.role === 'superadmin';
 
     res.json({
       success: true,
       token,
       message: 'Account verified successfully!',
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobileNumber: user.mobileNumber,
-        whatsappNumber: user.whatsappNumber,
-        instagramUsername: user.instagramUsername,
-        instagramId: user.instagramId || '',
-        role: isSuper ? 'superadmin' : 'user',
-        accountType: user.accountType,
-        isOnboarded: user.isOnboarded ?? false,
-        businessProfile: user.businessProfile || null,
-        profilePicUrl: user.profilePicUrl,
-        hasPasskeys: (user.passkeys || []).length > 0,
-        hasInstagramToken: Boolean(user.instagramPageAccessToken),
-        isInstagramConnected: Boolean(user.instagramPageAccessToken),
-      },
+      user: serializeUser(user),
     });
   } catch (err) {
     console.error('❌ Registration Verify OTP error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Verification failed. Please try again.' });
   }
 });
 
@@ -279,16 +413,21 @@ router.post('/register/verify-otp', async (req, res) => {
  * Standard login: Direct password verification.
  * (OneAuth / TOTP is an alternative login method, NOT enforced on password login)
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
-    const { identifier, password, totpCode } = req.body;
-    if (!identifier) {
+    const { identifier, password, totpCode } = req.body || {};
+    if ((identifier !== undefined && identifier !== null && typeof identifier !== 'string') ||
+        (password !== undefined && password !== null && typeof password !== 'string') ||
+        (totpCode !== undefined && totpCode !== null && typeof totpCode !== 'string' && typeof totpCode !== 'number')) {
+      return res.status(400).json({ error: 'Invalid login request' });
+    }
+    if (!identifier || !identifier.trim()) {
       return res.status(400).json({ error: 'Email or Username is required' });
     }
 
     // If totpCode is provided without password, route to OneAuth passwordless login
     if (!password && totpCode) {
-      return handleOneAuthDirectLogin(req, res, identifier, totpCode);
+      return await handleOneAuthDirectLogin(req, res, identifier, totpCode);
     }
 
     if (!password) {
@@ -309,38 +448,23 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    if (user.isVerified === false) {
+      return res.status(403).json({ error: 'Please verify your email first.', needsVerification: true, email: user.email });
+    }
+
     user.lastLogin = new Date();
     await user.save();
 
     const token = authService.generateToken(user);
-    const isSuper = user.role === 'superadmin';
 
     res.json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobileNumber: user.mobileNumber,
-        whatsappNumber: user.whatsappNumber,
-        instagramUsername: user.instagramUsername,
-        instagramId: user.instagramId || '',
-        role: isSuper ? 'superadmin' : 'user',
-        accountType: user.accountType,
-        isOnboarded: user.isOnboarded ?? false,
-        businessProfile: user.businessProfile || null,
-        profilePicUrl: user.profilePicUrl || '',
-        hasPasskeys: (user.passkeys || []).length > 0,
-        hasInstagramToken: Boolean(user.instagramPageAccessToken),
-        isInstagramConnected: Boolean(user.instagramPageAccessToken),
-      },
+      user: serializeUser(user),
     });
   } catch (err) {
     console.error('❌ Login error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
 
@@ -348,6 +472,9 @@ router.post('/login', async (req, res) => {
  * Helper to execute direct Zoho OneAuth login
  */
 async function handleOneAuthDirectLogin(req, res, identifier, code) {
+  if (typeof identifier !== 'string' || (typeof code !== 'string' && typeof code !== 'number')) {
+    return res.status(400).json({ error: 'Email/Username and 6-digit OneAuth code are required' });
+  }
   const cleanIdentifier = identifier.trim().toLowerCase();
   const cleanCode = (code || '').toString().trim();
 
@@ -375,6 +502,11 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
     return res.status(401).json({ error: 'Invalid or expired 6-digit code from Zoho OneAuth app. Please check your app and try again.' });
   }
 
+  if (user.isVerified === false) {
+    await user.save(); // persist TOTP replay step
+    return res.status(403).json({ error: 'Please verify your email first.', needsVerification: true, email: user.email });
+  }
+
   user.lastLogin = new Date();
   await user.save();
 
@@ -382,18 +514,7 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
   return res.json({
     success: true,
     token,
-    user: {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      mobileNumber: user.mobileNumber,
-      whatsappNumber: user.whatsappNumber,
-      instagramUsername: user.instagramUsername,
-      accountType: user.accountType,
-      hasPasskeys: (user.passkeys || []).length > 0,
-    },
+    user: serializeUser(user),
   });
 }
 
@@ -401,16 +522,16 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
  * POST /api/auth/oneauth-login
  * Dedicated direct passwordless login using Zoho OneAuth 6-digit code
  */
-router.post('/oneauth-login', async (req, res) => {
+router.post('/oneauth-login', authLimiter, async (req, res) => {
   try {
-    const { identifier, code } = req.body;
+    const { identifier, code } = req.body || {};
     if (!identifier || !code) {
       return res.status(400).json({ error: 'Email/Username and 6-digit OneAuth code are required' });
     }
-    return handleOneAuthDirectLogin(req, res, identifier, code);
+    return await handleOneAuthDirectLogin(req, res, identifier, code);
   } catch (err) {
     console.error('❌ OneAuth login error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'OneAuth login failed. Please try again.' });
   }
 });
 
@@ -418,27 +539,37 @@ router.post('/oneauth-login', async (req, res) => {
  * POST /api/auth/oneauth/request-setup-otp
  * Allows unauthenticated owner to verify identity via email OTP to retrieve Zoho OneAuth QR code
  */
-router.post('/oneauth/request-setup-otp', async (req, res) => {
+router.post('/oneauth/request-setup-otp', authLimiter, async (req, res) => {
   try {
-    const { email = 'guidetalk.app@gmail.com' } = req.body;
+    const { email } = req.body || {};
+    if (!isNonEmptyString(email)) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
     const cleanEmail = email.trim().toLowerCase();
+    const genericMessage = `If an account exists for ${cleanEmail}, a 6-digit verification code has been sent to unlock OneAuth setup.`;
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.json({ success: true, message: genericMessage });
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = generateOtp();
     user.resetOtp = {
       code: otpCode,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
     };
     await user.save();
 
-    await authService.sendOtpEmail(user.email, otpCode, 'Zoho OneAuth Setup');
-    res.json({ success: true, message: `A 6-digit verification code has been sent to ${user.email} to unlock OneAuth setup.` });
+    try {
+      await authService.sendOtpEmail(user.email, otpCode, 'Zoho OneAuth Setup');
+    } catch (mailErr) {
+      // Do not reveal account existence or mail configuration
+      console.error('❌ [OneAuth Setup OTP] Email sending failed:', mailErr.message);
+    }
+    res.json({ success: true, message: genericMessage });
   } catch (err) {
     console.error('❌ Request OneAuth Setup OTP error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Could not process the request. Please try again.' });
   }
 });
 
@@ -446,26 +577,33 @@ router.post('/oneauth/request-setup-otp', async (req, res) => {
  * POST /api/auth/oneauth/verify-setup-otp
  * Verifies email OTP and returns the QR code & secret to link Zoho OneAuth app
  */
-router.post('/oneauth/verify-setup-otp', async (req, res) => {
+router.post('/oneauth/verify-setup-otp', authLimiter, async (req, res) => {
   try {
-    const { email = 'guidetalk.app@gmail.com', otpCode } = req.body;
+    const { email } = req.body || {};
+    const otpCode = cleanOtpInput((req.body || {}).otpCode);
+    if (!isNonEmptyString(email)) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    if (!otpCode) {
+      return res.status(400).json({ error: 'Invalid 6-digit verification code' });
+    }
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: cleanEmail });
 
-    if (!user || !user.resetOtp?.code) {
-      return res.status(400).json({ error: 'Invalid or expired setup request' });
+    const otpErr = await checkOtp(user, 'resetOtp', otpCode, {
+      missing: 'Invalid or expired setup request',
+      expired: 'Verification code expired. Please request a new one.',
+      invalid: 'Invalid 6-digit verification code',
+    });
+    if (otpErr) {
+      return res.status(otpErr.status).json({ error: otpErr.error });
     }
 
-    if (new Date() > new Date(user.resetOtp.expiresAt)) {
-      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    if (!user.twoFactor?.secret) {
+      user.twoFactor = user.twoFactor || {};
+      user.twoFactor.secret = authService.generateTotpSecret();
+      user.twoFactor.enabled = true;
     }
-
-    if (user.resetOtp.code !== (otpCode || '').trim()) {
-      return res.status(400).json({ error: 'Invalid 6-digit verification code' });
-    }
-
-    // Reset OTP code
-    user.resetOtp = { code: '', expiresAt: null };
     await user.save();
 
     // Return QR code and secret
@@ -476,38 +614,23 @@ router.post('/oneauth/verify-setup-otp', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Verify OneAuth Setup OTP error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Could not verify the setup code. Please try again.' });
   }
 });
 ;
 
 /**
- * GET /api/auth/oneauth/qr
- * Direct QR Code retrieval for easy phone scanning on the login screen
+ * GET /api/auth/oneauth/qr (Protected)
+ * Returns the QR code of the logged-in user only.
+ * (Before login, use /oneauth/request-setup-otp → /oneauth/verify-setup-otp.)
  */
-router.get('/oneauth/qr', async (req, res) => {
+router.get('/oneauth/qr', requireAuth, async (req, res) => {
   try {
-    const rawEmail = (req.query.email || '').trim().toLowerCase();
-    let user = null;
-    if (rawEmail) {
-      user = await User.findOne({
-        $or: [{ email: rawEmail }, { username: rawEmail }]
-      });
-    }
-    // If no email specified, fallback to owner account
-    if (!user && !rawEmail) {
-      user = await User.findOne({
-        $or: [{ email: 'samjoshuacs2002@gmail.com' }, { username: 'samjoshua2002' }]
-      });
-    }
-    if (!user) {
-      return res.status(404).json({ error: `Account for "${rawEmail}" was not found. Please verify your email or username.` });
-    }
+    const user = req.user;
 
     if (!user.twoFactor?.secret) {
-      const { generateSecret } = require('otplib');
       user.twoFactor = user.twoFactor || {};
-      user.twoFactor.secret = generateSecret();
+      user.twoFactor.secret = authService.generateTotpSecret();
       user.twoFactor.enabled = true;
       await user.save();
     }
@@ -521,7 +644,7 @@ router.get('/oneauth/qr', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ OneAuth QR error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Could not load the OneAuth QR code.' });
   }
 });
 
@@ -529,10 +652,15 @@ router.get('/oneauth/qr', async (req, res) => {
  * POST /api/auth/forgot-password/verify-oneauth
  * Reset password instantly using Zoho OneAuth code (bypasses email timeouts completely)
  */
-router.post('/forgot-password/verify-oneauth', async (req, res) => {
+router.post('/forgot-password/verify-oneauth', authLimiter, async (req, res) => {
   try {
-    const { identifier = 'guidetalk.app@gmail.com', totpCode, newPassword } = req.body;
-    if (!identifier || !totpCode || !newPassword) {
+    const { totpCode, newPassword } = req.body || {};
+    const identifier = (req.body || {}).identifier ?? (req.body || {}).email;
+    if (typeof identifier !== 'string' || typeof newPassword !== 'string' ||
+        (typeof totpCode !== 'string' && typeof totpCode !== 'number')) {
+      return res.status(400).json({ error: 'Username/Email, OneAuth code, and new password are required' });
+    }
+    if (!identifier.trim() || !totpCode || !newPassword) {
       return res.status(400).json({ error: 'Username/Email, OneAuth code, and new password are required' });
     }
     if (newPassword.length < 8) {
@@ -559,7 +687,7 @@ router.post('/forgot-password/verify-oneauth', async (req, res) => {
     res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
   } catch (err) {
     console.error('❌ OneAuth password reset error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Password reset failed. Please try again.' });
   }
 });
 
@@ -567,42 +695,41 @@ router.post('/forgot-password/verify-oneauth', async (req, res) => {
  * POST /api/auth/forgot-password/send-otp
  * Generates and sends a 6-digit OTP code to Sam's email
  */
-router.post('/forgot-password/send-otp', async (req, res) => {
+router.post('/forgot-password/send-otp', authLimiter, async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const { email } = req.body || {};
+    if (!isNonEmptyString(email)) return res.status(400).json({ error: 'Email is required' });
 
     const cleanEmail = email.trim().toLowerCase();
+    const genericMessage = 'If this email exists, a verification code has been sent.';
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      return res.json({ success: true, message: 'If this email exists, a verification code has been sent.' });
+      return res.json({ success: true, message: genericMessage });
     }
 
     // Generate secure 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = generateOtp();
     user.resetOtp = {
       code: otpCode,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      attempts: 0,
     };
     await user.save();
 
     // Send verification email
     try {
-      const sendResult = await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
-      const targetMsg = sendResult.forwarded
-        ? `A 6-digit verification code was sent to ${sendResult.deliveredTo} (Resend sandbox for ${user.email}).`
-        : `A 6-digit verification code has been sent to ${user.email}. Please check your inbox.`;
-      res.json({
-        success: true,
-        message: targetMsg
-      });
+      await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
     } catch (mailErr) {
+      // Do not reveal account existence or mail configuration
       console.error('❌ [Password Reset OTP] Email delivery failed:', mailErr.message);
-      return res.status(500).json({ error: 'Failed to send verification email: ' + mailErr.message });
     }
+    res.json({
+      success: true,
+      message: genericMessage
+    });
   } catch (err) {
     console.error('❌ Send OTP error:', err.message);
-    res.status(500).json({ error: err.message || 'Error generating password reset code' });
+    res.status(500).json({ error: 'Error generating password reset code' });
   }
 });
 
@@ -610,10 +737,14 @@ router.post('/forgot-password/send-otp', async (req, res) => {
  * POST /api/auth/forgot-password/verify-reset
  * Verifies OTP and updates user password
  */
-router.post('/forgot-password/verify-reset', async (req, res) => {
+router.post('/forgot-password/verify-reset', authLimiter, async (req, res) => {
   try {
-    const { email, otpCode, newPassword } = req.body;
-    if (!email || !otpCode || !newPassword) {
+    const { email, newPassword } = req.body || {};
+    const otpCode = cleanOtpInput((req.body || {}).otpCode);
+    if (typeof email !== 'string' || typeof newPassword !== 'string') {
+      return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
+    }
+    if (!email.trim() || !otpCode || !newPassword) {
       return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
     }
     if (newPassword.length < 8) {
@@ -622,36 +753,37 @@ router.post('/forgot-password/verify-reset', async (req, res) => {
 
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: cleanEmail });
-    if (!user || !user.resetOtp?.code) {
-      return res.status(400).json({ error: 'Invalid or expired verification request' });
-    }
-
-    if (new Date() > new Date(user.resetOtp.expiresAt)) {
-      return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
-    }
-
-    if (user.resetOtp.code !== otpCode.trim()) {
-      return res.status(400).json({ error: 'Invalid verification code' });
+    const otpErr = await checkOtp(user, 'resetOtp', otpCode, {
+      missing: 'Invalid or expired verification request',
+      expired: 'Verification code has expired. Please request a new one.',
+      invalid: 'Invalid verification code',
+    });
+    if (otpErr) {
+      return res.status(otpErr.status).json({ error: otpErr.error });
     }
 
     user.passwordHash = await User.hashPassword(newPassword);
-    user.resetOtp = { code: '', expiresAt: null };
     await user.save();
 
     res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
   } catch (err) {
     console.error('❌ Verify Reset error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Password reset failed. Please try again.' });
   }
 });
 
 /**
  * GET /api/auth/passkey/login-options
- * Generates WebAuthn options for Passkey / Fingerprint login
+ * Generates WebAuthn options for Passkey / Fingerprint login.
+ * The challenge is stored server-side (in-memory, 5 min), never on the user document.
  */
-router.get('/passkey/login-options', async (req, res) => {
+router.get('/passkey/login-options', authLimiter, async (req, res) => {
   try {
-    const rawId = (req.query.email || req.query.identifier || '').trim().toLowerCase();
+    const rawQuery = req.query.email || req.query.identifier || '';
+    if (typeof rawQuery !== 'string') {
+      return res.status(400).json({ error: 'Invalid identifier' });
+    }
+    const rawId = rawQuery.trim().toLowerCase();
     let user = null;
     if (rawId) {
       user = await User.findOne({
@@ -659,10 +791,14 @@ router.get('/passkey/login-options', async (req, res) => {
       });
     }
     const options = await authService.generatePasskeyAuthenticationOptions(user, req);
+    passkeyChallenges.set(options.challenge, {
+      userId: user ? user._id.toString() : null,
+      expiresAt: Date.now() + PASSKEY_CHALLENGE_TTL,
+    });
     res.json(options);
   } catch (err) {
     console.error('❌ Passkey login options error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Could not start passkey login.' });
   }
 });
 
@@ -670,29 +806,39 @@ router.get('/passkey/login-options', async (req, res) => {
  * POST /api/auth/passkey/login-verify
  * Verifies biometric assertion and logs user in
  */
-router.post('/passkey/login-verify', async (req, res) => {
+router.post('/passkey/login-verify', authLimiter, async (req, res) => {
   try {
-    const { response, email, identifier } = req.body;
-    if (!response) return res.status(400).json({ error: 'Assertion response is required' });
+    const { response } = req.body || {};
+    if (!response || typeof response !== 'object' || typeof response.id !== 'string' ||
+        typeof response.response?.clientDataJSON !== 'string') {
+      return res.status(400).json({ error: 'Assertion response is required' });
+    }
 
-    let user = null;
-    const cleanId = (email || identifier || '').trim().toLowerCase();
-    if (cleanId) {
-      user = await User.findOne({
-        $or: [{ email: cleanId }, { username: cleanId }]
-      });
+    // Look up the challenge from the signed clientDataJSON
+    let challenge = '';
+    try {
+      const clientData = JSON.parse(Buffer.from(response.response.clientDataJSON, 'base64url').toString('utf8'));
+      challenge = typeof clientData.challenge === 'string' ? clientData.challenge : '';
+    } catch (e) {}
+    const stored = challenge ? passkeyChallenges.get(challenge) : null;
+    if (!stored || Date.now() > stored.expiresAt) {
+      if (challenge) passkeyChallenges.delete(challenge);
+      return res.status(400).json({ error: 'Passkey challenge expired. Please try again.' });
     }
-    if (!user && response.id) {
-      user = await User.findOne({ 'passkeys.credentialId': response.id });
-    }
-    if (!user) {
-      user = await User.findOne({ email: 'samjoshuacs2002@gmail.com' });
-    }
-    if (!user) {
+    passkeyChallenges.delete(challenge); // single-use
+
+    // Find the user by the credential id
+    const user = await User.findOne({ 'passkeys.credentialId': response.id });
+    if (!user || (stored.userId && stored.userId !== user._id.toString())) {
       return res.status(404).json({ error: 'No user registered with this passkey' });
     }
 
-    const verified = await authService.verifyPasskeyAuthentication(user, response, req);
+    let verified = false;
+    try {
+      verified = await authService.verifyPasskeyAuthentication(user, response, req, challenge);
+    } catch (verifyErr) {
+      return res.status(401).json({ error: 'Passkey verification failed' });
+    }
     if (!verified) {
       return res.status(401).json({ error: 'Passkey verification failed' });
     }
@@ -704,6 +850,7 @@ router.post('/passkey/login-verify', async (req, res) => {
       success: true,
       token,
       user: {
+        _id: user._id,
         id: user._id,
         username: user.username,
         email: user.email,
@@ -725,7 +872,7 @@ router.post('/passkey/login-verify', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Passkey login verify error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Passkey login failed. Please try again.' });
   }
 });
 
@@ -749,17 +896,23 @@ router.post('/passkey/register-options', requireAuth, async (req, res) => {
  */
 router.post('/passkey/register-verify', requireAuth, async (req, res) => {
   try {
-    const { response, name } = req.body;
-    if (!response) return res.status(400).json({ error: 'Registration response required' });
+    const { response, name } = req.body || {};
+    if (!response || typeof response !== 'object') return res.status(400).json({ error: 'Registration response required' });
 
-    const verified = await authService.verifyPasskeyRegistration(req.user, response, req);
+    let verified = false;
+    try {
+      verified = await authService.verifyPasskeyRegistration(req.user, response, req);
+    } catch (verifyErr) {
+      console.warn('⚠️ Passkey registration verify failed:', verifyErr.message);
+      verified = false;
+    }
     if (!verified) {
       return res.status(400).json({ error: 'Failed to verify passkey registration' });
     }
 
     // Set device name from client or detect dynamically from User-Agent
     const userAgent = req.get('user-agent') || '';
-    let resolvedName = (name || '').trim();
+    let resolvedName = (typeof name === 'string' ? name : '').trim();
     if (!resolvedName) {
       if (/iPhone/i.test(userAgent)) resolvedName = 'iPhone (Touch ID / Face ID)';
       else if (/iPad/i.test(userAgent)) resolvedName = 'iPad (Touch ID)';
@@ -807,6 +960,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
   res.json({
     id: user._id,
+    _id: user._id,
     username: user.username,
     email: user.email,
     profilePicUrl: user.profilePicUrl || '',
@@ -853,7 +1007,20 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       instagramUsername,
       instagramPageAccessToken,
       instagramAccountId,
-    } = req.body;
+    } = req.body || {};
+
+    const stringFields = { accountType, personaTone, greetingMessage, chatMode, instagramUsername, instagramPageAccessToken, instagramAccountId };
+    if (Object.values(stringFields).some(v => v !== undefined && v !== null && typeof v !== 'string')) {
+      return res.status(400).json({ error: 'Invalid onboarding details.' });
+    }
+    if (businessProfile !== undefined && businessProfile !== null &&
+        (typeof businessProfile !== 'object' ||
+         ['businessName', 'category', 'description'].some(k => businessProfile[k] !== undefined && businessProfile[k] !== null && typeof businessProfile[k] !== 'string'))) {
+      return res.status(400).json({ error: 'Invalid business profile.' });
+    }
+    if (accountType && !['personal', 'creator', 'business', 'agency'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type.' });
+    }
 
     if (accountType) {
       user.accountType = accountType;
@@ -861,10 +1028,10 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     if (instagramUsername) {
       user.instagramUsername = instagramUsername.trim().replace(/^@/, '');
     }
-    if (instagramPageAccessToken !== undefined) {
+    if (instagramPageAccessToken !== undefined && instagramPageAccessToken !== null) {
       user.instagramPageAccessToken = instagramPageAccessToken.trim();
     }
-    if (instagramAccountId !== undefined) {
+    if (instagramAccountId !== undefined && instagramAccountId !== null) {
       user.instagramAccountId = instagramAccountId.trim();
     }
     if (businessProfile) {
@@ -880,9 +1047,9 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     // Sync with PersonaConfig
     try {
       const PersonaConfig = require('../models/PersonaConfig');
-      let persona = await PersonaConfig.findOne();
+      let persona = await PersonaConfig.findOne({ ownerId: user._id });
       if (!persona) {
-        persona = new PersonaConfig();
+        persona = new PersonaConfig({ ownerId: user._id });
       }
       if (personaTone) {
         persona.tone = personaTone;
@@ -900,29 +1067,12 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       console.warn('Could not update persona during onboarding:', e.message);
     }
 
-    // Sync with RoutingConfig
-    try {
-      const RoutingConfig = require('../models/RoutingConfig');
-      let routing = await RoutingConfig.findOne();
-      if (!routing) {
-        routing = new RoutingConfig();
-      }
-      if (chatMode) {
-        routing.chatMode = chatMode;
-      }
-      if (typeof enableGlobalBot === 'boolean') {
-        routing.globalBotActive = enableGlobalBot;
-      }
-      await routing.save();
-    } catch (e) {
-      console.warn('Could not update routing during onboarding:', e.message);
-    }
-
     res.json({
       success: true,
       message: 'Onboarding configured successfully!',
       user: {
         id: user._id,
+        _id: user._id,
         username: user.username,
         email: user.email,
         firstName: user.firstName,
@@ -939,7 +1089,7 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Onboarding error:', err.message);
-    res.status(500).json({ error: 'Failed to complete onboarding: ' + err.message });
+    res.status(500).json({ error: 'Failed to complete onboarding. Please try again.' });
   }
 });
 
@@ -957,6 +1107,7 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
       message: 'Onboarding dismissed. You can configure rules and persona anytime in Settings.',
       user: {
         id: user._id,
+        _id: user._id,
         username: user.username,
         email: user.email,
         role: user.role || 'user',
@@ -978,21 +1129,30 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
  */
 router.get('/instagram/connect', (req, res) => {
   try {
-    const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
-    const clientOrigin = req.query.origin || 'https://instagram-ebon-zeta.vercel.app';
-    const userJwt = req.query.token || '';
+    const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID;
+    const clientOrigin = resolveAllowedOrigin(req.query.origin);
+    // The popup cannot set headers, so the session JWT arrives as ?token= — it is verified here
+    // and only the userId goes into the signed state (never the JWT itself).
+    const userJwt = typeof req.query.token === 'string' ? req.query.token : '';
+    const decodedSession = userJwt ? authService.verifyToken(userJwt) : null;
+
+    if (!metaAppId) {
+      return res.status(500).send(renderOAuthResultPage({ ok: false, origin: clientOrigin, message: 'Instagram connection is not configured on the server (META_APP_ID missing).' }));
+    }
+    if (!decodedSession || !decodedSession.userId) {
+      return res.status(401).send(renderOAuthResultPage({ ok: false, origin: clientOrigin, message: 'Your session has expired. Please sign in again and retry.' }));
+    }
 
     let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
     const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
-    const stateObj = {
-      token: userJwt,
+    const state = authService.signOAuthState({
+      userId: String(decodedSession.userId),
       origin: clientOrigin,
       redirectUri,
-      appId: metaAppId,
-    };
-    const state = Buffer.from(JSON.stringify(stateObj)).toString('base64');
+      nonce: crypto.randomBytes(16).toString('hex'),
+    });
 
     const scopes = [
       'instagram_basic',
@@ -1008,9 +1168,61 @@ router.get('/instagram/connect', (req, res) => {
     res.redirect(authUrl);
   } catch (err) {
     console.error('❌ /instagram/connect error:', err.message);
-    res.status(500).send('Failed to initiate Instagram OAuth: ' + err.message);
+    res.status(500).send('Failed to initiate Instagram OAuth.');
   }
 });
+
+/**
+ * Renders the auto-closing popup page for the Instagram OAuth flow.
+ * Every interpolated value is HTML-escaped (markup) or JSON-encoded (script).
+ * postMessage targets only the validated origin and never carries the access token.
+ */
+function renderOAuthResultPage({ ok, origin, message, instagramUsername = '', instagramAccountId = '' }) {
+  const safeOrigin = resolveAllowedOrigin(origin);
+  const messageData = ok
+    ? { type: 'INSTAGRAM_OAUTH_SUCCESS', payload: { success: true, instagramUsername: instagramUsername || '', instagramAccountId: instagramAccountId || '' } }
+    : { type: 'INSTAGRAM_OAUTH_ERROR', error: String(message || 'Authorization failed') };
+  const badge = ok ? 'SUCCESSFULLY CONNECTED' : 'CONNECTION FAILED';
+  const heading = ok ? 'Instagram Account Linked!' : 'Could Not Connect';
+  const body = ok
+    ? `Connected as <strong>@${escapeHtml(instagramUsername || 'Instagram')}</strong>.<br/>Returning to Chatter OS...`
+    : `${escapeHtml(message || 'Authorization failed')}`;
+  return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${ok ? 'Instagram Connected' : 'Connection Failed'}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa; color: #09090b; }
+          .card { background: #ffffff; border: 1px solid ${ok ? '#e4e4e7' : '#fee2e2'}; border-radius: 16px; padding: 36px 30px; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+          .badge { display: inline-block; background: ${ok ? '#dcfce7' : '#fee2e2'}; color: ${ok ? '#15803d' : '#b91c1c'}; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px; }
+          h2 { margin: 0 0 8px 0; font-size: 20px; }
+          p { color: #71717a; font-size: 14px; line-height: 1.5; margin: 0 0 16px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">${badge}</div>
+          <h2>${heading}</h2>
+          <p>${body}</p>
+          ${ok ? '' : '<p style="font-size: 12px; color: #9ca3af;">You can also enter your Page Access Token manually in the setup wizard.</p>'}
+        </div>
+        <script>
+          (function () {
+            var targetOrigin = ${jsonForScript(safeOrigin)};
+            var data = ${jsonForScript(messageData)};
+            if (window.opener) {
+              window.opener.postMessage(data, targetOrigin);
+              setTimeout(function () { window.close(); }, ${ok ? 1200 : 3500});
+            } else if (${ok ? 'true' : 'false'}) {
+              setTimeout(function () { window.location.href = targetOrigin; }, 1500);
+            }
+          })();
+        </script>
+      </body>
+      </html>
+    `;
+}
 
 /**
  * GET /api/auth/instagram/callback
@@ -1020,55 +1232,34 @@ router.get('/instagram/callback', async (req, res) => {
   try {
     const { code, state, error, error_description } = req.query;
 
-    let origin = 'https://instagram-ebon-zeta.vercel.app';
-    let userJwt = '';
-    let savedRedirectUri = '';
-    let savedAppId = '';
-
-    if (state) {
-      try {
-        const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
-        if (decoded.origin) origin = decoded.origin;
-        if (decoded.token) userJwt = decoded.token;
-        if (decoded.redirectUri) savedRedirectUri = decoded.redirectUri;
-        if (decoded.appId) savedAppId = decoded.appId;
-      } catch (e) {}
+    // Verify the signed, short-lived state (userId + origin + nonce)
+    const decodedState = typeof state === 'string' && state ? authService.verifyOAuthState(state) : null;
+    if (!decodedState || !decodedState.userId) {
+      return res.status(400).send(renderOAuthResultPage({ ok: false, origin: null, message: 'Invalid or expired authorization request. Please start the connection again.' }));
     }
+    const origin = resolveAllowedOrigin(decodedState.origin);
+    const stateUserId = String(decodedState.userId);
+    const savedRedirectUri = typeof decodedState.redirectUri === 'string' ? decodedState.redirectUri : '';
 
     if (error) {
       console.error('❌ Meta OAuth error:', error, error_description);
-      const safeErr = (error_description || error || 'Authorization was cancelled').replace(/['"]/g, '');
-      return res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head><title>Authorization Failed</title></head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa; color: #09090b;">
-          <div style="background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px; padding: 36px 30px; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
-            <div style="display: inline-block; background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;">AUTHORIZATION FAILED</div>
-            <h2 style="margin: 0 0 8px 0; font-size: 20px;">Could Not Connect</h2>
-            <p style="color: #71717a; font-size: 14px; line-height: 1.5; margin: 0 0 16px 0;">${safeErr}</p>
-            <p style="font-size: 12px; color: #a1a1aa;">Closing window and returning to Chatter OS...</p>
-          </div>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', error: "${safeErr}" }, "*");
-              setTimeout(() => { window.close(); }, 3000);
-            }
-          </script>
-        </body>
-        </html>
-      `);
+      const safeErr = String(error_description || error || 'Authorization was cancelled');
+      return res.send(renderOAuthResultPage({ ok: false, origin, message: safeErr }));
     }
 
-    if (!code) {
-      return res.status(400).send('No authorization code provided by Meta.');
+    if (!code || typeof code !== 'string') {
+      return res.status(400).send(renderOAuthResultPage({ ok: false, origin, message: 'No authorization code provided by Meta.' }));
     }
 
     // Strip URL fragment #_ from code
     const cleanCode = (code || '').split('#')[0].trim();
-    const instagramAppId = savedAppId || process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '28946827981672606';
-    const metaAppId = process.env.META_APP_ID || '28946827981672606';
-    const metaAppSecret = process.env.META_APP_SECRET || process.env.INSTAGRAM_APP_SECRET || '4494347ba6f01696552b99a2e90ccd75';
+    const instagramAppId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || '';
+    const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID || '';
+    const metaAppSecret = process.env.META_APP_SECRET || process.env.INSTAGRAM_APP_SECRET || '';
+    if (!metaAppId || !metaAppSecret) {
+      console.error('❌ Meta OAuth callback: META_APP_ID / META_APP_SECRET (or INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET) not configured.');
+      return res.status(500).send(renderOAuthResultPage({ ok: false, origin, message: 'Instagram connection is not configured on the server. Please contact support.' }));
+    }
 
     let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
@@ -1085,12 +1276,10 @@ router.get('/instagram/callback', async (req, res) => {
       `${normalizedNoSlash.replace(/^https:/i, 'http:')}/`,
     ]));
 
-    // Candidate App IDs (prioritize active configured App 28946827981672606)
+    // Candidate App IDs (from environment only)
     const appIdCandidates = Array.from(new Set([
-      '28946827981672606',
       metaAppId,
       instagramAppId,
-      '1082976137966604'
     ])).filter(Boolean);
 
     let shortLivedToken = '';
@@ -1247,13 +1436,12 @@ router.get('/instagram/callback', async (req, res) => {
       } catch (e) {}
     }
 
-    // 4. Save to User document if JWT was passed in state
+    // 4. Save to the User document identified by the signed state
     const linkedPageToken = longLivedToken;
-    if (userJwt) {
+    if (stateUserId && mongoose.isValidObjectId(stateUserId)) {
       try {
-        const decodedToken = authService.verifyToken(userJwt);
-        if (decodedToken && decodedToken.userId) {
-          const user = await User.findById(decodedToken.userId);
+        {
+          const user = await User.findById(stateUserId);
           if (user) {
             if (linkedPageToken) user.instagramPageAccessToken = linkedPageToken;
             if (instagramAccountId) user.instagramAccountId = instagramAccountId;
@@ -1284,70 +1472,21 @@ router.get('/instagram/callback', async (req, res) => {
           }
         }
       } catch (e) {
-        console.warn('Could not auto-save token from JWT state:', e.message);
+        console.warn('Could not auto-save token from OAuth state:', e.message);
       }
     }
 
-    // 5. Return auto-closing HTML that posts message to opener
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Instagram Connected</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa; color: #09090b; }
-          .card { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px; padding: 36px 30px; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
-          .badge { display: inline-block; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px; }
-          h2 { margin: 0 0 8px 0; font-size: 20px; }
-          p { color: #71717a; font-size: 14px; line-height: 1.5; margin: 0 0 16px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="badge">SUCCESSFULLY CONNECTED</div>
-          <h2>Instagram Account Linked!</h2>
-          <p>Connected as <strong>@${instagramUsername || 'Instagram'}</strong>.<br/>Returning to Chatter OS...</p>
-        </div>
-        <script>
-          const payload = {
-            success: true,
-            instagramUsername: "${instagramUsername || ''}",
-            instagramAccountId: "${instagramAccountId || ''}",
-            instagramPageAccessToken: "${linkedPageToken || ''}"
-          };
-          if (window.opener) {
-            window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_SUCCESS', payload }, "*");
-            setTimeout(() => { window.close(); }, 1200);
-          } else {
-            setTimeout(() => { window.location.href = "${origin}"; }, 1500);
-          }
-        </script>
-      </body>
-      </html>
-    `);
+    // 5. Return auto-closing HTML that posts message to opener (token stays server-side)
+    return res.send(renderOAuthResultPage({ ok: true, origin, instagramUsername, instagramAccountId }));
   } catch (err) {
     console.error('❌ Meta OAuth callback error:', err.response?.data || err.message);
-    const errText = (err.response?.data?.error?.message || err.message || 'Unknown error').replace(/['"]/g, '');
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Connection Failed</title></head>
-      <body style="font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fafafa;">
-        <div style="background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px; padding: 36px 30px; max-width: 440px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
-          <div style="display: inline-block; background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;">CONNECTION FAILED</div>
-          <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #dc2626;">Could Not Retrieve Token</h2>
-          <p style="color: #4b5563; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0;">${errText}</p>
-          <p style="font-size: 12px; color: #9ca3af;">You can also enter your Page Access Token manually in the setup wizard.</p>
-        </div>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({ type: 'INSTAGRAM_OAUTH_ERROR', error: "${errText}" }, "*");
-            setTimeout(() => { window.close(); }, 3500);
-          }
-        </script>
-      </body>
-      </html>
-    `);
+    const errText = String(err.response?.data?.error?.message || err.message || 'Unknown error');
+    let errOrigin = null;
+    try {
+      const st = typeof req.query.state === 'string' ? authService.verifyOAuthState(req.query.state) : null;
+      errOrigin = st ? st.origin : null;
+    } catch (e) {}
+    return res.send(renderOAuthResultPage({ ok: false, origin: errOrigin, message: errText }));
   }
 });
 
@@ -1358,14 +1497,55 @@ router.get('/instagram/callback', async (req, res) => {
 router.put('/profile', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl } = req.body;
+    const { username, firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl } = req.body || {};
 
-    if (profilePicUrl !== undefined) user.profilePicUrl = profilePicUrl;
-    if (firstName !== undefined) user.firstName = firstName.trim();
-    if (lastName !== undefined) user.lastName = lastName.trim();
-    if (mobileNumber !== undefined) user.mobileNumber = mobileNumber.trim();
-    if (whatsappNumber !== undefined) user.whatsappNumber = whatsappNumber.trim();
-    if (instagramUsername !== undefined) user.instagramUsername = instagramUsername.trim();
+    const stringFields = { username, firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, profilePicUrl };
+    if (Object.values(stringFields).some(v => v !== undefined && v !== null && typeof v !== 'string')) {
+      return res.status(400).json({ error: 'Invalid profile details.' });
+    }
+    const addressKeys = ['street', 'city', 'state', 'country', 'postalCode'];
+    if (address !== undefined && address !== null &&
+        (typeof address !== 'object' || addressKeys.some(k => address[k] !== undefined && address[k] !== null && typeof address[k] !== 'string'))) {
+      return res.status(400).json({ error: 'Invalid address.' });
+    }
+
+    // Username change: sanitize like registration and enforce uniqueness
+    if (typeof username === 'string' && username.trim()) {
+      const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+      }
+      if (cleanUsername !== user.username) {
+        const taken = await User.findOne({ username: cleanUsername, _id: { $ne: user._id } });
+        if (taken) {
+          return res.status(409).json({ error: 'This username is already taken. Please choose another.' });
+        }
+        user.username = cleanUsername;
+      }
+    }
+
+    // Instagram handle change: must not belong to another verified user
+    if (typeof instagramUsername === 'string') {
+      const cleanIg = instagramUsername.trim().replace(/^@/, '');
+      if (cleanIg && cleanIg.toLowerCase() !== (user.instagramUsername || '').toLowerCase()) {
+        const escapeRegex = (s) => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const igTaken = await User.findOne({
+          instagramUsername: new RegExp(`^@?${escapeRegex(cleanIg)}$`, 'i'),
+          isVerified: { $ne: false },
+          _id: { $ne: user._id },
+        });
+        if (igTaken) {
+          return res.status(409).json({ error: `The Instagram handle @${cleanIg} is already registered to another Chatter OS account.` });
+        }
+      }
+      user.instagramUsername = cleanIg;
+    }
+
+    if (typeof profilePicUrl === 'string') user.profilePicUrl = profilePicUrl;
+    if (typeof firstName === 'string') user.firstName = firstName.trim();
+    if (typeof lastName === 'string') user.lastName = lastName.trim();
+    if (typeof mobileNumber === 'string') user.mobileNumber = mobileNumber.trim();
+    if (typeof whatsappNumber === 'string') user.whatsappNumber = whatsappNumber.trim();
     if (address && typeof address === 'object') {
       user.address = {
         street: address.street || user.address?.street || '',
@@ -1382,6 +1562,7 @@ router.put('/profile', requireAuth, async (req, res) => {
       message: 'Profile updated successfully',
       user: {
         id: user._id,
+        _id: user._id,
         username: user.username,
         email: user.email,
         profilePicUrl: user.profilePicUrl || '',
@@ -1397,7 +1578,10 @@ router.put('/profile', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Profile update error:', err.message);
-    res.status(500).json({ error: err.message });
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'This username is already taken. Please choose another.' });
+    }
+    res.status(500).json({ error: 'Failed to update profile.' });
   }
 });
 
@@ -1408,8 +1592,8 @@ router.put('/profile', requireAuth, async (req, res) => {
 router.put('/passkeys/:credentialId', requireAuth, async (req, res) => {
   try {
     const { credentialId } = req.params;
-    const { name } = req.body;
-    if (!name || !name.trim()) {
+    const { name } = req.body || {};
+    if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Passkey name is required' });
     }
     const passkey = (req.user.passkeys || []).find(p => p.credentialId === credentialId);
@@ -1710,10 +1894,25 @@ router.get('/ig-request-access', requireAuth, async (req, res) => {
 router.post('/ig-request-access', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const { instagramUsername } = req.body;
+    const { instagramUsername } = req.body || {};
 
+    if (instagramUsername !== undefined && instagramUsername !== null && typeof instagramUsername !== 'string') {
+      return res.status(400).json({ error: 'Invalid Instagram username.' });
+    }
     if (instagramUsername) {
-      user.instagramUsername = instagramUsername.trim().replace(/^@/, '');
+      const cleanIg = instagramUsername.trim().replace(/^@/, '');
+      if (cleanIg && cleanIg.toLowerCase() !== (user.instagramUsername || '').toLowerCase()) {
+        const escapeRegex = (s) => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const igTaken = await User.findOne({
+          instagramUsername: new RegExp(`^@?${escapeRegex(cleanIg)}$`, 'i'),
+          isVerified: { $ne: false },
+          _id: { $ne: user._id },
+        });
+        if (igTaken) {
+          return res.status(409).json({ error: `The Instagram handle @${cleanIg} is already registered to another Chatter OS account.` });
+        }
+      }
+      user.instagramUsername = cleanIg;
     }
 
     user.igApprovalStatus = 'pending';
@@ -1742,9 +1941,15 @@ router.post('/admin/approve-ig-access', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
     }
 
-    const { userId, instagramUsername } = req.body;
+    const { userId, instagramUsername } = req.body || {};
     if (!userId) {
       return res.status(400).json({ error: 'Target userId is required.' });
+    }
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid userId.' });
+    }
+    if (instagramUsername !== undefined && instagramUsername !== null && typeof instagramUsername !== 'string') {
+      return res.status(400).json({ error: 'Invalid Instagram username.' });
     }
 
     const targetUser = await User.findById(userId);
@@ -1779,6 +1984,7 @@ router.post('/admin/approve-ig-access', requireAuth, async (req, res) => {
       message: `Approved @${targetUser.instagramUsername || targetUser.username}! ${emailResult?.success ? 'Notification email sent.' : 'Saved in database.'}`,
       user: {
         id: targetUser._id,
+        _id: targetUser._id,
         igApprovalStatus: 'approved',
         instagramUsername: targetUser.instagramUsername,
       }
@@ -1798,9 +2004,12 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
     if (req.user.role !== 'superadmin') {
       return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
     }
-    const { userId } = req.body;
+    const { userId } = req.body || {};
     if (!userId) {
       return res.status(400).json({ error: 'Target userId is required.' });
+    }
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid userId.' });
     }
     const targetUser = await User.findById(userId);
     if (!targetUser) {
@@ -1813,6 +2022,7 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
       token,
       user: {
         id: targetUser._id,
+        _id: targetUser._id,
         email: targetUser.email,
         username: targetUser.username,
         role: targetUser.role || 'user',
@@ -1846,6 +2056,9 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'Target userId is required.' });
     }
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid userId.' });
+    }
 
     if (req.user._id.toString() === userId.toString()) {
       return res.status(400).json({ error: 'Cannot delete your own superadmin account.' });
@@ -1862,18 +2075,18 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
     // Delete user from DB
     await User.findByIdAndDelete(userId);
 
-    // Delete social graph / contacts associated with this user
-    try {
-      const SocialGraph = require('../models/SocialGraph');
-      await SocialGraph.deleteMany({
-        $or: [
-          { ownerId: userId },
-          { instagramHandle: targetUser.instagramUsername },
-          { senderId: targetUser.instagramId }
-        ]
-      });
-    } catch (e) {
-      console.warn('SocialGraph cleanup warning:', e.message);
+    // Delete tenant data owned by this user — strictly by ownerId (never by handle/senderId,
+    // which default to '' and would wipe other tenants' data)
+    const ownerFilter = { ownerId: new mongoose.Types.ObjectId(userId) };
+    for (const modelName of ['SocialGraph', 'PersonaConfig', 'MediaVault', 'Message', 'UserMemory']) {
+      try {
+        const Model = require(`../models/${modelName}`);
+        // Safety: never run deleteMany if the model has no ownerId path (filter could be stripped)
+        if (!Model.schema.path('ownerId')) continue;
+        await Model.deleteMany(ownerFilter);
+      } catch (e) {
+        console.warn(`${modelName} cleanup warning:`, e.message);
+      }
     }
 
     res.json({
