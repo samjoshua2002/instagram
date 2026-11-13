@@ -3020,6 +3020,7 @@ body {
   max-width: 480px;
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px 24px 22px;
   border-radius: var(--radius-card);
   background: var(--glass-fill-strong);
@@ -3031,16 +3032,19 @@ body {
 }
 
 .ig-setup-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  /* Sticky (not absolute) so it stays in reach while a tall popup scrolls on a short phone */
+  position: sticky;
+  top: -16px; /* sticky counts from inside the 28px padding: sits 12px from the edge */
+  float: right;
+  z-index: 1;
+  margin: -16px -12px -44px 0;
   width: 44px;
   height: 44px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   border: none;
-  background: transparent;
+  background: var(--glass-fill-strong);
   color: var(--color-text-secondary);
   cursor: pointer;
 }

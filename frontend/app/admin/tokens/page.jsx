@@ -128,7 +128,7 @@ export default function TokenRadarPage() {
                 return (
                   <tr key={row.userId} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 700 }}>{row.username}{row.isBanned ? ' (banned)' : ''}</div>
+                      <div style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{row.username}{row.isBanned ? ' (banned)' : ''}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{row.accountType}</div>
                     </td>
                     <td style={{ padding: '10px 12px' }}>

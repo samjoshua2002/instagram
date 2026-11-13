@@ -527,7 +527,7 @@ export default function SuperadminPage() {
 
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
+                          <span style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--color-text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>
                             {account.firstName ? `${account.firstName} ${account.lastName || ''}`.trim() : account.username}
                           </span>
                           {isSuper ? (
