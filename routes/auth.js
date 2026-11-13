@@ -7,7 +7,7 @@ const User = require('../models/User');
 const authService = require('../services/authService');
 const redisService = require('../services/redisService');
 const { setUserInstagram, getUserInstagramToken, clearUserInstagram } = require('../services/instagramTokenService');
-const { rateLimit, FailureLockout, SlidingWindowLimiter, track, MINUTE } = require('../services/rateLimiter');
+const { rateLimit, AccountLockout, SlidingWindowLimiter, track, clientIp, MINUTE } = require('../services/rateLimiter');
 const { escapeHtml, safeJsonForScript, asString, resolveUploadPath, PasskeyError } = authService;
 const bcrypt = require('bcryptjs');
 // Real bcrypt hash (same cost as User.hashPassword) so an unknown account takes as long as a wrong password
@@ -21,9 +21,11 @@ const registerIpLimit = rateLimit({ name: 'register', windowMs: 60 * MINUTE, max
 const passkeyIpLimit = rateLimit({ name: 'passkey', windowMs: 15 * MINUTE, max: 40 });
 const handleIpLimit = rateLimit({ name: 'handle', windowMs: MINUTE, max: 20, message: 'Too many handle checks. Please slow down.' });
 const oauthIpLimit = rateLimit({ name: 'oauth', windowMs: 15 * MINUTE, max: 30 });
-// Per account: 5 wrong codes (OneAuth or emailed) or 10 wrong passwords in 15 min lock it for 15 min
-const codeLockout = track(new FailureLockout({ maxFailures: 5, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
-const passwordLockout = track(new FailureLockout({ maxFailures: 10, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
+// Per account + network address: 5 wrong codes (OneAuth or emailed) or 10 wrong passwords in 15 min
+// lock that address out of that account for 15 min, so a stranger cannot lock the real owner out.
+// Per account (any address): 30 wrong codes or 50 wrong passwords still lock it, against spread-out guessing.
+const codeLockout = track(new AccountLockout({ perIp: 5, perAccount: 30, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
+const passwordLockout = track(new AccountLockout({ perIp: 10, perAccount: 50, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
 // Per email address: at most 3 emailed codes per 15 min
 const emailSendLimiter = track(new SlidingWindowLimiter({ windowMs: 15 * MINUTE, max: 3 }));
 
@@ -169,7 +171,8 @@ const MAX_OTP_ATTEMPTS = 5;
 
 // Checks an emailed 6-digit code stored on user[field]; wipes it after too many wrong tries.
 // Returns an error message, or null when the code matches.
-async function checkOtp(user, field, code, purpose = '') {
+async function checkOtp(user, field, code, purpose = '', req = null) {
+  const ip = req ? clientIp(req) : '';
   const otp = user[field];
   if (!otp?.code) return 'No pending code. Please request a new one.';
   // A code only works for the flow it was sent for (password reset and OneAuth setup share resetOtp)
@@ -177,7 +180,7 @@ async function checkOtp(user, field, code, purpose = '') {
   if (new Date() > new Date(otp.expiresAt)) return 'Verification code expired. Please request a new one.';
   if (typeof code !== 'string' && typeof code !== 'number') return 'Invalid 6-digit verification code.';
   if (otp.code !== String(code).trim()) {
-    codeLockout.recordFailure(`code:${user._id}`);
+    codeLockout.recordFailure(`code:${user._id}`, ip);
     // Local copy: after the reset below, otp (a live view of the document) reads back 0
     const attempts = (otp.attempts || 0) + 1;
     user[field] = attempts >= MAX_OTP_ATTEMPTS
@@ -188,13 +191,13 @@ async function checkOtp(user, field, code, purpose = '') {
       ? 'Too many wrong codes. Please request a new one.'
       : 'Invalid 6-digit verification code.';
   }
-  codeLockout.recordSuccess(`code:${user._id}`);
+  codeLockout.recordSuccess(`code:${user._id}`, ip);
   return null;
 }
 
 // 429 response when this account is locked for wrong codes, else null
 function codeLocked(res, user) {
-  const status = codeLockout.status(`code:${user._id}`);
+  const status = codeLockout.status(`code:${user._id}`, clientIp(res.req));
   return status.locked ? lockedResponse(res, status) : null;
 }
 
@@ -442,7 +445,7 @@ router.post('/register/verify-otp', codeIpLimit, async (req, res) => {
     }
     const locked = codeLocked(res, user);
     if (locked) return locked;
-    const otpError = await checkOtp(user, 'verificationOtp', otpCode);
+    const otpError = await checkOtp(user, 'verificationOtp', otpCode, '', req);
     if (otpError) return res.status(400).json({ error: otpError });
     // The code alone is not enough: anyone can restart a pending sign-up with their own
     // password, so the browser must also prove it knows the password this code was sent for
@@ -510,16 +513,16 @@ router.post('/login', loginIpLimit, async (req, res) => {
     }
 
     const lockKey = `pw:${user._id}`;
-    const lock = passwordLockout.status(lockKey);
+    const lock = passwordLockout.status(lockKey, clientIp(req));
     if (lock.locked) return lockedResponse(res, lock);
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      const after = passwordLockout.recordFailure(lockKey);
+      const after = passwordLockout.recordFailure(lockKey, clientIp(req));
       if (after.locked) return lockedResponse(res, after);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    passwordLockout.recordSuccess(lockKey);
+    passwordLockout.recordSuccess(lockKey, clientIp(req));
     const blocked = signInBlocked(res, user);
     if (blocked) return blocked;
 
@@ -570,7 +573,7 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
 
   const result = await authService.consumeTotp(user, cleanCode);
   if (result !== 'ok') {
-    const after = codeLockout.recordFailure(`code:${user._id}`);
+    const after = codeLockout.recordFailure(`code:${user._id}`, clientIp(req));
     if (after.locked) return lockedResponse(res, after);
     return res.status(401).json({
       error: result === 'replayed'
@@ -578,7 +581,7 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
         : 'Invalid or expired 6-digit code from Zoho OneAuth app. Please check your app and try again.',
     });
   }
-  codeLockout.recordSuccess(`code:${user._id}`);
+  codeLockout.recordSuccess(`code:${user._id}`, clientIp(req));
 
   const blocked = signInBlocked(res, user);
   if (blocked) return blocked;
@@ -664,7 +667,7 @@ router.post('/oneauth/verify-setup-otp', codeIpLimit, async (req, res) => {
     }
     const locked = codeLocked(res, user);
     if (locked) return locked;
-    const otpError = await checkOtp(user, 'resetOtp', otpCode, 'oneauth_setup');
+    const otpError = await checkOtp(user, 'resetOtp', otpCode, 'oneauth_setup', req);
     if (otpError) return res.status(400).json({ error: otpError });
 
     // Reset OTP code and always issue a fresh authenticator secret: the new QR is shown below, and
@@ -720,7 +723,7 @@ router.post('/forgot-password/verify-oneauth', codeIpLimit, async (req, res) => 
 
     const result = await authService.consumeTotp(user, totpCode);
     if (result !== 'ok') {
-      const after = codeLockout.recordFailure(`code:${user._id}`);
+      const after = codeLockout.recordFailure(`code:${user._id}`, clientIp(req));
       if (after.locked) return lockedResponse(res, after);
       return res.status(401).json({
         error: result === 'replayed'
@@ -728,8 +731,8 @@ router.post('/forgot-password/verify-oneauth', codeIpLimit, async (req, res) => 
           : 'Invalid 6-digit OneAuth code. Check your app and try again.',
       });
     }
-    codeLockout.recordSuccess(`code:${user._id}`);
-    passwordLockout.recordSuccess(`pw:${user._id}`);
+    codeLockout.recordSuccess(`code:${user._id}`, clientIp(req));
+    passwordLockout.recordSuccess(`pw:${user._id}`, clientIp(req));
 
     user.passwordHash = await User.hashPassword(newPassword);
     authService.bumpTokenVersion(user); // sign out every existing session
@@ -810,14 +813,14 @@ router.post('/forgot-password/verify-reset', codeIpLimit, async (req, res) => {
     }
     const locked = codeLocked(res, user);
     if (locked) return locked;
-    const otpError = await checkOtp(user, 'resetOtp', otpCode, 'reset');
+    const otpError = await checkOtp(user, 'resetOtp', otpCode, 'reset', req);
     if (otpError) return res.status(400).json({ error: otpError });
 
     user.passwordHash = await User.hashPassword(newPassword);
     user.resetOtp = { code: '', expiresAt: null, attempts: 0 };
     authService.bumpTokenVersion(user); // sign out every existing session
     await user.save();
-    passwordLockout.recordSuccess(`pw:${user._id}`);
+    passwordLockout.recordSuccess(`pw:${user._id}`, clientIp(req));
 
     res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
   } catch (err) {

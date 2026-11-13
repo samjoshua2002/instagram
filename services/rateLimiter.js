@@ -92,6 +92,44 @@ class FailureLockout {
 }
 
 /**
+ * Account lockout that a stranger cannot use against the owner. Wrong tries are counted per
+ * account AND network address (strict), so they lock only the place they come from; a much higher
+ * per-account cap still stops guessing spread over many addresses. Success clears both.
+ */
+class AccountLockout {
+  constructor({ perIp = 5, perAccount = 30, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now } = {}) {
+    this.ipLock = new FailureLockout({ maxFailures: perIp, windowMs, lockMs, now });
+    this.accountLock = new FailureLockout({ maxFailures: perAccount, windowMs, lockMs, now });
+  }
+
+  static ipKey(key, ip) {
+    return `${key}|${ip || 'unknown'}`;
+  }
+
+  status(key, ip) {
+    const here = this.ipLock.status(AccountLockout.ipKey(key, ip));
+    return here.locked ? here : this.accountLock.status(key);
+  }
+
+  // Records one failure; returns the lock status after it
+  recordFailure(key, ip) {
+    const here = this.ipLock.recordFailure(AccountLockout.ipKey(key, ip));
+    const account = this.accountLock.recordFailure(key);
+    return here.locked ? here : account;
+  }
+
+  recordSuccess(key, ip) {
+    this.ipLock.recordSuccess(AccountLockout.ipKey(key, ip));
+    this.accountLock.recordSuccess(key);
+  }
+
+  prune() {
+    this.ipLock.prune();
+    this.accountLock.prune();
+  }
+}
+
+/**
  * The real client IP. server.js trusts every proxy hop, so req.ip is the left-most
  * X-Forwarded-For entry, which the client can fake. Instead take the entry added by
  * our own proxy: TRUST_PROXY_HOPS (default 1, e.g. Render) entries from the right.
@@ -152,6 +190,7 @@ module.exports = {
   MINUTE,
   SlidingWindowLimiter,
   FailureLockout,
+  AccountLockout,
   rateLimit,
   clientIp,
   track,
