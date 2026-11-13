@@ -478,8 +478,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    background: '#4ade80',
-                    border: '1px solid #4ade80',
+                    background: 'var(--color-success)',
+                    border: '1px solid var(--color-success)',
                     color: 'var(--color-surface)',
                     borderRadius: '8px',
                     padding: '8px 14px',
@@ -696,7 +696,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     style={{
                       width: '100%',
                       background: 'var(--ambient-dominant)',
-                      color: '#000',
+                      color: 'var(--on-ambient-dominant, #000)',
                       border: 'none',
                       borderRadius: '11px',
                       padding: '14px 20px',

@@ -608,7 +608,7 @@ function SettingsPageContent() {
           border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
           padding: '14px 18px',
           borderRadius: '12px',
-          color: '#f87171',
+          color: 'var(--color-danger)',
           fontSize: '0.86rem',
           boxShadow: '0 2px 8px rgba(239,68,68,0.06)'
         }}>
@@ -768,7 +768,7 @@ function SettingsPageContent() {
                 disabled={oauthConnecting}
                 style={{
                   background: 'var(--ambient-dominant)',
-                  color: '#000',
+                  color: 'var(--on-ambient-dominant, #000)',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '9px 16px',
@@ -1079,7 +1079,7 @@ function SettingsPageContent() {
           {/* Forbidden & Banned Words */}
           <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} style={{ color: '#f87171' }} />
+              <ShieldAlert size={18} style={{ color: 'var(--color-danger)' }} />
               <span>Forbidden & Banned Words / Phrases</span>
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
@@ -1117,7 +1117,7 @@ function SettingsPageContent() {
                     gap: '6px',
                     background: 'color-mix(in srgb, #ef4444 12%, transparent)',
                     border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
-                    color: '#f87171',
+                    color: 'var(--color-danger)',
                     padding: '5px 12px',
                     borderRadius: '20px',
                     fontSize: '0.8rem',
@@ -1128,7 +1128,7 @@ function SettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => handleRemoveForbiddenWord(word)}
-                    style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
                     title="Remove banned phrase"
                   >
                     ×
@@ -1251,7 +1251,7 @@ function SettingsPageContent() {
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--color-success)', textTransform: 'uppercase' }}>
                         How {formData.creatorName} Replies:
                       </span>
                     </div>
@@ -1320,12 +1320,12 @@ function SettingsPageContent() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {giphyStatus === 'success' ? (
-                  <span style={{ fontSize: '0.72rem', background: 'color-mix(in srgb, #22c55e 14%, transparent)', color: '#4ade80', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.72rem', background: 'color-mix(in srgb, #22c55e 14%, transparent)', color: 'var(--color-success)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <CheckCircle2 size={12} />
                     <span>Connected & Verified</span>
                   </span>
                 ) : giphyStatus === 'error' ? (
-                  <span style={{ fontSize: '0.72rem', background: 'color-mix(in srgb, #ef4444 14%, transparent)', color: '#f87171', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.72rem', background: 'color-mix(in srgb, #ef4444 14%, transparent)', color: 'var(--color-danger)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertCircle size={12} />
                     <span>Connection Failed</span>
                   </span>

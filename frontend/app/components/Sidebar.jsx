@@ -505,7 +505,7 @@ export default function Sidebar() {
               style={{
                 width: '100%',
                 background: 'var(--sp-green)',
-                color: '#000000',
+                color: 'var(--sp-on-green)',
                 border: 'none',
                 padding: '10px 14px',
                 borderRadius: '9999px',
@@ -519,7 +519,7 @@ export default function Sidebar() {
                 boxShadow: '0 3px 10px rgba(9, 9, 11, 0.1)'
               }}
             >
-              <Sparkles size={14} color="#000000" />
+              <Sparkles size={14} color="currentColor" />
               <span>Add Person</span>
             </motion.button>
           )}
@@ -660,7 +660,7 @@ export default function Sidebar() {
                       fontFamily: "var(--font-label)",
                       fontWeight: '800',
                       background: 'var(--color-text-primary)',
-                      color: '#22c55e',
+                      color: 'var(--color-surface)',
                       border: '1px solid var(--color-text-secondary)',
                       padding: '1px 5px',
                       borderRadius: '4px',
@@ -673,8 +673,8 @@ export default function Sidebar() {
                       fontSize: '0.58rem',
                       fontFamily: "var(--font-label)",
                       fontWeight: '800',
-                      background: 'color-mix(in srgb, #f59e0b 35%, transparent)',
-                      color: '#fbbf24',
+                      background: 'color-mix(in srgb, #f59e0b 14%, transparent)',
+                      color: 'var(--color-warning)',
                       border: '1px solid #fde047',
                       padding: '1px 5px',
                       borderRadius: '4px',

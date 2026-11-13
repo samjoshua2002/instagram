@@ -103,7 +103,7 @@ export default function ChangePasswordCard() {
           <span style={labelStyle}>Confirm new password</span>
           <input type={type} autoComplete="new-password" value={form.confirm} onChange={set('confirm')} required style={inputStyle} />
         </label>
-        {error && <div role="alert" style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600 }}>{error}</div>}
+        {error && <div role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger)', fontWeight: 600 }}>{error}</div>}
         <button
           type="submit"
           disabled={saving}

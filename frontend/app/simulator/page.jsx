@@ -69,7 +69,7 @@ export default function SimulatorPage() {
   return (
     <div className="page-container" style={{ height: '100%', minHeight: 'calc(100vh - 70px)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '0.72rem', color: '#10b981', fontFamily: "var(--font-label)", fontWeight: 'bold' }}>
+        <div style={{ fontSize: '0.72rem', color: 'var(--color-success)', fontFamily: "var(--font-label)", fontWeight: 'bold' }}>
           // INSTANT PERSONA TESTING PLAYGROUND
         </div>
         <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px' }}>

@@ -274,7 +274,7 @@ export default function SuperadminPage() {
               SUPERADMIN
             </span>
           </div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px', color: 'var(--color-text-primary)' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px', color: 'var(--color-text-primary)' }}>
             Connected Accounts & Directory
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
