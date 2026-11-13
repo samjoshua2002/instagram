@@ -63,9 +63,9 @@ class AuthService {
   async ensureOwnerUser() {
     try {
       const superadminEmail = 'samjoshuacs2002@gmail.com';
-      let user = await User.findOne({
-        $or: [{ email: superadminEmail }, { username: 'samjoshua2002' }]
-      });
+      // Matched by email only: usernames can be changed and re-registered by anyone, so a
+      // username match could promote a stranger's account to superadmin
+      let user = await User.findOne({ email: superadminEmail });
 
       const totpSecret = generateSecret();
 
