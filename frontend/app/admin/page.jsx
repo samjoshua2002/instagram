@@ -525,7 +525,7 @@ export default function SuperadminPage() {
                         )}
                       </div>
 
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
                             {account.firstName ? `${account.firstName} ${account.lastName || ''}`.trim() : account.username}
@@ -557,7 +557,7 @@ export default function SuperadminPage() {
                           )}
                         </div>
 
-                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)" }}>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", overflowWrap: 'anywhere' }}>
                           {account.email} • @{account.username}
                         </div>
                       </div>
