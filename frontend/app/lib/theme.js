@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { THEME_KEY } from './themeBoot';
+import { THEME_KEY, THEME_COLORS } from './themeBoot';
 import { bannersReady } from './banners';
 import { getTrigger, prefersReducedMotion } from './motion';
 
@@ -50,6 +50,7 @@ export function useTheme() {
   const setTheme = useCallback(next => {
     const apply = () => {
       document.documentElement.dataset.theme = next;
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[next === 'light' ? 'light' : 'dark']);
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
       // Sync render, so the banner hooks ask for the new lists before bannersReady() looks
       flushSync(() => window.dispatchEvent(new Event('chatter:theme')));

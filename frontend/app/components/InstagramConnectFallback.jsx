@@ -344,7 +344,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
           <div style={{
             background: 'color-mix(in srgb, #ef4444 12%, transparent)',
             border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
-            color: '#f87171',
+            color: 'var(--color-danger)',
             borderRadius: '10px',
             padding: '12px 16px',
             fontSize: '0.84rem',
@@ -403,7 +403,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             fontWeight: '800',
             fontFamily: "var(--font-label)",
             background: approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 14%, transparent)' : (approvalStatus === 'approved' ? 'color-mix(in srgb, var(--ambient-dominant) 12%, transparent)' : 'var(--color-surface-hover)'),
-            color: approvalStatus === 'pending' ? '#fbbf24' : (approvalStatus === 'approved' ? 'var(--ambient-dominant)' : 'var(--color-text-secondary)'),
+            color: approvalStatus === 'pending' ? 'var(--color-warning)' : (approvalStatus === 'approved' ? 'var(--ambient-dominant)' : 'var(--color-text-secondary)'),
             border: `1px solid ${approvalStatus === 'pending' ? 'color-mix(in srgb, #f59e0b 35%, transparent)' : (approvalStatus === 'approved' ? 'color-mix(in srgb, var(--ambient-dominant) 35%, transparent)' : 'var(--color-border)')}`,
             padding: '4px 10px',
             borderRadius: '6px'
@@ -421,18 +421,18 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             padding: '16px 20px',
             marginBottom: '22px',
             fontSize: '0.82rem',
-            color: approvalStatus === 'approved' ? '#4ade80' : (approvalStatus === 'pending' ? '#fbbf24' : 'var(--color-text-secondary)'),
+            color: approvalStatus === 'approved' ? 'var(--color-success)' : (approvalStatus === 'pending' ? 'var(--color-warning)' : 'var(--color-text-secondary)'),
             boxSizing: 'border-box'
           }}>
             {approvalStatus === 'pending' ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: '240px' }}>
-                  <Clock size={18} color="#fbbf24" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <Clock size={18} color="var(--color-warning)" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#fbbf24', marginBottom: '3px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--color-warning)', marginBottom: '3px' }}>
                       Request Submitted — Waiting for Admin Whitelist
                     </div>
-                    <div style={{ lineHeight: 1.5, color: '#fbbf24' }}>
+                    <div style={{ lineHeight: 1.5, color: 'var(--color-warning)' }}>
                       Your handle <strong>@{user?.instagramUsername || handle}</strong> is awaiting addition into Meta App Roles by the Superadmin. Once added, you will receive an automated email with direct steps to accept the invite.
                     </div>
                   </div>
@@ -448,7 +448,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     padding: '7px 12px',
                     fontSize: '0.74rem',
                     fontWeight: '700',
-                    color: '#fbbf24',
+                    color: 'var(--color-warning)',
                     cursor: checkingStatus ? 'wait' : 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -462,12 +462,12 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             ) : approvalStatus === 'approved' ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: '240px' }}>
-                  <CheckCircle2 size={18} color="#4ade80" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <CheckCircle2 size={18} color="var(--color-success)" style={{ marginTop: '2px', flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: '#4ade80', marginBottom: '3px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--color-success)', marginBottom: '3px' }}>
                       Whitelisted in Meta Roles! Complete Next 2 Steps:
                     </div>
-                    <div style={{ lineHeight: 1.5, color: '#4ade80' }}>
+                    <div style={{ lineHeight: 1.5, color: 'var(--color-success)' }}>
                       <strong>Step 1:</strong> Accept the invite in Instagram: <em>Settings &rarr; Website Permissions (or Apps and Websites) &rarr; Tester Invites</em>.<br />
                       <strong>Step 2:</strong> Click <strong>1-Click Meta Login</strong> below to grant token access.
                     </div>
@@ -627,7 +627,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 <span style={{
                   fontSize: '0.62rem',
                   background: 'color-mix(in srgb, #22c55e 14%, transparent)',
-                  color: '#4ade80',
+                  color: 'var(--color-success)',
                   padding: '1px 6px',
                   borderRadius: '999px',
                   fontWeight: '800'
@@ -676,15 +676,15 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#4ade80" style={{ marginTop: 1 }} />
+                      <CheckCircle2 size={16} color="var(--color-success)" style={{ marginTop: 1 }} />
                       <span>Automatic Instagram Business ID resolution</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#4ade80" style={{ marginTop: 1 }} />
+                      <CheckCircle2 size={16} color="var(--color-success)" style={{ marginTop: 1 }} />
                       <span>60-day auto-refreshing encrypted Page Access Token</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <CheckCircle2 size={16} color="#4ade80" style={{ marginTop: 1 }} />
+                      <CheckCircle2 size={16} color="var(--color-success)" style={{ marginTop: 1 }} />
                       <span>Instant webhook routing for real-time AI responses</span>
                     </div>
                   </div>

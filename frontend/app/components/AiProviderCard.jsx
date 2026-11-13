@@ -247,7 +247,7 @@ export default function AiProviderCard() {
                   {p.badge}
                 </span>
                 {savedProvider === p.id && (
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '3px' }}>
                     <CheckCircle2 size={11} /> Active
                   </span>
                 )}
@@ -339,7 +339,7 @@ export default function AiProviderCard() {
               fontWeight: 600,
               background: testResult.ok ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'color-mix(in srgb, #ef4444 12%, transparent)',
               border: `1px solid ${testResult.ok ? 'color-mix(in srgb, #22c55e 35%, transparent)' : 'color-mix(in srgb, #ef4444 35%, transparent)'}`,
-              color: testResult.ok ? '#4ade80' : '#f87171'
+              color: testResult.ok ? 'var(--color-success)' : 'var(--color-danger)'
             }}
           >
             {testResult.ok ? <CheckCircle2 size={16} style={{ flexShrink: 0 }} /> : <XCircle size={16} style={{ flexShrink: 0 }} />}

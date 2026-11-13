@@ -591,7 +591,7 @@ function SettingsPageContent() {
           border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)',
           padding: '14px 18px',
           borderRadius: '12px',
-          color: 'var(--color-text)',
+          color: 'var(--color-text-primary)',
           fontSize: '0.86rem',
         }}>
           <RefreshCw size={18} className="animate-spin" />

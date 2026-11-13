@@ -22,6 +22,7 @@
   --sh-text-2: #8a4a50;
   --sh-accent: #d6455a;
   --sh-action: var(--ambient-accent, var(--sp-green-press, #1db954));
+  --sh-on-accent: #ffffff; /* white reads on #d6455a (5.6:1); #2a1217 was 3.1:1 */
 }
 
 .sh-home {
@@ -67,7 +68,7 @@
   flex: none; border: 1px solid var(--sh-border); background: var(--sh-card); color: var(--sh-text);
   padding: 7px 14px; border-radius: 999px; font: 600 0.82rem var(--font-sans); cursor: pointer;
 }
-.sh-chip.active { background: var(--sh-accent); border-color: var(--sh-accent); color: #2a1217; }
+.sh-chip.active { background: var(--sh-accent); border-color: var(--sh-accent); color: var(--sh-on-accent, #2a1217); }
 
 /* Spotlight cards: abstract light artwork, rounded, horizontally scrolling */
 .sh-spot-row {
@@ -233,16 +234,16 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
 .sh-follow-photo { width: 44px; height: 44px; border-radius: 50%; font-size: 0.85rem; }
 .sh-follow-badge {
   position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%;
-  display: grid; place-items: center; background: var(--sh-accent); color: #111; border: 2px solid var(--sh-bg-2);
+  display: grid; place-items: center; background: var(--sh-accent); color: var(--sh-on-accent, #111); border: 2px solid var(--sh-bg-2);
 }
-.sh-follow-birthday .sh-follow-badge { background: #ffb547; }
+.sh-follow-birthday .sh-follow-badge { background: #ffb547; color: #111; }
 .sh-follow-text { display: flex; flex-direction: column; min-width: 0; }
 .sh-follow-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sh-follow-why { font-size: 0.78rem; color: var(--sh-text-2); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sh-follow-actions { display: flex; align-items: center; gap: 6px; flex: none; }
 .sh-follow-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
-  background: var(--sh-action); color: #000 !important; font-weight: 800; font-size: 0.8rem;
+  background: var(--sh-action); color: var(--on-ambient-accent, #000) !important; font-weight: 800; font-size: 0.8rem;
 }
 .sh-follow-btn:hover { filter: brightness(1.08); }
 .sh-follow-later {
@@ -259,7 +260,7 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
 .sh-empty { margin-top: 40px; padding: 32px; border-radius: 22px; background: var(--sh-card); text-align: center; }
 .sh-empty-title { font-size: 1.2rem; font-weight: 800; }
 .sh-empty p { color: var(--sh-text-2); }
-.sh-btn { display: inline-block; margin-top: 8px; padding: 10px 22px; border-radius: 999px; background: var(--sh-action); color: #000 !important; font-weight: 800; }
+.sh-btn { display: inline-block; margin-top: 8px; padding: 10px 22px; border-radius: 999px; background: var(--sh-action); color: var(--on-ambient-accent, #000) !important; font-weight: 800; }
 
 /* Phones: everything smaller so more of Home fits on one screen */
 @media (max-width: 640px) {
@@ -383,6 +384,7 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
 :root[data-theme="light"] .sh-home .sh-hello { text-shadow: none; }
 :root[data-theme="light"] .sh-home.sh-tinted {
   --sh-accent: color-mix(in srgb, var(--ambient-dominant) 80%, #000);
+  --sh-on-accent: var(--on-ambient-dominant-80);
   --sh-text-2: color-mix(in srgb, var(--ambient-dominant) 35%, #555);
   --sh-border: color-mix(in srgb, var(--ambient-dominant) 22%, transparent);
   background: linear-gradient(180deg,
