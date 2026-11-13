@@ -1,5 +1,6 @@
 const { AzureOpenAI } = require('openai');
-const { traceOpenAI, instrument } = require('./langfuse');
+const { traceOpenAI, instrument, annotate } = require('./langfuse');
+const repeatGuard = require('./repeatGuard');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -484,6 +485,10 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       }
     }
 
+    // What the AI already said to this person: shown to the model so it never repeats itself
+    const antiRepeat = repeatGuard.antiRepeatBlock(effectiveHistory);
+    if (antiRepeat) messages.splice(1, 0, { role: 'system', content: antiRepeat });
+
     // Add current incoming message
     messages.push({
       role: 'user',
@@ -495,6 +500,7 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       let reply = features?.byoLlmCustomEndpoint === false
         ? null
         : await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 220, temperature: 0.90 });
+      const usedPlatformModel = reply === null;
       if (reply === null) {
         // Empty content / errors fall back to gpt-4o; reasoning deployments get a 1200-token cap.
         // A prompt Azure's filter blocks (slurs friends use as banter) is retried masked.
@@ -506,6 +512,34 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       }
 
       reply = String(reply ?? '').trim();
+
+      // A near copy of something already said to them: write it again, differently (once)
+      let regenerated = false;
+      const copied = usedPlatformModel ? repeatGuard.findRepeat(reply, effectiveHistory) : null;
+      if (copied) {
+        regenerated = true;
+        const retry = [
+          ...messages.slice(0, -1),
+          { role: 'system', content: `Your draft "${reply.slice(0, 200)}" is almost the same as what you already sent them ("${copied.slice(0, 200)}"). Write a completely different reply to their latest message: different opening, different words, react to a specific detail they said.` },
+          messages[messages.length - 1],
+        ];
+        reply = String((await this.completeWithFilterRetry(selectedModel, retry, { maxTokens: 220, temperature: 0.95, extra: { frequency_penalty: 0.6, presence_penalty: 0.6 } })) ?? '').trim() || reply;
+      }
+
+      annotate({
+        model: usedPlatformModel ? selectedModel : 'tenant provider',
+        chatType,
+        styleMode,
+        knowledgeScore,
+        factsInjected: Boolean(shouldInjectFacts),
+        historyMessages: historyToSend.length,
+        realVoiceFromDb: Boolean(realVoice),
+        tanglish: Boolean(allowTanglish),
+        documentsUsed: Boolean(knowledge?.context),
+        socialGraphUsed: Boolean(socialTreeContext),
+        antiRepeatNote: Boolean(antiRepeat),
+        regeneratedBecauseRepeat: regenerated,
+      });
 
       // Post-process to remove unwanted quotes or prefixes
       reply = reply.replace(/^"|"$/g, '').trim();
@@ -854,8 +888,8 @@ const azureOpenAIService = new AzureOpenAIService();
 
 // Langfuse: one named trace per task, tied to the account (userId) and the person (sessionId)
 const person = m => ({ userId: m?.ownerId, sessionId: m?.senderId, metadata: { person: m?.name || undefined } });
-instrument(azureOpenAIService, 'generateReply', 'Reply to DM', a => ({ ...person(a?.userMemory), userId: a?.userMemory?.ownerId || a?.tenant?._id, tags: ['reply', 'personal'] }));
-instrument(azureOpenAIService, 'generateBusinessReply', 'Reply to DM (business)', a => ({ ...person(a?.userMemory), userId: a?.userMemory?.ownerId || a?.tenant?._id, tags: ['reply', 'business'] }));
+instrument(azureOpenAIService, 'generateReply', 'Reply to DM', a => ({ ...person(a?.userMemory), userId: a?.userMemory?.ownerId || a?.tenant?._id, input: a?.incomingText, tags: ['reply', 'personal'] }));
+instrument(azureOpenAIService, 'generateBusinessReply', 'Reply to DM (business)', a => ({ ...person(a?.userMemory), userId: a?.userMemory?.ownerId || a?.tenant?._id, input: a?.incomingText, tags: ['reply', 'business'] }));
 instrument(azureOpenAIService, 'generateFollowUpReminder', 'Follow-up reminder', a => ({ ...person(a?.userMemory), tags: ['follow-up'] }));
 instrument(azureOpenAIService, 'interviewPersonForSocialTree', 'AI interview about a person', a => ({ userId: a?.ownerId, sessionId: a?.existingNode?.name, tags: ['people', 'interview'] }));
 instrument(azureOpenAIService, 'extractPersonFromRawChat', 'Learn person from pasted chat', a => ({ sessionId: a?.currentPerson?.name, tags: ['people', 'paste-chat'] }));

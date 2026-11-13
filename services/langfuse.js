@@ -2,7 +2,7 @@
 // Off unless LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set. Every model call becomes a generation in Langfuse
 // with its model, tokens, timing and (masked) messages. LANGFUSE_LOG_CONTENT=0 sends no message text at all.
 const { LangfuseSpanProcessor } = require('@langfuse/otel');
-const { setLangfuseTracerProvider, startActiveObservation, propagateAttributes } = require('@langfuse/tracing');
+const { setLangfuseTracerProvider, startActiveObservation, propagateAttributes, updateActiveObservation } = require('@langfuse/tracing');
 const { context } = require('@opentelemetry/api');
 const { AsyncLocalStorageContextManager } = require('@opentelemetry/context-async-hooks');
 const { observeOpenAI } = require('@langfuse/openai');
@@ -107,15 +107,18 @@ const id200 = v => (v === undefined || v === null || v === '' ? undefined : Stri
  * Run fn as one named AI task: every model call inside (including retries and fallbacks) becomes a child of a
  * trace with this name, tied to the account (userId) and the person it is about (sessionId).
  */
-async function aiTask(name, { userId, sessionId, tags, metadata } = {}, fn) {
+async function aiTask(name, { userId, sessionId, tags, metadata, input } = {}, fn) {
   if (!enabled) return fn();
   return propagateAttributes({ traceName: name, userId: id200(userId) || 'admin', sessionId: id200(sessionId), tags }, () =>
     startActiveObservation(
       name,
       async span => {
-        if (metadata) span.update({ metadata });
+        if (metadata || input !== undefined) span.update({ ...(metadata ? { metadata } : {}), ...(input !== undefined ? { input } : {}) });
         try {
-          return await fn();
+          const result = await fn();
+          // the task's answer (a reply, a summary…) as the trace output
+          if (typeof result === 'string') span.update({ output: result });
+          return result;
         } catch (err) {
           span.update({ level: 'ERROR', statusMessage: String(err && err.message ? err.message : err).slice(0, 500) });
           throw err;
@@ -124,6 +127,19 @@ async function aiTask(name, { userId, sessionId, tags, metadata } = {}, fn) {
       { asType: 'agent' },
     ),
   );
+}
+
+/**
+ * Add details to the task being traced right now (which model was picked, how much history was used, why…).
+ * Shows up as metadata on the trace in Langfuse. No-op when tracing is off or nothing is being traced.
+ */
+function annotate(metadata) {
+  if (!enabled || !metadata) return;
+  try {
+    updateActiveObservation({ metadata });
+  } catch {
+    /* tracing must never break a reply */
+  }
 }
 
 /** Wrap obj[method] so each call runs as aiTask(name, ctx(...args)). */
@@ -145,4 +161,4 @@ async function flushLangfuse() {
   if (processor) await processor.forceFlush().catch(() => {});
 }
 
-module.exports = { traceOpenAI, traceGeneration, aiTask, instrument, flushLangfuse, scrub, langfuseEnabled: enabled };
+module.exports = { traceOpenAI, traceGeneration, aiTask, instrument, annotate, flushLangfuse, scrub, langfuseEnabled: enabled };
