@@ -38,14 +38,21 @@ class MemoryService {
   async getOrCreateUserMemory(senderId, profileData = null, ownerId = null) {
     let memory = await UserMemory.findOne({ ownerId: ownerId || null, senderId });
     if (!memory) {
-      memory = new UserMemory({
-        ownerId: ownerId || null,
-        senderId,
-        username: profileData?.username || `User_${senderId.slice(-4)}`,
-        name: profileData?.name || '',
-        profilePic: profileData?.profile_pic || '',
+      // Upsert: two first DMs arriving together must not fail on the unique (creator, sender) key
+      memory = await UserMemory.findOneAndUpdate(
+        { ownerId: ownerId || null, senderId },
+        { $setOnInsert: {
+          ownerId: ownerId || null,
+          senderId,
+          username: profileData?.username || `User_${senderId.slice(-4)}`,
+          name: profileData?.name || '',
+          profilePic: profileData?.profile_pic || '',
+        } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      ).catch(async (e) => {
+        if (e && e.code === 11000) return UserMemory.findOne({ ownerId: ownerId || null, senderId });
+        throw e;
       });
-      await memory.save();
     } else if (profileData) {
       if (profileData.username && memory.username.startsWith('User_')) {
         memory.username = profileData.username;
@@ -438,8 +445,9 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           node.updatedAt = new Date();
           await node.save();
           console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for ${node.name} (DOB: "${node.dob || ''}", Rel: "${node.relationshipToSam}", Lore: ${node.lore.length})`);
-        } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU)) {
-          await SocialGraph.create({
+        } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU) && !/^sim_/.test(memory.senderId)) {
+          // Upsert by sender so the webhook and this sync can never make the same person twice
+          await SocialGraph.updateOne({ ownerId, senderId: memory.senderId }, { $setOnInsert: {
             ownerId,
             name: displayName,
             aliases: [cleanU, (memory.name || '').toLowerCase(), (memory.nickname || '').toLowerCase()].filter(Boolean),
@@ -456,7 +464,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
             personalNotes: memory.personalNotes || '',
             languages: ['English'],
             roastStyle: 'Casual & friendly'
-          });
+          } }, { upsert: true });
           console.log(`✨ [SocialGraph Dynamic Sync]: Created new card for ${displayName} (DOB: "${activeDob}")`);
         }
         socialGraphService.clearCache(ownerId);
