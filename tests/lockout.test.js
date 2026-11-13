@@ -89,7 +89,7 @@ test('account-wide locks double on each repeat, and a success resets them', () =
   clock.advance(60 * MINUTE + 1);
   lock.recordSuccess('code:j', '9.9.9.9');
   lockAccount();
-  assert.ok(Math.abs(lock.status('code:j', '9.9.9.9').retryAfterMs - 15 * MINUTE) < 1000);
+  assert.ok(Math.abs(lock.status('code:j', '8.8.8.8').retryAfterMs - 15 * MINUTE) < 1000);
 });
 
 test('per-address locks do not escalate (a typo-prone owner is never locked for hours)', () => {
@@ -99,4 +99,49 @@ test('per-address locks do not escalate (a typo-prone owner is never locked for 
     assert.ok(lock.status('pw:k', '1.2.3.4').retryAfterMs <= 15 * MINUTE);
     clock.advance(15 * MINUTE + 1);
   }
+});
+
+test('a network the owner signed in from skips the account-wide lock, but keeps its own', () => {
+  const { lock, clock } = make();
+  lock.recordSuccess('code:k', '5.5.5.5'); // owner signs in at home
+  for (let i = 0; i < 30; i++) lock.recordFailure('code:k', `10.2.${i}.1`); // stranger spreads guesses
+  assert.equal(lock.status('code:k', '8.8.8.8').locked, true); // strangers stay locked
+  assert.equal(lock.status('code:k', '5.5.5.5').locked, false); // owner at home is not
+  for (let i = 0; i < 5; i++) lock.recordFailure('code:k', '5.5.5.5');
+  assert.equal(lock.status('code:k', '5.5.5.5').locked, true); // own per-address lock still applies
+  clock.advance(31 * 24 * 60 * MINUTE); // trust expires after 30 days
+  for (let i = 0; i < 30; i++) lock.recordFailure('code:k', `10.3.${i}.1`);
+  assert.equal(lock.status('code:k', '5.5.5.5').locked, true);
+});
+
+test('the account lock stays at 24h once capped instead of dropping back to 15 minutes', () => {
+  const { lock, clock } = make();
+  let r = 0;
+  const lockAccount = () => {
+    for (let i = 0; i < 30; i++) lock.recordFailure('code:z', `10.${r}.${i}.1`);
+    r++;
+    return lock.status('code:z', '9.9.9.9').retryAfterMs;
+  };
+  let ms;
+  for (let k = 0; k < 8; k++) { ms = lockAccount(); clock.advance(ms + 1); }
+  assert.equal(ms, 24 * 60 * MINUTE);
+  assert.equal(lockAccount(), 24 * 60 * MINUTE);
+});
+
+test('strikes fade after a quiet day', () => {
+  const { lock, clock } = make();
+  const lockAccount = (p) => { for (let i = 0; i < 30; i++) lock.recordFailure('code:q', `10.${p}.${i}.1`); };
+  lockAccount(1);
+  clock.advance(15 * MINUTE + 24 * 60 * MINUTE + 1);
+  lockAccount(2);
+  assert.ok(Math.abs(lock.status('code:q', '9.9.9.9').retryAfterMs - 15 * MINUTE) < 1000);
+});
+
+test('address forms of one client share one bucket', () => {
+  const { networkOf } = require('../services/rateLimiter');
+  for (const ip of ['1.2.3.4', '1.2.3.4:5555', '::ffff:1.2.3.4', '::FFFF:0102:0304', '0:0:0:0:0:ffff:102:304']) {
+    assert.equal(networkOf(ip), '1.2.3.4', ip);
+  }
+  assert.equal(networkOf('[2001:db8:1:2::1]:443'), networkOf('2001:0DB8:0001:0002:ffff::'));
+  assert.equal(networkOf('2001:db8:1:2::5%eth0'), '2001:db8:1:2::/64');
 });
