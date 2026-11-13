@@ -152,42 +152,40 @@ export default function InstagramConnectFallback({ onConnect, user }) {
     return () => window.removeEventListener('message', handleOAuthMessage);
   }, [API_BASE, showToast, updateUserProfile, refreshAccount]);
 
-  const handleLaunchInstagramOAuth = () => {
+  const oauthPollRef = React.useRef(null);
+  const stopOauthPoll = () => {
+    if (oauthPollRef.current) { clearInterval(oauthPollRef.current); oauthPollRef.current = null; }
+  };
+  React.useEffect(() => stopOauthPoll, []);
+
+  const handleLaunchInstagramOAuth = async () => {
     setErrorMsg('');
+    // Open the popup synchronously (before any await) so the browser does not block it
+    const popup = window.open('about:blank', 'instagram_oauth', 'width=620,height=720,left=250,top=100');
+    if (!popup) {
+      setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
+      return;
+    }
     setOauthConnecting(true);
-    try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://instagram-ebon-zeta.vercel.app';
-      const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : '') || '';
-
-      const backendUrl = (API_BASE || 'https://instagram-ai-bot-64tf.onrender.com').replace(/\/+$/, '');
-      const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
-
-      const metaAppId = '28946827981672606';
-      const scopes = [
-        'instagram_basic',
-        'instagram_manage_messages',
-        'pages_show_list',
-        'pages_read_engagement',
-        'pages_manage_metadata'
-      ].join(',');
-
-      const stateObj = {
-        token: currentToken,
-        origin: clientOrigin,
-        redirectUri: redirectUri,
-        appId: metaAppId
-      };
-      const state = btoa(JSON.stringify(stateObj));
-
-      // Official Meta / Facebook OAuth dialog for App ID 28946827981672606
-      const directOAuthUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
-
-      const popup = window.open(directOAuthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
-      if (!popup) {
+    stopOauthPoll();
+    oauthPollRef.current = setInterval(() => {
+      if (popup.closed) {
+        stopOauthPoll();
         setOauthConnecting(false);
-        setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
       }
+    }, 500);
+    try {
+      // Single-use, short-lived ticket so the session JWT never goes in the URL
+      const res = await fetch(`${API_BASE}/api/auth/instagram/connect-ticket`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ticket) throw new Error(data.error || 'Could not start Instagram login');
+      popup.location.href = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(window.location.origin)}&ticket=${encodeURIComponent(data.ticket)}`;
     } catch (e) {
+      stopOauthPoll();
+      try { popup.close(); } catch (_) {}
       setOauthConnecting(false);
       setErrorMsg('Failed to open login dialog: ' + e.message);
     }
