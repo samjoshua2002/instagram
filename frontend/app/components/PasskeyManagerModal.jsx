@@ -87,6 +87,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
     }
   });
   const [profileSaving, setProfileSaving] = useState(false);
+  // Save stays locked until the real profile has loaded: saving the empty starter form would blank
+  // the stored name, phone numbers and Instagram username
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -134,6 +137,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
             postalCode: data.address?.postalCode || '',
           }
         });
+        setProfileLoaded(true);
       }
     } catch (err) {
       console.warn('Failed loading user info:', err);
@@ -198,6 +202,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       if (res.ok) {
         showToast?.('Passkey removed', 'success');
         setPasskeys(prev => prev.filter(p => p.id !== credentialId));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast?.(d.error || 'Could not remove passkey.', 'error');
       }
     } catch (err) {
       showToast?.(err.message, 'error');
@@ -216,6 +223,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
         showToast?.('Passkey name updated', 'success');
         setPasskeys(prev => prev.map(p => p.id === credentialId ? { ...p, name: editingPasskeyName.trim() } : p));
         setEditingPasskeyId(null);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast?.(d.error || 'Could not rename passkey.', 'error');
       }
     } catch (err) {
       showToast?.(err.message, 'error');
@@ -297,6 +307,10 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
 
   const handleSaveProfile = async (e) => {
     e?.preventDefault();
+    if (!profileLoaded) {
+      showToast?.('Still loading your profile. Try again in a moment.', 'error');
+      return;
+    }
     setProfileSaving(true);
     try {
       const res = await fetch(`${API_BASE}/api/auth/profile`, {
@@ -863,7 +877,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="submit"
-                  disabled={profileSaving}
+                  disabled={profileSaving || !profileLoaded}
                   style={{
                     background: 'var(--color-text-primary)',
                     color: 'var(--color-surface)',

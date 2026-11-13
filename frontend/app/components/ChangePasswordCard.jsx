@@ -19,7 +19,7 @@ const labelStyle = { fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-t
 
 /** Profile card: the signed-in user changes their own password (needs the current one). */
 export default function ChangePasswordCard() {
-  const { token, API_BASE, showToast, login, user } = useApp();
+  const { token, API_BASE, showToast, setSessionToken } = useApp();
   const [form, setForm] = useState({ current: '', next: '', confirm: '' });
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -43,7 +43,8 @@ export default function ChangePasswordCard() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not change password.');
       // The server signs out old sessions on a password change and sends a fresh token for this one
-      if (data.token) login?.(data.token, user);
+      // Swap the token in place; the full sign-in flow would reload onto Home and lose the toast
+      if (data.token) setSessionToken?.(data.token);
       setForm({ current: '', next: '', confirm: '' });
       showToast?.('Password changed.', 'success');
     } catch (err) {
