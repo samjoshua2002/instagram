@@ -1,5 +1,5 @@
 const { AzureOpenAI } = require('openai');
-const { traceOpenAI } = require('./langfuse');
+const { traceOpenAI, instrument } = require('./langfuse');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -42,7 +42,7 @@ class AzureOpenAIService {
           timeout: 30000,
           maxRetries: 1,
         }),
-        { generationName: `azure-${deployment}`, tags: ['azure-openai'] },
+        { generationName: deployment, tags: ['azure-openai'] },
       );
     }
     return this.clients[deployment];
@@ -850,4 +850,14 @@ Return a STRICT JSON object in this exact format:
   }
 }
 
-module.exports = new AzureOpenAIService();
+const azureOpenAIService = new AzureOpenAIService();
+
+// Langfuse: one named trace per task, tied to the account (userId) and the person (sessionId)
+const person = m => ({ userId: m?.ownerId, sessionId: m?.senderId, metadata: { person: m?.name || undefined } });
+instrument(azureOpenAIService, 'generateReply', 'Reply to DM', a => ({ ...person(a?.userMemory), userId: a?.userMemory?.ownerId || a?.tenant?._id, tags: ['reply', 'personal'] }));
+instrument(azureOpenAIService, 'generateBusinessReply', 'Reply to DM (business)', a => ({ ...person(a?.userMemory), userId: a?.userMemory?.ownerId || a?.tenant?._id, tags: ['reply', 'business'] }));
+instrument(azureOpenAIService, 'generateFollowUpReminder', 'Follow-up reminder', a => ({ ...person(a?.userMemory), tags: ['follow-up'] }));
+instrument(azureOpenAIService, 'interviewPersonForSocialTree', 'AI interview about a person', a => ({ userId: a?.ownerId, sessionId: a?.existingNode?.name, tags: ['people', 'interview'] }));
+instrument(azureOpenAIService, 'extractPersonFromRawChat', 'Learn person from pasted chat', a => ({ sessionId: a?.currentPerson?.name, tags: ['people', 'paste-chat'] }));
+
+module.exports = azureOpenAIService;

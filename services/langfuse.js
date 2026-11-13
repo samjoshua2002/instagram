@@ -2,7 +2,9 @@
 // Off unless LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set. Every model call becomes a generation in Langfuse
 // with its model, tokens, timing and (masked) messages. LANGFUSE_LOG_CONTENT=0 sends no message text at all.
 const { LangfuseSpanProcessor } = require('@langfuse/otel');
-const { setLangfuseTracerProvider, startActiveObservation } = require('@langfuse/tracing');
+const { setLangfuseTracerProvider, startActiveObservation, propagateAttributes } = require('@langfuse/tracing');
+const { context } = require('@opentelemetry/api');
+const { AsyncLocalStorageContextManager } = require('@opentelemetry/context-async-hooks');
 const { observeOpenAI } = require('@langfuse/openai');
 const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
 
@@ -63,6 +65,8 @@ if (enabled) {
   });
   // a private provider just for Langfuse: never clashes with any other OpenTelemetry setup
   setLangfuseTracerProvider(new NodeTracerProvider({ spanProcessors: [processor] }));
+  // lets a task's model calls (retries, fallbacks) nest under that task's trace across awaits
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
   const stop = () => processor.forceFlush().catch(() => {});
   process.once('beforeExit', stop);
   for (const sig of ['SIGTERM', 'SIGINT']) {
@@ -97,8 +101,48 @@ async function traceGeneration(name, attributes, run) {
   );
 }
 
+const id200 = v => (v === undefined || v === null || v === '' ? undefined : String(v).slice(0, 200));
+
+/**
+ * Run fn as one named AI task: every model call inside (including retries and fallbacks) becomes a child of a
+ * trace with this name, tied to the account (userId) and the person it is about (sessionId).
+ */
+async function aiTask(name, { userId, sessionId, tags, metadata } = {}, fn) {
+  if (!enabled) return fn();
+  return propagateAttributes({ traceName: name, userId: id200(userId) || 'admin', sessionId: id200(sessionId), tags }, () =>
+    startActiveObservation(
+      name,
+      async span => {
+        if (metadata) span.update({ metadata });
+        try {
+          return await fn();
+        } catch (err) {
+          span.update({ level: 'ERROR', statusMessage: String(err && err.message ? err.message : err).slice(0, 500) });
+          throw err;
+        }
+      },
+      { asType: 'agent' },
+    ),
+  );
+}
+
+/** Wrap obj[method] so each call runs as aiTask(name, ctx(...args)). */
+function instrument(obj, method, name, ctx = () => ({})) {
+  const orig = obj && obj[method];
+  if (!enabled || typeof orig !== 'function') return;
+  obj[method] = function (...args) {
+    let c = {};
+    try {
+      c = ctx(...args) || {};
+    } catch {
+      /* labels are best-effort */
+    }
+    return aiTask(name, c, () => orig.apply(this, args));
+  };
+}
+
 async function flushLangfuse() {
   if (processor) await processor.forceFlush().catch(() => {});
 }
 
-module.exports = { traceOpenAI, traceGeneration, flushLangfuse, scrub, langfuseEnabled: enabled };
+module.exports = { traceOpenAI, traceGeneration, aiTask, instrument, flushLangfuse, scrub, langfuseEnabled: enabled };
