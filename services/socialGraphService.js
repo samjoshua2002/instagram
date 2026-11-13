@@ -293,7 +293,7 @@ class SocialGraphService {
 
       if (senderNode) {
         lines.push(`• YOU ARE CURRENTLY CHATTING WITH: ${senderNode.name} (${senderNode.instagramHandle || 'User'})`);
-        lines.push(`  - Relationship to you (Sam): ${senderNode.relationshipToSam}`);
+        lines.push(`  - Relationship to you: ${senderNode.relationshipToSam}`);
         lines.push(`  - Gender: ${senderNode.gender}`);
         if (senderNode.connections && senderNode.connections.length > 0) {
           lines.push(`  - Connected Friends in your circle:`);
@@ -313,7 +313,7 @@ class SocialGraphService {
         lines.push(`• FRIENDS MENTIONED IN THIS CONVERSATION (TREE CHAIN):`);
         for (const [name, node] of mentionedNodes.entries()) {
           lines.push(`  - ${name} (${node.instagramHandle || 'Friend'}):`);
-          lines.push(`    * Relationship to you (Sam): ${node.relationshipToSam}`);
+          lines.push(`    * Relationship to you: ${node.relationshipToSam}`);
           if (senderNode) {
             const directConn = (senderNode.connections || []).find(c => c.targetName.toLowerCase() === name.toLowerCase());
             if (directConn) {
