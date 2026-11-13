@@ -1646,7 +1646,8 @@ router.put('/profile', requireAuth, async (req, res) => {
     }
 
     // Username change: sanitize like registration and enforce uniqueness
-    if (typeof username === 'string' && username.trim() && req.impersonatedBy && username.trim().toLowerCase() !== (user.username || '').toLowerCase()) {
+    if (typeof username === 'string' && username.trim() && req.impersonatedBy &&
+        username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '') !== (user.username || '').toLowerCase()) {
       return res.status(403).json({ error: 'The login username can only be changed by the account owner.' });
     }
     if (typeof username === 'string' && username.trim()) {
