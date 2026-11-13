@@ -23,8 +23,9 @@ const handleIpLimit = rateLimit({ name: 'handle', windowMs: MINUTE, max: 20, mes
 const oauthIpLimit = rateLimit({ name: 'oauth', windowMs: 15 * MINUTE, max: 30 });
 // Per account + network address: 5 wrong codes (OneAuth or emailed) or 10 wrong passwords in 15 min
 // lock that address out of that account for 15 min, so a stranger cannot lock the real owner out.
-// Per account (any address): 30 wrong codes or 50 wrong passwords still lock it, against spread-out guessing.
-const codeLockout = track(new AccountLockout({ perIp: 5, perAccount: 30, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
+// Per account (any address): 10 wrong codes or 50 wrong passwords still lock it, and each repeat lock
+// doubles (15 min, 30, 60 ... up to 24 h), so a 6-digit code cannot be guessed by spreading attempts.
+const codeLockout = track(new AccountLockout({ perIp: 5, perAccount: 10, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
 const passwordLockout = track(new AccountLockout({ perIp: 10, perAccount: 50, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
 // Per email address: at most 3 emailed codes per 15 min
 const emailSendLimiter = track(new SlidingWindowLimiter({ windowMs: 15 * MINUTE, max: 3 }));

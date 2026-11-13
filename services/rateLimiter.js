@@ -51,12 +51,24 @@ class SlidingWindowLimiter {
  * Keys are account ids (or any identifier); a success clears the failures.
  */
 class FailureLockout {
-  constructor({ maxFailures = 5, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now } = {}) {
+  // escalate: each repeat lock within 24h lasts twice as long (up to maxLockMs); a success resets it
+  constructor({ maxFailures = 5, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now, escalate = false, maxLockMs = 24 * 60 * MINUTE } = {}) {
     this.maxFailures = maxFailures;
     this.lockMs = lockMs;
     this.now = now;
+    this.escalate = escalate;
+    this.maxLockMs = maxLockMs;
     this.failures = new SlidingWindowLimiter({ windowMs, max: Number.MAX_SAFE_INTEGER, now });
     this.lockedUntil = new Map();
+    this.strikes = new Map(); // key -> { count, at } (escalate only)
+  }
+
+  nextLockMs(key) {
+    if (!this.escalate) return this.lockMs;
+    const prev = this.strikes.get(key);
+    const count = prev && this.now() - prev.at < 24 * 60 * MINUTE ? prev.count + 1 : 1;
+    this.strikes.set(key, { count, at: this.now() });
+    return Math.min(this.maxLockMs, this.lockMs * 2 ** (count - 1));
   }
 
   status(key) {
@@ -74,7 +86,7 @@ class FailureLockout {
   recordFailure(key) {
     this.failures.hit(key);
     if (this.failures.count(key) >= this.maxFailures) {
-      this.lockedUntil.set(key, this.now() + this.lockMs);
+      this.lockedUntil.set(key, this.now() + this.nextLockMs(key));
       this.failures.reset(key);
     }
     return this.status(key);
@@ -83,12 +95,31 @@ class FailureLockout {
   recordSuccess(key) {
     this.failures.reset(key);
     this.lockedUntil.delete(key);
+    this.strikes.delete(key);
   }
 
   prune() {
     this.failures.prune();
     for (const key of [...this.lockedUntil.keys()]) this.status(key);
+    for (const [key, s] of this.strikes) if (this.now() - s.at >= 24 * 60 * MINUTE) this.strikes.delete(key);
   }
+}
+
+/**
+ * The address group used for lockouts: an IPv4 address as is, an IPv6 address by its /64 network
+ * (one home or phone line gets a whole /64, so single IPv6 addresses are free to rotate).
+ */
+function networkOf(ip) {
+  let s = String(ip || '').trim().toLowerCase();
+  if (!s) return 'unknown';
+  if (s.startsWith('::ffff:') && s.includes('.')) return s.slice(7); // IPv4 written as IPv6
+  if (!s.includes(':')) return s;
+  s = s.split('%')[0];
+  const [head, tail] = s.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail !== undefined && tail ? tail.split(':') : [];
+  const groups = tail !== undefined ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return groups.slice(0, 4).map(g => (g || '0').replace(/^0+(?=.)/, '')).join(':') + '::/64';
 }
 
 /**
@@ -99,11 +130,12 @@ class FailureLockout {
 class AccountLockout {
   constructor({ perIp = 5, perAccount = 30, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now } = {}) {
     this.ipLock = new FailureLockout({ maxFailures: perIp, windowMs, lockMs, now });
-    this.accountLock = new FailureLockout({ maxFailures: perAccount, windowMs, lockMs, now });
+    // Account-wide locks double on each repeat, so spread-out guessing slows to a crawl
+    this.accountLock = new FailureLockout({ maxFailures: perAccount, windowMs, lockMs, now, escalate: true });
   }
 
   static ipKey(key, ip) {
-    return `${key}|${ip || 'unknown'}`;
+    return `${key}|${networkOf(ip)}`;
   }
 
   status(key, ip) {
@@ -191,6 +223,7 @@ module.exports = {
   SlidingWindowLimiter,
   FailureLockout,
   AccountLockout,
+  networkOf,
   rateLimit,
   clientIp,
   track,
