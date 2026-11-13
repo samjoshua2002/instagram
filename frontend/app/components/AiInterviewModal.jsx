@@ -18,8 +18,8 @@ export default function AiInterviewModal() {
   useEffect(() => {
     if (isAiModalOpen) {
       const greeting = editingNode
-        ? `Hey Sam! Let's update intel for ${editingNode.name}. What new life updates, inside jokes, exam dates, or relationship changes happened?`
-        : `Hey Sam! Who is this new person? Tell me their name, Instagram @username, relation to you (sister, homie, medicine friend), and what they're like!`;
+        ? `Hey! Let's update intel for ${editingNode.name}. What new life updates, inside jokes, exam dates, or relationship changes happened?`
+        : `Hey! Who is this new person? Tell me their name, Instagram @username, relation to you (sister, homie, medicine friend), and what they're like!`;
 
       setAiChat([{ role: 'assistant', content: greeting }]);
       setAccumulatedNode(editingNode ? { ...editingNode } : {
@@ -80,36 +80,38 @@ export default function AiInterviewModal() {
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
-        if (data.node) {
-          // If handle was mentioned, check if DB knows them
-          let matchedSenderId = accumulatedNode?.senderId || '';
-          let matchedPic = accumulatedNode?.profilePic || '';
-          const h = data.node.instagramHandle || accumulatedNode?.instagramHandle;
-          if (h && !matchedSenderId) {
-            const lookup = await lookupContact(h);
-            if (lookup?.senderId) {
-              matchedSenderId = lookup.senderId;
-              matchedPic = lookup.profilePic || '';
-            }
-          }
-
-          setAccumulatedNode(prev => ({
-            ...prev,
-            ...data.node,
-            senderId: matchedSenderId || prev.senderId,
-            profilePic: matchedPic || prev.profilePic
-          }));
-        }
-        const reply = data.question || (data.isComplete ? `Got all details saved to preview. Review the attributes and click Save Person!` : data.summary);
-        setAiChat(prev => [...prev, { role: 'assistant', content: reply }]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
+      if (data.node) {
+        // If handle was mentioned, check if DB knows them
+        let matchedSenderId = accumulatedNode?.senderId || '';
+        let matchedPic = accumulatedNode?.profilePic || '';
+        const h = data.node.instagramHandle || accumulatedNode?.instagramHandle;
+        if (h && !matchedSenderId) {
+          const lookup = await lookupContact(h);
+          if (lookup?.senderId) {
+            matchedSenderId = lookup.senderId;
+            matchedPic = lookup.profilePic || '';
+          }
+        }
+
+        setAccumulatedNode(prev => ({
+          ...prev,
+          ...data.node,
+          senderId: matchedSenderId || prev.senderId,
+          profilePic: matchedPic || prev.profilePic
+        }));
+      }
+      const reply = data.question || (data.isComplete ? `Got all details saved to preview. Review the attributes and click Save Person!` : data.summary);
+      setAiChat(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (err) {
       setAiChat(prev => [...prev, {
         role: 'assistant',
-        content: `Got that noted! What else should Sam's clone remember about them (handle, connections, or banter style)?`
+        content: `Could not process that: ${err.message || 'request failed'}. Please try again.`
       }]);
+      showToast(`AI interview failed: ${err.message || 'request failed'}`, 'error');
     } finally {
       setIsAiTyping(false);
     }
@@ -124,16 +126,17 @@ export default function AiInterviewModal() {
     const payload = {
       ...accumulatedNode,
       name: accumulatedNode.name.trim(),
-      handle: accumulatedNode.instagramHandle,
-      relationship: accumulatedNode.relationshipToSam,
+      handle: accumulatedNode.instagramHandle || accumulatedNode.handle,
+      relationship: accumulatedNode.relationshipToSam || accumulatedNode.relationship,
       category: accumulatedNode.category || 'online_friend',
       dob: accumulatedNode.dob || '',
       personalNotes: accumulatedNode.personalNotes || (accumulatedNode.lore || []).join('\n')
     };
 
-    await saveNode(payload);
+    const ok = await saveNode(payload);
+    if (!ok) return; // saveNode already showed the real error
     setIsAiModalOpen(false);
-    showToast(`Added ${payload.name} to People Directory`);
+    showToast(`Added ${payload.name} to People Directory`, 'success');
   };
 
   return (
@@ -237,7 +240,7 @@ export default function AiInterviewModal() {
           <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid #e4e4e7', display: 'flex', gap: '8px', background: '#ffffff' }}>
             <input
               type="text"
-              placeholder="Answer AI (e.g. She studies medicine, @handle, loves hamsters)..."
+              placeholder="Answer AI (e.g. She studies medicine, @handle, loves cats)..."
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
               style={{ flex: 1, background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px', color: '#09090b', padding: '10px 14px', fontSize: '0.84rem', outline: 'none' }}

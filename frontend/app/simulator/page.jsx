@@ -1,25 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { MessageSquare, Send, Sparkles } from 'lucide-react';
 
 export default function SimulatorPage() {
   const { nodes, API_BASE } = useApp();
-  const [selectedFriendId, setSelectedFriendId] = useState('bhavani');
+  const [selectedFriendId, setSelectedFriendId] = useState(null);
   const [inputMsg, setInputMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: 'user', text: 'hey sam! how is everything going with the video projects?', time: '10:45 AM' },
-    { role: 'assistant', text: 'yoo! going good fr! just finishing up a motion graphic reel. hows your medicine study going? how are the hamsters doing haha 🐹', time: '10:46 AM' }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const friendList = nodes.filter(n => !n.isRoot);
   const targetFriend = friendList.find(f => f.id === selectedFriendId) || friendList[0];
+  const activeFriendId = targetFriend?.id || null;
+
+  // Each contact gets a fresh test thread
+  useEffect(() => {
+    setMessages([]);
+    setInputMsg('');
+  }, [activeFriendId]);
 
   const handleSend = async (e) => {
     e?.preventDefault();
-    if (!inputMsg.trim()) return;
+    if (!inputMsg.trim() || !targetFriend) return;
 
     const userText = inputMsg.trim();
     setInputMsg('');
@@ -31,20 +35,23 @@ export default function SimulatorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          testSenderId: targetFriend?.senderId || 'test_sim_id',
-          testUsername: targetFriend?.name || 'Friend',
+          // sim_ prefix keeps test messages out of the real contact's history
+          testSenderId: 'sim_' + (targetFriend.senderId || targetFriend.id),
+          testUsername: targetFriend.name || 'Friend',
           messageText: userText
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!data.replyText) throw new Error('The AI returned no reply');
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', text: data.replyText || 'haha chill bro got it', time: 'Just now' }
+        { role: 'assistant', text: data.replyText, time: 'Just now' }
       ]);
-    } catch (e) {
+    } catch (err) {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', text: 'yoo wassup! (local simulation reply)', time: 'Just now' }
+        { role: 'error', text: `Simulator error: ${err.message || 'request failed'}`, time: 'Just now' }
       ]);
     } finally {
       setIsLoading(false);
@@ -72,8 +79,8 @@ export default function SimulatorPage() {
             key={f.id}
             onClick={() => setSelectedFriendId(f.id)}
             style={{
-              background: selectedFriendId === f.id ? '#ffffff' : '#09090b',
-              color: selectedFriendId === f.id ? '#000000' : '#a1a1aa',
+              background: activeFriendId === f.id ? '#ffffff' : '#09090b',
+              color: activeFriendId === f.id ? '#000000' : '#a1a1aa',
               border: '1px solid #27272a',
               padding: '6px 14px',
               borderRadius: '8px',
@@ -91,7 +98,18 @@ export default function SimulatorPage() {
       {/* Chat Window */}
       <div style={{ flex: 1, background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {messages.map((msg, i) => (
+          {messages.length === 0 && !isLoading && (
+            <div style={{ margin: 'auto', textAlign: 'center', color: '#a1a1aa', fontSize: '0.85rem' }}>
+              {targetFriend
+                ? `Send a test DM as ${targetFriend.name} to see how your AI replies.`
+                : 'Add a contact in People first, then test replies here.'}
+            </div>
+          )}
+          {messages.map((msg, i) => msg.role === 'error' ? (
+            <div key={i} style={{ alignSelf: 'center', color: '#ef4444', fontSize: '0.78rem', textAlign: 'center' }}>
+              {msg.text}
+            </div>
+          ) : (
             <div
               key={i}
               style={{
@@ -122,14 +140,15 @@ export default function SimulatorPage() {
         <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid #27272a', display: 'flex', gap: '10px', background: '#0e0e11' }}>
           <input
             type="text"
-            placeholder={`Type a DM as ${targetFriend?.name || 'Friend'}...`}
+            placeholder={targetFriend ? `Type a DM as ${targetFriend.name}...` : 'No contacts yet'}
+            disabled={!targetFriend}
             value={inputMsg}
             onChange={(e) => setInputMsg(e.target.value)}
             style={{ flex: 1, background: '#000000', border: '1px solid #27272a', borderRadius: '8px', color: '#ffffff', padding: '12px 16px', fontSize: '0.85rem', outline: 'none' }}
           />
           <button
             type="submit"
-            disabled={isLoading || !inputMsg.trim()}
+            disabled={isLoading || !inputMsg.trim() || !targetFriend}
             style={{ background: '#ffffff', color: '#000000', border: 'none', borderRadius: '8px', padding: '0 20px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Send size={15} />

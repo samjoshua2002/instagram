@@ -586,11 +586,20 @@ function AppStateProvider({ children }) {
     syncBackend();
 
     // Live background polling every 8 seconds to sync chat & reel counts smoothly
+    // (paused while the tab is hidden; refreshes at once when it becomes visible again)
     const interval = setInterval(() => {
+      if (document.hidden) return;
       syncBackend();
     }, 8000);
+    const onVisibility = () => {
+      if (!document.hidden) syncBackend();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [getUserId(user) || user?.username, token]);
 
   const syncBackend = useCallback(async () => {
@@ -863,8 +872,6 @@ function AppStateProvider({ children }) {
           lore: formattedNode.lore,
           facts: formattedNode.facts,
           roastStyle: formattedNode.roastStyle,
-          chatsCount: formattedNode.chatsCount,
-          reelsCount: formattedNode.reelsCount,
           connections: formattedNode.connections.map(c => ({
             targetName: c.targetName,
             relationship: c.rel
@@ -990,7 +997,7 @@ function AppStateProvider({ children }) {
     );
   };
 
-  // Update Per-Person AI Reply Mode (Full AI, Reels Only, Paused / Sam Manual)
+  // Update Per-Person AI Reply Mode (Full AI, Reels Only, Paused / Manual)
   const updateContactPreferences = useCallback(async (contactIdOrSenderId, prefs) => {
     if (!contactIdOrSenderId) return false;
     const { aiMode, autoSendReels } = (typeof prefs === 'object' && prefs !== null) ? prefs : { aiMode: prefs };
@@ -1233,20 +1240,15 @@ function AppStateProvider({ children }) {
   }, []);
 
   // AI Autofill fields for a person based on chat history
+  // Throws on a failed request so callers can show the real error
   const aiAutofillPerson = useCallback(async (personName) => {
     if (!personName) return null;
-    try {
-      const res = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(personName)}/ai-autofill`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.success && data.autofill) {
-        return data.autofill;
-      }
-    } catch (e) {
-      console.warn('AI autofill failed:', e.message);
-    }
-    return null;
+    const res = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(personName)}/ai-autofill`, {
+      method: 'POST'
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+    return data.autofill || null;
   }, []);
 
   // Link Instagram ID & Merge chatter records
@@ -1352,21 +1354,16 @@ function AppStateProvider({ children }) {
   }, []);
 
   // Extract attributes from raw chat text using Azure OpenAI
+  // Throws on a failed request so callers can show the real error
   const extractFromRawChat = useCallback(async (chatText, currentPerson = {}, userClarifications = '') => {
-    try {
-      const res = await fetch(`${API_BASE}/api/social-graph/extract-from-chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatText, currentPerson, userClarifications })
-      });
-      const data = await res.json();
-      if (data.success && data.extraction) {
-        return data.extraction;
-      }
-    } catch (e) {
-      console.warn('Extract from raw chat error:', e.message);
-    }
-    return null;
+    const res = await fetch(`${API_BASE}/api/social-graph/extract-from-chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatText, currentPerson, userClarifications })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+    return data.extraction || null;
   }, []);
 
   const contextValue = useMemo(() => ({
