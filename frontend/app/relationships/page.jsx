@@ -561,12 +561,12 @@ function RelationshipsPageInner() {
   // Remove custom fact from memory and update node
   const handleRemoveFact = async (factToRemove) => {
     if (!selectedPerson) return;
-    const currentFacts = (selectedPerson.facts || selectedPerson.lore || []);
-    const filtered = currentFacts.filter(f => f !== factToRemove);
+    // facts and lore are separate lists (lore also holds lines from personal notes):
+    // remove only this fact from each, never replace lore with the facts list
     const updated = {
       ...selectedPerson,
-      facts: filtered,
-      lore: filtered
+      facts: (selectedPerson.facts || []).filter(f => f !== factToRemove),
+      lore: (selectedPerson.lore || []).filter(l => l !== factToRemove)
     };
     const ok = await saveNode(updated);
     if (!ok) return;
