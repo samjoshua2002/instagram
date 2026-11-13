@@ -34,6 +34,7 @@ class ReminderService {
 
       const candidateUsers = await UserMemory.find({
         aiEnabled: true,
+        replyToMessages: { $ne: false },
         remindersEnabled: { $ne: false },
         handoffRequestedAt: null,
         lastInteraction: { $gte: policyCutoff, $lte: new Date(now - HOUR_MS) },
@@ -116,6 +117,14 @@ class ReminderService {
 
     console.log(`⏰ [Reminder Service] Generating genuine follow-up for engaged user @${user.username} (${user.senderId})...`);
 
+    // Send with the contact owner's token; never the admin token for a tenant's contact.
+    // Checked before writing the message so a disconnected account costs no AI call.
+    const ownerToken = await getOwnerSendToken(user.ownerId);
+    if (ownerToken === '') {
+      console.warn(`⚠️ [Reminder Service] Skipping @${user.username}: owner's Instagram is not connected.`);
+      return;
+    }
+
     // Generate warm, casual follow-up in the owner's own voice
     const reminderText = await azureOpenAI.generateFollowUpReminder({
       userMemory: user,
@@ -123,13 +132,6 @@ class ReminderService {
       config,
     });
     if (!reminderText) return;
-
-    // Send with the contact owner's token; never the admin token for a tenant's contact
-    const ownerToken = await getOwnerSendToken(user.ownerId);
-    if (ownerToken === '') {
-      console.warn(`⚠️ [Reminder Service] Skipping @${user.username}: owner's Instagram is not connected.`);
-      return;
-    }
     // Claim the contact atomically: only succeeds if nobody (another run / server instance) sent or
     // claimed a reminder since we read it, and they have not texted again in the meantime.
     const previousSentAt = user.lastReminderSentAt || null;
@@ -147,8 +149,13 @@ class ReminderService {
     const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText, ownerToken)
       .catch(err => ({ success: false, error: err.message }));
     if (!sendResult?.success) {
-      // Not delivered: release the claim (only if it is still ours) so a later run can retry
-      await UserMemory.updateOne(
+      // Not delivered: release the claim (only if it is still ours) so a later run can retry.
+      // Permanent errors (expired token, no permission, user unreachable) keep the claim, so the
+      // same contact is not re-written by the AI every 15 minutes.
+      const igErr = sendResult?.error?.error || sendResult?.error || {};
+      const permanent = [10, 190, 200, 551].includes(Number(igErr.code)) ||
+        [2018278, 2534022].includes(Number(igErr.error_subcode));
+      if (!permanent) await UserMemory.updateOne(
         { _id: user._id, lastReminderSentAt: claimedAt },
         { $set: { lastReminderSentAt: previousSentAt } }
       ).catch(() => {});

@@ -110,18 +110,27 @@ function escapeRegex(string) {
 // 2. Chat pacing: Must reply with at least 2 plain text messages before next GIF.
 // 3. Randomness: ~1 in 6 chance ("bullet in trigger out of 6") when eligible.
 // =========================================================================
-const userMediaTracker = new Map(); // senderId -> { textCountSinceMedia: number, lastMediaTime: number }
-const globalMediaTimestamps = []; // sliding 1-hour window timestamps of media sent
+const userMediaTracker = new Map(); // contact key -> { textCountSinceMedia: number, lastMediaTime: number }
+const mediaTimestampsByOwner = new Map(); // owner -> sliding 1-hour window of media sent (Meta's limit is per account)
+const mediaOwnerOf = (key) => String(key).split(':')[0];
+
+// Keeps the per-contact tracker from growing forever: drop the oldest entries past 5000
+function trimMediaTracker() {
+  while (userMediaTracker.size > 5000) userMediaTracker.delete(userMediaTracker.keys().next().value);
+}
 
 function canSendMedia(senderId, isExplicitRequest = false) {
   const now = Date.now();
+  const owner = mediaOwnerOf(senderId);
+  const stamps = mediaTimestampsByOwner.get(owner) || [];
   // Prune timestamps older than 1 hour (3600000ms)
-  while (globalMediaTimestamps.length > 0 && globalMediaTimestamps[0] < now - 3600000) {
-    globalMediaTimestamps.shift();
+  while (stamps.length > 0 && stamps[0] < now - 3600000) {
+    stamps.shift();
   }
+  if (stamps.length === 0) mediaTimestampsByOwner.delete(owner);
   // Hard cap to safeguard API quota
-  if (globalMediaTimestamps.length >= 60) {
-    console.log(`🛡️ [Media Governor]: Global hourly limit reached (${globalMediaTimestamps.length}/60 per hour). Suppressing media attachment.`);
+  if (stamps.length >= 60) {
+    console.log(`🛡️ [Media Governor]: Hourly limit reached for this account (${stamps.length}/60 per hour). Suppressing media attachment.`);
     return false;
   }
   // If user explicitly asks ("send a gif", "send meme"), allow immediately
@@ -138,11 +147,15 @@ function canSendMedia(senderId, isExplicitRequest = false) {
 
 function recordMediaSent(senderId) {
   const now = Date.now();
-  globalMediaTimestamps.push(now);
+  const owner = mediaOwnerOf(senderId);
+  const stamps = mediaTimestampsByOwner.get(owner) || [];
+  stamps.push(now);
+  mediaTimestampsByOwner.set(owner, stamps);
   const tracker = userMediaTracker.get(senderId) || { textCountSinceMedia: 0, lastMediaTime: 0 };
   tracker.textCountSinceMedia = 0;
   tracker.lastMediaTime = now;
   userMediaTracker.set(senderId, tracker);
+  trimMediaTracker();
 }
 
 function recordTextSent(senderId) {
@@ -1014,6 +1027,38 @@ async function writeAndSendReply(queueEntry, flight) {
     ? 'Thanks for your message! Our team will get back to you shortly.'
     : 'yoo wassup!';
 
+  // Runs once per batch, even when the reply was superseded or switched off, so escalations
+  // and lead/booking capture are never lost
+  let aiFailed = false;
+  const afterTurn = async (deliveredText) => {
+    if (ownerUser && (enabledFeatures.leadExtraction || enabledFeatures.bookingScheduler)) {
+      analyticsService.processConversationTurn({
+        ownerId: ownerUser._id,
+        senderId,
+        timeZone: config?.businessPolicy?.timezone || null,
+        handle: userMemory.username || '',
+        incomingText: combinedText,
+        replyText: deliveredText || '',
+        captureLeads: enabledFeatures.leadExtraction,
+        captureBookings: enabledFeatures.bookingScheduler,
+      }).catch(() => {});
+    }
+    // Business escalation: pause the bot for this customer and queue them for a human. Also when
+    // the AI failed and the customer was told "our team will get back to you"
+    const escalateForFailure = isBusinessTenant && aiFailed;
+    if ((businessDecision?.shouldEscalate || escalateForFailure) && enabledFeatures.humanHandoffInbox) {
+      const reason = businessDecision?.shouldEscalate
+        ? (businessDecision.context.message.matchedEscalation || businessDecision.chatType)
+        : 'ai_unavailable';
+      await UserMemory.updateOne(
+        { _id: userMemory._id },
+        { $set: { aiEnabled: false, handoffRequestedAt: new Date(), handoffReason: reason } }
+      ).catch(err => console.warn('⚠️ [Handoff] Could not flag customer:', err.message));
+      await redisService.invalidateUserMemory(senderId).catch(() => {});
+      console.log(`🙋 [Handoff]: Customer ${senderId} escalated (${reason}); bot paused for this chat.`);
+    }
+  };
+
   try {
     // Turn on typing indicator while generating (fire-and-forget so a slow Graph call never delays the reply)
     instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
@@ -1033,10 +1078,12 @@ async function writeAndSendReply(queueEntry, flight) {
       console.error(`❌ [AI Generation Error]:`, aiErr.message);
       // Fallback reply so recipient is never left on read
       replyText = fallbackReply;
+      aiFailed = true;
     }
 
     if (!replyText || replyText.trim().length === 0) {
       replyText = fallbackReply;
+      aiFailed = true;
     }
 
     // Extract optional sticker or attachment tag (e.g. [ATTACHMENT: joy], [STICKER: lol])
@@ -1135,6 +1182,7 @@ async function writeAndSendReply(queueEntry, flight) {
     // The wait above can be up to ~34s: drop this reply if it was replaced, or AI was switched off meanwhile
     if (flight.cancelled) {
       console.log(`🛑 [Reply Superseded]: A newer reply or the creator took over for ${senderId}; not sending.`);
+      await afterTurn('');
       return;
     }
     // Same switches as at the start (global pause, chat mode lists, per-person toggles): any of them may
@@ -1149,19 +1197,25 @@ async function writeAndSendReply(queueEntry, flight) {
         (latestConfig.chatMode === 'only_selected' && !(latestConfig.includedContactIds || []).includes(senderId))));
     if (switchedOff) {
       console.log(`⏸️ AI was switched off for ${senderId} while typing; not sending.`);
+      await afterTurn('');
       return;
     }
 
     const hasText = !!(replyText && replyText.trim().length > 0);
+    // Only the bubbles that really reached Instagram are saved to history
+    const deliveredBubbles = [];
     if (hasText) {
       // Personal replies with two distinct thoughts go out as 2-3 bubbles, 1-2s apart (§15.6.5)
       const bubbles = (isBusinessTenant || !enabledFeatures.antiAiHumanMimicry) ? [replyText] : splitIntoBubbles(replyText);
       sendResult = await instagramService.sendTextMessage(senderId, bubbles[0], creatorAccessToken, lastMid);
+      if (sendResult?.success === true) deliveredBubbles.push(bubbles[0]);
       for (const bubble of bubbles.slice(1)) {
         if (sendResult?.success !== true || flight.cancelled) break;
         instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
         await new Promise(resolve => setTimeout(resolve, bubbleGapMs()));
-        await instagramService.sendTextMessage(senderId, bubble, creatorAccessToken);
+        const bubbleResult = await instagramService.sendTextMessage(senderId, bubble, creatorAccessToken);
+        if (bubbleResult?.success !== true) break;
+        deliveredBubbles.push(bubble);
       }
     }
 
@@ -1213,7 +1267,7 @@ async function writeAndSendReply(queueEntry, flight) {
     }
 
     if (textDelivered || stickerDelivered) {
-      const persistedText = textDelivered ? replyText : `[Sent ${stickerType} sticker]`;
+      const persistedText = textDelivered ? deliveredBubbles.join('\n') : `[Sent ${stickerType} sticker]`;
 
       // Save outgoing message in DB
       await Message.create({
@@ -1228,46 +1282,19 @@ async function writeAndSendReply(queueEntry, flight) {
       });
 
       // Also append outgoing assistant reply to UserMemory recentChatBuffer
+      // Atomic push: a read-modify-save here could wipe an incoming DM pushed in between
       try {
-        const memToUpdate = await UserMemory.findById(userMemory._id);
-        if (memToUpdate) {
-          memToUpdate.recentChatBuffer = (memToUpdate.recentChatBuffer || []).slice(-9);
-          memToUpdate.recentChatBuffer.push({
-            role: 'assistant',
-            text: persistedText,
-            timestamp: new Date()
-          });
-          await memToUpdate.save();
-          await redisService.pushMessage(senderId, { role: 'assistant', text: persistedText, timestamp: new Date() });
-          await redisService.cacheUserMemory(senderId, memToUpdate.toObject ? memToUpdate.toObject() : memToUpdate, 3600);
-        }
+        const bufEntry = { role: 'assistant', text: persistedText, timestamp: new Date() };
+        await UserMemory.updateOne(
+          { _id: userMemory._id },
+          { $push: { recentChatBuffer: { $each: [bufEntry], $slice: -10 } } }
+        );
+        await redisService.pushMessage(senderId, bufEntry);
+        await redisService.invalidateUserMemory(senderId);
       } catch (bufErr) {}
     }
 
-    // Business conversion analytics: capture leads and bookings from this exchange
-    if (ownerUser && (enabledFeatures.leadExtraction || enabledFeatures.bookingScheduler)) {
-      analyticsService.processConversationTurn({
-        ownerId: ownerUser._id,
-        senderId,
-        timeZone: config?.businessPolicy?.timezone || null,
-        handle: userMemory.username || '',
-        incomingText: combinedText,
-        replyText: textDelivered ? replyText : '',
-        captureLeads: enabledFeatures.leadExtraction,
-        captureBookings: enabledFeatures.bookingScheduler,
-      }).catch(() => {});
-    }
-
-    // Business escalation: pause the bot for this customer and queue them for a human
-    if (businessDecision?.shouldEscalate && enabledFeatures.humanHandoffInbox) {
-      const reason = businessDecision.context.message.matchedEscalation || businessDecision.chatType;
-      await UserMemory.updateOne(
-        { _id: userMemory._id },
-        { $set: { aiEnabled: false, handoffRequestedAt: new Date(), handoffReason: reason } }
-      ).catch(err => console.warn('⚠️ [Handoff] Could not flag customer:', err.message));
-      await redisService.invalidateUserMemory(senderId);
-      console.log(`🙋 [Handoff]: Customer ${senderId} escalated (${reason}); bot paused for this chat.`);
-    }
+    await afterTurn(textDelivered ? deliveredBubbles.join('\n') : '');
   } finally {
     // Ensure typing indicator is always turned off
     await instagramService.sendSenderAction(senderId, 'typing_off', creatorAccessToken).catch(() => {});
