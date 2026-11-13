@@ -207,6 +207,12 @@ function MediaVaultPageContent() {
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
+    // Same 15 MB limit as the server: say so now instead of after a long upload
+    if (file && file.size > 15 * 1024 * 1024) {
+      showToast(`"${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Files must be 15 MB or smaller.`, 'error');
+      e.target.value = '';
+      return;
+    }
     if (file) {
       setSelectedFile(file);
       if (!mediaName) {

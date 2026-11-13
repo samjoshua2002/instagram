@@ -35,7 +35,9 @@ const grow = (delay = 0) => ({ initial: { scaleX: 0 }, animate: { scaleX: 1 }, t
 /* Real message counts from GET /api/analytics/activity, refreshed every minute while visible */
 export function useActivity(range, scope) {
   const { API_BASE, token } = useApp();
-  const [state, setState] = useState({ data: null, loading: true });
+  const [state, setState] = useState({ data: null, loading: true, key: '' });
+  // The data remembers which range it is for: a failed fetch never shows the old range under the new label
+  const key = `${range}|${scope || ''}`;
   useEffect(() => {
     const t = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
     if (!t) return undefined;
@@ -46,7 +48,7 @@ export function useActivity(range, scope) {
       if (scope) qs.set('scope', scope);
       fetch(`${API_BASE}/api/analytics/activity?${qs}`, { headers: { Authorization: `Bearer ${t}` } })
         .then(r => (r.ok ? r.json() : null))
-        .then(data => { if (alive) setState(s => ({ data: data || s.data, loading: false })); })
+        .then(data => { if (alive) setState(s => (data ? { data, loading: false, key } : { ...s, loading: false })); })
         .catch(() => { if (alive) setState(s => ({ ...s, loading: false })); });
     };
     load();
@@ -56,7 +58,7 @@ export function useActivity(range, scope) {
     }, 60000);
     return () => { alive = false; clearInterval(timer); };
   }, [API_BASE, token, range, scope]);
-  return state;
+  return { data: state.key === key ? state.data : null, loading: state.loading };
 }
 
 export function RangeTabs({ value, onChange }) {

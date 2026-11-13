@@ -318,12 +318,16 @@ function RelationshipsPageContent() {
   // fact learned from DMs shows up without leaving the page. Fields you are editing are kept.
   useEffect(() => {
     if (!selectedPerson) return;
-    const fresh = nodes.find(n => !n.isRoot && n.id === selectedPerson.id);
+    // A rename gives the saved node a new id (made from the name), so also match by sender id or name
+    const fresh = nodes.find(n => !n.isRoot && n.id === selectedPerson.id)
+      || nodes.find(n => !n.isRoot && selectedPerson.senderId && n.senderId === selectedPerson.senderId)
+      || nodes.find(n => !n.isRoot && (n.name || '').toLowerCase() === (selectedPerson.name || '').toLowerCase());
     if (!fresh) return;
-    const watched = ['name', 'dob', 'age', 'gender', 'personalNotes', 'facts', 'lore', 'chatsCount', 'reelsCount', 'messageCount', 'handle', 'profilePic'];
+    const watched = ['name', 'dob', 'age', 'gender', 'personalNotes', 'facts', 'lore', 'chatsCount', 'reelsCount', 'messageCount', 'handle', 'profilePic', 'aiEnabled', 'replyToMessages'];
     if (!watched.some(k => JSON.stringify(fresh[k] ?? null) !== JSON.stringify(selectedPerson[k] ?? null))) return;
 
-    setSelectedPerson(prev => (prev && prev.id === fresh.id ? { ...prev, ...fresh } : prev));
+    // Keep the open id so the person-switch effect (keyed on id) does not reset the page
+    setSelectedPerson(prev => (prev && prev.id === selectedPerson.id ? { ...prev, ...fresh, id: prev.id } : prev));
     const snap = serverSnapshot.current;
     const incoming = {
       name: fresh.name || '',
@@ -558,20 +562,28 @@ function RelationshipsPageContent() {
   }, [selectedPerson]);
 
   // Set AI mode with instant state reflection
-  const handleSetAiMode = (mode) => {
+  const handleSetAiMode = async (mode) => {
     if (!selectedPerson) return;
     const targetKey = selectedPerson.senderId || selectedPerson.id || selectedPerson.name;
     const isPaused = mode === 'paused';
     const isFullAi = mode === 'full_ai';
+    const prev = selectedPerson;
 
-    setSelectedPerson(prev => ({
-      ...prev,
+    setSelectedPerson(p => ({
+      ...p,
       aiEnabled: !isPaused,
       replyToMessages: isFullAi,
       replyToReelsAndPosts: false
     }));
 
-    updateContactPreferences(targetKey, { aiMode: mode });
+    try {
+      // silent: errors are thrown back here so the switch can be put back
+      await updateContactPreferences(targetKey, { aiMode: mode }, { silent: true });
+      showToast(isPaused ? `Stopped AI for ${prev.name}. Manual chat active!` : `Full AI auto-reply enabled for ${prev.name}!`);
+    } catch (e) {
+      setSelectedPerson(p => (p && p.id === prev.id ? { ...p, aiEnabled: prev.aiEnabled, replyToMessages: prev.replyToMessages, replyToReelsAndPosts: prev.replyToReelsAndPosts } : p));
+      showToast(`Could not update ${prev.name}: ${e.message}`, 'error');
+    }
   };
 
   // Save changes from inner page
@@ -588,10 +600,8 @@ function RelationshipsPageContent() {
     const isRenamed = oldName && oldName.toLowerCase() !== newName.toLowerCase();
     const cleanHandle = formData.handle.trim() ? (formData.handle.startsWith('@') ? formData.handle.trim() : `@${formData.handle.trim()}`) : '';
 
-    const updated = {
-      ...selectedPerson,
+    const formFields = {
       name: newName,
-      oldName: isRenamed ? oldName : undefined,
       handle: cleanHandle,
       instagramHandle: cleanHandle,
       senderId: formData.senderId.trim() || selectedPerson.senderId || '',
@@ -612,10 +622,12 @@ function RelationshipsPageContent() {
       reelsCount: parseInt(formData.reelsCount, 10) || 0,
       messageCount: parseInt(formData.chatsCount, 10) || 0
     };
+    const updated = { ...selectedPerson, ...formFields, oldName: isRenamed ? oldName : undefined };
 
     setSaveState('saving');
     const ok = await saveNode(updated, isRenamed ? [oldName] : [], { quiet: true });
-    setSelectedPerson(updated);
+    // Only the saved form fields, and only if this person is still open (never reopen someone you left)
+    setSelectedPerson(prev => (prev && prev.id === updated.id ? { ...prev, ...formFields } : prev));
     // A newer edit waiting in the autosave timer keeps the label on "Unsaved changes"
     if (!autosaveTimer.current) setSaveState(ok === false ? 'error' : 'saved');
     if (!quiet && ok !== false) showToast(`Saved details for ${updated.name}`);
@@ -655,7 +667,15 @@ function RelationshipsPageContent() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
   };
 
-  useEffect(() => () => clearTimeout(autosaveTimer.current), []);
+  // Leaving the page with a save still waiting: save it now instead of dropping it
+  const saveInnerFormRef = useRef(handleSaveInnerForm);
+  saveInnerFormRef.current = handleSaveInnerForm;
+  useEffect(() => () => {
+    if (!autosaveTimer.current) return;
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = null;
+    saveInnerFormRef.current(null, { quiet: true });
+  }, []);
 
   // The ... menu closes on an outside click, Escape or scroll (the hero fades its top bar
   // while scrolling, which would leave an open menu half see-through)
@@ -757,7 +777,7 @@ function RelationshipsPageContent() {
         }));
 
         if (Array.isArray(autofill.facts)) {
-          autofill.facts.forEach(f => addFact(selectedPerson.id, f));
+          autofill.facts.forEach(f => addFact(selectedPerson.name, f));
         }
 
         showToast('AI autofilled profile fields from conversation');
@@ -827,44 +847,54 @@ function RelationshipsPageContent() {
     // Merge notes and facts
     const currentNotes = formData.personalNotes.trim();
     const newNotes = extractedData.personalNotes || '';
-    const mergedNotes = currentNotes ? `${currentNotes}\n${newNotes}` : newNotes;
+    let mergedNotes = currentNotes ? `${currentNotes}\n${newNotes}` : newNotes;
+    // Facts go into the notes too: autosave turns note lines into lore, which the profile reads back
+    const newFacts = (Array.isArray(extractedData.facts) ? extractedData.facts : [])
+      .map(f => String(f || '').trim()).filter(Boolean);
+    newFacts.forEach(f => {
+      if (!mergedNotes.split('\n').some(l => l.trim().replace(/^[•\-\*]\s*/, '') === f)) {
+        mergedNotes = mergedNotes ? `${mergedNotes}\n• ${f}` : `• ${f}`;
+      }
+    });
 
-    setFormData(prev => ({
-      ...prev,
-      name: extractedData.name || prev.name,
-      handle: extractedData.handle || prev.handle,
-      dob: extractedData.dob || prev.dob,
-      gender: extractedData.gender || prev.gender,
-      category: extractedData.category || prev.category,
-      relationship: extractedData.relationshipToSam || prev.relationship,
-      personalNotes: mergedNotes,
-      roastStyle: extractedData.banterStyle || prev.roastStyle
-    }));
-
-    // Add facts if extracted
-    if (Array.isArray(extractedData.facts) && selectedPerson) {
-      extractedData.facts.forEach(f => {
-        addFact(selectedPerson.id, f);
-      });
-    }
-
-    // Add connections if extracted
+    // Add connections if extracted (saved together with the rest by autosave)
     if (Array.isArray(extractedData.connections) && selectedPerson) {
       const currentConns = selectedPerson.connections || [];
       const newConns = [...currentConns];
       extractedData.connections.forEach(c => {
-        if (!newConns.some(nc => nc.targetName.toLowerCase() === c.targetName.toLowerCase())) {
+        const target = (c?.targetName || '').trim().toLowerCase();
+        if (!target) return;
+        if (!newConns.some(nc => (nc.targetName || '').toLowerCase() === target)) {
           newConns.push(c);
         }
       });
-      selectedPerson.connections = newConns;
+      setSelectedPerson(prev => (prev && prev.id === selectedPerson.id ? { ...prev, connections: newConns } : prev));
+      saveNode({ ...selectedPerson, connections: newConns }, [], { quiet: true });
+    }
+
+    editProfile({
+      name: extractedData.name || formData.name,
+      handle: extractedData.handle || formData.handle,
+      dob: extractedData.dob || formData.dob,
+      gender: extractedData.gender || formData.gender,
+      category: extractedData.category || formData.category,
+      relationship: extractedData.relationshipToSam || formData.relationship,
+      personalNotes: mergedNotes,
+      roastStyle: extractedData.banterStyle || formData.roastStyle
+    });
+
+    // Add facts if extracted
+    if (selectedPerson) {
+      newFacts.forEach(f => {
+        addFact(selectedPerson.name, f);
+      });
     }
 
     setIsRawChatModalOpen(false);
     setExtractedData(null);
     setRawChatText('');
     setUserClarification('');
-    showToast('AI pre-filled all profile fields! Review and click Save Changes.');
+    showToast('AI filled in the profile from the chat. Changes save automatically.');
   };
 
   // Add custom fact to memory and synchronize with personalNotes
@@ -872,13 +902,12 @@ function RelationshipsPageContent() {
     e?.preventDefault();
     if (!newFactInput.trim() || !selectedPerson) return;
     const factText = newFactInput.trim();
-    addFact(selectedPerson.id, factText);
+    addFact(selectedPerson.name, factText);
 
-    // Link: also append to personalNotes
-    setFormData(prev => ({
-      ...prev,
-      personalNotes: prev.personalNotes ? `${prev.personalNotes}\n• ${factText}` : `• ${factText}`
-    }));
+    // Link: also append to personalNotes (autosave turns note lines into lore, so it is kept)
+    editProfile({
+      personalNotes: formData.personalNotes ? `${formData.personalNotes}\n• ${factText}` : `• ${factText}`
+    });
 
     setNewFactInput('');
     showToast('Fact added & linked to personal lore');
@@ -889,14 +918,20 @@ function RelationshipsPageContent() {
     if (!selectedPerson) return;
     // facts and lore are separate lists (lore also holds lines from personal notes):
     // remove only this fact from each, never replace lore with the facts list
+    // Also drop its line from the notes, or autosave rebuilds lore from them and the fact comes back
+    const stripFact = (notes) => String(notes || '').split('\n')
+      .filter(l => l.trim().replace(/^[•\-\*]\s*/, '') !== String(factToRemove).trim()).join('\n');
     const updated = {
       ...selectedPerson,
       facts: (selectedPerson.facts || selectedPerson.lore || []).filter(f => f !== factToRemove),
-      lore: (selectedPerson.lore || []).filter(l => l !== factToRemove)
+      lore: (selectedPerson.lore || []).filter(l => l !== factToRemove),
+      personalNotes: stripFact(selectedPerson.personalNotes)
     };
     const original = selectedPerson;
+    setFormData(prev => ({ ...prev, personalNotes: stripFact(prev.personalNotes) }));
+    serverSnapshot.current.personalNotes = stripFact(serverSnapshot.current.personalNotes);
     await saveNode(updated);
-    setSelectedPerson(updated);
+    setSelectedPerson(prev => (prev && prev.id === updated.id ? { ...prev, facts: updated.facts, lore: updated.lore, personalNotes: updated.personalNotes } : prev));
 
     if (selectedPerson.senderId) {
       try {

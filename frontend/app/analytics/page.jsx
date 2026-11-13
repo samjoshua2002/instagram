@@ -225,6 +225,10 @@ export default function AnalyticsPage() {
 
   // Paginated accounts
   const totalPages = Math.ceil(filteredAccounts.length / pageSize) || 1;
+  // The list can shrink (filter, search, refresh): never stay on a page that no longer exists
+  useEffect(() => {
+    setCurrentPage(p => Math.max(1, Math.min(p, totalPages)));
+  }, [totalPages]);
   const paginatedAccounts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredAccounts.slice(start, start + pageSize);
@@ -359,10 +363,10 @@ export default function AnalyticsPage() {
                 flexWrap: 'wrap',
                 gap: '10px',
                 fontSize: '0.78rem',
-                color: '#fbbf24'
+                color: 'var(--color-warning)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle size={16} color="#fbbf24" style={{ flexShrink: 0 }} />
+                  <AlertCircle size={16} color="var(--color-warning)" style={{ flexShrink: 0 }} />
                   <span>
                     <strong>{kpiMetrics.pendingApproval} Creator(s) waiting for Meta Sandbox Whitelist:</strong> Add their Instagram username in <em>Meta App Roles &rarr; Roles (Instagram Testers)</em>, then click <strong>Approve &amp; Email</strong> to dispatch invite instructions.
                   </span>
@@ -380,7 +384,7 @@ export default function AnalyticsPage() {
                     padding: '4px 9px',
                     fontSize: '0.72rem',
                     fontWeight: '700',
-                    color: '#fbbf24',
+                    color: 'var(--color-warning)',
                     cursor: 'pointer'
                   }}
                 >
@@ -479,7 +483,7 @@ export default function AnalyticsPage() {
               <div style={{
                 background: 'color-mix(in srgb, #ef4444 12%, transparent)',
                 border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
-                color: '#f87171',
+                color: 'var(--color-danger)',
                 padding: '10px 14px',
                 borderRadius: '8px',
                 fontSize: '0.8rem',
@@ -645,11 +649,11 @@ export default function AnalyticsPage() {
 
                                 if (isConnected) {
                                   dotColor = '#16a34a';
-                                  textColor = '#4ade80';
+                                  textColor = 'var(--color-success)';
                                   label = 'Active';
                                 } else if (isPending) {
                                   dotColor = '#f59e0b';
-                                  textColor = '#fbbf24';
+                                  textColor = 'var(--color-warning)';
                                   label = 'Pending Approval';
                                 } else if (isApproved) {
                                   dotColor = 'var(--ambient-dominant)';
@@ -687,7 +691,7 @@ export default function AnalyticsPage() {
                                   gap: '4px',
                                   background: 'color-mix(in srgb, #22c55e 12%, transparent)',
                                   border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
-                                  color: '#16a34a',
+                                  color: 'var(--color-success)',
                                   fontSize: '0.68rem',
                                   fontWeight: '700',
                                   padding: '2px 6px',
@@ -801,7 +805,7 @@ export default function AnalyticsPage() {
                                       padding: '5px 8px',
                                       fontSize: '0.72rem',
                                       fontWeight: '700',
-                                      color: '#f87171',
+                                      color: 'var(--color-danger)',
                                       cursor: deletingId === acc.id ? 'wait' : 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',

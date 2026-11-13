@@ -123,6 +123,12 @@ export default function ProfilePage() {
     // Only when a different account is shown: other user updates must not wipe unsaved edits
   }, [user?.id, user?._id]);
 
+  // The tier can also change from the sidebar: always show the account's real tier
+  useEffect(() => {
+    if (switchingTier) return;
+    setFormData(prev => ({ ...prev, accountType: user?.accountType || 'personal' }));
+  }, [user?.accountType]);
+
   const fetchPasskeys = async () => {
     if (!token) return;
     try {
@@ -225,6 +231,9 @@ export default function ProfilePage() {
     setSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
+    // The tier saves at once through the tier switch and the photo through its own upload:
+    // sending them here would undo a tier change made in the sidebar
+    const { accountType, profilePicUrl, ...details } = formData;
     try {
       const res = await fetch(`${API_BASE}/api/auth/profile`, {
         method: 'PUT',
@@ -232,14 +241,14 @@ export default function ProfilePage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(details)
       });
 
       const data = await res.json();
       if (res.ok) {
         setSuccessMsg('Profile details saved successfully!');
         if (updateUserProfile) {
-          updateUserProfile(data.user || { ...user, ...formData });
+          updateUserProfile(data.user || { ...user, ...details });
         }
         showToast?.('Profile updated successfully', 'success');
         setTimeout(() => setSuccessMsg(''), 3500);

@@ -15,9 +15,13 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const listRef = useRef(null);
+  // A reply still on its way must not land in another person's thread or a cleared one
+  const senderRef = useRef(senderId);
+  const clearCountRef = useRef(0);
+  const resetThread = () => { clearCountRef.current += 1; setMessages([]); setLoading(false); };
 
   // New sender, fresh thread
-  useEffect(() => { setMessages([]); }, [senderId]);
+  useEffect(() => { senderRef.current = senderId; resetThread(); }, [senderId]);
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, loading]);
 
   const send = async e => {
@@ -27,6 +31,9 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text }]);
     setLoading(true);
+    const sentFor = senderId;
+    const sentClear = clearCountRef.current;
+    const isStale = () => senderRef.current !== sentFor || clearCountRef.current !== sentClear;
     try {
       const res = await fetch(`${API_BASE}/api/simulator/chat`, {
         method: 'POST',
@@ -34,14 +41,16 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
         body: JSON.stringify({ testSenderId: senderId, testUsername: senderName, messageText: text }),
       });
       const data = await res.json();
+      if (isStale()) return;
       if (!res.ok) throw new Error(data.error || 'No reply');
       // The pipeline may answer in several short bubbles
       const parts = Array.isArray(data.replyParts) && data.replyParts.length ? data.replyParts : [data.replyText].filter(Boolean);
       setMessages(prev => [...prev, ...(parts.length ? parts : ['(no reply: the bot chose to stay quiet)']).map(t => ({ role: 'assistant', text: t }))]);
     } catch (err) {
+      if (isStale()) return;
       setMessages(prev => [...prev, { role: 'error', text: err.message || 'Could not reach the reply engine' }]);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   };
 
@@ -52,7 +61,7 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           Test chat as <strong>{senderName}</strong>
         </span>
-        <button type="button" className="story-icon-btn" onClick={() => setMessages([])} aria-label="Clear test chat" title="Clear">
+        <button type="button" className="story-icon-btn" onClick={resetThread} aria-label="Clear test chat" title="Clear">
           <RotateCcw size={14} />
         </button>
       </UnsplashBanner>
