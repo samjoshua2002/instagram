@@ -62,6 +62,9 @@ async function checkOtp(user, field, code, messages = {}, purpose = '') {
   return null;
 }
 
+const bcrypt = require('bcryptjs');
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password', 10);
+
 // A new code is sent at most once a minute per account (stops inbox flooding and code cycling)
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 function otpRecentlySent(otp) {
@@ -466,6 +469,8 @@ router.post('/login', authLimiter, async (req, res) => {
     });
 
     if (!user) {
+      // Spend the same time as a real check so response time does not reveal which accounts exist
+      await bcrypt.compare(password, DUMMY_BCRYPT_HASH);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
