@@ -337,6 +337,7 @@ function applyPalette(palette, imageUrl) {
   // so a fixed black or white was unreadable on some pages (e.g. black on dark red, white on bright green)
   root.setProperty('--on-ambient-accent', readableOn(p.accent) || '#000000');
   root.setProperty('--on-ambient-dominant', readableOn(p.dominant) || '#000000');
+  root.setProperty('--on-ambient-dominant-80', readableOn(p.dominant, 0.8) || '#ffffff');
   root.setProperty('--on-ambient-dominant-85', readableOn(p.dominant, 0.85) || '#ffffff');
   root.setProperty('--on-ambient-dominant-70', readableOn(p.dominant, 0.7) || '#ffffff');
   root.setProperty('--ambient-dominant', p.dominant);

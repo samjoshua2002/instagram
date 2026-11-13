@@ -48,6 +48,7 @@
   --glass-fill-subtle: #f7f7f7;
   --glass-fill-standard: #f4f4f4;
   --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-highlight: transparent;
 }
 
 /* ── No glass anywhere except the sticky mobile bars ─────────────── */

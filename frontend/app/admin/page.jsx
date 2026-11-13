@@ -215,7 +215,7 @@ export default function SuperadminPage() {
             height: '56px',
             borderRadius: '50%',
             background: 'color-mix(in srgb, #ef4444 12%, transparent)',
-            color: '#ef4444',
+            color: 'var(--color-danger)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -313,7 +313,7 @@ export default function SuperadminPage() {
           border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
           borderRadius: '8px',
           padding: '12px 16px',
-          color: '#f87171',
+          color: 'var(--color-danger)',
           marginBottom: '20px',
           display: 'flex',
           alignItems: 'center',
@@ -373,7 +373,7 @@ export default function SuperadminPage() {
           <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
             CLOSE FRIENDS
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#16a34a', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--color-success)', marginTop: '6px' }}>
             {data?.contactsBreakdown?.closeFriends ?? (loading ? <Sk w={56} h={28} r={8} style={{ display: 'inline-block' }} /> : 0)}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
@@ -575,7 +575,7 @@ export default function SuperadminPage() {
                         </span>
                       </div>
                       {account.instagramId && (
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontFamily: "var(--font-label)", fontWeight: '700' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--color-success)', fontFamily: "var(--font-label)", fontWeight: '700' }}>
                           Permanent ID: {account.instagramId}
                         </span>
                       )}
@@ -585,7 +585,7 @@ export default function SuperadminPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.76rem', color: 'var(--color-text-primary)', fontWeight: '700' }}>
-                          <Fingerprint size={14} color={account.hasPasskeys ? '#16a34a' : 'var(--color-text-muted)'} />
+                          <Fingerprint size={14} color={account.hasPasskeys ? 'var(--color-success)' : 'var(--color-text-muted)'} />
                           <span>{account.hasPasskeys ? `${account.passkeyCount} Passkey(s)` : 'Password'}</span>
                         </div>
                         <span style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)' }}>
@@ -615,7 +615,7 @@ export default function SuperadminPage() {
                           gap: '5px'
                         }}
                       >
-                        <Shield size={12} color="#22c55e" />
+                        <Shield size={12} color="var(--color-success)" />
                         <span>{enteringId === account.id ? 'Opening...' : 'Manage'}</span>
                       </button>
 
@@ -658,7 +658,7 @@ export default function SuperadminPage() {
                           title={account.isBanned ? 'Lift the suspension' : 'Suspend this tenant and revoke its Instagram token'}
                           style={{
                             background: account.isBanned ? 'color-mix(in srgb, #f59e0b 14%, transparent)' : 'var(--color-surface)',
-                            color: account.isBanned ? '#fbbf24' : 'var(--color-text-primary)',
+                            color: account.isBanned ? 'var(--color-warning)' : 'var(--color-text-primary)',
                             border: `1px solid ${account.isBanned ? 'color-mix(in srgb, #f59e0b 35%, transparent)' : 'var(--color-border)'}`,
                             borderRadius: '7px',
                             padding: '6px 10px',
@@ -686,7 +686,7 @@ export default function SuperadminPage() {
                           title="Permanently delete this account"
                           style={{
                             background: 'var(--color-surface)',
-                            color: '#f87171',
+                            color: 'var(--color-danger)',
                             border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
                             borderRadius: '7px',
                             padding: '6px 10px',
@@ -847,7 +847,7 @@ export default function SuperadminPage() {
                         padding: '3px 8px',
                         borderRadius: '4px',
                         background: member.category === 'close_friend' ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'var(--color-surface-hover)',
-                        color: member.category === 'close_friend' ? '#16a34a' : 'var(--color-text-secondary)'
+                        color: member.category === 'close_friend' ? 'var(--color-success)' : 'var(--color-text-secondary)'
                       }}>
                         {member.category?.toUpperCase() || 'ONLINE_FRIEND'}
                       </span>

@@ -80,7 +80,7 @@
 }
 
 .ctl-list-head .ctl-title { margin: 0; }
-.ctl-num-on { color: #16a34a !important; }
+.ctl-num-on { color: var(--color-success) !important; }
 
 /* Search and filter tabs share one row */
 .ctl-tools {

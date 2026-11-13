@@ -24,7 +24,7 @@ export default function WorkspaceImpersonationBanner() {
         borderBottom: '1px solid var(--color-text-secondary)',
         position: 'sticky',
         top: 0,
-        zIndex: 9999,
+        zIndex: 50,
         fontSize: '0.78rem',
         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)'
       }}
@@ -33,7 +33,7 @@ export default function WorkspaceImpersonationBanner() {
         <span
           style={{
             background: '#22c55e',
-            color: 'var(--color-text-primary)',
+            color: '#000',
             fontFamily: "var(--font-label)",
             fontWeight: '800',
             fontSize: '0.64rem',
