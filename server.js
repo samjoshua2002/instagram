@@ -74,6 +74,14 @@ async function migrateOwnership() {
     await PersonaConfig.updateOne({ ownerId: null }, { $set: { ownerId: owner._id } });
   }
 
+  // Built-in GIFs that GIPHY has taken down (they show as broken images)
+  const deadGifs = [
+    'https://media.giphy.com/media/j9mqKgQvkNOziGICfd/giphy.gif',
+    'https://media.giphy.com/media/26BRv0ThflsDTjDUs/giphy.gif',
+  ];
+  const deadRemoved = await MediaVault.deleteMany({ url: { $in: deadGifs } }).catch(() => ({ deletedCount: 0 }));
+  if (deadRemoved.deletedCount) console.log(`🔧 [Migration] Removed ${deadRemoved.deletedCount} broken built-in GIFs from vaults.`);
+
   // Media: legacy items owned only by a username get the account id once (usernames can change and be reused)
   const legacyMediaNames = await MediaVault.distinct('ownerUsername', { ownerId: null, ownerUsername: { $nin: [null, ''] } });
   for (const uname of legacyMediaNames) {
