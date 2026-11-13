@@ -45,9 +45,10 @@ class AuthService {
     const pass = rawPass ? rawPass.replace(/\s+/g, '') : null;
     if (user && pass) {
       this.transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        // Gmail by default; SMTP_HOST / SMTP_PORT / SMTP_SECURE allow any mail server
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: Number(process.env.SMTP_PORT) || 465,
+        secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : true,
         auth: { user, pass },
         connectionTimeout: 15000,
         greetingTimeout: 15000,
@@ -264,7 +265,10 @@ class AuthService {
         if (result.error) {
           // If Resend is in free onboarding sandbox mode, it only allows sending to the registered account (guidetalk.app@gmail.com)
           const errorMsg = result.error.message || '';
-          if (result.error.statusCode === 403 && errorMsg.includes('only send testing emails')) {
+          // Forwarding someone else's code to one shared inbox is a test-only convenience: it must be switched on
+          // explicitly, never in production, or every user's reset code would land in that inbox
+          if (result.error.statusCode === 403 && errorMsg.includes('only send testing emails') &&
+              process.env.RESEND_SANDBOX_FORWARD === 'true' && process.env.NODE_ENV !== 'production') {
             console.log(`ℹ️ [Resend Sandbox] Forwarding code for ${cleanTo} to registered Resend email guidetalk.app@gmail.com`);
             const fallbackResult = await this.resend.emails.send({
               from: fromAddress,
