@@ -65,13 +65,11 @@ export default function AuthGate({ children }) {
 
   // Handler for login from LoginPage to ensure immediate navigation to dashboard
   const handleLogin = (jwtToken, userData) => {
+    // login() already navigates to '/' in-app; a window.location jump here forced a full reload
     login(jwtToken, userData);
     try {
       sessionStorage.setItem('chatter_session_active', 'true');
     } catch (e) {}
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.href = '/';
-    }
   };
 
   // Until mounted, render the same neutral shell on server and client (no hydration mismatch).
@@ -102,7 +100,13 @@ export default function AuthGate({ children }) {
   }
 
   if (!token || !user) {
-    return <LoginPage onLoginSuccess={handleLogin} />;
+    // Toast here too, so "Signed out" / "Switching account" messages are actually visible
+    return (
+      <>
+        <LoginPage onLoginSuccess={handleLogin} />
+        <Toast />
+      </>
+    );
   }
 
   return (

@@ -56,14 +56,18 @@ const PersonaConfigSchema = new mongoose.Schema({
     default: '',
   },
 
-  forbiddenWords: [
-    "as an ai",
-    "language model",
-    "how may i assist you",
-    "i do not have personal feelings",
-    "delighted to help",
-    "certainly!",
-  ],
+  // { type, default } form: a bare array here is only a type declaration and new personas got []
+  forbiddenWords: {
+    type: [String],
+    default: [
+      "as an ai",
+      "language model",
+      "how may i assist you",
+      "i do not have personal feelings",
+      "delighted to help",
+      "certainly!",
+    ],
+  },
   globalBotActive: {
     type: Boolean,
     default: true,

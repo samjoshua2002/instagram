@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * High-performance Monochrome Avatar Component (Light Theme)
@@ -12,11 +12,18 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
   const [imgError, setImgError] = useState(false);
   const [unavatarError, setUnavatarError] = useState(false);
 
-  if (!contact) return null;
-
-  const rawUsername = (contact.handle || contact.instagramHandle || contact.username || '')
+  const rawUsername = ((contact && (contact.handle || contact.instagramHandle || contact.username)) || '')
     .replace(/^@/, '')
     .trim();
+  const profilePicKey = (contact && contact.profilePic) || '';
+
+  // A new handle or picture gets a fresh try (an earlier 404 must not block it forever)
+  useEffect(() => {
+    setImgError(false);
+    setUnavatarError(false);
+  }, [rawUsername, profilePicKey]);
+
+  if (!contact) return null;
 
   const displayName = contact.name || rawUsername || 'Contact';
 
@@ -33,7 +40,7 @@ export default function ContactAvatar({ contact, size = 40, showStatus = true, s
   if (!imgError && contact.profilePic && contact.profilePic.startsWith('http')) {
     avatarSrc = contact.profilePic;
   } else if (!unavatarError && rawUsername) {
-    avatarSrc = `https://unavatar.io/instagram/${rawUsername}?fallback=false`;
+    avatarSrc = `https://unavatar.io/instagram/${encodeURIComponent(rawUsername)}?fallback=false`;
   }
 
   // Monochrome status indicator

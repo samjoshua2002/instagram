@@ -574,7 +574,7 @@ export default function ProfilePage() {
                         <Laptop size={15} color="#71717a" />
                         <div>
                           <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text)' }}>
-                            {pk.deviceType || pk.name || 'Biometric Passkey'}
+                            {pk.name || 'Biometric Passkey'}
                           </div>
                           <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                             Created: {new Date(pk.createdAt).toLocaleDateString()}
