@@ -74,6 +74,13 @@ async function migrateOwnership() {
     await PersonaConfig.updateOne({ ownerId: null }, { $set: { ownerId: owner._id } });
   }
 
+  // Media: legacy items owned only by a username get the account id once (usernames can change and be reused)
+  const legacyMediaNames = await MediaVault.distinct('ownerUsername', { ownerId: null, ownerUsername: { $nin: [null, ''] } });
+  for (const uname of legacyMediaNames) {
+    const u = await User.findOne({ username: uname });
+    if (u) await MediaVault.updateMany({ ownerId: null, ownerUsername: uname }, { $set: { ownerId: u._id } });
+  }
+
   // People entries: ownerUsername -> ownerId, leftovers -> original owner
   const legacyUsernames = await SocialGraph.distinct('ownerUsername', { ownerId: null, ownerUsername: { $nin: [null, ''] } });
   for (const uname of legacyUsernames) {
@@ -1758,8 +1765,8 @@ app.get('/api/media-vault', async (req, res) => {
     const isSuper = req.user?.role === 'superadmin';
     const ownerFilter = req.user
       ? (isSuper
-          ? { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }, { ownerId: null }] }
-          : { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] })
+          ? { $or: [{ ownerId: req.user._id }, { ownerId: null }] }
+          : { ownerId: req.user._id })
       : {};
     const filter = isStr(category) && category && category !== 'all'
       ? { ...ownerFilter, category: category.toLowerCase().trim() }
@@ -1892,7 +1899,7 @@ app.put('/api/media-vault/:id', async (req, res) => {
     const isSuper = req.user?.role === 'superadmin';
     const query = { _id: req.params.id };
     if (!isSuper && req.user) {
-      query.$or = [{ ownerId: req.user._id }, { ownerUsername: req.user.username }];
+      query.ownerId = req.user._id;
     }
     const update = {};
     if (name !== undefined) update.name = name.trim();
@@ -1921,7 +1928,7 @@ app.delete('/api/media-vault/:id', async (req, res) => {
     const isSuper = req.user?.role === 'superadmin';
     const query = { _id: req.params.id };
     if (!isSuper && req.user) {
-      query.$or = [{ ownerId: req.user._id }, { ownerUsername: req.user.username }];
+      query.ownerId = req.user._id;
     }
     const item = await MediaVault.findOne(query);
     if (!item) return res.status(404).json({ error: 'Media not found or unauthorized' });

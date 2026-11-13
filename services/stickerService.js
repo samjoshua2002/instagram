@@ -276,7 +276,7 @@ class StickerService {
       : list;
 
     const results = { added: 0, skipped: 0, items: [] };
-    const ownerQuery = user ? { ownerId: user._id } : {};
+    const ownerQuery = { ownerId: user?._id || null };
 
     for (const item of toImport) {
       try {
@@ -417,7 +417,7 @@ class StickerService {
 
     // 1. FIRST PRIORITY: User's custom uploaded media in MongoDB MediaVault
     try {
-      const ownerQuery = user ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] } : {};
+      const ownerQuery = { ownerId: user?._id || null };
       let allVaultItems = await MediaVault.find(ownerQuery);
       // Auto-seed predefined catalog if vault is empty for system
       if ((!allVaultItems || allVaultItems.length === 0) && !user) {
@@ -619,7 +619,7 @@ class StickerService {
       if (config && config.customReactionCategories) {
         customList = config.customReactionCategories;
       }
-      const ownerQuery = user ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] } : {};
+      const ownerQuery = { ownerId: user?._id || null };
       const dbCategories = await MediaVault.distinct('category', ownerQuery);
       customList = Array.from(new Set([...customList, ...dbCategories]));
     } catch (_) {}
