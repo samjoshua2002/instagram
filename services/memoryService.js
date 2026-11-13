@@ -1,5 +1,5 @@
 const { AzureOpenAI } = require('openai');
-const { traceOpenAI } = require('./langfuse');
+const { traceOpenAI, instrument } = require('./langfuse');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const redisService = require('./redisService');
@@ -101,7 +101,7 @@ class MemoryService {
         timeout: 30000,
         maxRetries: 1,
       }),
-      { generationName: "memory", tags: ["memory"] },
+      { generationName: DEPLOYMENT, tags: ["memory"] },
     );
   }
 
@@ -785,5 +785,8 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
 
 }
 
-module.exports = new MemoryService();
+const memoryService = new MemoryService();
+// Langfuse: each memory refresh (re-reads the chat with this person and updates what the AI knows) is one trace
+instrument(memoryService, '_updateMemoryOnce', 'Update memory of a person', (senderId, options = {}) => ({ userId: options.ownerId, sessionId: senderId, tags: ['memory'] }));
+module.exports = memoryService;
 module.exports.changedFields = changedFields;

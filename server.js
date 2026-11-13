@@ -18,6 +18,7 @@ const MediaVault = require('./models/MediaVault');
 // Services
 const instagramService = require('./services/instagramService');
 const azureOpenAI = require('./services/azureOpenAI');
+const { aiTask } = require('./services/langfuse');
 const celRuleEngine = require('./services/celRuleEngine');
 const analyticsService = require('./services/analyticsService');
 const memoryService = require('./services/memoryService');
@@ -2780,7 +2781,7 @@ Generate a JSON object with:
 
 Return ONLY raw JSON.`;
 
-    const completion = await azureOpenAI.getClient().chat.completions.create({
+    const completion = await aiTask('Autofill person profile', { userId: req.user?._id, sessionId: req.params.name, tags: ['people', 'autofill'] }, () => azureOpenAI.getClient().chat.completions.create({
       model: azureOpenAI.defaultDeployment,
       messages: [
         { role: 'system', content: 'You are an expert social intelligence analyzer. Output valid JSON only without markdown formatting.' },
@@ -2788,7 +2789,7 @@ Return ONLY raw JSON.`;
       ],
       temperature: 0.3,
       max_tokens: 800,
-    });
+    }));
 
     const raw = completion.choices[0].message.content.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();
     const parsed = JSON.parse(raw);
