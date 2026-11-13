@@ -48,6 +48,42 @@ class AzureOpenAIService {
   }
 
   /**
+   * One chat call with settings each model accepts. gpt-5* deployments reject temperature,
+   * penalties and max_tokens (they take max_completion_tokens only), so those are left out for them.
+   * If the model fails or returns no text, the same request is retried once on gpt-4o.
+   * Returns the reply text (trimmed).
+   */
+  async chatText(deployment, messages, { maxTokens, temperature, penalty, json = false } = {}) {
+    deployment = deployment || this.defaultDeployment;
+    const paramsFor = (model) => {
+      const isGpt5 = String(model).startsWith('gpt-5');
+      const p = { messages };
+      if (json) p.response_format = { type: 'json_object' };
+      if (isGpt5) {
+        if (maxTokens) p.max_completion_tokens = maxTokens;
+      } else {
+        if (maxTokens) p.max_tokens = maxTokens;
+        if (temperature !== undefined) p.temperature = temperature;
+        if (penalty !== undefined) { p.frequency_penalty = penalty; p.presence_penalty = penalty; }
+      }
+      return p;
+    };
+    const run = async (model) => {
+      const response = await this.getClient(model).chat.completions.create(paramsFor(model));
+      const text = (response?.choices?.[0]?.message?.content || '').trim();
+      if (!text) throw new Error('empty reply');
+      return text;
+    };
+    try {
+      return await run(deployment);
+    } catch (err) {
+      if (deployment === 'gpt-4o') throw err;
+      console.warn(`⚠️ [Model Fallback]: Model "${deployment}" failed (${err.message}). Falling back to "gpt-4o"...`);
+      return run('gpt-4o');
+    }
+  }
+
+  /**
    * Generates a reply mimicking the creator's exact tone, adapting to the user's conversation style,
    * referencing remembered facts, and drawing upon the social graph network of friends.
    */
@@ -355,29 +391,7 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
     });
 
     try {
-      let client = this.getClient(selectedModel);
-      let response;
-      const isGpt5 = selectedModel.startsWith('gpt-5');
-      const requestParams = {
-        messages,
-        ...(isGpt5 ? { max_completion_tokens: 220 } : { max_tokens: 220, temperature: 0.90, frequency_penalty: 0.35, presence_penalty: 0.35 }),
-      };
-
-      try {
-        response = await client.chat.completions.create(requestParams);
-      } catch (modelErr) {
-        console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
-        client = this.getClient('gpt-4o');
-        response = await client.chat.completions.create({
-          messages,
-          temperature: 0.90,
-          frequency_penalty: 0.35,
-          presence_penalty: 0.35,
-          max_tokens: 220,
-        });
-      }
-
-      let reply = response.choices[0].message.content.trim();
+      let reply = await this.chatText(selectedModel, messages, { maxTokens: 220, temperature: 0.90, penalty: 0.35 });
 
       // Post-process to remove unwanted quotes or prefixes
       reply = reply.replace(/^"|"$/g, '').trim();
@@ -469,16 +483,7 @@ RULES:
     });
 
     try {
-      const client = this.getClient('gpt-5.1-chat');
-      const response = await client.chat.completions.create({
-        messages,
-        temperature: 0.8,
-        frequency_penalty: 0.5,
-        presence_penalty: 0.5,
-        max_tokens: 150,
-      });
-
-      let reply = response.choices[0].message.content.trim();
+      let reply = await this.chatText('gpt-5.1-chat', messages, { maxTokens: 150, temperature: 0.8, penalty: 0.5 });
       reply = reply.replace(/^"|"$/g, '').trim();
       if (reply.startsWith(`${config.creatorName}:`)) {
         reply = reply.replace(`${config.creatorName}:`, '').trim();
@@ -562,15 +567,8 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
     }
 
     try {
-      const client = this.getClient('gpt-5.6-luna');
-      const response = await client.chat.completions.create({
-        messages,
-        temperature: 0.4,
-        response_format: { type: 'json_object' }
-      });
-
-      const parsed = JSON.parse(response.choices[0].message.content.trim());
-      return parsed;
+      const text = await this.chatText('gpt-5.6-luna', messages, { temperature: 0.4, json: true });
+      return JSON.parse(text);
     } catch (err) {
       console.error('❌ Azure OpenAI interview error:', err.message);
       throw err;
@@ -615,13 +613,8 @@ Return a STRICT JSON object in this exact format:
 }`;
 
     try {
-      const client = this.getClient('gpt-5.6-luna');
-      const response = await client.chat.completions.create({
-        messages: [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }],
-        temperature: 0.3,
-        response_format: { type: 'json_object' }
-      });
-      return JSON.parse(response.choices[0].message.content.trim());
+      const messages = [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }];
+      return JSON.parse(await this.chatText('gpt-5.6-luna', messages, { temperature: 0.3, json: true }));
     } catch (err) {
       console.error('❌ Azure OpenAI raw chat extraction error:', err.message);
       throw err;
