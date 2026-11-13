@@ -23,33 +23,49 @@ const MAX_OTP_ATTEMPTS = 5;
  * Counts wrong attempts, invalidates after MAX_OTP_ATTEMPTS, and clears the code on success.
  * Returns null on success, or { status, error } on failure. Caller must save the user on success.
  */
-async function checkOtp(user, field, code, messages = {}) {
+async function checkOtp(user, field, code, messages = {}, purpose = '') {
   const otp = user && user[field];
   if (!otp || !otp.code) {
     return { status: 400, error: messages.missing || 'Invalid or expired verification request' };
+  }
+  if (purpose && (otp.purpose || '') !== purpose) {
+    return { status: 400, error: messages.invalid || 'Invalid verification code' };
   }
   if (!otp.expiresAt || new Date() > new Date(otp.expiresAt)) {
     user[field] = { code: '', expiresAt: null, attempts: 0 };
     await user.save();
     return { status: 400, error: messages.expired || 'Verification code has expired. Please request a new one.' };
   }
+  // Count this guess atomically BEFORE comparing, so parallel guesses can never get extra tries
+  const reserved = await User.findOneAndUpdate(
+    { _id: user._id, [`${field}.code`]: otp.code, [`${field}.attempts`]: { $lt: MAX_OTP_ATTEMPTS } },
+    { $inc: { [`${field}.attempts`]: 1 } },
+    { new: true }
+  ).select(field);
+  if (!reserved) {
+    await User.updateOne({ _id: user._id, [`${field}.code`]: otp.code }, { $set: { [field]: { code: '', expiresAt: null, attempts: 0 } } });
+    user[field] = { code: '', expiresAt: null, attempts: 0 };
+    return { status: 400, error: 'Too many attempts, request a new code' };
+  }
   const a = Buffer.from(String(otp.code));
   const b = Buffer.from(String(code || ''));
   const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
   if (!ok) {
-    const attempts = (otp.attempts || 0) + 1;
-    if (attempts >= MAX_OTP_ATTEMPTS) {
-      user[field] = { code: '', expiresAt: null, attempts: 0 };
-      await user.save();
+    if ((reserved[field]?.attempts || 0) >= MAX_OTP_ATTEMPTS) {
+      await User.updateOne({ _id: user._id, [`${field}.code`]: otp.code }, { $set: { [field]: { code: '', expiresAt: null, attempts: 0 } } });
       return { status: 400, error: 'Too many attempts, request a new code' };
     }
-    user[field] = { code: otp.code, expiresAt: otp.expiresAt, attempts };
-    await user.save();
     return { status: 400, error: messages.invalid || 'Invalid verification code' };
   }
   // Success: OTP is single-use
   user[field] = { code: '', expiresAt: null, attempts: 0 };
   return null;
+}
+
+// A new code is sent at most once a minute per account (stops inbox flooding and code cycling)
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+function otpRecentlySent(otp) {
+  return Boolean(otp && otp.code && otp.sentAt && Date.now() - new Date(otp.sentAt).getTime() < OTP_RESEND_COOLDOWN_MS);
 }
 
 // Tiny in-memory rate limiter (per IP + route), no dependency
@@ -262,9 +278,10 @@ router.post('/register/request-otp', authLimiter, async (req, res) => {
           code: otpCode,
           expiresAt: otpExpires,
           attempts: 0,
+          sentAt: new Date(),
         },
         twoFactor: {
-          enabled: true,
+          enabled: false, // switched on only when the user sets up OneAuth
           secret: totpSecret,
         },
       });
@@ -283,10 +300,11 @@ router.post('/register/request-otp', authLimiter, async (req, res) => {
         code: otpCode,
         expiresAt: otpExpires,
         attempts: 0,
+        sentAt: new Date(),
       };
       if (!user.twoFactor?.secret) {
         user.twoFactor = {
-          enabled: true,
+          enabled: false,
           secret: totpSecret,
         };
       }
@@ -338,6 +356,9 @@ router.post('/register/resend-otp', authLimiter, async (req, res) => {
     if (!user || user.isVerified !== false) {
       return res.json(genericResponse);
     }
+    if (otpRecentlySent(user.verificationOtp)) {
+      return res.status(429).json({ error: 'A code was just sent. Please wait a minute before asking for another one.' });
+    }
 
     const otpCode = generateOtp();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -346,6 +367,7 @@ router.post('/register/resend-otp', authLimiter, async (req, res) => {
       code: otpCode,
       expiresAt: otpExpires,
       attempts: 0,
+      sentAt: new Date(),
     };
     await user.save();
 
@@ -486,20 +508,18 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
     $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }]
   });
 
+  // Same answer whether the account is missing, has no OneAuth, or the code is wrong (no account probing)
+  const badCode = { error: 'Invalid or expired 6-digit code from Zoho OneAuth app. Please check your app and try again.' };
   if (!user) {
-    return res.status(401).json({ error: 'User not found' });
+    return res.status(401).json(badCode);
   }
 
-  if (!user.twoFactor?.secret) {
-    return res.status(400).json({
-      error: 'Zoho OneAuth is not configured on this account yet. Please log in with password or passkey first to scan the QR code.',
-      needsSetup: true,
-    });
+  const totp = await authService.checkTotpWithLock(user, cleanCode);
+  if (totp.locked) {
+    return res.status(429).json({ error: 'Too many wrong OneAuth codes. OneAuth sign-in is locked for 15 minutes; use your password or passkey.' });
   }
-
-  const isValidTotp = authService.verifyTotp(user, cleanCode);
-  if (!isValidTotp) {
-    return res.status(401).json({ error: 'Invalid or expired 6-digit code from Zoho OneAuth app. Please check your app and try again.' });
+  if (!totp.ok) {
+    return res.status(401).json(badCode);
   }
 
   if (user.isVerified === false) {
@@ -548,7 +568,7 @@ router.post('/oneauth/request-setup-otp', authLimiter, async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const genericMessage = `If an account exists for ${cleanEmail}, a 6-digit verification code has been sent to unlock OneAuth setup.`;
     const user = await User.findOne({ email: cleanEmail });
-    if (!user) {
+    if (!user || otpRecentlySent(user.resetOtp)) {
       return res.json({ success: true, message: genericMessage });
     }
 
@@ -557,6 +577,8 @@ router.post('/oneauth/request-setup-otp', authLimiter, async (req, res) => {
       code: otpCode,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       attempts: 0,
+      sentAt: new Date(),
+      purpose: 'oneauth_setup',
     };
     await user.save();
 
@@ -594,7 +616,7 @@ router.post('/oneauth/verify-setup-otp', authLimiter, async (req, res) => {
       missing: 'Invalid or expired setup request',
       expired: 'Verification code expired. Please request a new one.',
       invalid: 'Invalid 6-digit verification code',
-    });
+    }, 'oneauth_setup');
     if (otpErr) {
       return res.status(otpErr.status).json({ error: otpErr.error });
     }
@@ -602,8 +624,8 @@ router.post('/oneauth/verify-setup-otp', authLimiter, async (req, res) => {
     if (!user.twoFactor?.secret) {
       user.twoFactor = user.twoFactor || {};
       user.twoFactor.secret = authService.generateTotpSecret();
-      user.twoFactor.enabled = true;
     }
+    user.twoFactor.enabled = true; // the user is setting OneAuth up now
     await user.save();
 
     // Return QR code and secret
@@ -628,10 +650,10 @@ router.get('/oneauth/qr', requireAuth, async (req, res) => {
   try {
     const user = req.user;
 
-    if (!user.twoFactor?.secret) {
+    if (!user.twoFactor?.secret || !user.twoFactor?.enabled) {
       user.twoFactor = user.twoFactor || {};
-      user.twoFactor.secret = authService.generateTotpSecret();
-      user.twoFactor.enabled = true;
+      if (!user.twoFactor.secret) user.twoFactor.secret = authService.generateTotpSecret();
+      user.twoFactor.enabled = true; // the user opened the QR to set OneAuth up
       await user.save();
     }
 
@@ -672,16 +694,21 @@ router.post('/forgot-password/verify-oneauth', authLimiter, async (req, res) => 
       $or: [{ email: cleanIdentifier }, { username: cleanIdentifier }]
     });
 
-    if (!user || !user.twoFactor?.secret) {
-      return res.status(400).json({ error: 'OneAuth not configured for this account' });
+    const badCode = { error: 'Invalid 6-digit OneAuth code. Check your app and try again.' };
+    if (!user) {
+      return res.status(401).json(badCode);
     }
 
-    const isValid = authService.verifyTotp(user, totpCode);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Invalid 6-digit OneAuth code. Check your app and try again.' });
+    const totp = await authService.checkTotpWithLock(user, totpCode);
+    if (totp.locked) {
+      return res.status(429).json({ error: 'Too many wrong OneAuth codes. Please wait 15 minutes or reset with an email code.' });
+    }
+    if (!totp.ok) {
+      return res.status(401).json(badCode);
     }
 
     user.passwordHash = await User.hashPassword(newPassword);
+    user.tokenVersion = (user.tokenVersion || 0) + 1; // log out every other session
     await user.save();
 
     res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
@@ -693,7 +720,7 @@ router.post('/forgot-password/verify-oneauth', authLimiter, async (req, res) => 
 
 /**
  * POST /api/auth/forgot-password/send-otp
- * Generates and sends a 6-digit OTP code to Sam's email
+ * Generates and sends a 6-digit OTP code to the account's email
  */
 router.post('/forgot-password/send-otp', authLimiter, async (req, res) => {
   try {
@@ -703,7 +730,7 @@ router.post('/forgot-password/send-otp', authLimiter, async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const genericMessage = 'If this email exists, a verification code has been sent.';
     const user = await User.findOne({ email: cleanEmail });
-    if (!user) {
+    if (!user || otpRecentlySent(user.resetOtp)) {
       return res.json({ success: true, message: genericMessage });
     }
 
@@ -713,6 +740,8 @@ router.post('/forgot-password/send-otp', authLimiter, async (req, res) => {
       code: otpCode,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
       attempts: 0,
+      sentAt: new Date(),
+      purpose: 'reset',
     };
     await user.save();
 
@@ -757,12 +786,13 @@ router.post('/forgot-password/verify-reset', authLimiter, async (req, res) => {
       missing: 'Invalid or expired verification request',
       expired: 'Verification code has expired. Please request a new one.',
       invalid: 'Invalid verification code',
-    });
+    }, 'reset');
     if (otpErr) {
       return res.status(otpErr.status).json({ error: otpErr.error });
     }
 
     user.passwordHash = await User.hashPassword(newPassword);
+    user.tokenVersion = (user.tokenVersion || 0) + 1; // log out every other session
     await user.save();
 
     res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
