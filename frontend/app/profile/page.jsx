@@ -843,7 +843,7 @@ export default function ProfilePage() {
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted, var(--color-text-secondary))' }}
                       title="Copy ID"
                     >
-                      <IconSwap k={copiedId ? 'check' : 'copy'}>{copiedId ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}</IconSwap>
+                      <IconSwap k={copiedId ? 'check' : 'copy'}>{copiedId ? <Check size={13} color="var(--color-success)" /> : <Copy size={13} />}</IconSwap>
                     </button>
                   )}
                 </div>

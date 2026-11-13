@@ -983,7 +983,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                   </div>
                   <div>
                     <span style={{ color: 'var(--color-text-secondary)' }}>Status:</span>{' '}
-                    <strong style={{ color: isConnected ? '#4ade80' : '#fbbf24' }}>
+                    <strong style={{ color: isConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
                       {isConnected ? 'Ready to Automate' : 'Credentials Needed'}
                     </strong>
                   </div>

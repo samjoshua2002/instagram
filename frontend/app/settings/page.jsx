@@ -867,7 +867,7 @@ function SettingsPageContent() {
                         style={{
                           background: 'transparent',
                           border: 'none',
-                          color: copiedToken ? '#16a34a' : 'var(--color-text-secondary)',
+                          color: copiedToken ? 'var(--color-success)' : 'var(--color-text-secondary)',
                           cursor: 'pointer',
                           padding: '4px 6px',
                           display: 'flex',

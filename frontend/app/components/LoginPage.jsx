@@ -2673,6 +2673,7 @@ export default function LoginPage({ onLoginSuccess }) {
             padding: '26px',
             maxHeight: 'calc(100dvh - 40px)',
             overflowY: 'auto',
+            overscrollBehavior: 'contain',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
             boxSizing: 'border-box'
           }}>

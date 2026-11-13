@@ -597,7 +597,7 @@ export default function Sidebar() {
                     justifyContent: 'center',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                   }}>
-                    <Shield size={17} color="#22c55e" strokeWidth={2.2} />
+                    <Shield size={17} color="var(--color-success)" strokeWidth={2.2} />
                   </div>
                 ) : user?.profilePicUrl ? (
                   <img
@@ -673,9 +673,9 @@ export default function Sidebar() {
                       fontSize: '0.58rem',
                       fontFamily: "var(--font-label)",
                       fontWeight: '800',
-                      background: 'color-mix(in srgb, #f59e0b 14%, transparent)',
+                      background: 'color-mix(in srgb, var(--color-warning) 14%, transparent)',
                       color: 'var(--color-warning)',
-                      border: '1px solid #fde047',
+                      border: '1px solid color-mix(in srgb, var(--color-warning) 35%, transparent)',
                       padding: '1px 5px',
                       borderRadius: '4px',
                       flexShrink: 0
