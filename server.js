@@ -1206,14 +1206,11 @@ app.get('/api/conversations', async (req, res) => {
     const users = await UserMemory.find({ ownerId }).sort({ lastInteraction: -1 }).limit(50);
     const ids = users.map(u => u.senderId);
 
-    // Last message of every conversation in ONE query (was one query per contact)
-    const lastMsgs = ids.length === 0 ? [] : await Message.aggregate([
-      { $match: { ownerId, $or: [{ senderId: { $in: ids } }, { recipientId: { $in: ids } }] } },
-      { $sort: { createdAt: -1 } },
-      { $project: { text: 1, role: 1, timestamp: 1, createdAt: 1, contact: { $cond: [{ $in: ['$senderId', ids] }, '$senderId', '$recipientId'] } } },
-      { $group: { _id: '$contact', doc: { $first: '$$ROOT' } } },
-    ]);
-    const lastByContact = new Map(lastMsgs.map(m => [m._id, m.doc]));
+    // Last message per conversation: one tiny indexed lookup each, all in parallel
+    // (the old aggregate sorted EVERY message of 50 contacts in memory first)
+    const lastMsgs = await Promise.all(ids.map(id => Message.findOne({ ownerId, $or: [{ senderId: id }, { recipientId: id }] })
+      .sort({ createdAt: -1 }).select('text role timestamp createdAt').lean()));
+    const lastByContact = new Map(ids.map((id, i) => [id, lastMsgs[i]]));
 
     const conversations = users.map(u => {
       const lastMessage = lastByContact.get(u.senderId);
@@ -1414,13 +1411,19 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
 });
 
 // Batch Learn & Sync: process all 1-month chat history in MongoDB across all contacts
+// Re-learning every contact calls the AI once per contact: it runs in the background, never inside the request
+const historySyncRunning = new Set();
 app.post('/api/memory/sync-all-history', async (req, res) => {
-  try {
-    const results = await memoryService.batchSyncAllChatsFromMongo(ownerOf(req), [req.user?.instagramAccountId]);
-    res.json({ success: true, count: results.length, contacts: results });
-  } catch (err) {
-    sendError(res, err);
+  const key = String(ownerOf(req));
+  if (historySyncRunning.has(key)) {
+    return res.status(409).json({ error: 'A full memory sync is already running for this account.' });
   }
+  historySyncRunning.add(key);
+  res.status(202).json({ success: true, started: true, message: 'Memory sync started in the background.' });
+  memoryService.batchSyncAllChatsFromMongo(ownerOf(req), [req.user?.instagramAccountId])
+    .then(results => console.log(`🧠 [Memory Sync] Creator ${key}: ${results.length} contacts re-learned.`))
+    .catch(err => console.error(`❌ [Memory Sync] Creator ${key}:`, err.message))
+    .finally(() => historySyncRunning.delete(key));
 });
 
 
@@ -1853,34 +1856,34 @@ app.post('/api/media-vault', async (req, res) => {
 // Batch add multiple media items (e.g. multi-select from GIPHY search)
 app.post('/api/media-vault/batch', async (req, res) => {
   try {
-    const { items: itemsToInsert } = req.body;
+    const { items: itemsToInsert } = req.body || {};
     if (!Array.isArray(itemsToInsert) || itemsToInsert.length === 0) {
       return res.status(400).json({ error: 'Array of items is required' });
     }
 
-    const created = [];
-    const ownerFilter = req.user ? { ownerId: req.user._id } : {};
+    // Validate everything first, then check duplicates with ONE query and insert with ONE call
+    const ownerId = req.user?._id || null;
+    const seen = new Set();
+    const docs = [];
     for (const item of itemsToInsert.slice(0, 100)) {
       if (!item || !isStr(item.url) || !/^https?:\/\//i.test(item.url.trim())) continue;
-      const cleanCat = (isStr(item.category) && item.category ? item.category : 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '') || 'joy';
-      const parsedKeywords = parseKeywords(item.keywords);
-
-      // Check if duplicate URL already in user's vault
-      const existing = await MediaVault.findOne({ url: item.url.trim(), ...ownerFilter });
-      if (existing) continue;
-
-      const newMedia = await MediaVault.create({
-        name: isStr(item.name) && item.name.trim() ? item.name.trim() : 'Reaction GIF',
-        category: cleanCat,
-        url: item.url.trim(),
+      const url = item.url.trim();
+      if (seen.has(url)) continue;
+      seen.add(url);
+      docs.push({
+        name: isStr(item.name) && item.name.trim() ? item.name.trim().slice(0, 200) : 'Reaction GIF',
+        category: (isStr(item.category) && item.category ? item.category : 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '') || 'joy',
+        url,
         mediaType: allowedEnum(MediaVault, 'mediaType', item.mediaType, 'gif'),
         caption: isStr(item.caption) ? item.caption : '',
-        keywords: parsedKeywords,
-        ownerId: req.user?._id || null,
+        keywords: parseKeywords(item.keywords),
+        ownerId,
         ownerUsername: req.user?.username || '',
       });
-      created.push(newMedia);
     }
+    const already = new Set(docs.length ? await MediaVault.distinct('url', { ownerId, url: { $in: docs.map(d => d.url) } }) : []);
+    const fresh = docs.filter(d => !already.has(d.url));
+    const created = fresh.length ? await MediaVault.insertMany(fresh, { ordered: false }) : [];
 
     res.json({ success: true, count: created.length, items: created });
   } catch (err) {
