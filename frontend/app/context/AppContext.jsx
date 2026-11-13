@@ -229,6 +229,7 @@ function AppStateProvider({ children }) {
   selectedNodeRef.current = selectedNode;
   const unauthorizedHandledRef = useRef(false);
   const logoutRef = useRef(null);
+  const exitWorkspaceRef = useRef(null);
   
   // Authentication & Session State
   const [token, setToken] = useState(() => {
@@ -306,7 +307,21 @@ function AppStateProvider({ children }) {
   // Link Instagram ID Modal State
   const [linkingTargetPerson, setLinkingTargetPerson] = useState(null);
 
+  // Bumped on every login / logout / account switch: a sync that started for the previous
+  // session must never write its results (or its 401) into the new one
+  const sessionGenRef = useRef(0);
+  const resetSessionUi = () => {
+    sessionGenRef.current += 1;
+    setIsAiModalOpen(false);
+    setEditingNode(null);
+    setLinkingTargetPerson(null);
+    setIsPasskeyModalOpen(false);
+    setIsOnboardingModalOpen(false);
+  };
+
   const login = useCallback((jwtToken, userData) => {
+    resetSessionUi();
+    setIsSyncingInitial(true);
     localStorage.setItem('chatter_jwt_token', jwtToken);
     if (userData) {
       try {
@@ -370,6 +385,7 @@ function AppStateProvider({ children }) {
   }, [showToast]);
 
   const switchAccount = useCallback(() => {
+    resetSessionUi();
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     try {
@@ -396,6 +412,7 @@ function AppStateProvider({ children }) {
   }, [showToast]);
 
   const logout = useCallback(() => {
+    resetSessionUi();
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     try {
@@ -427,6 +444,12 @@ function AppStateProvider({ children }) {
     if (unauthorizedHandledRef.current) return;
     if (!localStorage.getItem('chatter_jwt_token')) return;
     unauthorizedHandledRef.current = true;
+    // An expired workspace (impersonation) token returns the superadmin to their own console
+    // instead of throwing away their still-valid admin session
+    if (localStorage.getItem('chatter_admin_session') && exitWorkspaceRef.current) {
+      exitWorkspaceRef.current();
+      return;
+    }
     logoutRef.current?.();
   }, []);
 
@@ -474,6 +497,7 @@ function AppStateProvider({ children }) {
       }
     }
   }, [adminSession, showToast]);
+  exitWorkspaceRef.current = exitWorkspace;
 
   const updateUserProfile = useCallback((updatedUser) => {
     setUser(prev => ({ ...prev, ...updatedUser }));
@@ -612,11 +636,15 @@ function AppStateProvider({ children }) {
       setIsSyncingInitial(false);
       return;
     }
+    const gen = sessionGenRef.current;
+    const stale = () => gen !== sessionGenRef.current;
     try {
       // 1. Sync social graph directly from live MongoDB database
       const res = await fetch(`${API_BASE}/api/social-graph`);
+      if (stale()) return;
       if (res.status === 401) { handleUnauthorized(); return; }
       const data = await res.json();
+      if (stale()) return;
       if (data.success && Array.isArray(data.nodes)) {
         const currentUser = userRef.current;
         const userKey = getStorageNodesKey(currentUser);
@@ -708,8 +736,10 @@ function AppStateProvider({ children }) {
       // 2. Sync persona config
       const editTimestampBefore = lastRoutingEditTimeRef.current;
       const personaRes = await fetch(`${API_BASE}/api/persona`);
+      if (stale()) return;
       if (personaRes.status === 401) { handleUnauthorized(); return; }
       const pData = await personaRes.json();
+      if (stale()) return;
       if (pData && (pData.chatMode || pData.globalBotActive !== undefined)) {
         if (activeRoutingSavesRef.current === 0 && lastRoutingEditTimeRef.current === editTimestampBefore && Date.now() - editTimestampBefore > 6000) {
           const mode = pData.chatMode || 'everyone';
@@ -732,7 +762,7 @@ function AppStateProvider({ children }) {
     } catch (e) {
       console.warn('Backend sync note (using cached):', e.message);
     } finally {
-      setIsSyncingInitial(false);
+      if (!stale()) setIsSyncingInitial(false);
     }
   }, [handleUnauthorized]);
 
