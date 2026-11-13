@@ -418,6 +418,13 @@ app.use('/uploads', express.static(uploadsDir, {
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// The old static dashboard (public/index.html) was retired: it had no login and every call failed.
+// The backend's home page sends people to the real dashboard (the Next.js app) instead.
+app.get('/', (req, res) => {
+  const first = (process.env.FRONTEND_ORIGINS || '').split(',').map(s => s.trim()).find(Boolean);
+  res.redirect(302, first || 'https://instagram-ebon-zeta.vercel.app');
+});
+
 // Authentication & Passkey Endpoints
 app.use('/api/auth', authRouter);
 
