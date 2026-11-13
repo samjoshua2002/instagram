@@ -470,6 +470,88 @@ const processedMids = new Set();
 
 // Anti-spam debounce queue: aggregates rapid-fire/spam messages and replies once
 const userDebounceQueues = new Map();
+
+// AI replies being written / "typed" right now, per contact (queueKey -> { cancelled }).
+// The creator taking over (phone or dashboard) or a newer reply for the same contact cancels them.
+const inFlightReplies = new Map();
+
+// What this app itself just sent per contact, so Meta's echo of it is never mistaken for the
+// creator typing on their phone (that would cancel the AI's own sticker and count a manual reply)
+const recentAiSends = new Map(); // queueKey -> [{ text, mid, media, at }]
+const RECENT_AI_SEND_MS = 60 * 1000;
+function noteAiSend(qKey, entry) {
+  const now = Date.now();
+  const list = (recentAiSends.get(qKey) || []).filter(e => now - e.at < RECENT_AI_SEND_MS);
+  const item = { ...entry, at: now };
+  list.push(item);
+  recentAiSends.set(qKey, list);
+  return item;
+}
+// True (and consumed) when this echo is one of the app's own recent sends
+function takeRecentAiSend(qKey, { mid, text, hasMedia }) {
+  const now = Date.now();
+  const list = (recentAiSends.get(qKey) || []).filter(e => now - e.at < RECENT_AI_SEND_MS);
+  const i = list.findIndex(e =>
+    (mid && e.mid && e.mid === mid) ||
+    (text && e.text && e.text.trim() === text.trim()) ||
+    (hasMedia && !text && e.media));
+  if (i !== -1) list.splice(i, 1);
+  if (list.length) recentAiSends.set(qKey, list); else recentAiSends.delete(qKey);
+  return i !== -1;
+}
+
+// Stops any AI reply for this contact that is waiting (debounce) or being written / typed
+function cancelAiReply(ownerId, senderId, reason) {
+  const qKey = queueKey(ownerId, senderId);
+  let cancelled = false;
+  if (userDebounceQueues.has(qKey)) {
+    clearTimeout(userDebounceQueues.get(qKey).timer);
+    userDebounceQueues.delete(qKey);
+    cancelled = true;
+  }
+  const flight = inFlightReplies.get(qKey);
+  if (flight && !flight.cancelled) {
+    flight.cancelled = true;
+    cancelled = true;
+  }
+  if (cancelled) console.log(`🛑 [AI Reply Cancelled] ${senderId}: ${reason}`);
+  return cancelled;
+}
+
+// Why the AI must not auto-reply to this contact right now, or null when it may.
+// Missing fields count as their schema defaults (all on), so lean reads behave like full documents.
+function aiReplyBlockedReason(config, memory, senderId, isReelOrShare) {
+  const cfg = config || {};
+  const mem = memory || {};
+  const name = mem.username || senderId;
+  if (cfg.globalBotActive === false || cfg.chatMode === 'paused') return 'Global Bot is paused';
+  if (cfg.chatMode === 'everyone_except' && (cfg.excludedContactIds || []).includes(senderId)) return `${name} is excluded`;
+  if (cfg.chatMode === 'only_selected' && !(cfg.includedContactIds || []).includes(senderId)) return `${name} not in whitelist`;
+  if (mem.aiEnabled === false) return `AI paused for ${name}`;
+  if (isReelOrShare && mem.replyToReelsAndPosts === false) return `Reel/Post reply disabled for @${name}`;
+  if (!isReelOrShare && mem.replyToMessages === false) return `Message reply disabled for @${name}`;
+  return null;
+}
+
+// Last check right before sending: not cancelled, and the creator's CURRENT settings still allow it
+// (AI may have been paused for this person or globally while the reply was being written)
+async function replyStillWanted(flight, ownerId, senderId, isReelOrShare) {
+  if (flight.cancelled) return false;
+  try {
+    const [cfg, mem] = await Promise.all([
+      PersonaConfig.findOne({ ownerId }).select('globalBotActive chatMode excludedContactIds includedContactIds').lean(),
+      UserMemory.findOne({ ownerId, senderId }).select('username aiEnabled replyToMessages replyToReelsAndPosts').lean(),
+    ]);
+    const reason = aiReplyBlockedReason(cfg, mem, senderId, isReelOrShare);
+    if (reason) {
+      console.log(`🛑 [AI Reply Dropped]: ${reason} (changed while the reply was being written)`);
+      return false;
+    }
+  } catch (err) {
+    console.warn('⚠️ Could not re-check reply settings, sending anyway:', err.message);
+  }
+  return !flight.cancelled;
+}
 const DEBOUNCE_WAIT_MS = 3500; // Hold on for 3.5s to see if user is typing multiple quick messages / spamming
 
 /**
@@ -602,19 +684,19 @@ async function handleCreatorEchoAsync(event, accountId) {
   // Echo of a message THIS app sent (AI reply, reminder, dashboard send): store it once, nothing else
   const appIds = [process.env.META_APP_ID, process.env.INSTAGRAM_APP_ID].filter(Boolean).map(String);
   const sentByThisApp = event.message?.app_id && appIds.includes(String(event.message.app_id));
-  if (sentByThisApp || (event.message?.mid && await Message.exists({ ownerId, mid: event.message.mid }))) {
+  const ownRecentSend = takeRecentAiSend(queueKey(ownerId, contactId), {
+    mid: event.message?.mid,
+    text: event.message?.text || '',
+    hasMedia: Boolean(event.message?.attachments?.length),
+  });
+  if (sentByThisApp || ownRecentSend || (event.message?.mid && await Message.exists({ ownerId, mid: event.message.mid }))) {
     await Message.record({ ownerId, senderId: senderAccountId, recipientId: contactId, role: 'assistant', text: text || '[Media]', mid, sentByAI: true, timestamp: new Date() }).catch(() => {});
     return;
   }
   console.log(`📱 [Creator Echo]: Creator manually replied to ${contactId}: "${text}"`);
 
-  // Cancel any active AI debounce queue so the bot doesn't reply over the creator
-  const qKey = queueKey(ownerId, contactId);
-  if (userDebounceQueues.has(qKey)) {
-    clearTimeout(userDebounceQueues.get(qKey).timer);
-    userDebounceQueues.delete(qKey);
-    console.log(`🛑 [Creator Intervened]: Cancelled pending AI auto-reply for ${contactId}`);
-  }
+  // The creator took over: stop any AI reply that is waiting OR already being written / typed
+  cancelAiReply(ownerId, contactId, 'creator replied from their phone');
 
   // Record outgoing message in DB
   Message.record({
@@ -890,38 +972,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     console.error('Background memory update failed (non-critical):', err.message);
   });
 
-  // 4. Check if Bot is enabled globally or paused
-  if (!config.globalBotActive || config.chatMode === 'paused') {
-    console.log(`⏸️ Global Bot is paused. Message learned, skipping auto-reply.`);
-    return;
-  }
-
-  // Check chat routing mode
-  if (config.chatMode === 'everyone_except') {
-    if ((config.excludedContactIds || []).includes(senderId) || userMemory.aiEnabled === false) {
-      console.log(`⏸️ ${userMemory.username} is excluded. Message learned, skipping auto-reply.`);
-      return;
-    }
-  } else if (config.chatMode === 'only_selected') {
-    if (!(config.includedContactIds || []).includes(senderId)) {
-      console.log(`⏸️ ${userMemory.username} not in whitelist. Message learned, skipping auto-reply.`);
-      return;
-    }
-  }
-
-  // Check if AI is enabled for this specific user
-  if (!userMemory.aiEnabled) {
-    console.log(`⏸️ AI paused for ${userMemory.username}. Message learned, skipping auto-reply.`);
-    return;
-  }
-
-  // Check per-person reply toggles
-  if (isReelOrShare && userMemory.replyToReelsAndPosts === false) {
-    console.log(`⏸️ Reel/Post reply disabled for @${userMemory.username}. Skipping.`);
-    return;
-  }
-  if (!isReelOrShare && userMemory.replyToMessages === false) {
-    console.log(`⏸️ Message reply disabled for @${userMemory.username}. Skipping.`);
+  // 4. Global pause, routing mode (everyone / except / only selected) and per-person toggles
+  const blockedReason = aiReplyBlockedReason(config, userMemory, senderId, isReelOrShare);
+  if (blockedReason) {
+    console.log(`⏸️ ${blockedReason}. Message learned, skipping auto-reply.`);
     return;
   }
 
@@ -981,6 +1035,23 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
  * Dispatches a single, smart AI reply after user finishes typing their message(s)
  */
 async function dispatchDebouncedReply(queueEntry) {
+  const qKey = queueKey(queueEntry.ownerId, queueEntry.senderId);
+  // A newer burst of messages replaces a reply still being written for the older one (one reply, not two)
+  const previous = inFlightReplies.get(qKey);
+  if (previous && !previous.cancelled) {
+    previous.cancelled = true;
+    console.log(`🔁 [AI Reply Superseded] ${queueEntry.senderId}: newer messages arrived, replying to those instead`);
+  }
+  const flight = { cancelled: false };
+  inFlightReplies.set(qKey, flight);
+  try {
+    return await writeAndSendReply(queueEntry, flight, qKey);
+  } finally {
+    if (inFlightReplies.get(qKey) === flight) inFlightReplies.delete(qKey);
+  }
+}
+
+async function writeAndSendReply(queueEntry, flight, qKey) {
   const { senderId, recipientId, targetAccountId, creatorAccessToken, ownerUser, ownerId, userMemory, config, messages, lastMid, isReelOrShare = false } = queueEntry;
 
   // Combine multiple messages if user sent a cluster
@@ -1134,15 +1205,22 @@ async function dispatchDebouncedReply(queueEntry) {
 
     console.log(`✨ [${config?.creatorName || 'AI'}'s Reply]: "${replyText}" ${stickerType ? `[Media/Sticker: ${stickerType}]` : ''}`);
 
+    // The creator may have replied, or paused the AI, while this reply was being written / typed
+    if (!(await replyStillWanted(flight, ownerId, senderId, isReelOrShare))) {
+      return;
+    }
+
     const hasText = !!(replyText && replyText.trim().length > 0);
     if (hasText) {
+      const note = noteAiSend(qKey, { text: replyText });
       sendResult = await instagramService.sendTextMessage(senderId, replyText, creatorAccessToken, lastMid);
+      if (sendResult?.data?.message_id) note.mid = sendResult.data.message_id;
     }
 
     // If a sticker or media attachment was chosen, send the image/GIF directly to Instagram DM!
     let stickerSendResult = null;
     let mediaWasSent = false;
-    if (stickerType && stickerService.hasSticker(stickerType)) {
+    if (stickerType && !flight.cancelled && stickerService.hasSticker(stickerType)) {
       // GIFs react to the HUMAN'S chat message, never our AI reply text
       const stickerUrl = await stickerService.getStickerUrl(stickerType, combinedText, config?.ownerId ? { _id: config.ownerId } : null);
       if (stickerUrl) {
@@ -1150,6 +1228,7 @@ async function dispatchDebouncedReply(queueEntry) {
           await new Promise(resolve => setTimeout(resolve, 600));
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending accessory ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
+            noteAiSend(qKey, { media: true });
             const accRes = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
             if (accRes?.success) {
               mediaWasSent = true;
@@ -1163,6 +1242,7 @@ async function dispatchDebouncedReply(queueEntry) {
         } else {
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending sticker-only ${stickerType} (${stickerUrl}) to ${senderId}...`);
+            noteAiSend(qKey, { media: true });
             stickerSendResult = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);
             if (stickerSendResult?.success) {
               mediaWasSent = true;
@@ -1343,6 +1423,8 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
     const config = await PersonaConfig.findOne({ ownerId });
     const token = creatorToken(req.user, config, config?.instagramAccountId || req.user.instagramAccountId);
     instagramService.registerAccount(token, config?.instagramAccountId || req.user.instagramAccountId);
+    // The creator is replying by hand: stop any AI reply for this person first
+    cancelAiReply(ownerId, senderId, 'creator replied from the dashboard');
     const sendResult = await instagramService.sendTextMessage(senderId, text, token);
     if (!sendResult || sendResult.success !== true) {
       // Nothing reached Instagram: say so and do not store a message that was never delivered
@@ -1363,13 +1445,6 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
       timestamp: new Date(),
     };
     await Message.record(newMsg, { update: { senderId: 'me', sentByAI: false } });
-
-    // Cancel any active AI debounce queue so the bot doesn't reply over the creator
-    const qKey = queueKey(ownerId, senderId);
-    if (userDebounceQueues.has(qKey)) {
-      clearTimeout(userDebounceQueues.get(qKey).timer);
-      userDebounceQueues.delete(qKey);
-    }
 
     // Update memory interaction time & reset reminder cycle to reactivate conversation
     await UserMemory.updateOne({ ownerId, senderId }, { 
