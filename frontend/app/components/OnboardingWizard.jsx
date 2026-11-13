@@ -57,6 +57,16 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
     }
   }, [user]);
 
+  // Watches the OAuth popup so oauthConnecting never stays stuck after the user closes it
+  const oauthPollRef = React.useRef(null);
+  const stopOauthPoll = () => {
+    if (oauthPollRef.current) {
+      clearInterval(oauthPollRef.current);
+      oauthPollRef.current = null;
+    }
+  };
+  useEffect(() => () => stopOauthPoll(), []);
+
   // Listen for OAuth postMessage from login popup window
   useEffect(() => {
     const handleOAuthMessage = (event) => {
@@ -68,11 +78,13 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         const { instagramUsername: igUser, instagramAccountId: igId } = event.data.payload || {};
         if (igUser) setInstagramUsername(igUser);
         if (igId) setInstagramAccountId(igId);
+        stopOauthPoll();
         setOauthConnecting(false);
         // Token stays on the server now: re-read account + persona
         refreshAccount?.();
         showToast?.(`Instagram connected: @${igUser || 'account'}!`, 'success');
       } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
+        stopOauthPoll();
         setOauthConnecting(false);
         setError(event.data.error || 'Instagram connection cancelled or failed. You can enter credentials manually.');
       }
@@ -83,21 +95,47 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
 
   if (!isOpen) return null;
 
-  const handleLaunchInstagramOAuth = () => {
+  const handleLaunchInstagramOAuth = async () => {
     setError('');
-    setOauthConnecting(true);
+    stopOauthPoll();
+    // Open the window synchronously inside the click so popup blockers allow it
+    let popup = null;
     try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
-      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
-      if (!popup) {
-        setOauthConnecting(false);
-        setError('Popup was blocked by your browser. Please allow popups for this site or enter your token below.');
-        setShowManualToken(true);
-      }
+      popup = window.open('', 'instagram_oauth', 'width=620,height=720,left=250,top=100');
     } catch (e) {
+      popup = null;
+    }
+    if (!popup) {
+      setError('Popup was blocked by your browser. Please allow popups for this site or enter your token below.');
+      setShowManualToken(true);
+      return;
+    }
+    setOauthConnecting(true);
+    oauthPollRef.current = setInterval(() => {
+      if (popup.closed) {
+        stopOauthPoll();
+        setOauthConnecting(false);
+      }
+    }, 500);
+    try {
+      // Single-use, short-lived ticket so the session JWT never goes in the URL
+      const res = await fetch(`${API_BASE}/api/auth/instagram/connect-ticket`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ticket) throw new Error(data.error || 'Could not start Instagram login');
+      const clientOrigin = window.location.origin;
+      popup.location.href = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&ticket=${encodeURIComponent(data.ticket)}`;
+    } catch (e) {
+      stopOauthPoll();
+      try { popup.close(); } catch (_) {}
       setOauthConnecting(false);
       setError('Failed to open login dialog: ' + e.message);
+      showToast?.(e.message || 'Could not start Instagram login', 'error');
     }
   };
 

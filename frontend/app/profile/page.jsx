@@ -24,14 +24,20 @@ import {
 import { motion } from 'framer-motion';
 import { startRegistration } from '@simplewebauthn/browser';
 
-const formatAddress = (addr) => {
-  if (!addr) return '';
-  if (typeof addr === 'string') return addr;
-  if (typeof addr === 'object') {
-    const parts = [addr.street, addr.city, addr.state, addr.country, addr.postalCode].filter(Boolean);
-    return parts.join(', ');
+const ADDRESS_FIELDS = ['street', 'city', 'state', 'country', 'postalCode'];
+
+// PUT /api/auth/profile only accepts address as { street, city, state, country, postalCode }
+const toAddressObject = (addr) => {
+  const out = { street: '', city: '', state: '', country: '', postalCode: '' };
+  if (!addr) return out;
+  if (typeof addr === 'string') {
+    out.street = addr;
+    return out;
   }
-  return '';
+  if (typeof addr === 'object') {
+    ADDRESS_FIELDS.forEach(k => { out[k] = typeof addr[k] === 'string' ? addr[k] : ''; });
+  }
+  return out;
 };
 
 export default function ProfilePage() {
@@ -50,7 +56,7 @@ export default function ProfilePage() {
     mobileNumber: user?.mobileNumber || '',
     whatsappNumber: user?.whatsappNumber || '',
     instagramUsername: user?.instagramUsername || '',
-    address: formatAddress(user?.address),
+    address: toAddressObject(user?.address),
   });
 
   // Passkeys state
@@ -67,7 +73,7 @@ export default function ProfilePage() {
         mobileNumber: user.mobileNumber || '',
         whatsappNumber: user.whatsappNumber || '',
         instagramUsername: user.instagramUsername || '',
-        address: formatAddress(user.address),
+        address: toAddressObject(user.address),
       });
       fetchPasskeys();
     }
@@ -376,21 +382,33 @@ export default function ProfilePage() {
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#52525b', marginBottom: '4px' }}>
                     Location / Address
                   </label>
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="City, Country"
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#ffffff',
-                      fontSize: '0.84rem',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                    {[
+                      ['street', 'Street'],
+                      ['city', 'City'],
+                      ['state', 'State'],
+                      ['country', 'Country'],
+                      ['postalCode', 'Postal code'],
+                    ].map(([key, label]) => (
+                      <input
+                        key={key}
+                        type="text"
+                        value={formData.address?.[key] || ''}
+                        onChange={(e) => setFormData({ ...formData, address: { ...formData.address, [key]: e.target.value } })}
+                        placeholder={label}
+                        aria-label={label}
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #e4e4e7',
+                          background: '#ffffff',
+                          fontSize: '0.84rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <button
