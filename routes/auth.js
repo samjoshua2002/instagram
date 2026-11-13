@@ -1725,12 +1725,20 @@ router.delete('/passkeys/:credentialId', requireAuth, async (req, res) => {
  * GET /api/auth/instagram/check-handle
  * Public endpoint to live check if an Instagram handle exists, fetching profile picture, display name, and permanent IG ID
  */
-router.get('/instagram/check-handle', async (req, res) => {
+router.get('/instagram/check-handle', authLimiter, async (req, res) => {
   try {
-    const rawHandle = (req.query.handle || '').toString().trim();
+    const rawHandle = typeof req.query.handle === 'string' ? req.query.handle.trim() : '';
     const handle = rawHandle.replace(/^@/, '').toLowerCase();
-    if (!handle || handle.length < 2) {
+    if (!handle || handle.length < 2 || !/^[a-z0-9._]{2,30}$/.test(handle)) {
       return res.status(400).json({ error: 'Please enter a valid Instagram handle.' });
+    }
+    // Optional login: a signed-in creator may match against THEIR OWN contacts only
+    let viewer = null;
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) {
+      const decoded = authService.verifyToken(authHeader.slice(7));
+      if (decoded && decoded.userId && mongoose.isValidObjectId(decoded.userId)) viewer = await User.findById(decoded.userId).select('_id tokenVersion');
+      if (viewer && (decoded.tv || 0) !== (viewer.tokenVersion || 0)) viewer = null;
     }
 
     // 1. Check if handle is already registered by an existing verified user in Chatter OS
@@ -1756,16 +1764,18 @@ router.get('/instagram/check-handle', async (req, res) => {
     const SocialGraph = require('../models/SocialGraph');
     const PersonaConfig = require('../models/PersonaConfig');
 
-    const [matchedMemory, matchedContact, persona] = await Promise.all([
-      UserMemory.findOne({ username: safeRegex }),
+    // Never search other creators' private contact lists
+    const [matchedMemory, matchedContact, persona] = viewer ? await Promise.all([
+      UserMemory.findOne({ ownerId: viewer._id, username: safeRegex }),
       SocialGraph.findOne({
+        ownerId: viewer._id,
         $or: [
           { instagramHandle: safeHandleRegex },
           { name: safeRegex }
         ]
       }),
-      PersonaConfig.findOne({ instagramUsername: safeHandleRegex })
-    ]);
+      PersonaConfig.findOne({ ownerId: viewer._id, instagramHandle: safeHandleRegex })
+    ]) : [null, null, null];
 
     let dbProfile = null;
     if (matchedMemory || matchedContact || persona) {
