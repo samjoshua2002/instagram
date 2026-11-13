@@ -218,7 +218,8 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           { role: 'system', content: 'You are an empathetic, razor-sharp chat memory analyst. Output pure valid JSON.' },
           { role: 'user', content: personalize(prompt, creator.name) }
         ],
-        temperature: 0.25,
+        // gpt-5* deployments reject temperature
+        ...(String(process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o').startsWith('gpt-5') ? {} : { temperature: 0.25 }),
         response_format: { type: 'json_object' }
       });
 
