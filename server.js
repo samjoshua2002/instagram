@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const connectDB = require('./config/db');
+const { creatorIdentity, personalize } = require('./services/creatorIdentity');
 
 // Models
 const User = require('./models/User');
@@ -54,6 +55,7 @@ async function migrateOwnership() {
     }
   } catch (e) { /* collection may not exist yet */ }
   await UserMemory.createIndexes().catch(e => console.warn('UserMemory index note:', e.message));
+  await dedupePersonas();
   await Message.createIndexes().catch(e => console.warn('Message index note:', e.message));
 
   // Legacy global persona belongs to the original owner (only if they have none yet)
@@ -121,6 +123,30 @@ async function migrateOwnership() {
   }
 }
 
+// Older code could create several settings records for one creator; keep the most recently edited one
+async function dedupePersonas() {
+  try {
+    const dups = await PersonaConfig.aggregate([
+      { $match: { ownerId: { $type: 'objectId' } } },
+      { $sort: { updatedAt: -1 } },
+      { $group: { _id: '$ownerId', ids: { $push: '$_id' }, n: { $sum: 1 } } },
+      { $match: { n: { $gt: 1 } } }
+    ]);
+    let removed = 0;
+    for (const d of dups) {
+      const r = await PersonaConfig.deleteMany({ _id: { $in: d.ids.slice(1) } });
+      removed += r.deletedCount || 0;
+    }
+    if (removed) console.log(`🔧 [Migration] Removed ${removed} duplicate persona records.`);
+    const idx = await PersonaConfig.collection.indexes().catch(() => []);
+    const old = idx.find(i => i.name === 'ownerId_1' && !i.unique);
+    if (old) await PersonaConfig.collection.dropIndex('ownerId_1');
+    await PersonaConfig.createIndexes();
+  } catch (e) {
+    console.warn('Persona dedupe note:', e.message);
+  }
+}
+
 function escapeRegex(string) {
   return (string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -142,6 +168,28 @@ function parseKeywords(keywords) {
   if (Array.isArray(keywords)) return keywords.filter(isStr).map(k => k.trim().toLowerCase()).filter(Boolean);
   if (isStr(keywords)) return keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
   return [];
+}
+
+// Starting persona for a creator, built from their own account (never another person's details)
+function personaSeedFor(user) {
+  if (!user) return {};
+  const displayName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.username;
+  const handle = user.instagramUsername ? `@${String(user.instagramUsername).replace(/^@/, '')}` : `@${user.username}`;
+  return {
+    creatorName: displayName,
+    instagramHandle: handle,
+    personaBio: user.businessProfile?.description || `I am ${displayName}, creator of ${handle}.`,
+    aboutMe: `I am ${displayName}, creator of ${handle}.`,
+    customKnowledge: `Account: ${handle}
+Creator: ${displayName}`,
+    instagramPageAccessToken: user.instagramPageAccessToken || '',
+    instagramAccountId: user.instagramAccountId || '',
+  };
+}
+
+// The creator's own settings, created once on first use
+function personaFor(user) {
+  return PersonaConfig.forOwner(user ? user._id : null, personaSeedFor(user));
 }
 
 function requireSuperadmin(req, res, next) {
@@ -462,7 +510,7 @@ async function handleCreatorEchoAsync(event, accountId) {
 
   const text = event.message?.text || (event.message?.attachments?.length ? '[Shared Media / Sticker]' : '');
   const mid = event.message?.mid || `echo_${Date.now()}`;
-  console.log(`📱 [Creator Echo]: Sam manually replied to ${contactId}: "${text}"`);
+  console.log(`📱 [Creator Echo]: Creator manually replied to ${contactId}: "${text}"`);
 
   // Cancel any active AI debounce queue so the bot doesn't reply over the creator
   const qKey = queueKey(ownerId, contactId);
@@ -600,10 +648,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const ownerId = ownerUser._id;
 
   // 2. Fetch the creator's own PersonaConfig (created with defaults if missing)
-  let config = await PersonaConfig.findOne({ ownerId });
-  if (!config) {
-    config = await PersonaConfig.create({ ownerId });
-  }
+  const config = await personaFor(ownerUser);
 
   // 3. Resolve the active token for THIS creator only
   const creatorAccessToken = creatorToken(ownerUser, config, targetAccountId);
@@ -1088,7 +1133,7 @@ app.get('/api/status', async (req, res) => {
 
     res.json({
       status: 'online',
-      creatorName: config.creatorName || 'Sam Joshua',
+      creatorName: config.creatorName || req.user?.firstName || req.user?.username || '',
       instagramHandle: config.instagramHandle || '@chipichappa.daily',
       globalBotActive: config.globalBotActive ?? true,
       chatMode: config.chatMode || 'everyone',
@@ -1174,7 +1219,7 @@ app.post('/api/conversations/:senderId/toggle-ai', async (req, res) => {
   }
 });
 
-// Manually send message as Sam from the dashboard
+// Manually send a message as the creator from the dashboard
 app.post('/api/conversations/:senderId/send', async (req, res) => {
   try {
     const { senderId } = req.params;
@@ -1360,27 +1405,7 @@ app.get('/api/persona', async (req, res) => {
       query = { ownerId: req.user._id };
     }
 
-    let config = await PersonaConfig.findOne(query);
-    if (!config && req.user) {
-      if (!config) {
-        const displayName = req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : req.user.username;
-        const handle = req.user.instagramUsername ? `@${req.user.instagramUsername.replace(/^@/, '')}` : `@${req.user.username}`;
-        config = await PersonaConfig.create({
-          ownerId: req.user._id,
-          creatorName: displayName,
-          instagramHandle: handle,
-          personaBio: req.user.businessProfile?.description || `I am ${displayName}, creator of ${handle}.`,
-          aboutMe: `I am ${displayName}, creator of ${handle}.`,
-          characteristics: 'Friendly, helpful, approachable, authentic.',
-          textingHabits: 'Casual lowercase, friendly, short messages.',
-          replyRules: 'Default to natural friendly replies without sounding robotic.',
-          toneGuidelines: '1. Talk naturally like a real human.\n2. Keep replies engaging and warm.\n3. Never sound like a robot.',
-          customKnowledge: `Account: ${handle}\nCreator: ${displayName}`,
-          instagramPageAccessToken: req.user.instagramPageAccessToken || '',
-          instagramAccountId: req.user.instagramAccountId || '',
-        });
-      }
-    }
+    const config = req.user ? await personaFor(req.user) : await PersonaConfig.findOne(query);
 
     if (config) {
       const userConfig = config.toObject();
@@ -1411,10 +1436,7 @@ app.put('/api/persona', async (req, res) => {
       query = { ownerId: req.user._id };
     }
 
-    let config = await PersonaConfig.findOne(query);
-    if (!config) {
-      config = new PersonaConfig({ ...query });
-    }
+    const config = req.user ? await personaFor(req.user) : (await PersonaConfig.findOne(query) || new PersonaConfig({ ...query }));
     const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
     const textFields = ['creatorName', 'instagramHandle', 'personaBio', 'aboutMe', 'characteristics', 'textingHabits', 'replyRules',
       'toneGuidelines', 'customKnowledge', 'chatMode', 'instagramPageAccessToken', 'instagramAccountId', 'giphyApiKey'];
@@ -1487,7 +1509,6 @@ app.put('/api/persona', async (req, res) => {
     if (req.user) {
       if (isStr(instagramPageAccessToken)) req.user.instagramPageAccessToken = instagramPageAccessToken.trim();
       if (isStr(instagramAccountId)) req.user.instagramAccountId = instagramAccountId.trim();
-      if (isStr(creatorName)) req.user.firstName = creatorName.trim();
       if (isStr(instagramHandle)) req.user.instagramUsername = instagramHandle.trim().replace(/^@/, '');
       req.user.hasInstagramToken = Boolean(req.user.instagramPageAccessToken);
       req.user.isInstagramConnected = Boolean(req.user.instagramPageAccessToken);
@@ -1550,7 +1571,7 @@ app.get('/api/giphy/trending', async (req, res) => {
   }
 });
 
-// Interactive Simulator: lets Sam test his AI clone without needing live Instagram DMs first!
+// Interactive Simulator: lets a creator test their AI clone without needing live Instagram DMs first!
 app.post('/api/simulator/chat', async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
@@ -1904,8 +1925,7 @@ app.post('/api/media-vault/categories', async (req, res) => {
     if (!cleanCat) return res.status(400).json({ error: 'Category must contain letters or numbers' });
 
     const personaQuery = req.user ? { ownerId: req.user._id } : {};
-    let config = await PersonaConfig.findOne(personaQuery);
-    if (!config) config = await PersonaConfig.create({ ownerId: req.user?._id || null });
+    const config = await personaFor(req.user);
 
     config.customReactionCategories = config.customReactionCategories || [];
     if (!config.customReactionCategories.includes(cleanCat)) {
@@ -2407,7 +2427,8 @@ app.post('/api/social-graph/extract-from-chat', async (req, res) => {
     const extraction = await azureOpenAI.extractPersonFromRawChat({
       chatText,
       currentPerson,
-      userClarifications
+      userClarifications,
+      ownerId: ownerOf(req)
     });
 
     res.json({ success: true, extraction });
@@ -2504,7 +2525,7 @@ app.post('/api/social-graph/node/:name/ai-autofill', async (req, res) => {
       }
     }
 
-    const creatorLabel = req.user?.firstName || 'Creator';
+    const creatorLabel = (await creatorIdentity(ownerId)).name;
     const conversationText = recentMessages.reverse().map(m => `${m.role === 'user' ? (node?.name || cleanName) : creatorLabel}: ${m.text || '[reel/media]'}`).join('\n');
 
     const prompt = `Analyze this Instagram conversation and existing memory for a friend of Sam Joshua named "${node?.name || cleanName}".
@@ -2528,7 +2549,7 @@ Return ONLY raw JSON.`;
       model: azureOpenAI.defaultDeployment,
       messages: [
         { role: 'system', content: 'You are an expert social intelligence analyzer. Output valid JSON only without markdown formatting.' },
-        { role: 'user', content: prompt }
+        { role: 'user', content: personalize(prompt, creatorLabel) }
       ],
       temperature: 0.3,
       max_tokens: 800,

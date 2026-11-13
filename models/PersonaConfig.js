@@ -5,31 +5,31 @@ const PersonaConfigSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null,
-    index: true,
   },
+  // Every creator starts with a neutral persona; nothing here may name a real person
   creatorName: {
     type: String,
-    default: 'Sam Joshua',
+    default: '',
   },
   instagramHandle: {
     type: String,
-    default: '@catovidz',
+    default: '',
   },
   personaBio: {
     type: String,
-    default: 'I am Sam Joshua, creator of @catovidz. I make creative video edits, content, and tech projects.',
+    default: '',
   },
   aboutMe: {
     type: String,
-    default: 'I am Sam Joshua, creator of @catovidz. Tech enthusiast, video editor, and developer. I make creative video edits, content, and tech projects. Love tech, gaming, video editing, creative ideas, and coding. Living in Tamil Nadu / India.',
+    default: '',
   },
   characteristics: {
     type: String,
-    default: 'Chill, witty, humble, friendly, authentic. Never arrogant. Gentle and sweet with female friends, humorous and teasing banter with guys/homies. Supportive and present when someone shares their problems or asks for advice.',
+    default: 'Chill, witty, humble, friendly, authentic. Never arrogant. Supportive and present when someone shares their problems or asks for advice.',
   },
   textingHabits: {
     type: String,
-    default: 'Always casual lowercase. Never use stiff ending periods (.). Use casual shortcuts and abbreviations naturally (u, rn, fr, tbh, idk, wbu, haha, lol, yo, ngl). Keep messages concise (1-2 short lines max) in quick human bursts. Match the sender energy and language (Tanglish for Tamil friends, English for others).',
+    default: 'Always casual lowercase. Never use stiff ending periods (.). Use casual shortcuts and abbreviations naturally (u, rn, fr, tbh, idk, wbu, haha, lol, yo, ngl). Keep messages concise (1-2 short lines max) in quick human bursts. Match the sender energy and language.',
   },
   replyRules: {
     type: String,
@@ -47,24 +47,13 @@ const PersonaConfigSchema = new mongoose.Schema({
   },
   sampleConversations: [
     {
-      userMessage: { type: String, default: "hey bro love your reels!" },
-      myReply: { type: String, default: "yoo appreciate it so much man! 🙌 which one did you watch?" }
-    },
-    {
-      userMessage: { type: String, default: "what tools do you use for video editing?" },
-      myReply: { type: String, default: "mostly Premiere Pro and After Effects for motion graphics! what are you editing on?" }
-    },
-    {
-      userMessage: { type: String, default: "can we collaborate?" },
-      myReply: { type: String, default: "sounds dope! send me what you have in mind or your portfolio, let me check it out." }
+      userMessage: { type: String, default: '' },
+      myReply: { type: String, default: '' }
     }
   ],
   customKnowledge: {
     type: String,
-    default: `Account: @catovidz
-Creator: Sam Joshua
-Topics: Content creation, AI tools, video editing, coding
-Inquiries: DMs open for cool collaborations & tech discussions`,
+    default: '',
   },
 
   forbiddenWords: [
@@ -74,7 +63,6 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     "i do not have personal feelings",
     "delighted to help",
     "certainly!",
-    "baddu",
   ],
   globalBotActive: {
     type: Boolean,
@@ -121,5 +109,20 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     default: 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
   },
 }, { timestamps: true });
+
+// One settings record per creator (legacy records without an owner are left alone)
+PersonaConfigSchema.index({ ownerId: 1 }, { unique: true, partialFilterExpression: { ownerId: { $type: 'objectId' } } });
+
+// Load a creator's settings, creating them exactly once even when many requests arrive together
+PersonaConfigSchema.statics.forOwner = async function(ownerId, seed = {}) {
+  if (!ownerId) return this.findOne({ ownerId: null });
+  const opts = { upsert: true, new: true, setDefaultsOnInsert: true };
+  try {
+    return await this.findOneAndUpdate({ ownerId }, { $setOnInsert: { ...seed, ownerId } }, opts);
+  } catch (err) {
+    if (err && err.code === 11000) return this.findOne({ ownerId });
+    throw err;
+  }
+};
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);
