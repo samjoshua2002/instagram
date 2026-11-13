@@ -2104,15 +2104,16 @@ app.post('/api/cleanup', async (req, res) => {
 });
 
 // Social Graph Tree Chain Endpoints (auto-discovers newly talked contacts & enriches with live DP & per-person AI settings)
-let lastTrainGraphTime = 0;
+const trainGraphTimes = new Map(); // creatorId -> last background training time
 const contactDiscoveryTimes = new Map(); // ownerId -> last auto-discovery time
 app.get('/api/social-graph', async (req, res) => {
   try {
-    // Only run trainGraphFromDB at most once every 5 minutes to prevent CPU blocking
+    // Train this creator's graph at most once every 5 minutes, in the background (this endpoint is polled)
     const now = Date.now();
-    if (now - lastTrainGraphTime > 5 * 60 * 1000) {
-      lastTrainGraphTime = now;
-      socialGraphService.trainGraphFromDB(UserMemory, Message).catch(e => console.warn('trainGraph error:', e.message));
+    const trainKey = String(ownerOf(req));
+    if (now - (trainGraphTimes.get(trainKey) || 0) > 5 * 60 * 1000) {
+      trainGraphTimes.set(trainKey, now);
+      socialGraphService.trainGraphFromDB(UserMemory, Message, ownerOf(req)).catch(e => console.warn('trainGraph error:', e.message));
     }
 
     // Every creator (superadmin included) sees only their own People list
@@ -2125,34 +2126,35 @@ app.get('/api/social-graph', async (req, res) => {
       contactDiscoveryTimes.set(String(ownerId), now);
       try {
         const known = new Set((await SocialGraph.find({ ownerId, senderId: { $nin: [null, ''] } }, { senderId: 1 })).map(n => n.senderId));
-        const mems = await UserMemory.find({ ownerId, senderId: { $nin: [...known, 'me'] } }).limit(200);
-        for (const mem of mems) {
+        const mems = await UserMemory.find({ ownerId, senderId: { $nin: [...known, 'me'] } })
+          .select('senderId username name profilePic messageCount personalNotes').limit(200).lean();
+        // One bulk upsert instead of one insert per contact; upsert by sender never makes duplicates
+        const ops = mems.filter(m => !/^(test_|ig_tester_|sim_)/i.test(m.senderId)).map(mem => {
           const cid = mem.senderId;
-          if (/^(test_|ig_tester_)/i.test(cid)) continue;
-          {
-            const chatsCount = mem.messageCount || 0;
-            const cleanU = (mem?.username || '').replace(/^@/, '').trim();
-            await SocialGraph.create({
-              ownerId: req.user._id,
-              ownerUsername: req.user.username,
-              senderId: cid,
-              name: mem?.name && !mem.name.startsWith('User_') ? mem.name : (cleanU || `User_${cid.slice(-4)}`),
-              instagramHandle: cleanU ? `@${cleanU}` : '',
-              profilePic: mem?.profilePic || '',
-              category: 'online_friend',
-              chatsCount,
-              reelsCount: 0,
-              relationshipToSam: 'Friend',
-              lore: mem?.personalNotes ? [mem.personalNotes] : []
-            }).catch(() => {});
-          }
-        }
+          const cleanU = (mem.username || '').replace(/^@/, '').trim();
+          return { updateOne: { filter: { ownerId, senderId: cid }, upsert: true, update: { $setOnInsert: {
+            ownerId: req.user._id,
+            ownerUsername: req.user.username,
+            senderId: cid,
+            name: mem.name && !mem.name.startsWith('User_') ? mem.name : (cleanU || `User_${cid.slice(-4)}`),
+            instagramHandle: cleanU ? `@${cleanU}` : '',
+            profilePic: mem.profilePic || '',
+            category: 'online_friend',
+            chatsCount: mem.messageCount || 0,
+            reelsCount: 0,
+            relationshipToSam: 'Friend',
+            lore: mem.personalNotes ? [mem.personalNotes] : [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          } } } };
+        });
+        if (ops.length) await SocialGraph.bulkWrite(ops, { ordered: false });
       } catch (syncErr) {
         console.warn('Auto contact sync error:', syncErr.message);
       }
     }
 
-    const nodes = await SocialGraph.find(query).sort({ updatedAt: -1 });
+    const nodes = await SocialGraph.find(query).sort({ updatedAt: -1 }).lean();
 
     // Load this creator's memories for all nodes in ONE query (was one or two queries per node)
     const nodeSenderIds = nodes.map(n => n.senderId).filter(Boolean);
@@ -2160,7 +2162,7 @@ app.get('/api/social-graph', async (req, res) => {
     const memDocs = (nodeSenderIds.length || nodeHandles.length) ? await UserMemory.find({
       ownerId,
       $or: [{ senderId: { $in: nodeSenderIds } }, { username: { $in: nodeHandles } }]
-    }) : [];
+    }).select('senderId username profilePic aiEnabled replyToMessages replyToReelsAndPosts importantDates relationshipType lastInteraction').lean() : [];
     const memBySender = new Map(memDocs.map(m => [m.senderId, m]));
     const memByUsername = new Map(memDocs.map(m => [(m.username || '').toLowerCase(), m]));
 
@@ -2189,7 +2191,7 @@ app.get('/api/social-graph', async (req, res) => {
       const reelsCount = typeof n.reelsCount === 'number' ? n.reelsCount : 0;
 
       return {
-        ...n.toObject(),
+        ...n,
         senderId: effectiveSenderId,
         category: n.category || (memory?.relationshipType ? (memory.relationshipType === 'collaborator' || memory.relationshipType === 'client' ? 'professional' : 'online_friend') : 'online_friend'),
         dob: n.dob || memoryDob || '',
@@ -2206,25 +2208,29 @@ app.get('/api/social-graph', async (req, res) => {
     });
 
     // Authoritative backend deduplication by senderId, instagramHandle, or normalized name
+    // (Map lookups: linear time. Same name alone only merges when one entry has no id/handle,
+    // because two real people can share a name.)
     const deduplicatedNodes = [];
+    const seenSender = new Map(), seenHandle = new Map(), seenBareName = new Map(), seenName = new Map();
     for (const node of enrichedNodes) {
       const cleanSenderId = (node.senderId || '').trim();
       const cleanHandle = (node.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
       const cleanName = (node.name || '').toLowerCase().trim();
+      const bare = !cleanSenderId && !cleanHandle;
 
-      const existingIndex = deduplicatedNodes.findIndex(m => {
-        if (cleanSenderId && m.senderId && m.senderId.trim() === cleanSenderId) return true;
-        const mHandle = (m.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
-        if (cleanHandle && mHandle && cleanHandle === mHandle) return true;
-        const mName = (m.name || '').toLowerCase().trim();
-        if (cleanName && mName && cleanName === mName) return true;
-        return false;
-      });
+      const existing = (cleanSenderId && seenSender.get(cleanSenderId)) ||
+        (cleanHandle && seenHandle.get(cleanHandle)) ||
+        (cleanName && (bare ? seenName.get(cleanName) : seenBareName.get(cleanName))) || null;
 
-      if (existingIndex === -1) {
+      if (!existing) {
         deduplicatedNodes.push(node);
+        if (cleanSenderId) seenSender.set(cleanSenderId, node);
+        if (cleanHandle) seenHandle.set(cleanHandle, node);
+        if (cleanName) {
+          if (!seenName.has(cleanName)) seenName.set(cleanName, node);
+          if (bare && !seenBareName.has(cleanName)) seenBareName.set(cleanName, node);
+        }
       } else {
-        const existing = deduplicatedNodes[existingIndex];
         if (!existing.instagramHandle && node.instagramHandle) existing.instagramHandle = node.instagramHandle;
         if (!existing.senderId && node.senderId) existing.senderId = node.senderId;
         if (!existing.profilePic && node.profilePic) existing.profilePic = node.profilePic;
@@ -2244,7 +2250,7 @@ app.get('/api/social-graph', async (req, res) => {
 
 app.post('/api/social-graph/sync', async (req, res) => {
   try {
-    await socialGraphService.trainGraphFromDB(UserMemory, Message);
+    await socialGraphService.trainGraphFromDB(UserMemory, Message, ownerOf(req));
     socialGraphService.clearCache(ownerOf(req));
     const nodes = await SocialGraph.find({ ownerId: ownerOf(req) });
     res.json({ success: true, message: 'Social knowledge tree synced from DB', count: nodes.length, nodes });
