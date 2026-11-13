@@ -1235,6 +1235,11 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
     const token = creatorToken(req.user, config, config?.instagramAccountId || req.user.instagramAccountId);
     instagramService.registerAccount(token, config?.instagramAccountId || req.user.instagramAccountId);
     const sendResult = await instagramService.sendTextMessage(senderId, text, token);
+    if (!sendResult || sendResult.success !== true) {
+      // Nothing reached Instagram: say so and do not store a message that was never delivered
+      const reason = !token ? 'Instagram is not connected for this account' : (sendResult?.reason || sendResult?.error || 'Instagram rejected the message');
+      return res.status(502).json({ error: `Message not sent: ${typeof reason === 'string' ? reason : JSON.stringify(reason)}` });
+    }
 
     // Save in DB
     const newMsg = await Message.create({
