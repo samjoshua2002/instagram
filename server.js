@@ -2472,19 +2472,18 @@ app.post('/api/social-graph/extract-from-chat', async (req, res) => {
 // Delete a person from the social knowledge tree & MongoDB
 app.delete('/api/social-graph/node/:identifier', async (req, res) => {
   try {
-    const { identifier } = req.params;
-    const clean = decodeURIComponent(identifier).trim();
+    // Express already decoded the path; decoding again breaks names containing "%"
+    const clean = String(req.params.identifier || '').trim();
 
-    // 1. Find matching node
+    // 1. Find matching node (an exact id always wins over a name)
     const ownerId = ownerOf(req);
     const isObjectId = mongoose.Types.ObjectId.isValid(clean);
-    const node = await SocialGraph.findOne({
+    const node = (isObjectId ? await SocialGraph.findOne({ ownerId, _id: clean }) : null) || await SocialGraph.findOne({
       ownerId,
       $or: [
         { name: new RegExp(`^${escapeRegex(clean)}$`, 'i') },
         { senderId: clean },
-        { instagramHandle: new RegExp(`^@?${escapeRegex(clean.replace(/^@/, ''))}$`, 'i') },
-        ...(isObjectId ? [{ _id: clean }] : [])
+        { instagramHandle: new RegExp(`^@?${escapeRegex(clean.replace(/^@/, ''))}$`, 'i') }
       ]
     });
 
@@ -2492,21 +2491,17 @@ app.delete('/api/social-graph/node/:identifier', async (req, res) => {
     const targetName = node.name;
     const targetSenderId = node.senderId || '';
 
-    // 2. Delete SocialGraph document(s) of THIS creator
-    await SocialGraph.deleteMany({
-      ownerId,
-      $or: [
-        { name: new RegExp(`^${escapeRegex(targetName)}$`, 'i') },
-        ...(targetSenderId ? [{ senderId: targetSenderId }] : []),
-        ...(isObjectId ? [{ _id: clean }] : [])
-      ]
-    });
+    // 2. Delete ONLY this person (others who share the name are different people)
+    await SocialGraph.deleteOne({ ownerId, _id: node._id });
 
-    // 3. Remove from other nodes' connections
-    await SocialGraph.updateMany(
-      { ownerId, 'connections.targetName': new RegExp(`^${escapeRegex(targetName)}$`, 'i') },
-      { $pull: { connections: { targetName: new RegExp(`^${escapeRegex(targetName)}$`, 'i') } } }
-    );
+    // 3. Remove from other nodes' connections, unless someone else still has this name
+    const sameNameLeft = await SocialGraph.exists({ ownerId, name: new RegExp(`^${escapeRegex(targetName)}$`, 'i') });
+    if (!sameNameLeft) {
+      await SocialGraph.updateMany(
+        { ownerId, 'connections.targetName': new RegExp(`^${escapeRegex(targetName)}$`, 'i') },
+        { $pull: { connections: { targetName: new RegExp(`^${escapeRegex(targetName)}$`, 'i') } } }
+      );
+    }
 
     // 4. Delete corresponding UserMemory if exists (safeguard: do not delete if another node still uses this senderId)
     if (targetSenderId && req.query.keepMemory !== 'true') {
