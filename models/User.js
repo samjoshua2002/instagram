@@ -107,6 +107,7 @@ const UserSchema = new mongoose.Schema({
     enabled: { type: Boolean, default: true },
     secret: { type: String, default: '' },
     backupCodes: [{ type: String }],
+    lastUsedStep: { type: Number, default: 0 },
   },
   passkeys: [{
     credentialId: { type: String, required: true },
@@ -129,10 +130,12 @@ const UserSchema = new mongoose.Schema({
   verificationOtp: {
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
   },
   resetOtp: {
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
   },
   lastLogin: {
     type: Date,
