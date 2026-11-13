@@ -17,6 +17,9 @@ class MemoryService {
         apiKey: process.env.AZURE_OPENAI_API_KEY,
         apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
         deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o",
+        // Background learning: a hung request must not hold the worker for the 10-minute default
+        maxRetries: 2,
+        timeout: 60 * 1000,
       });
     }
     return this._client;
