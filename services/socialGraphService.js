@@ -127,110 +127,102 @@ class SocialGraphService {
   }
 
   /**
-   * Train / Link Graph from DB (scans UserMemory and Messages to auto-connect ids and discovered people)
+   * Train / Link Graph from DB: links contacts (UserMemory) to People entries and adds newly talked people.
+   * With an ownerId only that creator's data is read. Each creator's contacts and People are loaded once
+   * and all changes are written in one bulk call (no per-contact queries).
    */
-  async trainGraphFromDB(UserMemoryModel, MessageModel) {
+  async trainGraphFromDB(UserMemoryModel, MessageModel, ownerId = null) {
     try {
       if (!UserMemoryModel) return;
-
-      // Only memories that belong to a creator are linked, and only into that creator's graph
-      const memories = await UserMemoryModel.find({ ownerId: { $ne: null } });
-      for (const mem of memories) {
-        const ownerId = mem.ownerId;
-        const usernameLower = (mem.username || '').replace(/^@/, '').toLowerCase().trim();
-        const nameLower = (mem.name || '').toLowerCase().trim();
-        const nicknameLower = (mem.nickname || '').toLowerCase().trim();
-
-        // Skip internal testing accounts
-        if (
-          !usernameLower ||
-          /^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(usernameLower) ||
-          /^(test_|ig_tester_)/i.test(mem.senderId) ||
-          mem.senderId === 'me'
-        ) {
-          continue;
-        }
-
-        const orConditions = [{ senderId: mem.senderId }];
-        if (usernameLower) {
-          orConditions.push({ aliases: usernameLower });
-          orConditions.push({ instagramHandle: `@${usernameLower}` });
-          orConditions.push({ instagramHandle: usernameLower });
-        }
-        if (nameLower) {
-          orConditions.push({ aliases: nameLower });
-          orConditions.push({ name: new RegExp(`^${escapeRegex(nameLower)}$`, 'i') });
-        }
-        if (nicknameLower) {
-          orConditions.push({ aliases: nicknameLower });
-        }
-
-        // Check if this memory belongs to an existing node
-        const matchingNode = await SocialGraph.findOne({ ownerId, $or: orConditions });
-
-        if (matchingNode) {
-          let updated = false;
-          if (!matchingNode.senderId && mem.senderId) {
-            matchingNode.senderId = mem.senderId;
-            updated = true;
-          }
-          if (mem.username && !matchingNode.instagramHandle) {
-            matchingNode.instagramHandle = `@${usernameLower}`;
-            updated = true;
-          }
-          if (mem.gender && matchingNode.gender === 'unknown') {
-            matchingNode.gender = mem.gender;
-            updated = true;
-          }
-          if (mem.profilePic && !matchingNode.profilePic) {
-            matchingNode.profilePic = mem.profilePic;
-            updated = true;
-          }
-          if (updated) {
-            await matchingNode.save();
-            console.log(`🔗 [SocialGraph] Linked senderId ${mem.senderId} (${mem.username}) to node ${matchingNode.name}`);
-          }
-        } else {
-          // Newly talked person discovered from conversation history!
-          const cleanDisplayName = mem.name && !mem.name.startsWith('User_') ? mem.name.trim() : (mem.nickname || mem.username);
-          const cleanHandle = `@${usernameLower}`;
-
-          // Extra safety duplicate check by name, handle, or senderId
-          const exists = await SocialGraph.findOne({
-            ownerId,
-            $or: [
-              { name: new RegExp(`^${escapeRegex(cleanDisplayName)}$`, 'i') },
-              { instagramHandle: cleanHandle },
-              { senderId: mem.senderId }
-            ]
-          });
-
-          if (!exists) {
-            await SocialGraph.create({
-              ownerId,
-              name: cleanDisplayName,
-              aliases: [usernameLower, nameLower, nicknameLower].filter(Boolean),
-              instagramHandle: cleanHandle,
-              senderId: mem.senderId,
-              profilePic: mem.profilePic || '',
-              gender: mem.gender || 'unknown',
-              relationshipToSam: mem.relationshipType && mem.relationshipType !== 'stranger'
-                ? `${mem.relationshipType.charAt(0).toUpperCase() + mem.relationshipType.slice(1)}`
-                : 'Follower / Online Contact',
-              connections: [],
-              lore: mem.personalNotes ? [mem.personalNotes] : ((mem.facts || []).map(f => f.fact).filter(Boolean)),
-              languages: ['English'],
-              roastStyle: 'Casual & friendly'
-            });
-            console.log(`✨ [SocialGraph] Added newly talked contact to Knowledge Tree: ${cleanDisplayName} (${cleanHandle})`);
-          }
+      const owners = ownerId ? [ownerId] : await UserMemoryModel.distinct('ownerId', { ownerId: { $ne: null } });
+      for (const oid of owners) {
+        try {
+          await this.trainOwnerGraph(UserMemoryModel, oid);
+        } catch (e) {
+          // One creator's bad data must never stop the others
+          console.error(`❌ [SocialGraph] Training failed for creator ${oid}:`, e.message);
         }
       }
-
-      this.clearCache();
+      this.clearCache(ownerId || undefined);
       console.log('🌳 [SocialGraph] Trained & interlinked social tree from database.');
     } catch (err) {
       console.error('❌ [SocialGraph] Error training graph from DB:', err.message);
+    }
+  }
+
+  async trainOwnerGraph(UserMemoryModel, ownerId) {
+    const genders = SocialGraph.schema.path('gender').enumValues;
+    const [memories, nodes] = await Promise.all([
+      UserMemoryModel.find({ ownerId }).select('senderId username name nickname gender profilePic relationshipType personalNotes facts').lean(),
+      SocialGraph.find({ ownerId }).select('name aliases instagramHandle senderId gender profilePic').lean(),
+    ]);
+
+    // Fast lookups over this creator's People
+    const bySender = new Map(), byKey = new Map();
+    const indexNode = (n) => {
+      if (n.senderId) bySender.set(n.senderId, n);
+      const keys = [n.name, n.instagramHandle, ...(n.aliases || [])]
+        .filter(Boolean).map(k => String(k).replace(/^@/, '').toLowerCase().trim());
+      for (const k of keys) if (k && !byKey.has(k)) byKey.set(k, n);
+    };
+    nodes.forEach(indexNode);
+
+    const ops = [];
+    for (const mem of memories) {
+      const usernameLower = (mem.username || '').replace(/^@/, '').toLowerCase().trim();
+      const nameLower = (mem.name || '').toLowerCase().trim();
+      const nicknameLower = (mem.nickname || '').toLowerCase().trim();
+
+      // Skip internal testing accounts
+      if (!usernameLower || /^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(usernameLower) ||
+          /^(test_|ig_tester_|sim_)/i.test(mem.senderId) || mem.senderId === 'me') {
+        continue;
+      }
+
+      const match = bySender.get(mem.senderId) || byKey.get(usernameLower) || (nameLower && byKey.get(nameLower)) || (nicknameLower && byKey.get(nicknameLower));
+      if (match) {
+        const set = {};
+        if (!match.senderId && mem.senderId) set.senderId = mem.senderId;
+        if (mem.username && !match.instagramHandle) set.instagramHandle = `@${usernameLower}`;
+        if (mem.gender && genders.includes(mem.gender) && (!match.gender || match.gender === 'unknown')) set.gender = mem.gender;
+        if (mem.profilePic && !match.profilePic) set.profilePic = mem.profilePic;
+        if (Object.keys(set).length) {
+          Object.assign(match, set);
+          if (set.senderId) bySender.set(set.senderId, match);
+          ops.push({ updateOne: { filter: { _id: match._id, ownerId }, update: { $set: set } } });
+        }
+        continue;
+      }
+
+      // Newly talked person discovered from conversation history
+      const cleanDisplayName = mem.name && !mem.name.startsWith('User_') ? mem.name.trim() : (mem.nickname || mem.username);
+      const doc = {
+        ownerId,
+        name: cleanDisplayName,
+        aliases: [usernameLower, nameLower, nicknameLower].filter(Boolean),
+        instagramHandle: `@${usernameLower}`,
+        senderId: mem.senderId,
+        profilePic: mem.profilePic || '',
+        gender: genders.includes(mem.gender) ? mem.gender : 'unknown',
+        relationshipToSam: mem.relationshipType && mem.relationshipType !== 'stranger'
+          ? `${mem.relationshipType.charAt(0).toUpperCase() + mem.relationshipType.slice(1)}`
+          : 'Follower / Online Contact',
+        connections: [],
+        lore: mem.personalNotes ? [mem.personalNotes] : ((mem.facts || []).map(f => f.fact).filter(Boolean)),
+        languages: ['English'],
+        roastStyle: 'Casual & friendly',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      // Upsert by sender so a webhook adding the same person at the same moment cannot make a duplicate
+      ops.push({ updateOne: { filter: { ownerId, senderId: mem.senderId }, update: { $setOnInsert: doc }, upsert: true } });
+      indexNode({ ...doc, _id: null });
+    }
+
+    if (ops.length) {
+      const r = await SocialGraph.bulkWrite(ops, { ordered: false });
+      const added = r.upsertedCount || 0, linked = r.modifiedCount || 0;
+      if (added || linked) console.log(`✨ [SocialGraph] Creator ${ownerId}: ${added} new contacts, ${linked} linked.`);
     }
   }
 
