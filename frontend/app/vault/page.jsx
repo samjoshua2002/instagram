@@ -449,8 +449,14 @@ function MediaVaultPageInner() {
       const data = await res.json();
       if (data.success) {
         showToast(`Category renamed to "${renameTargetName}"!`, 'success');
+        // Items moved to the new name: follow them if the old one was selected
+        const oldId = renameModalCategory.id;
+        const newId = renameTargetName.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+        if (Array.isArray(data.categories)) setCategories(data.categories);
+        if (selectedCategory === oldId) setSelectedCategory(newId);
         setRenameModalCategory(null);
-        fetchVaultData();
+        if (activeCategory === oldId) setActiveCategory(newId); // refetches via the effect
+        else fetchVaultData();
       } else {
         showToast(data.error || 'Rename failed', 'error');
       }
