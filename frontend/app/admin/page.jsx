@@ -137,8 +137,8 @@ export default function SuperadminPage() {
     return (
       <div className="page-container" style={{ maxWidth: '800px', margin: '40px auto', textAlign: 'center' }}>
         <div style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
           borderRadius: '12px',
           padding: '48px 24px',
           boxShadow: '0 4px 14px rgba(0, 0, 0, 0.04)'
@@ -147,8 +147,8 @@ export default function SuperadminPage() {
             width: '56px',
             height: '56px',
             borderRadius: '50%',
-            background: '#fef2f2',
-            color: '#ef4444',
+            background: 'var(--danger-bg)',
+            color: 'var(--danger)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -156,18 +156,18 @@ export default function SuperadminPage() {
           }}>
             <Lock size={28} />
           </div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#09090b', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text)', marginBottom: '8px' }}>
             Superadmin Access Required
           </h2>
-          <p style={{ color: '#71717a', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 20px', lineHeight: 1.5 }}>
             This command dashboard is strictly restricted to platform administrators with the superadmin role.
           </p>
           <a
             href="/"
             style={{
               display: 'inline-block',
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--primary)',
+              color: 'var(--primary-fg)',
               padding: '9px 18px',
               borderRadius: '6px',
               fontSize: '0.84rem',
@@ -194,25 +194,25 @@ export default function SuperadminPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
               PLATFORM GOVERNANCE
             </span>
             <span style={{
               fontSize: '0.62rem',
               fontWeight: '800',
               fontFamily: "'JetBrains Mono', monospace",
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--primary)',
+              color: 'var(--primary-fg)',
               padding: '2px 6px',
               borderRadius: '4px'
             }}>
               SUPERADMIN
             </span>
           </div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px', color: '#09090b' }}>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px', color: 'var(--text)' }}>
             Connected Accounts & Directory
           </h1>
-          <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
             Real-time multi-account observatory: monitor registered user accounts, Instagram handle identities, and active circle member topologies.
           </p>
         </div>
@@ -222,13 +222,13 @@ export default function SuperadminPage() {
           onClick={fetchAdminData}
           disabled={loading}
           style={{
-            background: '#ffffff',
-            border: '1px solid #e4e4e7',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
             padding: '8px 16px',
             borderRadius: '8px',
             fontSize: '0.78rem',
             fontWeight: '600',
-            color: '#09090b',
+            color: 'var(--text)',
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
@@ -244,11 +244,11 @@ export default function SuperadminPage() {
       {/* Error Alert */}
       {error && (
         <div style={{
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
+          background: 'var(--danger-bg)',
+          border: '1px solid var(--danger-border)',
           borderRadius: '8px',
           padding: '12px 16px',
-          color: '#b91c1c',
+          color: 'var(--danger)',
           marginBottom: '20px',
           display: 'flex',
           alignItems: 'center',
@@ -263,73 +263,73 @@ export default function SuperadminPage() {
       {/* Metric Summary Cards */}
       <div className="responsive-grid-4" style={{ marginBottom: '24px' }}>
         <div style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
-          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)',
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
             REGISTERED ACCOUNTS
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#09090b', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text)', marginTop: '6px' }}>
             {data?.totalAccounts ?? (loading ? '...' : 0)}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             Active platform users
           </div>
         </div>
 
         <div style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
-          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)',
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
             TOTAL CIRCLE MEMBERS
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#09090b', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text)', marginTop: '6px' }}>
             {data?.totalContacts ?? (loading ? '...' : 0)}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             SocialGraph mapped contacts
           </div>
         </div>
 
         <div style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
-          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)',
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
             CLOSE FRIENDS
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#16a34a', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--success)', marginTop: '6px' }}>
             {data?.contactsBreakdown?.closeFriends ?? (loading ? '...' : 0)}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             High-affinity inner circle
           </div>
         </div>
 
         <div style={{
-          background: '#ffffff',
-          border: '1px solid #e4e4e7',
-          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)',
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '0.7rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
             ONLINE & DM NETWORK
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#0284c7', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--info)', marginTop: '6px' }}>
             {data?.contactsBreakdown?.onlineFriends ?? (loading ? '...' : 0)}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '4px' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             Instagram chat relationships
           </div>
         </div>
@@ -337,8 +337,8 @@ export default function SuperadminPage() {
 
       {/* Main Section */}
       <div style={{
-        background: '#ffffff',
-        border: '1px solid #e4e4e7',
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
         borderRadius: '12px',
         padding: '20px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
@@ -350,11 +350,11 @@ export default function SuperadminPage() {
               type="button"
               onClick={() => setActiveTab('accounts')}
               style={{
-                background: activeTab === 'accounts' ? '#09090b' : '#f4f4f5',
-                color: activeTab === 'accounts' ? '#ffffff' : '#71717a',
+                background: activeTab === 'accounts' ? 'var(--primary)' : 'var(--bg-hover)',
+                color: activeTab === 'accounts' ? 'var(--primary-fg)' : '#52525b',
                 border: 'none',
                 padding: '7px 16px',
-                borderRadius: '7px',
+                borderRadius: 'var(--r-md)',
                 fontSize: '0.8rem',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -371,11 +371,11 @@ export default function SuperadminPage() {
               type="button"
               onClick={() => setActiveTab('members')}
               style={{
-                background: activeTab === 'members' ? '#09090b' : '#f4f4f5',
-                color: activeTab === 'members' ? '#ffffff' : '#71717a',
+                background: activeTab === 'members' ? 'var(--primary)' : 'var(--bg-hover)',
+                color: activeTab === 'members' ? 'var(--primary-fg)' : '#52525b',
                 border: 'none',
                 padding: '7px 16px',
-                borderRadius: '7px',
+                borderRadius: 'var(--r-md)',
                 fontSize: '0.8rem',
                 fontWeight: '700',
                 cursor: 'pointer',
@@ -390,7 +390,7 @@ export default function SuperadminPage() {
           </div>
 
           <div style={{ position: 'relative', width: '280px', maxWidth: '100%' }}>
-            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
               placeholder={activeTab === 'accounts' ? "Search accounts or handles..." : "Search members..."}
@@ -418,9 +418,9 @@ export default function SuperadminPage() {
                   key={account.id}
                   style={{
                     border: '1px solid',
-                    borderColor: isSuper ? '#09090b' : '#e4e4e7',
-                    borderRadius: '10px',
-                    background: isSuper ? '#fafafa' : '#ffffff',
+                    borderColor: isSuper ? 'var(--primary)' : 'var(--border)',
+                    borderRadius: 'var(--r-lg)',
+                    background: isSuper ? 'var(--bg-subtle)' : 'var(--bg)',
                     overflow: 'hidden',
                     transition: 'all 0.15s ease'
                   }}
@@ -443,8 +443,8 @@ export default function SuperadminPage() {
                         width: '42px',
                         height: '42px',
                         borderRadius: '50%',
-                        background: '#09090b',
-                        color: '#ffffff',
+                        background: 'var(--primary)',
+                        color: 'var(--primary-fg)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -462,7 +462,7 @@ export default function SuperadminPage() {
 
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: '800', fontSize: '0.92rem', color: '#09090b' }}>
+                          <span style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--text)' }}>
                             {account.firstName ? `${account.firstName} ${account.lastName || ''}`.trim() : account.username}
                           </span>
                           {isSuper ? (
@@ -470,8 +470,8 @@ export default function SuperadminPage() {
                               fontSize: '0.62rem',
                               fontFamily: "'JetBrains Mono', monospace",
                               fontWeight: '800',
-                              background: '#09090b',
-                              color: '#ffffff',
+                              background: 'var(--primary)',
+                              color: 'var(--primary-fg)',
                               padding: '2px 6px',
                               borderRadius: '4px'
                             }}>
@@ -482,8 +482,8 @@ export default function SuperadminPage() {
                               fontSize: '0.62rem',
                               fontFamily: "'JetBrains Mono', monospace",
                               fontWeight: '700',
-                              background: '#f4f4f5',
-                              color: '#71717a',
+                              background: 'var(--bg-hover)',
+                              color: '#52525b',
                               padding: '2px 6px',
                               borderRadius: '4px'
                             }}>
@@ -492,7 +492,7 @@ export default function SuperadminPage() {
                           )}
                         </div>
 
-                        <div style={{ fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                           {account.email} • @{account.username}
                         </div>
                       </div>
@@ -500,17 +500,17 @@ export default function SuperadminPage() {
 
                     {/* Instagram Handle & Permanent ID */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '160px' }}>
-                      <span style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                         INSTAGRAM IDENTITY
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Instagram size={13} color="#e1306c" />
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#09090b', fontFamily: "'JetBrains Mono', monospace" }}>
+                        <Instagram size={13} color="#09090b" />
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}>
                           {account.instagramUsername ? `@${account.instagramUsername}` : 'Not connected'}
                         </span>
                       </div>
                       {account.instagramId && (
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--success)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>
                           Permanent ID: {account.instagramId}
                         </span>
                       )}
@@ -519,11 +519,11 @@ export default function SuperadminPage() {
                     {/* Security & Members Count */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.76rem', color: '#09090b', fontWeight: '700' }}>
-                          <Fingerprint size={14} color={account.hasPasskeys ? '#16a34a' : '#a1a1aa'} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.76rem', color: 'var(--text)', fontWeight: '700' }}>
+                          <Fingerprint size={14} color={account.hasPasskeys ? '#15803d' : '#71717a'} />
                           <span>{account.hasPasskeys ? `${account.passkeyCount} Passkey(s)` : 'Password'}</span>
                         </div>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                           Joined {account.createdAt ? new Date(account.createdAt).toLocaleDateString() : 'N/A'}
                         </span>
                       </div>
@@ -537,10 +537,10 @@ export default function SuperadminPage() {
                         disabled={enteringId === account.id}
                         title="Enter and manage this workspace"
                         style={{
-                          background: '#09090b',
-                          color: '#ffffff',
+                          background: 'var(--primary)',
+                          color: 'var(--primary-fg)',
                           border: 'none',
-                          borderRadius: '7px',
+                          borderRadius: 'var(--r-md)',
                           padding: '6px 12px',
                           fontSize: '0.74rem',
                           fontWeight: '700',
@@ -550,7 +550,7 @@ export default function SuperadminPage() {
                           gap: '5px'
                         }}
                       >
-                        <Shield size={12} color="#22c55e" />
+                        <Shield size={12} color="#15803d" />
                         <span>{enteringId === account.id ? 'Opening...' : 'Manage'}</span>
                       </button>
 
@@ -564,10 +564,10 @@ export default function SuperadminPage() {
                           disabled={deletingId === account.id}
                           title="Permanently delete this account"
                           style={{
-                            background: '#ffffff',
-                            color: '#dc2626',
-                            border: '1px solid #fecaca',
-                            borderRadius: '7px',
+                            background: 'var(--bg)',
+                            color: 'var(--danger)',
+                            border: '1px solid var(--danger-border)',
+                            borderRadius: 'var(--r-md)',
                             padding: '6px 10px',
                             fontSize: '0.74rem',
                             fontWeight: '700',
@@ -586,11 +586,11 @@ export default function SuperadminPage() {
                         width: '32px',
                         height: '32px',
                         borderRadius: '6px',
-                        background: '#f4f4f5',
+                        background: 'var(--bg-hover)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#71717a'
+                        color: 'var(--text-muted)'
                       }}>
                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </div>
@@ -601,36 +601,36 @@ export default function SuperadminPage() {
                   {isExpanded && (
                     <div style={{
                       padding: '16px 18px',
-                      borderTop: '1px solid #e4e4e7',
-                      background: '#ffffff',
+                      borderTop: '1px solid var(--border)',
+                      background: 'var(--bg)',
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                       gap: '14px',
                       fontSize: '0.78rem'
                     }}>
                       <div>
-                        <span style={{ color: '#71717a', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
                           MOBILE NUMBER
                         </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>
                           {account.mobileNumber || 'Not provided'}
                         </span>
                       </div>
 
                       <div>
-                        <span style={{ color: '#71717a', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
                           LAST ACTIVITY
                         </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>
                           {account.lastLogin ? new Date(account.lastLogin).toLocaleString() : 'Recent'}
                         </span>
                       </div>
 
                       <div>
-                        <span style={{ color: '#71717a', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: '700', display: 'block', marginBottom: '2px' }}>
                           INTERNAL DATABASE ID
                         </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#71717a', fontSize: '0.72rem' }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-muted)', fontSize: '0.72rem' }}>
                           {account.id}
                         </span>
                       </div>
@@ -641,7 +641,7 @@ export default function SuperadminPage() {
             })}
 
             {filteredAccounts.length === 0 && !loading && (
-              <div style={{ textAlign: 'center', padding: '36px', color: '#a1a1aa', fontSize: '0.85rem' }}>
+              <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 No accounts match your query.
               </div>
             )}
@@ -653,34 +653,34 @@ export default function SuperadminPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
               <thead>
-                <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                     PERSON
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                     INSTAGRAM HANDLE
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                     CATEGORY
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                     RELATIONSHIP
                   </th>
-                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
+                  <th style={{ padding: '10px 14px', fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", textAlign: 'right' }}>
                     LORE FACTS
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredMembers.map((member) => (
-                  <tr key={member.id} style={{ borderBottom: '1px solid #f4f4f5' }}>
+                  <tr key={member.id} style={{ borderBottom: '1px solid var(--bg-hover)' }}>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          background: '#f4f4f5',
+                          background: 'var(--bg-hover)',
                           overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
@@ -694,14 +694,14 @@ export default function SuperadminPage() {
                             member.name?.[0] || 'P'
                           )}
                         </div>
-                        <span style={{ fontWeight: '700', fontSize: '0.84rem', color: '#09090b' }}>
+                        <span style={{ fontWeight: '700', fontSize: '0.84rem', color: 'var(--text)' }}>
                           {member.name}
                         </span>
                       </div>
                     </td>
 
                     <td style={{ padding: '12px 14px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.78rem', color: '#52525b' }}>
-                      {member.handle ? `@${member.handle}` : <span style={{ color: '#d4d4d8' }}>None</span>}
+                      {member.handle ? `@${member.handle}` : <span style={{ color: 'var(--text-muted)' }}>None</span>}
                     </td>
 
                     <td style={{ padding: '12px 14px' }}>
@@ -711,14 +711,14 @@ export default function SuperadminPage() {
                         fontFamily: "'JetBrains Mono', monospace",
                         padding: '3px 8px',
                         borderRadius: '4px',
-                        background: member.category === 'close_friend' ? '#f0fdf4' : '#f4f4f5',
-                        color: member.category === 'close_friend' ? '#16a34a' : '#71717a'
+                        background: member.category === 'close_friend' ? 'var(--success-bg)' : 'var(--bg-hover)',
+                        color: member.category === 'close_friend' ? 'var(--success)' : '#52525b'
                       }}>
                         {member.category?.toUpperCase() || 'ONLINE_FRIEND'}
                       </span>
                     </td>
 
-                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: '#71717a' }}>
+                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       {member.relationship || 'Friend'}
                     </td>
 
@@ -731,7 +731,7 @@ export default function SuperadminPage() {
             </table>
 
             {filteredMembers.length === 0 && !loading && (
-              <div style={{ textAlign: 'center', padding: '36px', color: '#a1a1aa', fontSize: '0.85rem' }}>
+              <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 No members found matching your search.
               </div>
             )}
