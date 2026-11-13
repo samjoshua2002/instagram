@@ -50,7 +50,7 @@ class ReminderService {
         lastInteraction: { $gte: policyCutoff, $lte: cutoffTime },
       });
 
-      const botAccountId = config.instagramAccountId || owner.instagramAccountId || process.env.INSTAGRAM_ACCOUNT_ID || '17841446877896232';
+      const botAccountId = config.instagramAccountId || owner.instagramAccountId || (owner.role === 'superadmin' ? process.env.INSTAGRAM_ACCOUNT_ID : '') || '';
       const excluded = new Set(config.excludedContactIds || []);
       const included = new Set(config.includedContactIds || []);
 

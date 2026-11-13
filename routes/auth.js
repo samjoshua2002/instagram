@@ -1047,7 +1047,7 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     // Sync with PersonaConfig
     try {
       const PersonaConfig = require('../models/PersonaConfig');
-      let persona = await PersonaConfig.findOne({ ownerId: user._id });
+      let persona = await PersonaConfig.forOwner(user._id);
       if (!persona) {
         persona = new PersonaConfig({ ownerId: user._id });
       }

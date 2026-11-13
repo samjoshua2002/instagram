@@ -1,4 +1,5 @@
 const { AzureOpenAI } = require('openai');
+const { creatorIdentity, personalize } = require('./creatorIdentity');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const redisService = require('./redisService');
@@ -79,7 +80,7 @@ class MemoryService {
         if (memory.recentChatBuffer && memory.recentChatBuffer.length > 0) {
           messagesToAnalyze = memory.recentChatBuffer.map(b => ({
             role: b.role,
-            senderId: b.role === 'assistant' ? '17841446877896232' : senderId,
+            senderId: b.role === 'assistant' ? 'me' : senderId,
             text: b.text
           }));
         } else {
@@ -107,10 +108,11 @@ class MemoryService {
         return;
       }
 
+      const creator = await creatorIdentity(ownerId);
       const formattedChat = messagesToAnalyze
         .map(m => {
-          const isSam = m.role === 'assistant' || m.senderId === '17841446877896232' || m.senderId === 'me';
-          const speaker = isSam ? 'Sam' : (memory.name || memory.username || 'User');
+          const isCreator = m.role === 'assistant' || m.senderId === 'me' || creator.accountIds.includes(String(m.senderId));
+          const speaker = isCreator ? creator.name : (memory.name || memory.username || 'User');
           return `${speaker}: ${m.text}`;
         })
         .join('\n');
@@ -144,7 +146,7 @@ INSTRUCTIONS:
    - Any nicknames Sam uses for them or they use for Sam.
    - Exact birthday / DOB if mentioned or celebrated anywhere in the chat.
    - School, college, workplace, or city/location if mentioned.
-   - Gender: female, male, neutral, unknown (infer accurately from their name e.g. Mikasa/Priya is female, Alex/Sam/User is neutral/unknown unless stated, or from how they speak).
+   - Gender: female, male, neutral, unknown (infer accurately from their name e.g. Mikasa/Priya is female, Alex/User is neutral/unknown unless stated, or from how they speak).
    - Real facts about their life, family, pets, hobbies, struggles, projects.
 
 2. TEXTING STYLE (HOW THEY TEXT):
@@ -201,7 +203,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
       const response = await this.client.chat.completions.create({
         messages: [
           { role: 'system', content: 'You are an empathetic, razor-sharp chat memory analyst. Output pure valid JSON.' },
-          { role: 'user', content: prompt }
+          { role: 'user', content: personalize(prompt, creator.name) }
         ],
         temperature: 0.25,
         response_format: { type: 'json_object' }
@@ -495,7 +497,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
   async batchSyncAllChatsFromMongo(ownerId, botIdsExtra = []) {
     console.log('🔄 [Batch Memory Sync]: Starting full backfill from 1-month chat data in MongoDB...');
     if (!ownerId) return [];
-    const botIds = ['me', '17841446877896232', ...botIdsExtra.filter(Boolean)];
+    const botIds = ['me', ...botIdsExtra.filter(Boolean).map(String)];
     const memoryUsers = await UserMemory.distinct('senderId', { ownerId, senderId: { $nin: botIds } });
 
     // Message counts per contact in ONE aggregate (no per-contact query), most active first
