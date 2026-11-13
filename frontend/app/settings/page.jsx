@@ -85,11 +85,13 @@ function SettingsPageInner() {
           ...(igUser ? { instagramHandle: `@${igUser.replace(/^@/, '')}` } : {}),
           ...(igId ? { instagramAccountId: igId } : {}),
         }));
+        stopOauthPoll();
         setOauthConnecting(false);
         // The token is no longer sent to the browser: re-read account + persona from the server
         Promise.resolve(refreshAccount?.()).finally(() => fetchPersonaRef.current?.());
         showToast?.(`Instagram connected: @${igUser || 'account'}! Credentials updated.`, 'success');
       } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
+        stopOauthPoll();
         setOauthConnecting(false);
         setErrorMsg(event.data.error || 'Instagram connection cancelled or failed.');
       }
@@ -98,20 +100,53 @@ function SettingsPageInner() {
     return () => window.removeEventListener('message', handleOAuthMessage);
   }, [API_BASE, showToast, refreshAccount]);
 
-  const handleLaunchInstagramOAuth = () => {
+  // Watches the OAuth popup so oauthConnecting never stays stuck after the user closes it
+  const oauthPollRef = React.useRef(null);
+  const stopOauthPoll = () => {
+    if (oauthPollRef.current) {
+      clearInterval(oauthPollRef.current);
+      oauthPollRef.current = null;
+    }
+  };
+  useEffect(() => () => stopOauthPoll(), []);
+
+  const handleLaunchInstagramOAuth = async () => {
     setErrorMsg('');
-    setOauthConnecting(true);
+    stopOauthPoll();
+    // Open the window synchronously inside the click so popup blockers allow it
+    let popup = null;
     try {
-      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-      const oauthUrl = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&token=${encodeURIComponent(token || '')}`;
-      const popup = window.open(oauthUrl, 'instagram_oauth', 'width=620,height=720,left=250,top=100');
-      if (!popup) {
-        setOauthConnecting(false);
-        setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
-      }
+      popup = window.open('', 'instagram_oauth', 'width=620,height=720,left=250,top=100');
     } catch (e) {
+      popup = null;
+    }
+    if (!popup) {
+      setErrorMsg('Popup was blocked by your browser. Please allow popups or enter your credentials below.');
+      return;
+    }
+    setOauthConnecting(true);
+    oauthPollRef.current = setInterval(() => {
+      if (popup.closed) {
+        stopOauthPoll();
+        setOauthConnecting(false);
+      }
+    }, 500);
+    try {
+      // Single-use, short-lived ticket so the session JWT never goes in the URL
+      const res = await fetch(`${API_BASE}/api/auth/instagram/connect-ticket`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ticket) throw new Error(data.error || 'Could not start Instagram login');
+      const clientOrigin = window.location.origin;
+      popup.location.href = `${API_BASE}/api/auth/instagram/connect?origin=${encodeURIComponent(clientOrigin)}&ticket=${encodeURIComponent(data.ticket)}`;
+    } catch (e) {
+      stopOauthPoll();
+      try { popup.close(); } catch (_) {}
       setOauthConnecting(false);
       setErrorMsg('Failed to open login dialog: ' + e.message);
+      showToast?.(e.message || 'Could not start Instagram login', 'error');
     }
   };
 
@@ -348,14 +383,19 @@ function SettingsPageInner() {
         })
       });
 
-      const data = await res.json();
-      if (data.success && data.reply) {
-        setTestMessages(prev => [...prev, { role: 'assistant', text: data.reply }]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || `Test chat failed (${res.status})`;
+        setTestMessages(prev => [...prev, { role: 'assistant', text: `(Error: ${msg})` }]);
+        showToast?.(msg, 'error');
+      } else if (data.replyText) {
+        setTestMessages(prev => [...prev, { role: 'assistant', text: data.replyText }]);
       } else {
-        setTestMessages(prev => [...prev, { role: 'assistant', text: '(AI generation error or empty response)' }]);
+        setTestMessages(prev => [...prev, { role: 'assistant', text: '(The AI returned an empty reply)' }]);
       }
     } catch (err) {
       setTestMessages(prev => [...prev, { role: 'assistant', text: '(Connection failed to simulator)' }]);
+      showToast?.('Could not reach the server: ' + (err.message || 'network error'), 'error');
     } finally {
       setTestSending(false);
     }
