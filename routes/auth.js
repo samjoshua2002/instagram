@@ -186,6 +186,15 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
+// Sign-in methods (passkeys, OneAuth/TOTP, login name) can only be changed by the account owner,
+// never from a superadmin's 1-hour workspace view: that would give lasting access to the account
+const notWhileImpersonating = (req, res, next) => {
+  if (req.impersonatedBy) {
+    return res.status(403).json({ error: 'Sign-in settings can only be changed by the account owner, not from a workspace view.' });
+  }
+  next();
+};
+
 /**
  * POST /api/auth/register/request-otp
  * Step 1: Validate registration details and dispatch 6-digit email verification OTP
@@ -657,7 +666,7 @@ router.post('/oneauth/verify-setup-otp', authLimiter, async (req, res) => {
  * Returns the QR code of the logged-in user only.
  * (Before login, use /oneauth/request-setup-otp → /oneauth/verify-setup-otp.)
  */
-router.get('/oneauth/qr', requireAuth, async (req, res) => {
+router.get('/oneauth/qr', requireAuth, notWhileImpersonating, async (req, res) => {
   try {
     const user = req.user;
 
@@ -920,7 +929,7 @@ router.post('/passkey/login-verify', authLimiter, async (req, res) => {
  * POST /api/auth/passkey/register-options (Protected)
  * Starts passkey registration for current user
  */
-router.post('/passkey/register-options', requireAuth, async (req, res) => {
+router.post('/passkey/register-options', requireAuth, notWhileImpersonating, async (req, res) => {
   try {
     const options = await authService.generatePasskeyRegistrationOptions(req.user, req);
     res.json(options);
@@ -934,7 +943,7 @@ router.post('/passkey/register-options', requireAuth, async (req, res) => {
  * POST /api/auth/passkey/register-verify (Protected)
  * Completes passkey registration for current user
  */
-router.post('/passkey/register-verify', requireAuth, async (req, res) => {
+router.post('/passkey/register-verify', requireAuth, notWhileImpersonating, async (req, res) => {
   try {
     const { response, name } = req.body || {};
     if (!response || typeof response !== 'object') return res.status(400).json({ error: 'Registration response required' });
@@ -978,7 +987,7 @@ router.post('/passkey/register-verify', requireAuth, async (req, res) => {
  * GET /api/auth/totp-setup (Protected)
  * Returns QR code and secret for setting up Zoho OneAuth app
  */
-router.get('/totp-setup', requireAuth, async (req, res) => {
+router.get('/totp-setup', requireAuth, notWhileImpersonating, async (req, res) => {
   try {
     const totpData = await authService.getTotpQrCode(req.user);
     res.json({
@@ -1637,6 +1646,9 @@ router.put('/profile', requireAuth, async (req, res) => {
     }
 
     // Username change: sanitize like registration and enforce uniqueness
+    if (typeof username === 'string' && username.trim() && req.impersonatedBy && username.trim().toLowerCase() !== (user.username || '').toLowerCase()) {
+      return res.status(403).json({ error: 'The login username can only be changed by the account owner.' });
+    }
     if (typeof username === 'string' && username.trim()) {
       const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
       if (cleanUsername.length < 3) {
@@ -1716,7 +1728,7 @@ router.put('/profile', requireAuth, async (req, res) => {
  * PUT /api/auth/passkeys/:credentialId (Protected)
  * Renames a registered passkey
  */
-router.put('/passkeys/:credentialId', requireAuth, async (req, res) => {
+router.put('/passkeys/:credentialId', requireAuth, notWhileImpersonating, async (req, res) => {
   try {
     const { credentialId } = req.params;
     const { name } = req.body || {};
@@ -1739,7 +1751,7 @@ router.put('/passkeys/:credentialId', requireAuth, async (req, res) => {
  * DELETE /api/auth/passkeys/:credentialId (Protected)
  * Removes a registered passkey
  */
-router.delete('/passkeys/:credentialId', requireAuth, async (req, res) => {
+router.delete('/passkeys/:credentialId', requireAuth, notWhileImpersonating, async (req, res) => {
   try {
     const { credentialId } = req.params;
     req.user.passkeys = (req.user.passkeys || []).filter(p => p.credentialId !== credentialId);
