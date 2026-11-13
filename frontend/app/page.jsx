@@ -96,27 +96,27 @@ function BarRow({ label, handle, value, max, index }) {
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.6, delay: 0.2 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
-      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f4f4f5' }}
+      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--bg-hover)' }}
     >
-      <span style={{ width: '16px', fontSize: '0.66rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textAlign: 'right', flexShrink: 0 }}>
+      <span style={{ width: '16px', fontSize: '0.66rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textAlign: 'right', flexShrink: 0 }}>
         {index + 1}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
-          <span style={{ fontSize: '0.81rem', fontWeight: '700', color: '#09090b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>{label}</span>
-          <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: '8px' }}>
+          <span style={{ fontSize: '0.81rem', fontWeight: '700', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>{label}</span>
+          <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: '8px' }}>
             <AnimatedNumber value={value} duration={1.6} />
           </span>
         </div>
-        <div style={{ width: '100%', height: '6px', background: '#f4f4f5', borderRadius: '3px', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '6px', background: 'var(--bg-hover)', borderRadius: '3px', overflow: 'hidden' }}>
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${pct}%` }}
             transition={{ duration: 1.6, delay: 0.25 + index * 0.12, ease: [0.16, 1, 0.3, 1] }}
-            style={{ height: '100%', background: shades[index] || '#d4d4d8', borderRadius: '3px' }}
+            style={{ height: '100%', background: shades[index] || 'var(--border-strong)', borderRadius: '3px' }}
           />
         </div>
-        {handle && <div style={{ fontSize: '0.63rem', color: '#a1a1aa', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>{handle}</div>}
+        {handle && <div style={{ fontSize: '0.63rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", marginTop: '2px' }}>{handle}</div>}
       </div>
     </motion.div>
   );
@@ -403,13 +403,13 @@ export default function AnalyticsPage() {
       {/* HEADER WITH VIEW SWITCHER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
-          <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em' }}>
             {isSuperadmin ? 'SUPERADMIN OBSERVATORY' : 'COMMAND CENTER'}
           </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-0.7px', marginTop: '4px', color: '#09090b' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900', letterSpacing: '-0.7px', marginTop: '4px', color: 'var(--text)' }}>
             {isSuperadmin && activeTab === 'platform' ? 'Platform Users & Workspaces' : 'Analytics Overview'}
           </h1>
-          <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
             {isSuperadmin && activeTab === 'platform'
               ? 'Multi-tenant management for all registered accounts, connected Instagram workspaces, and automations.'
               : 'Real-time analytics on your contacts, interaction volume, and AI routing.'}
@@ -425,14 +425,14 @@ export default function AnalyticsPage() {
               gap: '6px',
               padding: '6px 12px',
               borderRadius: '8px',
-              background: '#f4f4f5',
-              border: '1px solid #e4e4e7',
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border)',
               fontSize: '0.74rem',
               fontWeight: '700',
               fontFamily: "'JetBrains Mono', monospace",
-              color: '#09090b'
+              color: 'var(--text)'
             }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)' }} />
               <span>SUPERADMIN OBSERVATORY</span>
             </div>
 
@@ -447,8 +447,8 @@ export default function AnalyticsPage() {
                 gap: '6px',
                 padding: '6px 12px',
                 borderRadius: '8px',
-                background: '#09090b',
-                color: '#ffffff',
+                background: 'var(--primary)',
+                color: 'var(--primary-fg)',
                 border: 'none',
                 fontSize: '0.74rem',
                 fontWeight: '700',
@@ -481,8 +481,8 @@ export default function AnalyticsPage() {
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
               style={{
-                background: '#fff',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '18px',
                 display: 'flex',
@@ -493,18 +493,18 @@ export default function AnalyticsPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
                   Total Creators & Users
                 </span>
-                <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '5px', borderRadius: '6px', color: 'var(--text)' }}>
                   <Users size={15} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--text)', letterSpacing: '-1.5px', lineHeight: 1 }}>
                   <AnimatedNumber value={kpiMetrics.total} duration={1.6} />
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
                   {kpiMetrics.admins} Superadmin • {kpiMetrics.regular} Users
                 </div>
               </div>
@@ -516,8 +516,8 @@ export default function AnalyticsPage() {
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
               style={{
-                background: '#fff',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '18px',
                 display: 'flex',
@@ -528,18 +528,18 @@ export default function AnalyticsPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
                   Active Automations
                 </span>
-                <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '5px', borderRadius: '6px', color: 'var(--text)' }}>
                   <Bot size={15} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--text)', letterSpacing: '-1.5px', lineHeight: 1 }}>
                   <AnimatedNumber value={kpiMetrics.activeInstagram} duration={1.6} />
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
                   {kpiMetrics.notConnected} Not connected
                 </div>
               </div>
@@ -551,8 +551,8 @@ export default function AnalyticsPage() {
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
               style={{
-                background: '#fff',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '18px',
                 display: 'flex',
@@ -563,18 +563,18 @@ export default function AnalyticsPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
                   Instagram Workspaces
                 </span>
-                <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '5px', borderRadius: '6px', color: 'var(--text)' }}>
                   <Instagram size={15} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--text)', letterSpacing: '-1.5px', lineHeight: 1 }}>
                   <AnimatedNumber value={kpiMetrics.activeInstagram} duration={1.6} />
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
                   {kpiMetrics.pendingApproval > 0 ? `${kpiMetrics.pendingApproval} Pending whitelist` : 'Multi-account webhooks live'}
                 </div>
               </div>
@@ -586,8 +586,8 @@ export default function AnalyticsPage() {
               variants={statCardVariants}
               whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
               style={{
-                background: '#fff',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '18px',
                 display: 'flex',
@@ -598,18 +598,18 @@ export default function AnalyticsPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>
                   Account Structure
                 </span>
-                <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '5px', borderRadius: '6px', color: 'var(--text)' }}>
                   <Building2 size={15} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                <div style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--text)', letterSpacing: '-1.5px', lineHeight: 1 }}>
                   <AnimatedNumber value={kpiMetrics.business} duration={1.6} />
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>
                   Business accounts • {kpiMetrics.personal} Personal
                 </div>
               </div>
@@ -619,8 +619,8 @@ export default function AnalyticsPage() {
 
           {/* MAIN USERS DIRECTORY CONTAINER */}
           <div style={{
-            background: '#ffffff',
-            border: '1px solid #e4e4e7',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
             borderRadius: '12px',
             padding: '22px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
@@ -628,8 +628,8 @@ export default function AnalyticsPage() {
             {/* Meta Sandbox Pending Whitelist Alert Banner */}
             {kpiMetrics.pendingApproval > 0 && (
               <div style={{
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
+                background: 'var(--warning-bg)',
+                border: '1px solid var(--warning-border)',
                 borderRadius: '8px',
                 padding: '10px 14px',
                 marginBottom: '18px',
@@ -639,10 +639,10 @@ export default function AnalyticsPage() {
                 flexWrap: 'wrap',
                 gap: '10px',
                 fontSize: '0.78rem',
-                color: '#92400e'
+                color: 'var(--warning)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                  <AlertCircle size={16} color="#b45309" style={{ flexShrink: 0 }} />
                   <span>
                     <strong>{kpiMetrics.pendingApproval} Creator(s) waiting for Meta Sandbox Whitelist:</strong> Add their Instagram username in <em>Meta App Roles &rarr; Roles (Instagram Testers)</em>, then click <strong>Approve &amp; Email</strong> to dispatch invite instructions.
                   </span>
@@ -654,13 +654,13 @@ export default function AnalyticsPage() {
                     setCurrentPage(1);
                   }}
                   style={{
-                    background: '#fef3c7',
-                    border: '1px solid #fcd34d',
+                    background: 'var(--warning-bg)',
+                    border: '1px solid var(--warning-border)',
                     borderRadius: '6px',
                     padding: '4px 9px',
                     fontSize: '0.72rem',
                     fontWeight: '700',
-                    color: '#b45309',
+                    color: 'var(--warning)',
                     cursor: 'pointer'
                   }}
                 >
@@ -695,9 +695,9 @@ export default function AnalyticsPage() {
                       fontSize: '0.76rem',
                       fontWeight: '700',
                       border: '1px solid',
-                      borderColor: filterType === f.id ? '#09090b' : '#e4e4e7',
-                      background: filterType === f.id ? '#09090b' : '#ffffff',
-                      color: filterType === f.id ? '#ffffff' : '#52525b',
+                      borderColor: filterType === f.id ? 'var(--primary)' : 'var(--border)',
+                      background: filterType === f.id ? 'var(--primary)' : 'var(--bg)',
+                      color: filterType === f.id ? 'var(--primary-fg)' : '#52525b',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease'
                     }}
@@ -715,7 +715,7 @@ export default function AnalyticsPage() {
                   display: 'flex',
                   alignItems: 'center'
                 }}>
-                  <Search size={14} style={{ position: 'absolute', left: '11px', color: '#a1a1aa' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '11px', color: 'var(--text-muted)' }} />
                   <input
                     type="text"
                     value={adminSearch}
@@ -728,10 +728,10 @@ export default function AnalyticsPage() {
                       width: '100%',
                       padding: '8px 12px 8px 32px',
                       borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
+                      border: '1px solid var(--border)',
                       fontSize: '0.8rem',
                       outline: 'none',
-                      background: '#fcfcfc'
+                      background: 'var(--bg-subtle)'
                     }}
                   />
                 </div>
@@ -743,10 +743,10 @@ export default function AnalyticsPage() {
                   style={{
                     padding: '8px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
                     cursor: 'pointer',
-                    color: '#09090b'
+                    color: 'var(--text)'
                   }}
                 >
                   <RefreshCw size={14} className={adminLoading ? 'spin' : ''} />
@@ -757,9 +757,9 @@ export default function AnalyticsPage() {
             {/* Error Banner */}
             {adminError && (
               <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#b91c1c',
+                background: 'var(--danger-bg)',
+                border: '1px solid var(--danger-border)',
+                color: 'var(--danger)',
                 padding: '10px 14px',
                 borderRadius: '8px',
                 fontSize: '0.8rem',
@@ -778,8 +778,8 @@ export default function AnalyticsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{
-                    borderBottom: '1.5px solid #e4e4e7',
-                    color: '#71717a',
+                    borderBottom: '1.5px solid var(--border)',
+                    color: 'var(--text-muted)',
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: '0.68rem',
                     textTransform: 'uppercase',
@@ -807,8 +807,8 @@ export default function AnalyticsPage() {
                         <React.Fragment key={acc.id}>
                           <tr
                             style={{
-                              borderBottom: '1px solid #f4f4f5',
-                              background: isExpanded ? '#fafafa' : '#ffffff',
+                              borderBottom: '1px solid var(--bg-hover)',
+                              background: isExpanded ? 'var(--bg-subtle)' : 'var(--bg)',
                               transition: 'background 0.15s ease'
                             }}
                           >
@@ -819,8 +819,8 @@ export default function AnalyticsPage() {
                                   width: '36px',
                                   height: '36px',
                                   borderRadius: '8px',
-                                  background: '#09090b',
-                                  color: '#ffffff',
+                                  background: 'var(--primary)',
+                                  color: 'var(--primary-fg)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -836,16 +836,16 @@ export default function AnalyticsPage() {
                                   )}
                                 </div>
                                 <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontWeight: '800', color: '#09090b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <div style={{ fontWeight: '800', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                       {acc.firstName ? `${acc.firstName} ${acc.lastName || ''}`.trim() : acc.username}
                                     </span>
                                     {isSelf && (
                                       <span style={{
                                         fontSize: '0.58rem',
-                                        background: '#f4f4f5',
-                                        border: '1px solid #e4e4e7',
-                                        color: '#71717a',
+                                        background: 'var(--bg-hover)',
+                                        border: '1px solid var(--border)',
+                                        color: '#52525b',
                                         borderRadius: '3px',
                                         padding: '1px 4px',
                                         fontFamily: "'JetBrains Mono', monospace"
@@ -854,7 +854,7 @@ export default function AnalyticsPage() {
                                       </span>
                                     )}
                                   </div>
-                                  <div style={{ fontSize: '0.72rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {acc.email} • @{acc.username}
                                   </div>
                                 </div>
@@ -864,10 +864,10 @@ export default function AnalyticsPage() {
                             {/* Workspace / Business */}
                             <td style={{ padding: '12px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontWeight: '700', color: '#09090b' }}>
+                                <span style={{ fontWeight: '700', color: 'var(--text)' }}>
                                   {acc.businessProfile?.businessName || (isBusiness ? 'Creator Studio' : 'Personal')}
                                 </span>
-                                <span style={{ fontSize: '0.68rem', color: '#71717a', textTransform: 'capitalize' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                                   {acc.businessProfile?.category || acc.accountType || 'Personal'}
                                 </span>
                               </div>
@@ -884,17 +884,17 @@ export default function AnalyticsPage() {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px',
-                                    color: '#09090b',
+                                    color: 'var(--text)',
                                     textDecoration: 'none',
                                     fontWeight: '700',
                                     fontFamily: "'JetBrains Mono', monospace"
                                   }}
                                 >
                                   <span>@{acc.instagramUsername}</span>
-                                  <ExternalLink size={11} color="#a1a1aa" />
+                                  <ExternalLink size={11} color="#71717a" />
                                 </a>
                               ) : (
-                                <span style={{ color: '#a1a1aa', fontSize: '0.74rem' }}>Unlinked</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>Unlinked</span>
                               )}
                             </td>
 
@@ -906,8 +906,8 @@ export default function AnalyticsPage() {
                                 fontFamily: "'JetBrains Mono', monospace",
                                 padding: '2px 6px',
                                 borderRadius: '4px',
-                                background: isSuper ? '#09090b' : '#f4f4f5',
-                                color: isSuper ? '#ffffff' : '#09090b'
+                                background: isSuper ? 'var(--primary)' : 'var(--bg-hover)',
+                                color: isSuper ? 'var(--primary-fg)' : 'var(--text)'
                               }}>
                                 {isSuper ? 'SUPERADMIN' : 'USER'}
                               </span>
@@ -920,21 +920,21 @@ export default function AnalyticsPage() {
                                 const isPending = acc.igApprovalStatus === 'pending';
                                 const isApproved = acc.igApprovalStatus === 'approved';
 
-                                let dotColor = '#a1a1aa';
-                                let textColor = '#71717a';
+                                let dotColor = 'var(--text-dim)';
+                                let textColor = 'var(--text-muted)';
                                 let label = 'Not Connected';
 
                                 if (isConnected) {
-                                  dotColor = '#16a34a';
-                                  textColor = '#15803d';
+                                  dotColor = 'var(--success)';
+                                  textColor = 'var(--success)';
                                   label = 'Active';
                                 } else if (isPending) {
-                                  dotColor = '#f59e0b';
-                                  textColor = '#b45309';
+                                  dotColor = 'var(--warning)';
+                                  textColor = 'var(--warning)';
                                   label = 'Pending Approval';
                                 } else if (isApproved) {
-                                  dotColor = '#0284c7';
-                                  textColor = '#0369a1';
+                                  dotColor = 'var(--info)';
+                                  textColor = 'var(--info)';
                                   label = 'Approved';
                                 }
 
@@ -966,9 +966,9 @@ export default function AnalyticsPage() {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  background: '#f0fdf4',
-                                  border: '1px solid #bbf7d0',
-                                  color: '#16a34a',
+                                  background: 'var(--success-bg)',
+                                  border: '1px solid var(--success-border)',
+                                  color: 'var(--success)',
                                   fontSize: '0.68rem',
                                   fontWeight: '700',
                                   padding: '2px 6px',
@@ -978,12 +978,12 @@ export default function AnalyticsPage() {
                                   <span>{acc.passkeyCount || 1} Passkey</span>
                                 </span>
                               ) : (
-                                <span style={{ fontSize: '0.72rem', color: '#71717a' }}>Password</span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Password</span>
                               )}
                             </td>
 
                             {/* Registered */}
-                            <td style={{ padding: '12px', fontSize: '0.74rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                            <td style={{ padding: '12px', fontSize: '0.74rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                               {acc.createdAt ? new Date(acc.createdAt).toLocaleDateString() : 'Recent'}
                             </td>
 
@@ -999,13 +999,13 @@ export default function AnalyticsPage() {
                                       ? `Whitelisted in Meta Roles? Click to mark approved & dispatch invite email to ${acc.email}`
                                       : `Send Meta tester invite email to ${acc.email}`}
                                     style={{
-                                      background: acc.igApprovalStatus === 'pending' ? '#09090b' : '#ffffff',
-                                      border: acc.igApprovalStatus === 'pending' ? '1px solid #09090b' : '1px solid #e4e4e7',
+                                      background: acc.igApprovalStatus === 'pending' ? 'var(--primary)' : 'var(--bg)',
+                                      border: acc.igApprovalStatus === 'pending' ? '1px solid var(--primary)' : '1px solid var(--border)',
                                       borderRadius: '6px',
                                       padding: '5px 8px',
                                       fontSize: '0.7rem',
                                       fontWeight: '700',
-                                      color: acc.igApprovalStatus === 'pending' ? '#ffffff' : '#09090b',
+                                      color: acc.igApprovalStatus === 'pending' ? 'var(--primary-fg)' : 'var(--text)',
                                       cursor: approvingId === acc.id ? 'wait' : 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -1028,13 +1028,13 @@ export default function AnalyticsPage() {
                                     disabled={impersonatingId === acc.id}
                                     title={`Switch to ${acc.username}'s workspace`}
                                     style={{
-                                      background: '#09090b',
-                                      border: '1px solid #09090b',
+                                      background: 'var(--primary)',
+                                      border: '1px solid var(--primary)',
                                       borderRadius: '6px',
                                       padding: '5px 9px',
                                       fontSize: '0.72rem',
                                       fontWeight: '700',
-                                      color: '#ffffff',
+                                      color: 'var(--primary-fg)',
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -1050,13 +1050,13 @@ export default function AnalyticsPage() {
                                   type="button"
                                   onClick={() => setExpandedAccountId(isExpanded ? null : acc.id)}
                                   style={{
-                                    background: '#ffffff',
-                                    border: '1px solid #e4e4e7',
+                                    background: 'var(--bg)',
+                                    border: '1px solid var(--border)',
                                     borderRadius: '6px',
                                     padding: '5px 8px',
                                     fontSize: '0.72rem',
                                     fontWeight: '700',
-                                    color: '#09090b',
+                                    color: 'var(--text)',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -1074,13 +1074,13 @@ export default function AnalyticsPage() {
                                     disabled={deletingId === acc.id}
                                     title={`Permanently delete @${acc.username}`}
                                     style={{
-                                      background: '#ffffff',
-                                      border: '1px solid #fecaca',
+                                      background: 'var(--bg)',
+                                      border: '1px solid var(--danger-border)',
                                       borderRadius: '6px',
                                       padding: '5px 8px',
                                       fontSize: '0.72rem',
                                       fontWeight: '700',
-                                      color: '#dc2626',
+                                      color: 'var(--danger)',
                                       cursor: deletingId === acc.id ? 'wait' : 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -1097,26 +1097,26 @@ export default function AnalyticsPage() {
 
                           {/* Expanded Drawer */}
                           {isExpanded && (
-                            <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
+                            <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)' }}>
                               <td colSpan={8} style={{ padding: '16px 20px' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', fontSize: '0.76rem' }}>
                                   <div>
-                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>USER ID</div>
-                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>{acc.id}</div>
+                                    <div style={{ color: 'var(--text-muted)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>USER ID</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{acc.id}</div>
                                   </div>
                                   <div>
-                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>INSTAGRAM ID</div>
-                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>{acc.instagramId || 'None registered'}</div>
+                                    <div style={{ color: 'var(--text-muted)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>INSTAGRAM ID</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{acc.instagramId || 'None registered'}</div>
                                   </div>
                                   <div>
-                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>CONTACT NUMBERS</div>
-                                    <div style={{ color: '#09090b' }}>
+                                    <div style={{ color: 'var(--text-muted)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>CONTACT NUMBERS</div>
+                                    <div style={{ color: 'var(--text)' }}>
                                       Mobile: {acc.mobileNumber || 'N/A'} • WA: {acc.whatsappNumber || 'N/A'}
                                     </div>
                                   </div>
                                   <div>
-                                    <div style={{ color: '#71717a', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>LAST LOGIN</div>
-                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#09090b' }}>
+                                    <div style={{ color: 'var(--text-muted)', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", marginBottom: '3px' }}>LAST LOGIN</div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>
                                       {acc.lastLogin ? new Date(acc.lastLogin).toLocaleString() : 'Recent'}
                                     </div>
                                   </div>
@@ -1129,7 +1129,7 @@ export default function AnalyticsPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#71717a' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                         No accounts found matching your filter criteria.
                       </td>
                     </tr>
@@ -1147,9 +1147,9 @@ export default function AnalyticsPage() {
               gap: '12px',
               marginTop: '18px',
               paddingTop: '16px',
-              borderTop: '1px solid #f4f4f5',
+              borderTop: '1px solid var(--bg-hover)',
               fontSize: '0.78rem',
-              color: '#71717a'
+              color: 'var(--text-muted)'
             }}>
               <div>
                 Showing {filteredAccounts.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredAccounts.length)} of {filteredAccounts.length} creators
@@ -1165,10 +1165,10 @@ export default function AnalyticsPage() {
                   style={{
                     padding: '5px 8px',
                     borderRadius: '6px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
                     fontSize: '0.74rem',
-                    color: '#09090b'
+                    color: 'var(--text)'
                   }}
                 >
                   <option value={10}>10 per page</option>
@@ -1183,11 +1183,11 @@ export default function AnalyticsPage() {
                   style={{
                     padding: '5px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
                     fontSize: '0.74rem',
                     fontWeight: '700',
-                    color: currentPage <= 1 ? '#d4d4d8' : '#09090b',
+                    color: currentPage <= 1 ? 'var(--text-dim)' : 'var(--text)',
                     cursor: currentPage <= 1 ? 'not-allowed' : 'pointer'
                   }}
                 >
@@ -1196,7 +1196,7 @@ export default function AnalyticsPage() {
                 <span style={{
                   fontFamily: "'JetBrains Mono', monospace",
                   fontWeight: '700',
-                  color: '#09090b',
+                  color: 'var(--text)',
                   whiteSpace: 'nowrap',
                   minWidth: '54px',
                   textAlign: 'center',
@@ -1212,11 +1212,11 @@ export default function AnalyticsPage() {
                   style={{
                     padding: '5px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #e4e4e7',
-                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
                     fontSize: '0.74rem',
                     fontWeight: '700',
-                    color: currentPage >= totalPages ? '#d4d4d8' : '#09090b',
+                    color: currentPage >= totalPages ? 'var(--text-dim)' : 'var(--text)',
                     cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer'
                   }}
                 >
@@ -1245,8 +1245,8 @@ export default function AnalyticsPage() {
                 whileHover={{ y: -3, transition: { duration: 0.25, ease: 'easeOut' } }}
                 className="stat-card-item"
                 style={{
-                  background: '#fff',
-                  border: '1px solid #e4e4e7',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
                   borderRadius: '12px',
                   padding: '18px',
                   display: 'flex',
@@ -1257,17 +1257,17 @@ export default function AnalyticsPage() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{c.label}</span>
-                  <div style={{ background: '#f4f4f5', padding: '5px', borderRadius: '6px', color: '#09090b' }}>{c.icon}</div>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.06em' }}>{c.label}</span>
+                  <div style={{ background: 'var(--bg-hover)', padding: '5px', borderRadius: '6px', color: 'var(--text)' }}>{c.icon}</div>
                 </div>
                 <div>
-                  <div className="stat-card-value" style={{ fontSize: '2.4rem', fontWeight: '900', color: '#09090b', letterSpacing: '-1.5px', lineHeight: 1 }}>
+                  <div className="stat-card-value" style={{ fontSize: '2.4rem', fontWeight: '900', color: 'var(--text)', letterSpacing: '-1.5px', lineHeight: 1 }}>
                     <AnimatedNumber value={c.value} duration={1.8} />
                   </div>
-                  <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>{c.sub}</div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: "'JetBrains Mono', monospace" }}>{c.sub}</div>
                 </div>
                 {c.href ? (
-                  <Link href={c.href} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
+                  <Link href={c.href} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text)', textDecoration: 'none', fontWeight: '700' }}>
                     <span>View</span><ArrowRight size={10} />
                   </Link>
                 ) : <div />}
@@ -1283,16 +1283,16 @@ export default function AnalyticsPage() {
             className="charts-grid"
           >
             {/* Donut: Circle Breakdown */}
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>CIRCLE COMPOSITION</div>
-              <div style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b', marginBottom: '18px', marginTop: '2px' }}>Relationship Map</div>
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>CIRCLE COMPOSITION</div>
+              <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text)', marginBottom: '18px', marginTop: '2px' }}>Relationship Map</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '16px' }}>
                 <DonutChart segments={donutSegments.length > 0 ? donutSegments : [{ value: 1, color: '#f4f4f5' }]} size={130} stroke={20} />
                 <div style={{ position: 'absolute', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.7rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>
+                  <div style={{ fontSize: '1.7rem', fontWeight: '900', color: 'var(--text)', lineHeight: 1 }}>
                     <AnimatedNumber value={friendNodes.length} duration={1.5} />
                   </div>
-                  <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>TOTAL</div>
+                  <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700' }}>TOTAL</div>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -1308,7 +1308,7 @@ export default function AnalyticsPage() {
                       <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                       <span style={{ color: '#52525b' }}>{s.label}</span>
                     </div>
-                    <span style={{ fontWeight: '800', color: '#09090b', fontFamily: "'JetBrains Mono', monospace" }}>
+                    <span style={{ fontWeight: '800', color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}>
                       <AnimatedNumber value={s.value} duration={1.4} />
                     </span>
                   </div>
@@ -1317,33 +1317,33 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Bar: Top Chatters */}
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MESSAGE VOLUME</div>
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>MESSAGE VOLUME</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b' }}>Top Chatters</div>
-                <MessageSquare size={14} style={{ color: '#a1a1aa' }} />
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text)' }}>Top Chatters</div>
+                <MessageSquare size={14} style={{ color: 'var(--text-muted)' }} />
               </div>
               {topChatters.length > 0
                 ? topChatters.map((p, i) => <BarRow key={p.id || p.name} index={i} label={p.name} handle={p.handle || p.instagramHandle} value={p.chatsCount || p.messageCount || 0} max={maxChats} />)
-                : <div style={{ textAlign: 'center', padding: '30px 0', color: '#a1a1aa', fontSize: '0.8rem' }}>No message data yet</div>
+                : <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>No message data yet</div>
               }
-              <Link href="/relationships" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
+              <Link href="/relationships" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text)', textDecoration: 'none', fontWeight: '700' }}>
                 <span>View all</span><ArrowRight size={10} />
               </Link>
             </div>
 
             {/* Bar: Top Reel Sharers */}
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>REEL ACTIVITY</div>
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>REEL ACTIVITY</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b' }}>Top Reel Sharers</div>
-                <Film size={14} style={{ color: '#a1a1aa' }} />
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text)' }}>Top Reel Sharers</div>
+                <Film size={14} style={{ color: 'var(--text-muted)' }} />
               </div>
               {topReelers.length > 0
                 ? topReelers.map((p, i) => <BarRow key={p.id || p.name} index={i} label={p.name} handle={p.handle || p.instagramHandle} value={p.reelsCount || 0} max={maxReels} />)
-                : <div style={{ textAlign: 'center', padding: '30px 0', color: '#a1a1aa', fontSize: '0.8rem' }}>No reel data yet</div>
+                : <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>No reel data yet</div>
               }
-              <Link href="/relationships" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
+              <Link href="/relationships" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text)', textDecoration: 'none', fontWeight: '700' }}>
                 <span>View all</span><ArrowRight size={10} />
               </Link>
             </div>
@@ -1357,19 +1357,19 @@ export default function AnalyticsPage() {
             className="bottom-grid"
           >
             {/* AI Split */}
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>AI REPLY STATUS</div>
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>AI REPLY STATUS</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b' }}>Per-Contact AI Mode</div>
-                <Bot size={14} style={{ color: '#a1a1aa' }} />
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text)' }}>Per-Contact AI Mode</div>
+                <Bot size={14} style={{ color: 'var(--text-muted)' }} />
               </div>
-              <div style={{ height: '8px', background: '#f4f4f5', borderRadius: '4px', overflow: 'hidden', marginBottom: '14px' }}>
+              <div style={{ height: '8px', background: 'var(--bg-hover)', borderRadius: '4px', overflow: 'hidden', marginBottom: '14px' }}>
                 {friendNodes.length > 0 && (
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${(breakdown.aiActive / friendNodes.length) * 100}%` }}
                     transition={{ duration: 1.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    style={{ height: '100%', background: '#09090b', borderRadius: '4px' }}
+                    style={{ height: '100%', background: 'var(--primary)', borderRadius: '4px' }}
                   />
                 )}
               </div>
@@ -1378,35 +1378,35 @@ export default function AnalyticsPage() {
                   { label: 'Full AI Active', value: breakdown.aiActive, color: '#09090b' },
                   { label: 'Manual / Paused', value: breakdown.aiPaused, color: '#d4d4d8' },
                 ].map((s, i) => (
-                  <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: '#f4f4f5', border: '1px solid #e4e4e7', borderRadius: '8px' }}>
+                  <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: '900', color: '#09090b', letterSpacing: '-0.5px' }}>
+                      <div style={{ fontSize: '1.15rem', fontWeight: '900', color: 'var(--text)', letterSpacing: '-0.5px' }}>
                         <AnimatedNumber value={s.value} duration={1.5} />
                       </div>
-                      <div style={{ fontSize: '0.64rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>{s.label}</div>
+                      <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>{s.label}</div>
                     </div>
                   </div>
                 ))}
               </div>
-              <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
+              <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text)', textDecoration: 'none', fontWeight: '700' }}>
                 <span>Manage AI controls</span><ArrowRight size={10} />
               </Link>
             </div>
 
             {/* Routing Policy */}
-            <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ fontSize: '0.65rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ROUTING POLICY</div>
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ROUTING POLICY</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '2px' }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#09090b' }}>Active Chat Mode</div>
-                <Shield size={14} style={{ color: '#a1a1aa' }} />
+                <div style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--text)' }}>Active Chat Mode</div>
+                <Shield size={14} style={{ color: 'var(--text-muted)' }} />
               </div>
-              <div style={{ background: '#09090b', borderRadius: '10px', padding: '16px 18px', marginBottom: '12px' }}>
-                <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em', marginBottom: '5px' }}>CURRENT MODE</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#fff', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
+              <div style={{ background: 'var(--primary)', borderRadius: 'var(--r-lg)', padding: '16px 18px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em', marginBottom: '5px' }}>CURRENT MODE</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--primary-fg)', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
                   {routingConfig.chatMode.replace(/_/g, ' ')}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#71717a', marginTop: '3px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', fontFamily: "'JetBrains Mono', monospace" }}>
                   {routingConfig.chatMode === 'everyone_except' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} excluded`}
                   {routingConfig.chatMode === 'only_selected' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} selected`}
                   {routingConfig.chatMode === 'everyone' && 'All contacts — global auto-reply'}
@@ -1414,21 +1414,21 @@ export default function AnalyticsPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1, background: '#f4f4f5', borderRadius: '8px', padding: '9px 11px', border: '1px solid #e4e4e7' }}>
-                  <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '2px' }}>BOT STATUS</div>
+                <div style={{ flex: 1, background: 'var(--bg-hover)', borderRadius: '8px', padding: '9px 11px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '2px' }}>BOT STATUS</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: routingConfig.globalBotActive ? '#09090b' : '#d4d4d8' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#09090b' }}>{routingConfig.globalBotActive ? 'ONLINE' : 'PAUSED'}</span>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: routingConfig.globalBotActive ? 'var(--primary)' : 'var(--border-strong)' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text)' }}>{routingConfig.globalBotActive ? 'ONLINE' : 'PAUSED'}</span>
                   </div>
                 </div>
-                <div style={{ flex: 1, background: '#f4f4f5', borderRadius: '8px', padding: '9px 11px', border: '1px solid #e4e4e7' }}>
-                  <div style={{ fontSize: '0.58rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '2px' }}>CONTACTS</div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#09090b' }}>
+                <div style={{ flex: 1, background: 'var(--bg-hover)', borderRadius: '8px', padding: '9px 11px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', marginBottom: '2px' }}>CONTACTS</div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text)' }}>
                     <AnimatedNumber value={friendNodes.length} duration={1.5} /> people
                   </span>
                 </div>
               </div>
-              <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#09090b', textDecoration: 'none', fontWeight: '700' }}>
+              <Link href="/controls" style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text)', textDecoration: 'none', fontWeight: '700' }}>
                 <span>Adjust routing</span><ArrowRight size={10} />
               </Link>
             </div>

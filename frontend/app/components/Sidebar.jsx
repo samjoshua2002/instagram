@@ -160,8 +160,8 @@ export default function Sidebar() {
             width: '30px',
             height: '30px',
             borderRadius: '8px',
-            background: '#09090b',
-            color: '#ffffff',
+            background: 'var(--primary)',
+            color: 'var(--primary-fg)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -170,7 +170,7 @@ export default function Sidebar() {
           }}>
             C
           </div>
-          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: '#09090b', letterSpacing: '-0.3px' }}>
+          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--text)', letterSpacing: '-0.3px' }}>
             CHATTER OS
           </span>
         </div>
@@ -182,14 +182,14 @@ export default function Sidebar() {
               type="button"
               onClick={toggleGlobalBot}
               style={{
-                background: '#f4f4f5',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg-hover)',
+                border: '1px solid var(--border)',
                 borderRadius: '999px',
                 padding: '4px 10px',
                 fontSize: '0.7rem',
                 fontWeight: '700',
                 fontFamily: "'JetBrains Mono', monospace",
-                color: routingConfig.globalBotActive ? '#09090b' : '#71717a',
+                color: routingConfig.globalBotActive ? 'var(--text)' : 'var(--text-muted)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
@@ -200,21 +200,21 @@ export default function Sidebar() {
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: routingConfig.globalBotActive ? '#16a34a' : '#a1a1aa'
+                background: routingConfig.globalBotActive ? 'var(--success)' : 'var(--text-dim)'
               }} />
               <span>{routingConfig.globalBotActive ? 'BOT ACTIVE' : 'PAUSED'}</span>
             </button>
           ) : (
             <div
               style={{
-                background: '#f4f4f5',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg-hover)',
+                border: '1px solid var(--border)',
                 borderRadius: '999px',
                 padding: '4px 10px',
                 fontSize: '0.7rem',
                 fontWeight: '700',
                 fontFamily: "'JetBrains Mono', monospace",
-                color: '#09090b',
+                color: 'var(--text)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px'
@@ -224,7 +224,7 @@ export default function Sidebar() {
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: '#16a34a'
+                background: 'var(--success)'
               }} />
               <span>SUPERADMIN LIVE</span>
             </div>
@@ -238,7 +238,7 @@ export default function Sidebar() {
             style={{
               background: 'none',
               border: 'none',
-              color: '#71717a',
+              color: 'var(--text-muted)',
               padding: '6px',
               cursor: 'pointer',
               display: 'flex',
@@ -274,7 +274,7 @@ export default function Sidebar() {
                   justifyContent: 'center',
                   gap: '3px',
                   textDecoration: 'none',
-                  color: pathname === '/' ? '#09090b' : '#a1a1aa',
+                  color: pathname === '/' ? 'var(--text)' : 'var(--text-muted)',
                   transition: 'all 0.15s ease',
                   padding: '6px 0'
                 }}
@@ -296,7 +296,7 @@ export default function Sidebar() {
                   justifyContent: 'center',
                   gap: '3px',
                   textDecoration: 'none',
-                  color: pathname === '/admin' ? '#09090b' : '#a1a1aa',
+                  color: pathname === '/admin' ? 'var(--text)' : 'var(--text-muted)',
                   transition: 'all 0.15s ease',
                   padding: '6px 0'
                 }}
@@ -321,12 +321,12 @@ export default function Sidebar() {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#09090b',
+                  color: 'var(--text)',
                   padding: '6px 0'
                 }}
               >
-                <Shield size={19} strokeWidth={2.2} color="#22c55e" />
-                <span style={{ fontSize: '0.66rem', fontWeight: '700', color: '#09090b' }}>Security</span>
+                <Shield size={19} strokeWidth={2.2} color="#15803d" />
+                <span style={{ fontSize: '0.66rem', fontWeight: '700', color: 'var(--text)' }}>Security</span>
               </button>
             </motion.div>
           </>
@@ -344,7 +344,7 @@ export default function Sidebar() {
                   justifyContent: 'center',
                   gap: '3px',
                   textDecoration: 'none',
-                  color: pathname === '/' ? '#09090b' : '#a1a1aa',
+                  color: pathname === '/' ? 'var(--text)' : 'var(--text-muted)',
                   transition: 'all 0.15s ease',
                   padding: '6px 0'
                 }}
@@ -366,7 +366,7 @@ export default function Sidebar() {
                   justifyContent: 'center',
                   gap: '3px',
                   textDecoration: 'none',
-                  color: pathname === '/relationships' ? '#09090b' : '#a1a1aa',
+                  color: pathname === '/relationships' ? 'var(--text)' : 'var(--text-muted)',
                   transition: 'all 0.15s ease',
                   padding: '6px 0'
                 }}
@@ -386,8 +386,8 @@ export default function Sidebar() {
                   width: '44px',
                   height: '44px',
                   borderRadius: '50%',
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
                   border: 'none',
                   display: 'flex',
                   alignItems: 'center',
@@ -416,7 +416,7 @@ export default function Sidebar() {
                   justifyContent: 'center',
                   gap: '3px',
                   textDecoration: 'none',
-                  color: pathname === '/controls' ? '#09090b' : '#a1a1aa',
+                  color: pathname === '/controls' ? 'var(--text)' : 'var(--text-muted)',
                   transition: 'all 0.15s ease',
                   padding: '6px 0'
                 }}
@@ -438,7 +438,7 @@ export default function Sidebar() {
                   justifyContent: 'center',
                   gap: '3px',
                   textDecoration: 'none',
-                  color: pathname === '/profile' ? '#09090b' : '#a1a1aa',
+                  color: pathname === '/profile' ? 'var(--text)' : 'var(--text-muted)',
                   padding: '6px 0'
                 }}
               >
@@ -451,13 +451,13 @@ export default function Sidebar() {
                       height: '20px',
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: '1.5px solid #09090b'
+                      border: '1.5px solid var(--primary)'
                     }}
                   />
                 ) : (
-                  <UserCheck size={19} strokeWidth={pathname === '/profile' ? 2.5 : 1.8} color={pathname === '/profile' ? '#09090b' : '#a1a1aa'} />
+                  <UserCheck size={19} strokeWidth={pathname === '/profile' ? 2.5 : 1.8} color={pathname === '/profile' ? '#09090b' : '#71717a'} />
                 )}
-                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/profile' ? '700' : '600', color: pathname === '/profile' ? '#09090b' : '#a1a1aa' }}>Profile</span>
+                <span style={{ fontSize: '0.66rem', fontWeight: pathname === '/profile' ? '700' : '600', color: pathname === '/profile' ? 'var(--text)' : 'var(--text-muted)' }}>Profile</span>
               </Link>
             </motion.div>
           </>
@@ -484,16 +484,16 @@ export default function Sidebar() {
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingBottom: '16px',
-              borderBottom: '1px solid #e4e4e7'
+              borderBottom: '1px solid var(--border)'
             }}
           >
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
               <div style={{
                 width: '36px',
                 height: '36px',
-                borderRadius: '10px',
-                background: '#09090b',
-                color: '#ffffff',
+                borderRadius: 'var(--r-lg)',
+                background: 'var(--primary)',
+                color: 'var(--primary-fg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -504,10 +504,10 @@ export default function Sidebar() {
                 C
               </div>
               <div>
-                <div style={{ fontWeight: '800', fontSize: '0.92rem', letterSpacing: '-0.4px', color: '#09090b', lineHeight: 1.2 }}>
+                <div style={{ fontWeight: '800', fontSize: '0.92rem', letterSpacing: '-0.4px', color: 'var(--text)', lineHeight: 1.2 }}>
                   CHATTER OS
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
                   v2.6 // WORKSPACE
                 </div>
               </div>
@@ -519,8 +519,8 @@ export default function Sidebar() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                background: routingConfig.globalBotActive ? '#f0fdf4' : '#f4f4f5',
-                border: routingConfig.globalBotActive ? '1px solid #bbf7d0' : '1px solid #e4e4e7',
+                background: routingConfig.globalBotActive ? 'var(--success-bg)' : 'var(--bg-hover)',
+                border: routingConfig.globalBotActive ? '1px solid var(--success-border)' : '1px solid var(--border)',
                 borderRadius: '999px',
                 padding: '3px 8px',
                 cursor: 'pointer'
@@ -532,13 +532,13 @@ export default function Sidebar() {
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: routingConfig.globalBotActive ? '#16a34a' : '#a1a1aa'
+                background: routingConfig.globalBotActive ? 'var(--success)' : 'var(--text-dim)'
               }} />
               <span style={{
                 fontSize: '0.62rem',
                 fontWeight: '700',
                 fontFamily: "'JetBrains Mono', monospace",
-                color: routingConfig.globalBotActive ? '#15803d' : '#71717a'
+                color: routingConfig.globalBotActive ? 'var(--success)' : 'var(--text-muted)'
               }}>
                 {routingConfig.globalBotActive ? 'LIVE' : 'OFF'}
               </span>
@@ -554,7 +554,7 @@ export default function Sidebar() {
               style={{
                 fontSize: '0.68rem',
                 fontWeight: '700',
-                color: '#a1a1aa',
+                color: 'var(--text-muted)',
                 letterSpacing: '0.8px',
                 textTransform: 'uppercase',
                 marginBottom: '8px',
@@ -579,11 +579,11 @@ export default function Sidebar() {
                     <Link
                       href={item.href}
                       style={{
-                        background: isActive ? '#09090b' : 'transparent',
-                        color: isActive ? '#ffffff' : '#52525b',
+                        background: isActive ? 'var(--primary)' : 'transparent',
+                        color: isActive ? 'var(--primary-fg)' : '#52525b',
                         border: '1px solid',
-                        borderColor: isActive ? '#09090b' : 'transparent',
-                        borderRadius: '9px',
+                        borderColor: isActive ? 'var(--primary)' : 'transparent',
+                        borderRadius: 'var(--r-md)',
                         padding: '9px 12px',
                         display: 'flex',
                         alignItems: 'center',
@@ -619,7 +619,7 @@ export default function Sidebar() {
           variants={footerContainerVariants}
           initial="hidden"
           animate="visible"
-          style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid #e4e4e7' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}
         >
           {/* Automate Button: ONLY show if Instagram is NOT linked */}
           {!isPureSuperadmin && !isInstagramLinked && (
@@ -631,11 +631,11 @@ export default function Sidebar() {
               onClick={openOnboardingWizard}
               style={{
                 width: '100%',
-                background: '#ffffff',
-                color: '#000000',
-                border: '1.5px solid #000000',
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                border: '1.5px solid var(--primary)',
                 padding: '9px 12px',
-                borderRadius: '9px',
+                borderRadius: 'var(--r-md)',
                 fontWeight: '700',
                 fontSize: '0.8rem',
                 cursor: 'pointer',
@@ -659,11 +659,11 @@ export default function Sidebar() {
               onClick={() => startAiInterview(null)}
               style={{
                 width: '100%',
-                background: '#09090b',
-                color: '#ffffff',
+                background: 'var(--primary)',
+                color: 'var(--primary-fg)',
                 border: 'none',
                 padding: '10px 14px',
-                borderRadius: '9px',
+                borderRadius: 'var(--r-md)',
                 fontWeight: '700',
                 fontSize: '0.82rem',
                 display: 'flex',
@@ -689,11 +689,11 @@ export default function Sidebar() {
               onClick={toggleGlobalBot}
               style={{
                 width: '100%',
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
-                color: '#09090b',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
                 padding: '8px 12px',
-                borderRadius: '9px',
+                borderRadius: 'var(--r-md)',
                 fontWeight: '600',
                 fontSize: '0.76rem',
                 fontFamily: "'JetBrains Mono', monospace",
@@ -724,8 +724,8 @@ export default function Sidebar() {
             style={{
               marginTop: '6px',
               padding: '10px 12px',
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
@@ -751,10 +751,10 @@ export default function Sidebar() {
                   <div style={{
                     width: '34px',
                     height: '34px',
-                    borderRadius: '9px',
-                    background: '#09090b',
+                    borderRadius: 'var(--r-md)',
+                    background: 'var(--primary)',
                     border: '1.5px solid #27272a',
-                    color: '#ffffff',
+                    color: 'var(--primary-fg)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -769,9 +769,9 @@ export default function Sidebar() {
                     style={{
                       width: '34px',
                       height: '34px',
-                      borderRadius: '9px',
+                      borderRadius: 'var(--r-md)',
                       objectFit: 'cover',
-                      border: '1.5px solid #09090b',
+                      border: '1.5px solid var(--primary)',
                       display: 'block'
                     }}
                   />
@@ -779,9 +779,9 @@ export default function Sidebar() {
                   <div style={{
                     width: '34px',
                     height: '34px',
-                    borderRadius: '9px',
-                    background: '#09090b',
-                    color: '#ffffff',
+                    borderRadius: 'var(--r-md)',
+                    background: 'var(--primary)',
+                    color: 'var(--primary-fg)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -799,8 +799,8 @@ export default function Sidebar() {
                   width: '8px',
                   height: '8px',
                   borderRadius: '50%',
-                  background: '#16a34a',
-                  border: '1.5px solid #ffffff'
+                  background: 'var(--success)',
+                  border: '1.5px solid var(--bg)'
                 }} />
               </div>
 
@@ -809,7 +809,7 @@ export default function Sidebar() {
                   <span style={{
                     fontSize: '0.82rem',
                     fontWeight: '700',
-                    color: '#09090b',
+                    color: 'var(--text)',
                     lineHeight: 1.25,
                     whiteSpace: 'nowrap',
                     textOverflow: 'ellipsis',
@@ -822,7 +822,7 @@ export default function Sidebar() {
                       fontSize: '0.58rem',
                       fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: '800',
-                      background: '#09090b',
+                      background: 'var(--primary)',
                       color: '#22c55e',
                       border: '1px solid #27272a',
                       padding: '1px 5px',
@@ -836,9 +836,9 @@ export default function Sidebar() {
                       fontSize: '0.58rem',
                       fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: '800',
-                      background: '#fef08a',
-                      color: '#854d0e',
-                      border: '1px solid #fde047',
+                      background: 'var(--warning-bg)',
+                      color: 'var(--warning)',
+                      border: '1px solid var(--warning-border)',
                       padding: '1px 5px',
                       borderRadius: '4px',
                       flexShrink: 0
@@ -850,8 +850,8 @@ export default function Sidebar() {
                       fontSize: '0.58rem',
                       fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: '800',
-                      background: '#09090b',
-                      color: '#ffffff',
+                      background: 'var(--primary)',
+                      color: 'var(--primary-fg)',
                       padding: '1px 5px',
                       borderRadius: '4px',
                       flexShrink: 0
@@ -862,7 +862,7 @@ export default function Sidebar() {
                 </div>
                 <div style={{
                   fontSize: '0.7rem',
-                  color: '#71717a',
+                  color: 'var(--text-muted)',
                   whiteSpace: 'nowrap',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden'
@@ -871,7 +871,7 @@ export default function Sidebar() {
                 </div>
               </div>
 
-              <ChevronRight size={14} color="#a1a1aa" />
+              <ChevronRight size={14} color="#71717a" />
             </Link>
 
             {/* Impersonation Exit Quick Action */}
@@ -881,10 +881,10 @@ export default function Sidebar() {
                 onClick={exitWorkspace}
                 style={{
                   width: '100%',
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
                   border: 'none',
-                  borderRadius: '7px',
+                  borderRadius: 'var(--r-md)',
                   padding: '6px 8px',
                   fontSize: '0.72rem',
                   fontWeight: '700',
@@ -906,13 +906,13 @@ export default function Sidebar() {
                 href="/profile"
                 style={{
                   flex: 1,
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '7px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
                   padding: '6px 8px',
                   fontSize: '0.72rem',
                   fontWeight: '600',
-                  color: '#09090b',
+                  color: 'var(--text)',
                   textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
@@ -929,13 +929,13 @@ export default function Sidebar() {
                 onClick={switchAccount}
                 title="Switch account"
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '7px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
                   padding: '6px 9px',
                   fontSize: '0.72rem',
                   fontWeight: '600',
-                  color: '#09090b',
+                  color: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -952,11 +952,11 @@ export default function Sidebar() {
                 onClick={logout}
                 title="Sign out of workspace"
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '7px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
                   padding: '6px 9px',
-                  color: '#71717a',
+                  color: 'var(--text-muted)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

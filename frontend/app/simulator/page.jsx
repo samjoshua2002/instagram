@@ -61,13 +61,13 @@ export default function SimulatorPage() {
   return (
     <div className="page-container" style={{ maxWidth: '850px', height: '100%', minHeight: 'calc(100vh - 70px)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '0.72rem', color: '#10b981', fontFamily: "'JetBrains Mono', monospace", fontWeight: 'bold' }}>
+        <div style={{ fontSize: '0.72rem', color: 'var(--success)', fontFamily: "'JetBrains Mono', monospace", fontWeight: 'bold' }}>
           // INSTANT PERSONA TESTING PLAYGROUND
         </div>
         <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', marginTop: '4px' }}>
           Live DM Simulator
         </h1>
-        <p style={{ color: '#a1a1aa', fontSize: '0.88rem', marginTop: '4px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '4px' }}>
           Test how your AI persona responds to specific contacts without texting on Instagram.
         </p>
       </div>
@@ -79,9 +79,9 @@ export default function SimulatorPage() {
             key={f.id}
             onClick={() => setSelectedFriendId(f.id)}
             style={{
-              background: activeFriendId === f.id ? '#ffffff' : '#09090b',
-              color: activeFriendId === f.id ? '#000000' : '#a1a1aa',
-              border: '1px solid #27272a',
+              background: activeFriendId === f.id ? 'var(--primary)' : 'var(--bg)',
+              color: activeFriendId === f.id ? 'var(--primary-fg)' : 'var(--text-muted)',
+              border: activeFriendId === f.id ? '1px solid var(--primary)' : '1px solid var(--border)',
               padding: '6px 14px',
               borderRadius: '8px',
               fontSize: '0.78rem',
@@ -96,17 +96,17 @@ export default function SimulatorPage() {
       </div>
 
       {/* Chat Window */}
-      <div style={{ flex: 1, background: '#09090b', border: '1px solid #27272a', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {messages.length === 0 && !isLoading && (
-            <div style={{ margin: 'auto', textAlign: 'center', color: '#a1a1aa', fontSize: '0.85rem' }}>
+            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               {targetFriend
                 ? `Send a test DM as ${targetFriend.name} to see how your AI replies.`
                 : 'Add a contact in People first, then test replies here.'}
             </div>
           )}
           {messages.map((msg, i) => msg.role === 'error' ? (
-            <div key={i} style={{ alignSelf: 'center', color: '#ef4444', fontSize: '0.78rem', textAlign: 'center' }}>
+            <div key={i} style={{ alignSelf: 'center', color: 'var(--danger)', fontSize: '0.78rem', textAlign: 'center' }}>
               {msg.text}
             </div>
           ) : (
@@ -115,13 +115,13 @@ export default function SimulatorPage() {
               style={{
                 alignSelf: msg.role === 'user' ? 'flex-start' : 'flex-end',
                 maxWidth: '75%',
-                background: msg.role === 'user' ? '#18181b' : '#ffffff',
-                color: msg.role === 'user' ? '#ffffff' : '#000000',
+                background: msg.role === 'user' ? 'var(--primary)' : 'var(--bg)',
+                color: msg.role === 'user' ? 'var(--primary-fg)' : 'var(--text)',
                 padding: '12px 16px',
                 borderRadius: msg.role === 'user' ? '12px 12px 12px 2px' : '12px 12px 2px 12px',
                 fontSize: '0.85rem',
                 lineHeight: '1.45',
-                border: msg.role === 'user' ? '1px solid #27272a' : 'none'
+                border: msg.role === 'user' ? 'none' : '1px solid var(--border)'
               }}
             >
               <div>{msg.text}</div>
@@ -131,25 +131,26 @@ export default function SimulatorPage() {
             </div>
           ))}
           {isLoading && (
-            <div style={{ alignSelf: 'flex-end', background: '#18181b', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', color: '#a1a1aa' }}>
+            <div style={{ alignSelf: 'flex-end', background: 'var(--bg)', border: '1px solid var(--border)', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
               AI persona is typing...
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid #27272a', display: 'flex', gap: '10px', background: '#0e0e11' }}>
+        <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px', background: 'var(--bg)' }}>
           <input
             type="text"
             placeholder={targetFriend ? `Type a DM as ${targetFriend.name}...` : 'No contacts yet'}
             disabled={!targetFriend}
             value={inputMsg}
             onChange={(e) => setInputMsg(e.target.value)}
-            style={{ flex: 1, background: '#000000', border: '1px solid #27272a', borderRadius: '8px', color: '#ffffff', padding: '12px 16px', fontSize: '0.85rem', outline: 'none' }}
+            style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '12px 16px', fontSize: '0.85rem' }}
           />
           <button
             type="submit"
             disabled={isLoading || !inputMsg.trim() || !targetFriend}
-            style={{ background: '#ffffff', color: '#000000', border: 'none', borderRadius: '8px', padding: '0 20px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            className="is-primary"
+            style={{ background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: '8px', padding: '0 20px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Send size={15} />
             <span>Send</span>

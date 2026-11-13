@@ -512,14 +512,14 @@ function MediaVaultPageInner() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
            
-            <span style={{ fontSize: '0.76rem', color: '#71717a', fontWeight: '600' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: '600' }}>
               REACTION VAULT & EMOTION ATTACHMENTS (50% PRIORITY)
             </span>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#09090b', letterSpacing: '-0.03em', margin: 0 }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>
             Media & Reaction Vault
           </h1>
-          <p style={{ fontSize: '0.86rem', color: '#71717a', marginTop: '4px', maxWidth: '720px' }}>
+          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '720px' }}>
             Upload images and GIFs with labels & keywords across emotion categories (Joy, LOL, Wonder, Sad, Side Eye, etc.). The AI intelligently detects emotions and keywords in chat to pick your best matching GIF.
           </p>
         </div>
@@ -546,23 +546,23 @@ function MediaVaultPageInner() {
       </div>
 
       {/* TOP SECTION: UPLOAD / ADD FORM */}
-      <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '22px', marginBottom: '28px' }}>
+      <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Upload size={18} style={{ color: '#09090b' }} />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', margin: 0 }}>
+            <Upload size={18} style={{ color: 'var(--text)' }} />
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', margin: 0 }}>
               Add Media with Keywords & Emotions
             </h3>
           </div>
 
           {/* Mode Switcher */}
-          <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '8px', padding: '3px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '8px', padding: '3px' }}>
             <button
               type="button"
               onClick={() => setUploadMode('file')}
               style={{
-                background: uploadMode === 'file' ? '#ffffff' : 'transparent',
-                color: uploadMode === 'file' ? '#09090b' : '#71717a',
+                background: uploadMode === 'file' ? 'var(--bg)' : 'transparent',
+                color: uploadMode === 'file' ? 'var(--text)' : 'var(--text-muted)',
                 border: 'none',
                 padding: '5px 12px',
                 borderRadius: '6px',
@@ -578,8 +578,8 @@ function MediaVaultPageInner() {
               type="button"
               onClick={() => setUploadMode('giphy')}
               style={{
-                background: uploadMode === 'giphy' ? '#ffffff' : 'transparent',
-                color: uploadMode === 'giphy' ? '#09090b' : '#71717a',
+                background: uploadMode === 'giphy' ? 'var(--bg)' : 'transparent',
+                color: uploadMode === 'giphy' ? 'var(--text)' : 'var(--text-muted)',
                 border: 'none',
                 padding: '5px 12px',
                 borderRadius: '6px',
@@ -595,8 +595,8 @@ function MediaVaultPageInner() {
               type="button"
               onClick={() => setUploadMode('url')}
               style={{
-                background: uploadMode === 'url' ? '#ffffff' : 'transparent',
-                color: uploadMode === 'url' ? '#09090b' : '#71717a',
+                background: uploadMode === 'url' ? 'var(--bg)' : 'transparent',
+                color: uploadMode === 'url' ? 'var(--text)' : 'var(--text-muted)',
                 border: 'none',
                 padding: '5px 12px',
                 borderRadius: '6px',
@@ -613,7 +613,7 @@ function MediaVaultPageInner() {
 
         {/* GIPHY MULTI-SELECT STUDIO */}
         {uploadMode === 'giphy' && (
-          <div style={{ padding: '18px', background: '#fafafa', borderRadius: '10px', border: '1px solid #e4e4e7', marginBottom: '8px' }}>
+          <div style={{ padding: '18px', background: 'var(--bg-subtle)', borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', marginBottom: '8px' }}>
             {/* Search Input Bar */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
               <input
@@ -638,7 +638,7 @@ function MediaVaultPageInner() {
 
             {/* Quick Keyword Suggestion Pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: '700', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>
                 Popular:
               </span>
               {[
@@ -656,13 +656,13 @@ function MediaVaultPageInner() {
                   type="button"
                   onClick={() => handleSearchGiphy(null, tag.q)}
                   style={{
-                    background: '#ffffff',
-                    border: '1px solid #e4e4e7',
-                    borderRadius: '14px',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-md)',
                     padding: '3px 10px',
                     fontSize: '0.72rem',
                     fontWeight: '600',
-                    color: '#09090b',
+                    color: 'var(--text)',
                     cursor: 'pointer'
                   }}
                 >
@@ -674,8 +674,8 @@ function MediaVaultPageInner() {
             {/* BATCH ACTION TOOLBAR (when GIFs are loaded) */}
             {giphyResults.length > 0 && (
               <div style={{
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
                 padding: '12px 14px',
                 marginBottom: '16px',
@@ -692,8 +692,8 @@ function MediaVaultPageInner() {
                     fontWeight: '800',
                     padding: '3px 9px',
                     borderRadius: '4px',
-                    background: selectedGiphyGifs.length > 0 ? '#09090b' : '#f4f4f5',
-                    color: selectedGiphyGifs.length > 0 ? '#ffffff' : '#71717a'
+                    background: selectedGiphyGifs.length > 0 ? 'var(--primary)' : 'var(--bg-hover)',
+                    color: selectedGiphyGifs.length > 0 ? 'var(--primary-fg)' : 'var(--text-muted)'
                   }}>
                     {selectedGiphyGifs.length} Selected
                   </span>
@@ -712,7 +712,7 @@ function MediaVaultPageInner() {
                 {/* Target Category & Keywords & Add Button */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#71717a' }}>Category:</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)' }}>Category:</span>
                     <select
                       value={batchCategory}
                       onChange={e => setBatchCategory(e.target.value)}
@@ -764,18 +764,18 @@ function MediaVaultPageInner() {
 
             {/* RESULTS MULTI-SELECT GRID */}
             {searchingGiphy ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#71717a' }}>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                 <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px auto' }} />
                 <div style={{ fontSize: '0.84rem' }}>Searching GIPHY live...</div>
               </div>
             ) : giphyResults.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '36px 0', color: '#a1a1aa' }}>
+              <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--text-muted)' }}>
                 <Film size={28} style={{ margin: '0 auto 8px auto' }} />
                 <div style={{ fontSize: '0.84rem' }}>Type a search query or click a popular tag above to preview and pick GIFs!</div>
               </div>
             ) : (
               <div>
-                <span style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
                   Click to select multiple GIFs for batch import:
                 </span>
                 <div style={{
@@ -800,9 +800,9 @@ function MediaVaultPageInner() {
                           borderRadius: '8px',
                           overflow: 'hidden',
                           cursor: 'pointer',
-                          border: isSelected ? '3px solid #09090b' : '1px solid #e4e4e7',
+                          border: isSelected ? '3px solid var(--primary)' : '1px solid var(--border)',
                           position: 'relative',
-                          background: '#ffffff',
+                          background: 'var(--bg)',
                           boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.12)' : 'none',
                           transition: 'transform 0.12s ease, border-color 0.12s ease'
                         }}
@@ -823,13 +823,13 @@ function MediaVaultPageInner() {
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          background: isSelected ? '#09090b' : 'rgba(255,255,255,0.85)',
-                          color: isSelected ? '#ffffff' : '#09090b',
+                          background: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.85)',
+                          color: isSelected ? 'var(--primary-fg)' : 'var(--text)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                          border: isSelected ? 'none' : '1px solid #d4d4d8'
+                          border: isSelected ? 'none' : '1px solid var(--border-strong)'
                         }}>
                           {isSelected ? <Check size={14} /> : null}
                         </div>
@@ -841,7 +841,7 @@ function MediaVaultPageInner() {
                             top: '6px',
                             left: '6px',
                             background: 'rgba(22, 163, 74, 0.9)',
-                            color: '#ffffff',
+                            color: 'var(--primary-fg)',
                             fontSize: '0.6rem',
                             fontWeight: '700',
                             padding: '2px 6px',
@@ -859,7 +859,7 @@ function MediaVaultPageInner() {
                           right: 0,
                           background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
                           padding: '16px 8px 6px 8px',
-                          color: '#ffffff',
+                          color: 'var(--primary-fg)',
                           fontSize: '0.68rem',
                           fontWeight: '600',
                           whiteSpace: 'nowrap',
@@ -883,7 +883,7 @@ function MediaVaultPageInner() {
           <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
             {/* Category Select */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Emotion Category
               </label>
               <select
@@ -901,7 +901,7 @@ function MediaVaultPageInner() {
 
             {/* Media Name */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Media Title / Label (Used by AI to understand the humor)
               </label>
               <input
@@ -916,7 +916,7 @@ function MediaVaultPageInner() {
 
           {/* Keywords / Tags Row */}
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
               <Tag size={13} />
               <span>Keywords & Humour Triggers (Comma separated)</span>
             </label>
@@ -927,7 +927,7 @@ function MediaVaultPageInner() {
               onChange={e => setMediaKeywords(e.target.value)}
               style={{ height: '40px' }}
             />
-            <span style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '4px', display: 'block' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
               When friends text any of these words (e.g. &quot;u sus&quot;, &quot;why chatting like ai&quot;), the AI prioritizes this exact reaction!
             </span>
           </div>
@@ -935,16 +935,16 @@ function MediaVaultPageInner() {
           {/* Upload Input Area */}
           {uploadMode === 'file' ? (
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Select File (GIF, JPG, PNG, WebP)
               </label>
               <div
                 style={{
-                  border: '2px dashed #e4e4e7',
-                  borderRadius: '10px',
+                  border: '2px dashed var(--border)',
+                  borderRadius: 'var(--r-lg)',
                   padding: '24px',
                   textAlign: 'center',
-                  background: '#fafafa',
+                  background: 'var(--bg-subtle)',
                   cursor: 'pointer'
                 }}
                 onClick={() => fileInputRef.current?.click()}
@@ -963,17 +963,17 @@ function MediaVaultPageInner() {
                       alt="Preview"
                       style={{ maxHeight: '140px', maxWidth: '240px', borderRadius: '8px', objectFit: 'contain' }}
                     />
-                    <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: '700' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: '700' }}>
                       File selected: {selectedFile?.name} ({((selectedFile?.size || 0) / 1024).toFixed(0)} KB) — Click to change
                     </span>
                   </div>
                 ) : (
                   <div>
-                    <Upload size={28} style={{ color: '#a1a1aa', margin: '0 auto 8px auto' }} />
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#09090b' }}>
+                    <Upload size={28} style={{ color: 'var(--text-muted)', margin: '0 auto 8px auto' }} />
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text)' }}>
                       Click to choose an image or GIF file
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '4px' }}>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Supports animated GIFs, JPG, PNG, and WebP up to 15MB
                     </div>
                   </div>
@@ -982,7 +982,7 @@ function MediaVaultPageInner() {
             </div>
           ) : uploadMode === 'giphy' ? (
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Selected GIPHY URL
               </label>
               <input
@@ -995,13 +995,13 @@ function MediaVaultPageInner() {
               {filePreview && (
                 <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <img src={filePreview} alt="Selected" style={{ maxHeight: '90px', borderRadius: '6px' }} />
-                  <span style={{ fontSize: '0.76rem', color: '#16a34a', fontWeight: '700' }}>Ready to save to vault</span>
+                  <span style={{ fontSize: '0.76rem', color: 'var(--success)', fontWeight: '700' }}>Ready to save to vault</span>
                 </div>
               )}
             </div>
           ) : (
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Direct GIF or Image URL (Tenor / Giphy / Imgur / CDN)
               </label>
               <input
@@ -1040,8 +1040,8 @@ function MediaVaultPageInner() {
 
       {/* QUICK IMPORT BANNER FOR PREDEFINED GIFS */}
       <div style={{
-        background: '#fcfcfc',
-        border: '1px solid #e4e4e7',
+        background: 'var(--bg-subtle)',
+        border: '1px solid var(--border)',
         borderRadius: '12px',
         padding: '16px 20px',
         marginBottom: '24px',
@@ -1052,14 +1052,14 @@ function MediaVaultPageInner() {
         gap: '14px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#09090b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary)', color: 'var(--primary-fg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Sparkles size={18} />
           </div>
           <div>
-            <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#09090b' }}>
+            <div style={{ fontSize: '0.92rem', fontWeight: '800', color: 'var(--text)' }}>
               Curated Reaction GIF Library ({predefinedList.length} Memes Ready)
             </div>
-            <div style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
               Pre-configured with viral memes (Chloe side eye, Travolta, Popcat, Risitas, Mind blown) with full keyword tagging for instant 50% chat attachments.
             </div>
           </div>
@@ -1097,10 +1097,10 @@ function MediaVaultPageInner() {
       {/* CATEGORY FILTER PILLS */}
       <div style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: '#71717a', fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
             FILTER BY EMOTION CATEGORY
           </span>
-          <span style={{ fontSize: '0.75rem', color: '#71717a' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             Total Items: {items.length}
           </span>
         </div>
@@ -1115,9 +1115,9 @@ function MediaVaultPageInner() {
               padding: '6px 14px',
               borderRadius: '20px',
               border: '1px solid',
-              borderColor: activeCategory === 'all' ? '#09090b' : '#e4e4e7',
-              background: activeCategory === 'all' ? '#09090b' : '#ffffff',
-              color: activeCategory === 'all' ? '#ffffff' : '#09090b',
+              borderColor: activeCategory === 'all' ? 'var(--primary)' : 'var(--border)',
+              background: activeCategory === 'all' ? 'var(--primary)' : 'var(--bg)',
+              color: activeCategory === 'all' ? 'var(--primary-fg)' : 'var(--text)',
               fontSize: '0.78rem',
               fontWeight: '700',
               cursor: 'pointer',
@@ -1141,9 +1141,9 @@ function MediaVaultPageInner() {
                   padding: '6px 14px',
                   borderRadius: '20px',
                   border: '1px solid',
-                  borderColor: isSelected ? '#09090b' : '#e4e4e7',
-                  background: isSelected ? '#09090b' : '#ffffff',
-                  color: isSelected ? '#ffffff' : '#09090b',
+                  borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+                  background: isSelected ? 'var(--primary)' : 'var(--bg)',
+                  color: isSelected ? 'var(--primary-fg)' : 'var(--text)',
                   fontSize: '0.78rem',
                   fontWeight: '700',
                   cursor: 'pointer',
@@ -1160,7 +1160,7 @@ function MediaVaultPageInner() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: isSelected ? '#ffffff' : '#71717a',
+                      color: isSelected ? 'var(--primary-fg)' : 'var(--text-muted)',
                       cursor: 'pointer',
                       padding: 0,
                       display: 'flex',
@@ -1180,7 +1180,7 @@ function MediaVaultPageInner() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: isSelected ? '#ffffff' : '#71717a',
+                      color: isSelected ? 'var(--primary-fg)' : 'var(--text-muted)',
                       cursor: 'pointer',
                       padding: 0,
                       display: 'flex',
@@ -1200,13 +1200,13 @@ function MediaVaultPageInner() {
 
       {/* GALLERY VIEW TOGGLE & FILTER BAR */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', background: '#f4f4f5', borderRadius: '8px', padding: '3px' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '8px', padding: '3px' }}>
           <button
             type="button"
             onClick={() => setGalleryView('vault')}
             style={{
-              background: galleryView === 'vault' ? '#ffffff' : 'transparent',
-              color: galleryView === 'vault' ? '#09090b' : '#71717a',
+              background: galleryView === 'vault' ? 'var(--bg)' : 'transparent',
+              color: galleryView === 'vault' ? 'var(--text)' : 'var(--text-muted)',
               border: 'none',
               padding: '6px 14px',
               borderRadius: '6px',
@@ -1222,8 +1222,8 @@ function MediaVaultPageInner() {
             type="button"
             onClick={() => setGalleryView('predefined')}
             style={{
-              background: galleryView === 'predefined' ? '#ffffff' : 'transparent',
-              color: galleryView === 'predefined' ? '#09090b' : '#71717a',
+              background: galleryView === 'predefined' ? 'var(--bg)' : 'transparent',
+              color: galleryView === 'predefined' ? 'var(--text)' : 'var(--text-muted)',
               border: 'none',
               padding: '6px 14px',
               borderRadius: '6px',
@@ -1263,15 +1263,15 @@ function MediaVaultPageInner() {
               <div
                 key={pred.id}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e4e4e7',
-                  borderRadius: '10px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-lg)',
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column'
                 }}
               >
-                <div style={{ height: '170px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                <div style={{ height: '170px', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
                   <img
                     src={pred.url}
                     alt={pred.name}
@@ -1285,7 +1285,7 @@ function MediaVaultPageInner() {
                       top: '8px',
                       left: '8px',
                       background: 'rgba(9, 9, 11, 0.85)',
-                      color: '#ffffff',
+                      color: 'var(--primary-fg)',
                       fontSize: '0.62rem',
                       fontWeight: '700',
                       padding: '2px 7px',
@@ -1301,13 +1301,13 @@ function MediaVaultPageInner() {
                       position: 'absolute',
                       top: '8px',
                       right: '8px',
-                      background: '#ffffff',
-                      color: '#09090b',
+                      background: 'var(--bg)',
+                      color: 'var(--text)',
                       fontSize: '0.62rem',
                       fontWeight: '700',
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      border: '1px solid #e4e4e7'
+                      border: '1px solid var(--border)'
                     }}
                   >
                     PREDEFINED
@@ -1316,7 +1316,7 @@ function MediaVaultPageInner() {
 
                 <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontWeight: '700', fontSize: '0.86rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    <div style={{ fontWeight: '700', fontSize: '0.86rem', color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {pred.name}
                     </div>
 
@@ -1327,8 +1327,8 @@ function MediaVaultPageInner() {
                             key={kw}
                             style={{
                               fontSize: '0.66rem',
-                              background: '#f4f4f5',
-                              color: '#09090b',
+                              background: 'var(--bg-hover)',
+                              color: 'var(--text)',
                               padding: '1px 6px',
                               borderRadius: '4px',
                               fontWeight: '600'
@@ -1341,19 +1341,19 @@ function MediaVaultPageInner() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f4f4f5' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--bg-hover)' }}>
                     <a
                       href={pred.url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ color: '#71717a', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                      style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
                     >
                       <ExternalLink size={12} />
                       <span>Preview</span>
                     </a>
 
                     {alreadyInVault ? (
-                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <CheckCircle2 size={13} />
                         <span>In My Vault</span>
                       </span>
@@ -1375,17 +1375,17 @@ function MediaVaultPageInner() {
           })}
         </div>
       ) : loading ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#71717a' }}>
+        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
           <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px auto' }} />
           <div>Loading reaction vault media...</div>
         </div>
       ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#fafafa', borderRadius: '12px', border: '1px dashed #e4e4e7' }}>
-          <ImageIcon size={36} style={{ color: '#a1a1aa', margin: '0 auto 12px auto' }} />
-          <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#09090b', margin: 0 }}>
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--bg-subtle)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
+          <ImageIcon size={36} style={{ color: 'var(--text-muted)', margin: '0 auto 12px auto' }} />
+          <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text)', margin: 0 }}>
             No uploads in [{activeCategory}] yet
           </h4>
-          <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '6px', maxWidth: '480px', margin: '6px auto 16px auto' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '6px', maxWidth: '480px', margin: '6px auto 16px auto' }}>
             Whenever this category is triggered in chats, the AI will use our curated smart GIF fallback until you upload your own images or GIFs above.
           </p>
           <button
@@ -1410,9 +1410,9 @@ function MediaVaultPageInner() {
             <div
               key={item._id}
               style={{
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
-                borderRadius: '10px',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-lg)',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1420,7 +1420,7 @@ function MediaVaultPageInner() {
               }}
             >
               {/* Thumbnail Container */}
-              <div style={{ height: '170px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+              <div style={{ height: '170px', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
                 <img
                   src={item.url}
                   alt={item.name}
@@ -1434,7 +1434,7 @@ function MediaVaultPageInner() {
                     top: '8px',
                     left: '8px',
                     background: 'rgba(9, 9, 11, 0.85)',
-                    color: '#ffffff',
+                    color: 'var(--primary-fg)',
                     fontSize: '0.62rem',
                     fontWeight: '700',
                     padding: '2px 7px',
@@ -1451,13 +1451,13 @@ function MediaVaultPageInner() {
                     position: 'absolute',
                     top: '8px',
                     right: '8px',
-                    background: '#ffffff',
-                    color: '#09090b',
+                    background: 'var(--bg)',
+                    color: 'var(--text)',
                     fontSize: '0.62rem',
                     fontWeight: '700',
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    border: '1px solid #e4e4e7'
+                    border: '1px solid var(--border)'
                   }}
                 >
                   {item.mediaType?.toUpperCase() || 'GIF'}
@@ -1467,10 +1467,10 @@ function MediaVaultPageInner() {
               {/* Card Meta & Actions */}
               <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontWeight: '700', fontSize: '0.86rem', color: '#09090b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  <div style={{ fontWeight: '700', fontSize: '0.86rem', color: 'var(--text)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                     {item.name}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: '#71717a', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
                     Added {new Date(item.createdAt).toLocaleDateString()}
                   </div>
 
@@ -1482,8 +1482,8 @@ function MediaVaultPageInner() {
                           key={kw}
                           style={{
                             fontSize: '0.66rem',
-                            background: '#f4f4f5',
-                            color: '#09090b',
+                            background: 'var(--bg-hover)',
+                            color: 'var(--text)',
                             padding: '1px 6px',
                             borderRadius: '4px',
                             fontWeight: '600'
@@ -1496,12 +1496,12 @@ function MediaVaultPageInner() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f4f4f5' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--bg-hover)' }}>
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ color: '#71717a', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                    style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
                   >
                     <ExternalLink size={12} />
                     <span>View Full</span>
@@ -1513,7 +1513,7 @@ function MediaVaultPageInner() {
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#09090b',
+                        color: 'var(--text)',
                         cursor: 'pointer',
                         padding: '4px',
                         display: 'flex',
@@ -1533,7 +1533,7 @@ function MediaVaultPageInner() {
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#ef4444',
+                        color: 'var(--danger)',
                         cursor: 'pointer',
                         padding: '4px',
                         display: 'flex',
@@ -1571,7 +1571,7 @@ function MediaVaultPageInner() {
           padding: '20px'
         }}>
           <div style={{
-            background: '#ffffff',
+            background: 'var(--bg)',
             borderRadius: '12px',
             padding: '24px',
             maxWidth: '480px',
@@ -1579,12 +1579,12 @@ function MediaVaultPageInner() {
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: '#09090b' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
                 Edit Media & Keywords
               </h3>
               <button
                 onClick={() => setEditingItem(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#71717a' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
               >
                 <X size={18} />
               </button>
@@ -1592,7 +1592,7 @@ function MediaVaultPageInner() {
 
             <form onSubmit={handleSaveEditItem}>
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Media Label / Title
                 </label>
                 <input
@@ -1604,7 +1604,7 @@ function MediaVaultPageInner() {
               </div>
 
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Category
                 </label>
                 <select
@@ -1621,7 +1621,7 @@ function MediaVaultPageInner() {
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Keywords / Humour Triggers (Comma separated)
                 </label>
                 <input
@@ -1672,7 +1672,7 @@ function MediaVaultPageInner() {
           padding: '20px'
         }}>
           <div style={{
-            background: '#ffffff',
+            background: 'var(--bg)',
             borderRadius: '12px',
             padding: '24px',
             maxWidth: '440px',
@@ -1680,24 +1680,24 @@ function MediaVaultPageInner() {
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: '#09090b' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
                 Add Custom Category
               </h3>
               <button
                 onClick={() => setShowNewCategoryModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#71717a' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Create a custom emotion or reaction category (e.g. <code>savage</code>, <code>flirty</code>, <code>gaming</code>, <code>food</code>). Your AI will understand this tag and attach your media when appropriate.
             </p>
 
             <form onSubmit={handleCreateCategory}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Category Tag / Name
                 </label>
                 <input
@@ -1749,7 +1749,7 @@ function MediaVaultPageInner() {
           padding: '20px'
         }}>
           <div style={{
-            background: '#ffffff',
+            background: 'var(--bg)',
             borderRadius: '12px',
             padding: '24px',
             maxWidth: '440px',
@@ -1757,24 +1757,24 @@ function MediaVaultPageInner() {
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: '#09090b' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
                 Rename Category &quot;{renameModalCategory.id}&quot;
               </h3>
               <button
                 onClick={() => setRenameModalCategory(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#71717a' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Renaming will automatically update all media items currently in this category to the new name.
             </p>
 
             <form onSubmit={handleRenameCategorySubmit}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   New Category Name
                 </label>
                 <input

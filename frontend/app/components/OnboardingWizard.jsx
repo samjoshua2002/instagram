@@ -274,10 +274,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
           width: '100%',
           maxWidth: '580px',
           maxHeight: '90vh',
-          background: '#ffffff',
+          background: 'var(--bg)',
           borderRadius: '16px',
           boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.25)',
-          border: '1px solid #e4e4e7',
+          border: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
@@ -286,7 +286,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         {/* Header Bar */}
         <div style={{
           padding: '18px 24px 14px 24px',
-          borderBottom: '1px solid #f4f4f5',
+          borderBottom: '1px solid var(--bg-hover)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
@@ -296,8 +296,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               width: '24px',
               height: '24px',
               borderRadius: '6px',
-              background: '#09090b',
-              color: '#ffffff',
+              background: 'var(--primary)',
+              color: 'var(--primary-fg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -306,7 +306,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
             }}>
               C
             </div>
-            <span style={{ fontSize: '0.82rem', fontWeight: '800', letterSpacing: '-0.3px', color: '#09090b' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: '800', letterSpacing: '-0.3px', color: 'var(--text)' }}>
               CHATTER OS // SETUP WIZARD
             </span>
           </div>
@@ -316,7 +316,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               fontSize: '0.7rem',
               fontWeight: '700',
               fontFamily: "'JetBrains Mono', monospace",
-              color: '#71717a'
+              color: 'var(--text-muted)'
             }}>
               STEP {step} OF {TOTAL_STEPS}
             </span>
@@ -327,7 +327,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 background: 'none',
                 border: 'none',
                 padding: '4px',
-                color: '#a1a1aa',
+                color: 'var(--text-muted)',
                 cursor: 'pointer',
                 borderRadius: '4px',
                 display: 'flex'
@@ -340,13 +340,13 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         </div>
 
         {/* 5-Step Segmented Progress Bar */}
-        <div style={{ display: 'flex', width: '100%', height: '3px', background: '#f4f4f5' }}>
+        <div style={{ display: 'flex', width: '100%', height: '3px', background: 'var(--bg-hover)' }}>
           {[1, 2, 3, 4, 5].map((s) => (
             <div
               key={s}
               style={{
                 flex: 1,
-                background: s <= step ? '#09090b' : 'transparent',
+                background: s <= step ? 'var(--primary)' : 'transparent',
                 transition: 'background 0.3s ease'
               }}
             />
@@ -357,11 +357,11 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
           {error && (
             <div style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
+              background: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
               borderRadius: '8px',
               padding: '10px 14px',
-              color: '#b91c1c',
+              color: 'var(--danger)',
               fontSize: '0.8rem',
               marginBottom: '16px',
               display: 'flex',
@@ -378,18 +378,18 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               ═══════════════════════════════════════════════════════════ */}
           {step === 1 && (
             <div>
-              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
+              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--text)', margin: 0, letterSpacing: '-0.4px' }}>
                 Connect Your Instagram
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '20px' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '20px' }}>
                 Authorize your Instagram account to unlock automated direct messages, relationship intelligence, and smart memory.
               </p>
 
               {/* Connected Status Card */}
               {isConnected ? (
                 <div style={{
-                  background: '#f0fdf4',
-                  border: '1.5px solid #86efac',
+                  background: 'var(--success-bg)',
+                  border: '1.5px solid var(--success-border)',
                   borderRadius: '12px',
                   padding: '18px 20px',
                   marginBottom: '20px',
@@ -401,33 +401,33 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     <div style={{
                       width: '40px',
                       height: '40px',
-                      borderRadius: '10px',
+                      borderRadius: 'var(--r-lg)',
                       background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#ffffff'
+                      color: 'var(--primary-fg)'
                     }}>
                       <Instagram size={22} />
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontWeight: '800', fontSize: '0.94rem', color: '#15803d' }}>
+                        <span style={{ fontWeight: '800', fontSize: '0.94rem', color: 'var(--success)' }}>
                           @{instagramUsername || 'Instagram Account'}
                         </span>
                         <span style={{
                           fontSize: '0.64rem',
                           fontWeight: '800',
                           fontFamily: "'JetBrains Mono', monospace",
-                          background: '#dcfce7',
-                          color: '#15803d',
+                          background: 'var(--success-bg)',
+                          color: 'var(--success)',
                           padding: '1px 6px',
                           borderRadius: '4px'
                         }}>
                           LINKED
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#166534', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: '2px', fontFamily: "'JetBrains Mono', monospace" }}>
                         ID: {instagramAccountId || 'Connected'} • Page Token Active
                       </div>
                     </div>
@@ -437,13 +437,13 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     type="button"
                     onClick={handleLaunchInstagramOAuth}
                     style={{
-                      background: '#ffffff',
-                      border: '1px solid #bbf7d0',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--success-border)',
                       borderRadius: '8px',
                       padding: '6px 12px',
                       fontSize: '0.74rem',
                       fontWeight: '700',
-                      color: '#15803d',
+                      color: 'var(--success)',
                       cursor: 'pointer'
                     }}
                   >
@@ -460,7 +460,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     style={{
                       width: '100%',
                       background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)',
-                      color: '#ffffff',
+                      color: 'var(--primary-fg)',
                       border: 'none',
                       borderRadius: '12px',
                       padding: '16px 20px',
@@ -488,7 +488,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       </>
                     )}
                   </button>
-                  <p style={{ fontSize: '0.73rem', color: '#71717a', textAlign: 'center', marginTop: '8px' }}>
+                  <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
                     Opens official Meta authorization popup. Grants permissions and fills your token automatically.
                   </p>
                 </div>
@@ -496,8 +496,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
 
               {/* Expandable Manual Credentials Override */}
               <div style={{
-                background: '#fafafa',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '14px 16px',
                 marginBottom: '10px'
@@ -513,7 +513,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Lock size={14} color="#71717a" />
-                    <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#09090b' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text)' }}>
                       Manual Credentials Override
                     </span>
                   </div>
@@ -536,8 +536,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                             width: '100%',
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            border: '1px solid #e4e4e7',
-                            background: '#ffffff',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg)',
                             fontSize: '0.8rem',
                             boxSizing: 'border-box'
                           }}
@@ -556,8 +556,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                             width: '100%',
                             padding: '8px 10px',
                             borderRadius: '6px',
-                            border: '1px solid #e4e4e7',
-                            background: '#ffffff',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg)',
                             fontSize: '0.8rem',
                             boxSizing: 'border-box'
                           }}
@@ -578,8 +578,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           width: '100%',
                           padding: '8px 10px',
                           borderRadius: '6px',
-                          border: '1px solid #e4e4e7',
-                          background: '#ffffff',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg)',
                           fontSize: '0.78rem',
                           fontFamily: "'JetBrains Mono', monospace",
                           boxSizing: 'border-box'
@@ -597,10 +597,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               ═══════════════════════════════════════════════════════════ */}
           {step === 2 && (
             <div>
-              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
+              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--text)', margin: 0, letterSpacing: '-0.4px' }}>
                 Choose Your Account Type
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '20px' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '20px' }}>
                 Select your primary workflow. We adapt your AI chat prompts, tone guidelines, and memory models accordingly.
               </p>
 
@@ -610,8 +610,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                   onClick={() => setAccountType('personal')}
                   style={{
                     border: '1.5px solid',
-                    borderColor: accountType === 'personal' ? '#09090b' : '#e4e4e7',
-                    background: accountType === 'personal' ? '#fafafa' : '#ffffff',
+                    borderColor: accountType === 'personal' ? 'var(--primary)' : 'var(--border)',
+                    background: accountType === 'personal' ? 'var(--bg-subtle)' : 'var(--bg)',
                     borderRadius: '12px',
                     padding: '18px 16px',
                     cursor: 'pointer',
@@ -627,8 +627,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       width: '36px',
                       height: '36px',
                       borderRadius: '8px',
-                      background: accountType === 'personal' ? '#09090b' : '#f4f4f5',
-                      color: accountType === 'personal' ? '#ffffff' : '#71717a',
+                      background: accountType === 'personal' ? 'var(--primary)' : 'var(--bg-hover)',
+                      color: accountType === 'personal' ? 'var(--primary-fg)' : '#52525b',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -636,10 +636,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     }}>
                       <User size={18} />
                     </div>
-                    <div style={{ fontWeight: '800', fontSize: '0.94rem', color: '#09090b' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.94rem', color: 'var(--text)' }}>
                       Personal &amp; Creator
                     </div>
-                    <p style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '6px', lineHeight: 1.4 }}>
+                    <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
                       Natural casual chat, friendly humor, witty reactions to shared reels/memes, and friend memory recall.
                     </p>
                   </div>
@@ -648,9 +648,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       width: '14px',
                       height: '14px',
                       borderRadius: '50%',
-                      border: accountType === 'personal' ? '4px solid #09090b' : '1.5px solid #d4d4d8'
+                      border: accountType === 'personal' ? '4px solid var(--primary)' : '1.5px solid var(--border-strong)'
                     }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: accountType === 'personal' ? '#09090b' : '#a1a1aa' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: accountType === 'personal' ? 'var(--text)' : 'var(--text-muted)' }}>
                       {accountType === 'personal' ? 'Selected' : 'Select'}
                     </span>
                   </div>
@@ -661,8 +661,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                   onClick={() => setAccountType('business')}
                   style={{
                     border: '1.5px solid',
-                    borderColor: accountType === 'business' ? '#09090b' : '#e4e4e7',
-                    background: accountType === 'business' ? '#fafafa' : '#ffffff',
+                    borderColor: accountType === 'business' ? 'var(--primary)' : 'var(--border)',
+                    background: accountType === 'business' ? 'var(--bg-subtle)' : 'var(--bg)',
                     borderRadius: '12px',
                     padding: '18px 16px',
                     cursor: 'pointer',
@@ -678,8 +678,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       width: '36px',
                       height: '36px',
                       borderRadius: '8px',
-                      background: accountType === 'business' ? '#09090b' : '#f4f4f5',
-                      color: accountType === 'business' ? '#ffffff' : '#71717a',
+                      background: accountType === 'business' ? 'var(--primary)' : 'var(--bg-hover)',
+                      color: accountType === 'business' ? 'var(--primary-fg)' : '#52525b',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -687,10 +687,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     }}>
                       <Briefcase size={18} />
                     </div>
-                    <div style={{ fontWeight: '800', fontSize: '0.94rem', color: '#09090b' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.94rem', color: 'var(--text)' }}>
                       Business &amp; Brand
                     </div>
-                    <p style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '6px', lineHeight: 1.4 }}>
+                    <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
                       Automate customer inquiries, appointments, services, FAQs, and product links professionally.
                     </p>
                   </div>
@@ -699,9 +699,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       width: '14px',
                       height: '14px',
                       borderRadius: '50%',
-                      border: accountType === 'business' ? '4px solid #09090b' : '1.5px solid #d4d4d8'
+                      border: accountType === 'business' ? '4px solid var(--primary)' : '1.5px solid var(--border-strong)'
                     }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: accountType === 'business' ? '#09090b' : '#a1a1aa' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '700', color: accountType === 'business' ? 'var(--text)' : 'var(--text-muted)' }}>
                       {accountType === 'business' ? 'Selected' : 'Select'}
                     </span>
                   </div>
@@ -717,17 +717,17 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
             <div>
               {accountType === 'business' ? (
                 <div>
-                  <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
+                  <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--text)', margin: 0, letterSpacing: '-0.4px' }}>
                     Business Profile &amp; Services
                   </h2>
-                  <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '18px' }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '18px' }}>
                     Give your AI assistant context about your brand, services, and offers to answer customer inquiries.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                           Business / Brand Name *
                         </label>
                         <input
@@ -739,14 +739,14 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                             width: '100%',
                             padding: '8px 12px',
                             borderRadius: '8px',
-                            border: '1px solid #e4e4e7',
+                            border: '1px solid var(--border)',
                             fontSize: '0.82rem',
                             boxSizing: 'border-box'
                           }}
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                           Industry / Category
                         </label>
                         <input
@@ -758,7 +758,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                             width: '100%',
                             padding: '8px 12px',
                             borderRadius: '8px',
-                            border: '1px solid #e4e4e7',
+                            border: '1px solid var(--border)',
                             fontSize: '0.82rem',
                             boxSizing: 'border-box'
                           }}
@@ -767,7 +767,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                         Products, Services &amp; Offers
                       </label>
                       <textarea
@@ -779,7 +779,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           width: '100%',
                           padding: '8px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #e4e4e7',
+                          border: '1px solid var(--border)',
                           fontSize: '0.82rem',
                           boxSizing: 'border-box',
                           fontFamily: 'inherit'
@@ -788,7 +788,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                         Website or Booking Link
                       </label>
                       <input
@@ -800,7 +800,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           width: '100%',
                           padding: '8px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #e4e4e7',
+                          border: '1px solid var(--border)',
                           fontSize: '0.82rem',
                           boxSizing: 'border-box'
                         }}
@@ -810,16 +810,16 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 </div>
               ) : (
                 <div>
-                  <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
+                  <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--text)', margin: 0, letterSpacing: '-0.4px' }}>
                     Personal Style &amp; Interests
                   </h2>
-                  <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '18px' }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '18px' }}>
                     Teach the AI your personality, slang, and how you chat with friends so it speaks just like you.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                         About You, Hobbies &amp; Interests
                       </label>
                       <textarea
@@ -831,7 +831,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           width: '100%',
                           padding: '8px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #e4e4e7',
+                          border: '1px solid var(--border)',
                           fontSize: '0.82rem',
                           boxSizing: 'border-box',
                           fontFamily: 'inherit'
@@ -840,7 +840,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                         Texting Style &amp; Slang
                       </label>
                       <input
@@ -852,7 +852,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           width: '100%',
                           padding: '8px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #e4e4e7',
+                          border: '1px solid var(--border)',
                           fontSize: '0.82rem',
                           boxSizing: 'border-box'
                         }}
@@ -860,7 +860,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                         Meme &amp; Shared Reels Reaction Style
                       </label>
                       <input
@@ -872,7 +872,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           width: '100%',
                           padding: '8px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #e4e4e7',
+                          border: '1px solid var(--border)',
                           fontSize: '0.82rem',
                           boxSizing: 'border-box'
                         }}
@@ -889,10 +889,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               ═══════════════════════════════════════════════════════════ */}
           {step === 4 && (
             <div>
-              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
+              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--text)', margin: 0, letterSpacing: '-0.4px' }}>
                 AI Persona Tone &amp; Greeting
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '18px' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '18px' }}>
                 Select how your AI sounds when replying to inbound direct messages.
               </p>
 
@@ -910,9 +910,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       onClick={() => setPersonaTone(tone.id)}
                       style={{
                         border: '1.5px solid',
-                        borderColor: isSelected ? '#09090b' : '#e4e4e7',
-                        background: isSelected ? '#fafafa' : '#ffffff',
-                        borderRadius: '10px',
+                        borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+                        background: isSelected ? 'var(--bg-subtle)' : 'var(--bg)',
+                        borderRadius: 'var(--r-lg)',
                         padding: '12px 14px',
                         cursor: 'pointer',
                         display: 'flex',
@@ -923,22 +923,22 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     >
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: '#09090b' }}>
+                          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--text)' }}>
                             {tone.title}
                           </span>
                           <span style={{
                             fontSize: '0.62rem',
                             fontWeight: '700',
                             fontFamily: "'JetBrains Mono', monospace",
-                            background: isSelected ? '#09090b' : '#f4f4f5',
-                            color: isSelected ? '#ffffff' : '#71717a',
+                            background: isSelected ? 'var(--primary)' : 'var(--bg-hover)',
+                            color: isSelected ? 'var(--primary-fg)' : '#52525b',
                             padding: '1px 6px',
                             borderRadius: '4px'
                           }}>
                             {tone.badge}
                           </span>
                         </div>
-                        <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '3px 0 0 0' }}>
+                        <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '3px 0 0 0' }}>
                           {tone.desc}
                         </p>
                       </div>
@@ -946,7 +946,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                         width: '16px',
                         height: '16px',
                         borderRadius: '50%',
-                        border: isSelected ? '5px solid #09090b' : '1.5px solid #d4d4d8',
+                        border: isSelected ? '5px solid var(--primary)' : '1.5px solid var(--border-strong)',
                         flexShrink: 0
                       }} />
                     </div>
@@ -955,7 +955,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#09090b', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }}>
                   Default Opening Greeting
                 </label>
                 <textarea
@@ -967,7 +967,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     width: '100%',
                     padding: '8px 12px',
                     borderRadius: '8px',
-                    border: '1px solid #e4e4e7',
+                    border: '1px solid var(--border)',
                     fontSize: '0.82rem',
                     boxSizing: 'border-box',
                     fontFamily: 'inherit'
@@ -982,40 +982,40 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               ═══════════════════════════════════════════════════════════ */}
           {step === 5 && (
             <div>
-              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: '#09090b', margin: 0, letterSpacing: '-0.4px' }}>
+              <h2 style={{ fontSize: '1.28rem', fontWeight: '800', color: 'var(--text)', margin: 0, letterSpacing: '-0.4px' }}>
                 Summary &amp; Automation Policy
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '4px', marginBottom: '16px' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '16px' }}>
                 Confirm your configuration and activate your Instagram AI Bot.
               </p>
 
               {/* Summary Card */}
               <div style={{
-                background: '#fafafa',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border)',
                 borderRadius: '12px',
                 padding: '14px 16px',
                 marginBottom: '16px'
               }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: '800', color: '#a1a1aa', letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: '10px' }}>
                   Configuration Overview
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.76rem' }}>
                   <div>
-                    <span style={{ color: '#71717a' }}>Instagram:</span>{' '}
-                    <strong style={{ color: '#09090b' }}>@{instagramUsername || 'Not connected'}</strong>
+                    <span style={{ color: 'var(--text-muted)' }}>Instagram:</span>{' '}
+                    <strong style={{ color: 'var(--text)' }}>@{instagramUsername || 'Not connected'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#71717a' }}>Account Tier:</span>{' '}
-                    <strong style={{ color: '#09090b' }}>{accountType === 'business' ? 'Business & Brand' : 'Personal & Creator'}</strong>
+                    <span style={{ color: 'var(--text-muted)' }}>Account Tier:</span>{' '}
+                    <strong style={{ color: 'var(--text)' }}>{accountType === 'business' ? 'Business & Brand' : 'Personal & Creator'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#71717a' }}>AI Tone:</span>{' '}
-                    <strong style={{ color: '#09090b' }}>{personaTone.toUpperCase()}</strong>
+                    <span style={{ color: 'var(--text-muted)' }}>AI Tone:</span>{' '}
+                    <strong style={{ color: 'var(--text)' }}>{personaTone.toUpperCase()}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#71717a' }}>Status:</span>{' '}
-                    <strong style={{ color: isConnected ? '#15803d' : '#b45309' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Status:</span>{' '}
+                    <strong style={{ color: isConnected ? 'var(--success)' : 'var(--warning)' }}>
                       {isConnected ? 'Ready to Automate' : 'Credentials Needed'}
                     </strong>
                   </div>
@@ -1036,9 +1036,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       onClick={() => setChatMode(mode.id)}
                       style={{
                         border: '1px solid',
-                        borderColor: isSelected ? '#09090b' : '#e4e4e7',
-                        background: isSelected ? '#fafafa' : '#ffffff',
-                        borderRadius: '10px',
+                        borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+                        background: isSelected ? 'var(--bg-subtle)' : 'var(--bg)',
+                        borderRadius: 'var(--r-lg)',
                         padding: '10px 12px',
                         cursor: 'pointer',
                         display: 'flex',
@@ -1048,10 +1048,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#09090b' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.82rem', color: 'var(--text)' }}>
                           {mode.title}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {mode.desc}
                         </div>
                       </div>
@@ -1059,7 +1059,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                         width: '14px',
                         height: '14px',
                         borderRadius: '50%',
-                        border: isSelected ? '4.5px solid #09090b' : '1.5px solid #d4d4d8',
+                        border: isSelected ? '4.5px solid var(--primary)' : '1.5px solid var(--border-strong)',
                         flexShrink: 0
                       }} />
                     </div>
@@ -1069,8 +1069,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
 
               {/* Master AI Bot Toggle */}
               <div style={{
-                background: '#f4f4f5',
-                borderRadius: '10px',
+                background: 'var(--bg-hover)',
+                borderRadius: 'var(--r-lg)',
                 padding: '12px 14px',
                 display: 'flex',
                 alignItems: 'center',
@@ -1079,10 +1079,10 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Zap size={16} color="#09090b" />
                   <div>
-                    <div style={{ fontWeight: '700', fontSize: '0.8rem', color: '#09090b' }}>
+                    <div style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--text)' }}>
                       Activate Instagram AI Bot Automation
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#71717a' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                       The AI bot will start responding automatically to incoming Instagram messages.
                     </div>
                   </div>
@@ -1099,7 +1099,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     position: 'absolute',
                     cursor: 'pointer',
                     top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: enableGlobalBot ? '#16a34a' : '#d4d4d8',
+                    backgroundColor: enableGlobalBot ? 'var(--success)' : 'var(--border-strong)',
                     borderRadius: '22px',
                     transition: '0.2s'
                   }}>
@@ -1124,8 +1124,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         {/* Footer Navigation Bar */}
         <div style={{
           padding: '16px 24px',
-          background: '#fafafa',
-          borderTop: '1px solid #f4f4f5',
+          background: 'var(--bg-subtle)',
+          borderTop: '1px solid var(--bg-hover)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
@@ -1138,7 +1138,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#71717a',
+                  color: 'var(--text-muted)',
                   fontSize: '0.82rem',
                   fontWeight: '700',
                   cursor: 'pointer',
@@ -1157,7 +1157,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#a1a1aa',
+                  color: 'var(--text-muted)',
                   fontSize: '0.8rem',
                   fontWeight: '600',
                   cursor: 'pointer'
@@ -1174,8 +1174,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 type="button"
                 onClick={handleNext}
                 style={{
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '9px 18px',
@@ -1197,8 +1197,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                 onClick={handleFinish}
                 disabled={loading}
                 style={{
-                  background: '#09090b',
-                  color: '#ffffff',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '9px 20px',

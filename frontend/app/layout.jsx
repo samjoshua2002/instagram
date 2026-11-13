@@ -15,7 +15,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{ background: '#ffffff', color: '#09090b', margin: 0, padding: 0 }}>
+      <body style={{ background: 'var(--bg)', color: 'var(--text)', margin: 0, padding: 0 }}>
         <AppProvider>
           <AuthGate>
             {children}
