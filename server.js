@@ -346,6 +346,26 @@ const storage = multer.diskStorage({
     cb(null, `${unique}${ext}`);
   }
 });
+// Checks the file's real first bytes, not the type the browser claimed
+function fileMatchesType(filePath, mime) {
+  let head;
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    head = Buffer.alloc(12);
+    fs.readSync(fd, head, 0, 12, 0);
+    fs.closeSync(fd);
+  } catch (e) { return false; }
+  const ascii = (a, b) => head.slice(a, b).toString('latin1');
+  switch (mime) {
+    case 'image/gif': return ascii(0, 4) === 'GIF8';
+    case 'image/jpeg': return head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+    case 'image/png': return head.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    case 'image/webp': return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
+    case 'video/mp4': return ascii(4, 8) === 'ftyp';
+    default: return false;
+  }
+}
+
 const upload = multer({
   storage,
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
@@ -366,13 +386,16 @@ app.use(cors());
 // Keep the raw body so Meta webhook signatures (X-Hub-Signature-256) can be verified
 app.use(express.json({ limit: '25mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// Uploaded files are mounted FIRST so their safety headers always apply
+// (public/ also contains uploads/, and the general static handler would otherwise serve them bare)
 app.use('/uploads', express.static(uploadsDir, {
+  fallthrough: false,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
   }
 }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Authentication & Passkey Endpoints
 app.use('/api/auth', authRouter);
@@ -1787,6 +1810,10 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No media file was uploaded.' });
+    }
+    if (!fileMatchesType(req.file.path, (req.file.mimetype || '').toLowerCase())) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: 'This file is not a real GIF, JPG, PNG, WebP or MP4.' });
     }
     const { category = 'joy', name, caption, keywords } = req.body || {};
     const cleanCat = (isStr(category) && category ? category : 'joy').toLowerCase().trim().replace(/[^a-z0-9_]/g, '') || 'joy';
