@@ -90,7 +90,7 @@ function DonutChart({ segments, size = 130, stroke = 20 }) {
 // Horizontal bar row for leaderboards with butter-smooth progress animation
 function BarRow({ label, handle, value, max, index }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  const shades = ['#09090b', '#27272a', '#52525b', '#a1a1aa', '#d4d4d8'];
+  const shades = ['#09090b', '#3f3f46', '#5f5f68', '#78787f', '#8e8e96']; // all at least 3:1 on white
   return (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
@@ -377,9 +377,9 @@ export default function AnalyticsPage() {
   const donutSegments = [
     { label: 'Close Circle', value: breakdown.close, color: '#09090b' },
     { label: 'Online Friends', value: breakdown.online, color: '#3f3f46' },
-    { label: 'Offline Friends', value: breakdown.offline, color: '#71717a' },
-    { label: 'Family', value: breakdown.relatives, color: '#a1a1aa' },
-    { label: 'Professional', value: breakdown.professional, color: '#d4d4d8' },
+    { label: 'Offline Friends', value: breakdown.offline, color: '#5f5f68' },
+    { label: 'Family', value: breakdown.relatives, color: '#78787f' },
+    { label: 'Professional', value: breakdown.professional, color: '#8e8e96' },
   ].filter(s => s.value > 0);
 
   const activeModeCount = routingConfig.chatMode === 'everyone_except'
@@ -1299,9 +1299,9 @@ export default function AnalyticsPage() {
                 {[
                   { label: 'Close Circle', value: breakdown.close, color: '#09090b' },
                   { label: 'Online Friends', value: breakdown.online, color: '#3f3f46' },
-                  { label: 'Offline Friends', value: breakdown.offline, color: '#71717a' },
-                  { label: 'Family', value: breakdown.relatives, color: '#a1a1aa' },
-                  { label: 'Professional', value: breakdown.professional, color: '#d4d4d8' },
+                  { label: 'Offline Friends', value: breakdown.offline, color: '#5f5f68' },
+                  { label: 'Family', value: breakdown.relatives, color: '#78787f' },
+                  { label: 'Professional', value: breakdown.professional, color: '#8e8e96' },
                 ].map((s, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1376,7 +1376,7 @@ export default function AnalyticsPage() {
               <div style={{ display: 'flex', gap: '10px' }}>
                 {[
                   { label: 'Full AI Active', value: breakdown.aiActive, color: '#09090b' },
-                  { label: 'Manual / Paused', value: breakdown.aiPaused, color: '#d4d4d8' },
+                  { label: 'Manual / Paused', value: breakdown.aiPaused, color: '#8e8e96' },
                 ].map((s, i) => (
                   <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
