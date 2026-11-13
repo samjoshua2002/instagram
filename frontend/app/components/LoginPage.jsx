@@ -186,6 +186,11 @@ export default function LoginPage({ onLoginSuccess }) {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrData, setQrData] = useState(null);
   const [copiedSecret, setCopiedSecret] = useState(false);
+  // OneAuth QR now unlocked via email code (pre-login): request-setup-otp -> verify-setup-otp
+  const [qrOtpSent, setQrOtpSent] = useState(false);
+  const [qrOtpCode, setQrOtpCode] = useState('');
+  const [qrEmail, setQrEmail] = useState('');
+  const [qrInfo, setQrInfo] = useState('');
 
   // Create Account Flow States
   // regStage: 'form' (Stage 1) | 'otp' (Stage 1.5) | 'passkey_prompt' (Stage 2)
@@ -238,10 +243,12 @@ export default function LoginPage({ onLoginSuccess }) {
     setInstaChecking(true);
     setInstaPreview(null);
 
+    let cancelled = false;
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`${API_BASE}/api/auth/instagram/check-handle?handle=${encodeURIComponent(handle)}`);
         const data = await res.json();
+        if (cancelled) return;
         if (data.alreadyRegistered) {
           setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
           setInstaPreview(null);
@@ -279,6 +286,7 @@ export default function LoginPage({ onLoginSuccess }) {
           }
         }
       } catch (err) {
+        if (cancelled) return;
         if (/^[a-zA-Z0-9._]{1,30}$/.test(handle)) {
           setInstaPreview({
             exists: true,
@@ -294,11 +302,11 @@ export default function LoginPage({ onLoginSuccess }) {
           setInstaPreview(null);
         }
       } finally {
-        setInstaChecking(false);
+        if (!cancelled) setInstaChecking(false);
       }
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [regForm.instagramUsername]);
 
   // Forgot Password Modal States
@@ -483,6 +491,30 @@ export default function LoginPage({ onLoginSuccess }) {
     }
   };
 
+  // Unverified account (403 needsVerification): jump to the registration email-code step
+  const moveToEmailVerification = async (email, message) => {
+    setError(message || 'Please verify your email address before signing in.');
+    if (!email || !String(email).includes('@')) return;
+    setAuthMode('register');
+    setRegForm(prev => ({ ...prev, email: String(email).trim() }));
+    setRegOtpCode('');
+    setRegStage('otp');
+    setRegError('');
+    setRegSuccess(message || 'Your email is not verified yet.');
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: String(email).trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to send verification code.');
+      setRegSuccess(data.message || `A verification code was sent to ${email}.`);
+    } catch (err) {
+      setRegError(err.message || 'Failed to send verification code.');
+    }
+  };
+
   // Password Login (+ optional OneAuth 2FA)
   const handlePasswordLogin = async (e) => {
     e?.preventDefault();
@@ -514,7 +546,11 @@ export default function LoginPage({ onLoginSuccess }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403 && data.needsVerification) {
+        await moveToEmailVerification(data.email || loginId, data.error);
+        return;
+      }
       if (!res.ok) {
         throw new Error(data.error || 'Invalid email or password.');
       }
@@ -567,7 +603,11 @@ export default function LoginPage({ onLoginSuccess }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403 && data.needsVerification) {
+        await moveToEmailVerification(data.email || loginId, data.error);
+        return;
+      }
       if (!res.ok) {
         throw new Error(data.error || 'Zoho OneAuth verification failed.');
       }
@@ -602,19 +642,75 @@ export default function LoginPage({ onLoginSuccess }) {
     setError('');
     setShowQrCode(true);
     setQrLoading(true);
+    setQrData(null);
+    setQrOtpSent(false);
+    setQrOtpCode('');
+    setQrInfo('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/oneauth/qr?email=${encodeURIComponent(emailToFetch)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate QR code.');
-      setQrData(data);
+      const res = await fetch(`${API_BASE}/api/auth/oneauth/request-setup-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToFetch })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to send verification code.');
+      setQrEmail(emailToFetch);
+      setQrOtpSent(true);
+      setQrInfo(data.message || `A 6-digit code was sent to ${emailToFetch}.`);
     } catch (err) {
-      setError(err.message || 'Could not load QR code.');
+      setError(err.message || 'Could not send verification code.');
       setShowQrCode(false);
     } finally {
       setQrLoading(false);
     }
   };
+
+  const verifyQrSetupOtp = async () => {
+    if (!qrOtpCode || qrOtpCode.trim().length !== 6) {
+      setError('Please enter the 6-digit code sent to your email.');
+      return;
+    }
+    setError('');
+    setQrLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/oneauth/verify-setup-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: qrEmail, otpCode: qrOtpCode.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.qrDataUrl) throw new Error(data.error || 'Failed to generate QR code.');
+      setQrData(data);
+      setQrOtpSent(false);
+      setQrOtpCode('');
+    } catch (err) {
+      setError(err.message || 'Could not load QR code.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const renderQrSetupOtp = () => (
+    <div>
+      <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '0 0 8px' }}>{qrInfo || 'Enter the 6-digit code sent to your email to view your QR code.'}</p>
+      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          value={qrOtpCode}
+          onChange={(e) => setQrOtpCode(e.target.value.replace(/\D/g, ''))}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); verifyQrSetupOtp(); } }}
+          placeholder="Email code"
+          style={{ width: '120px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '7px', padding: '7px 9px', fontSize: '0.8rem', textAlign: 'center', letterSpacing: '2px', outline: 'none' }}
+        />
+        <button type="button" onClick={verifyQrSetupOtp} style={{ background: '#09090b', color: '#ffffff', border: 'none', borderRadius: '7px', padding: '7px 12px', fontSize: '0.74rem', fontWeight: '600', cursor: 'pointer' }}>
+          Show QR
+        </button>
+      </div>
+    </div>
+  );
 
   const copySecret = () => {
     if (qrData?.secret) {
@@ -1625,7 +1721,7 @@ export default function LoginPage({ onLoginSuccess }) {
                                   </button>
                                 </div>
                               </div>
-                            ) : null}
+                            ) : qrOtpSent ? renderQrSetupOtp() : null}
                           </div>
                         )}
 
@@ -1961,7 +2057,7 @@ export default function LoginPage({ onLoginSuccess }) {
                                   </button>
                                 </div>
                               </div>
-                            ) : null}
+                            ) : qrOtpSent ? renderQrSetupOtp() : null}
                           </div>
                         )}
 
@@ -2021,7 +2117,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
               {/* Bottom Footer Details */}
               <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '0.74rem', color: '#a1a1aa' }}>
-                Chatter OS • End-to-End Encrypted Session
+                Chatter OS • Secure HTTPS Session
               </div>
             </div>
           )}

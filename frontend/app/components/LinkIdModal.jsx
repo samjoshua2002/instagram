@@ -89,7 +89,7 @@ export default function LinkIdModal() {
         inset: 0,
         background: 'rgba(0, 0, 0, 0.4)',
         backdropFilter: 'blur(4px)',
-        zIndex: 100,
+        zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

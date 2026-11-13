@@ -49,8 +49,22 @@ function formatDobForInput(dob) {
 }
 
 export default function RelationshipsPage() {
+  const { user, isImpersonating } = useApp();
 
+  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
+  if (user?.role === 'superadmin' && !isImpersonating) {
+    return (
+      <SuperadminWorkspacePrompt
+        sectionTitle="Creator People Directory"
+        sectionCode="02 // RELATIONSHIPS"
+        sectionDescription="People directories, relationship tags, and contact memory belong to individual creator workspaces. Choose a creator workspace below to inspect and manage their contact directory."
+      />
+    );
+  }
+  return <RelationshipsPageInner />;
+}
 
+function RelationshipsPageInner() {
   const {
     nodes,
     saveNode,
@@ -65,23 +79,21 @@ export default function RelationshipsPage() {
     API_BASE,
     showToast,
     isSyncingInitial,
-    user,
-    isImpersonating
+    user
   } = useApp();
 
-  // If pure superadmin (not inside an impersonated creator workspace), show creator selector
-  if (user?.role === 'superadmin' && !isImpersonating) {
-    return (
-      <SuperadminWorkspacePrompt
-        sectionTitle="Creator People Directory"
-        sectionCode="02 // RELATIONSHIPS"
-        sectionDescription="People directories, relationship tags, and contact memory belong to individual creator workspaces. Choose a creator workspace below to inspect and manage their contact directory."
-      />
-    );
-  }
-
   // Navigation State: null = Directory Table view; Object = Full Inner Person Page
-  const [selectedPerson, setSelectedPerson] = useState(null);
+  // Only the person's identity is kept in state; live data is always read from `nodes`
+  const [selectedPersonRef, setSelectedPerson] = useState(null);
+  const selectedPerson = useMemo(() => {
+    if (!selectedPersonRef) return null;
+    const ref = selectedPersonRef;
+    const refName = (ref.name || '').toLowerCase();
+    const live = nodes.find(n => !n.isRoot && ref.senderId && n.senderId === ref.senderId)
+      || nodes.find(n => !n.isRoot && n.id === ref.id)
+      || nodes.find(n => !n.isRoot && (n.name || '').toLowerCase() === refName);
+    return live || ref;
+  }, [selectedPersonRef, nodes]);
 
   // Filters State
   const [activeCategory, setActiveCategory] = useState('all');
@@ -113,14 +125,14 @@ export default function RelationshipsPage() {
   const [tablePage, setTablePage] = useState(1);
 
   // Layout switcher state: 'table' | 'grid' | 'dense'
-  const [layoutMode, setLayoutMode] = useState(() => {
-    if (typeof window === 'undefined') return 'table';
+  const [layoutMode, setLayoutMode] = useState('table');
+  // Read saved layout after mount so server and client first render match
+  useEffect(() => {
     try {
-      return localStorage.getItem('chatter_people_layout') || 'table';
-    } catch {
-      return 'table';
-    }
-  });
+      const saved = localStorage.getItem('chatter_people_layout');
+      if (saved) setLayoutMode(saved);
+    } catch {}
+  }, []);
 
   const handleSetLayout = (mode) => {
     setLayoutMode(mode);
@@ -238,7 +250,7 @@ export default function RelationshipsPage() {
       if (n.isRoot) return;
       counts.all++;
       const cat = n.category || 'online_friend';
-      if (cat === 'close_friend' || n.id === 'fami' || n.id === 'bhavani' || n.id === 'rajveer' || n.id === 'moksha') {
+      if (cat === 'close_friend') {
         counts.close_friend++;
       } else if (cat === 'online_friend') {
         counts.online_friend++;
@@ -263,7 +275,7 @@ export default function RelationshipsPage() {
       if (activeCategory === 'unlinked') {
         if (n.handle || n.senderId) return false;
       } else if (activeCategory === 'close_friend') {
-        const isClose = n.category === 'close_friend' || n.id === 'fami' || n.id === 'bhavani' || n.id === 'rajveer' || n.id === 'moksha';
+        const isClose = n.category === 'close_friend';
         if (!isClose) return false;
       } else if (activeCategory === 'online_friend') {
         if (n.category !== 'online_friend' && n.category !== 'close_friend') return false;
@@ -279,12 +291,12 @@ export default function RelationshipsPage() {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
-        n.name.toLowerCase().includes(q) ||
+        (n.name || '').toLowerCase().includes(q) ||
         (n.handle || '').toLowerCase().includes(q) ||
         (n.dob || '').toLowerCase().includes(q) ||
         (n.relationship || '').toLowerCase().includes(q) ||
         (n.personalNotes || '').toLowerCase().includes(q) ||
-        (n.facts || []).some(f => f.toLowerCase().includes(q))
+        (n.facts || []).some(f => String(f).toLowerCase().includes(q))
       );
     });
   }, [nodes, activeCategory, searchQuery]);
@@ -337,7 +349,7 @@ export default function RelationshipsPage() {
   // Set AI mode with instant state reflection
   const handleSetAiMode = (mode) => {
     if (!selectedPerson) return;
-    const targetKey = selectedPerson.senderId || selectedPerson.id || selectedPerson.name;
+    const targetKey = selectedPerson.senderId || selectedPerson.name;
     const isPaused = mode === 'paused';
     const isReelsOnly = mode === 'reels_only';
     const isFullAi = mode === 'full_ai';
@@ -353,8 +365,10 @@ export default function RelationshipsPage() {
   };
 
   // Save changes from inner page
-  const handleSaveInnerForm = async (e) => {
-    e?.preventDefault();
+  // Save with the current form, or with an override form (e.g. an applied AI extraction)
+  const handleSaveInnerForm = (e, overrideForm, extraFields) => saveInnerForm(e, overrideForm || formData, extraFields);
+  const saveInnerForm = async (e, formData, extraFields) => {
+    e?.preventDefault?.();
     if (!formData.name.trim()) {
       showToast('Name cannot be empty');
       return;
@@ -383,12 +397,13 @@ export default function RelationshipsPage() {
       roastStyle: formData.roastStyle.trim(),
       chatsCount: parseInt(formData.chatsCount, 10) || 0,
       reelsCount: parseInt(formData.reelsCount, 10) || 0,
-      messageCount: parseInt(formData.chatsCount, 10) || 0
+      messageCount: parseInt(formData.chatsCount, 10) || 0,
+      ...(extraFields || {})
     };
 
-    await saveNode(updated, isRenamed ? [oldName] : []);
-    setSelectedPerson(updated);
-    showToast(`Saved details for ${updated.name}`);
+    const ok = await saveNode(updated, isRenamed ? [oldName] : []);
+    if (ok) setSelectedPerson(updated);
+    return ok;
   };
 
   // AI Autofill fields from chat logs
@@ -457,7 +472,8 @@ export default function RelationshipsPage() {
       const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/messages`);
       const data = await res.json();
       if (data.messages && data.messages.length > 0) {
-        const text = data.messages.map(m => `${m.role === 'assistant' ? 'Sam' : selectedPerson.name}: ${m.text}`).join('\n');
+        const ownerLabel = user?.firstName || 'You';
+        const text = data.messages.map(m => `${m.role === 'assistant' ? ownerLabel : selectedPerson.name}: ${m.text}`).join('\n');
         setRawChatText(text);
         showToast(`Loaded ${data.messages.length} messages from history`);
       } else {
@@ -469,58 +485,64 @@ export default function RelationshipsPage() {
   };
 
   // Confirm and Apply Extracted Attributes
-  const handleConfirmExtraction = () => {
-    if (!extractedData) return;
+  const handleConfirmExtraction = async () => {
+    if (!extractedData || !selectedPerson) return;
+    const extraction = extractedData;
 
     // Merge notes and facts
     const currentNotes = formData.personalNotes.trim();
-    const newNotes = extractedData.personalNotes || '';
+    const newNotes = extraction.personalNotes || '';
     const mergedNotes = currentNotes ? `${currentNotes}\n${newNotes}` : newNotes;
 
-    setFormData(prev => ({
-      ...prev,
-      name: extractedData.name || prev.name,
-      handle: extractedData.handle || prev.handle,
-      dob: extractedData.dob || prev.dob,
-      gender: extractedData.gender || prev.gender,
-      category: extractedData.category || prev.category,
-      relationship: extractedData.relationshipToSam || prev.relationship,
+    const nextForm = {
+      ...formData,
+      name: extraction.name || formData.name,
+      handle: extraction.handle || formData.handle,
+      dob: extraction.dob || formData.dob,
+      gender: extraction.gender || formData.gender,
+      category: extraction.category || formData.category,
+      relationship: extraction.relationshipToSam || formData.relationship,
       personalNotes: mergedNotes,
-      roastStyle: extractedData.banterStyle || prev.roastStyle
-    }));
+      roastStyle: extraction.banterStyle || formData.roastStyle
+    };
+    setFormData(nextForm);
 
-    // Add facts if extracted
-    if (Array.isArray(extractedData.facts) && selectedPerson) {
-      extractedData.facts.forEach(f => {
-        addFact(selectedPerson.id, f);
-      });
-    }
-
-    // Add connections if extracted
-    if (Array.isArray(extractedData.connections) && selectedPerson) {
-      const currentConns = selectedPerson.connections || [];
-      const newConns = [...currentConns];
-      extractedData.connections.forEach(c => {
-        if (!newConns.some(nc => nc.targetName.toLowerCase() === c.targetName.toLowerCase())) {
+    // Merge connections immutably (never mutate the node object in state)
+    const newConns = [...(selectedPerson.connections || [])];
+    if (Array.isArray(extraction.connections)) {
+      extraction.connections.forEach(c => {
+        if (c?.targetName && !newConns.some(nc => (nc.targetName || '').toLowerCase() === c.targetName.toLowerCase())) {
           newConns.push(c);
         }
       });
-      selectedPerson.connections = newConns;
     }
 
     setIsRawChatModalOpen(false);
     setExtractedData(null);
     setRawChatText('');
     setUserClarification('');
-    showToast('AI pre-filled all profile fields! Review and click Save Changes.');
+
+    // Persist the extraction right away
+    const ok = await handleSaveInnerForm(null, nextForm, { connections: newConns });
+    if (!ok) return;
+
+    // Add facts if extracted (stored in conversation memory too)
+    if (Array.isArray(extraction.facts)) {
+      const targetName = nextForm.name.trim();
+      for (const f of extraction.facts) {
+        await addFact(targetName, f);
+      }
+    }
   };
 
   // Add custom fact to memory and synchronize with personalNotes
-  const handleAddFact = (e) => {
+  const handleAddFact = async (e) => {
     e?.preventDefault();
     if (!newFactInput.trim() || !selectedPerson) return;
     const factText = newFactInput.trim();
-    addFact(selectedPerson.id, factText);
+    setNewFactInput('');
+    const ok = await addFact(selectedPerson.id, factText);
+    if (!ok) { setNewFactInput(factText); return; }
 
     // Link: also append to personalNotes
     setFormData(prev => ({
@@ -528,8 +550,7 @@ export default function RelationshipsPage() {
       personalNotes: prev.personalNotes ? `${prev.personalNotes}\n• ${factText}` : `• ${factText}`
     }));
 
-    setNewFactInput('');
-    showToast('Fact added & linked to personal lore');
+    showToast('Fact added & linked to personal lore', 'success');
   };
 
   // Remove custom fact from memory and update node
@@ -542,19 +563,24 @@ export default function RelationshipsPage() {
       facts: filtered,
       lore: filtered
     };
-    await saveNode(updated);
+    const ok = await saveNode(updated);
+    if (!ok) return;
     setSelectedPerson(updated);
 
     if (selectedPerson.senderId) {
       try {
-        await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/facts`, {
+        const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/facts`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fact: factToRemove })
         });
-      } catch (e) {}
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (e) {
+        showToast(`Fact removed from profile, but conversation memory could not be updated (${e.message})`, 'error');
+        return;
+      }
     }
-    showToast('Fact removed from memory');
+    showToast('Fact removed from memory', 'success');
   };
 
   // Force AI learning from DMs
@@ -597,11 +623,12 @@ export default function RelationshipsPage() {
       connections: updatedConns
     };
 
-    await saveNode(updated);
+    const ok = await saveNode(updated);
+    if (!ok) return;
     setSelectedPerson(updated);
     setNewConnTarget('');
     setNewConnRel('');
-    showToast(`Connected ${selectedPerson.name} with ${newConn.targetName}`);
+    showToast(`Connected ${selectedPerson.name} with ${newConn.targetName}`, 'success');
   };
 
   // =========================================================================
@@ -733,7 +760,7 @@ export default function RelationshipsPage() {
               inset: 0,
               background: 'rgba(9, 9, 11, 0.45)',
               backdropFilter: 'blur(4px)',
-              zIndex: 110,
+              zIndex: 1000,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1234,7 +1261,7 @@ export default function RelationshipsPage() {
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 >
-                  <option value="close_friend">Close Circle / Fami</option>
+                  <option value="close_friend">Close Circle</option>
                   <option value="online_friend">Online Friend</option>
                   <option value="offline_friend">Offline Friend</option>
                   <option value="family">Family / Relatives</option>
@@ -1701,7 +1728,7 @@ export default function RelationshipsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           {[
             { id: 'all', label: 'All People', count: categoryCounts.all },
-            { id: 'close_friend', label: 'Close Circle / Fami', count: categoryCounts.close_friend },
+            { id: 'close_friend', label: 'Close Circle', count: categoryCounts.close_friend },
             { id: 'online_friend', label: 'Online Friends', count: categoryCounts.online_friend },
             { id: 'offline_friend', label: 'Offline Friends', count: categoryCounts.offline_friend },
             { id: 'family', label: 'Family / Relatives', count: categoryCounts.family },

@@ -24,7 +24,7 @@ export default function WorkspaceImpersonationBanner() {
         borderBottom: '1px solid #27272a',
         position: 'sticky',
         top: 0,
-        zIndex: 9999,
+        zIndex: 200,
         fontSize: '0.78rem',
         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)'
       }}

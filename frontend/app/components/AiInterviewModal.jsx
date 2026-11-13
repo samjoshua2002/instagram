@@ -143,7 +143,7 @@ export default function AiInterviewModal() {
         inset: 0,
         background: 'rgba(9, 9, 11, 0.4)',
         backdropFilter: 'blur(4px)',
-        zIndex: 100,
+        zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
