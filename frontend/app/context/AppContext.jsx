@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://instagram-ai-bot-64tf.onrender.com';
 
@@ -185,6 +186,10 @@ export function AppProvider({ children }) {
 
 function AppStateProvider({ children }) {
   const showToast = useContext(ToastActionsContext);
+  // In-app navigation (no full page reload) for login / switch / logout
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   // Server and the first client render must match: AuthGate renders pages only once mounted
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -360,7 +365,7 @@ function AppStateProvider({ children }) {
     setAuthLoading(false);
     showToast?.(`Welcome back, ${userData?.firstName || userData?.username || 'User'}!`, 'success');
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.href = '/';
+      routerRef.current.replace('/');
     }
   }, [showToast]);
 
@@ -386,7 +391,7 @@ function AppStateProvider({ children }) {
     setUser(null);
     showToast?.('Switching account...', 'info');
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.href = '/';
+      routerRef.current.replace('/');
     }
   }, [showToast]);
 
@@ -412,7 +417,7 @@ function AppStateProvider({ children }) {
     setUser(null);
     showToast?.('Signed out successfully.', 'info');
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.href = '/';
+      routerRef.current.replace('/');
     }
   }, [showToast]);
   logoutRef.current = logout;
