@@ -92,6 +92,51 @@ class RedisService {
     this.fallbackExpiry.delete(key);
   }
 
+  /**
+   * Counts a hit in a fixed time window shared by every server process (Redis), with an in-memory fallback.
+   * Returns { count, ttlMs }.
+   */
+  async hitWindow(key, windowSeconds) {
+    if (this.isConnected && this.client) {
+      try {
+        const res = await this.client.multi().incr(key).expire(key, windowSeconds, 'NX').pttl(key).exec();
+        const count = Number(res[0][1]);
+        const ttlMs = Number(res[2][1]);
+        return { count, ttlMs: ttlMs > 0 ? ttlMs : windowSeconds * 1000 };
+      } catch (_) { /* fall back below */ }
+    }
+    const now = Date.now();
+    let exp = this.fallbackExpiry.get(key);
+    if (!exp || now > exp) {
+      exp = now + windowSeconds * 1000;
+      this.fallbackExpiry.set(key, exp);
+      this.fallbackStore.set(key, 0);
+    }
+    const count = (this.fallbackStore.get(key) || 0) + 1;
+    this.fallbackStore.set(key, count);
+    return { count, ttlMs: exp - now };
+  }
+
+  /** Reads a value and deletes it in one step (single-use tokens, shared across processes). */
+  async take(key) {
+    if (this.isConnected && this.client) {
+      try {
+        let data;
+        try {
+          data = await this.client.getdel(key);
+        } catch (e) {
+          // Servers older than Redis 6.2 have no GETDEL
+          data = await this.client.get(key);
+          if (data) await this.client.del(key);
+        }
+        if (data) return JSON.parse(data);
+      } catch (_) { /* fall back below */ }
+    }
+    const val = await this.get(key);
+    await this.del(key);
+    return val;
+  }
+
   // --- High-Speed Chat History Buffer ---
 
   async pushMessage(senderId, msg) {

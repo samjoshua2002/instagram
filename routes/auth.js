@@ -71,33 +71,24 @@ function otpRecentlySent(otp) {
   return Boolean(otp && otp.code && otp.sentAt && Date.now() - new Date(otp.sentAt).getTime() < OTP_RESEND_COOLDOWN_MS);
 }
 
-// Tiny in-memory rate limiter (per IP + route), no dependency
-const rateBuckets = new Map();
-const rateLimit = (max = 20, windowMs = 10 * 60 * 1000) => (req, res, next) => {
-  const now = Date.now();
-  const key = `${req.ip || req.socket?.remoteAddress || 'unknown'}|${req.baseUrl || ''}${req.route?.path || req.path}`;
-  let bucket = rateBuckets.get(key);
-  if (!bucket || now > bucket.resetAt) {
-    bucket = { count: 0, resetAt: now + windowMs };
-    rateBuckets.set(key, bucket);
-  }
-  bucket.count += 1;
-  if (bucket.count > max) {
-    res.set('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
-    return res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
-  }
+// Rate limiter (per IP + route). Counts live in Redis so they survive restarts and are shared by
+// every server process; falls back to memory if Redis is down.
+const redisService = require('../services/redisService');
+const rateLimit = (max = 20, windowMs = 10 * 60 * 1000) => async (req, res, next) => {
+  try {
+    const key = `rl:${req.ip || req.socket?.remoteAddress || 'unknown'}|${req.baseUrl || ''}${req.route?.path || req.path}`;
+    const { count, ttlMs } = await redisService.hitWindow(key, Math.ceil(windowMs / 1000));
+    if (count > max) {
+      res.set('Retry-After', String(Math.ceil(ttlMs / 1000)));
+      return res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
+    }
+  } catch (_) { /* never block logins because the limiter itself failed */ }
   next();
 };
 const authLimiter = rateLimit(20, 10 * 60 * 1000);
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of rateBuckets) if (now > v.resetAt) rateBuckets.delete(k);
-  for (const [k, v] of passkeyChallenges) if (now > v.expiresAt) passkeyChallenges.delete(k);
-}, 60 * 1000).unref();
-
-// Server-side store for passkey LOGIN challenges (keyed by the challenge itself, 5-minute expiry)
-const passkeyChallenges = new Map();
+// Passkey LOGIN challenges live in Redis (shared by all server processes, 5-minute expiry, single-use)
 const PASSKEY_CHALLENGE_TTL = 5 * 60 * 1000;
+const passkeyChallengeKey = (c) => `pkc:${c}`;
 
 // Escape a value for safe use inside HTML markup
 const escapeHtml = (v) => String(v ?? '')
@@ -830,10 +821,10 @@ router.get('/passkey/login-options', authLimiter, async (req, res) => {
       });
     }
     const options = await authService.generatePasskeyAuthenticationOptions(user, req);
-    passkeyChallenges.set(options.challenge, {
+    await redisService.set(passkeyChallengeKey(options.challenge), {
       userId: user ? user._id.toString() : null,
       expiresAt: Date.now() + PASSKEY_CHALLENGE_TTL,
-    });
+    }, PASSKEY_CHALLENGE_TTL / 1000);
     res.json(options);
   } catch (err) {
     console.error('❌ Passkey login options error:', err.message);
@@ -859,12 +850,11 @@ router.post('/passkey/login-verify', authLimiter, async (req, res) => {
       const clientData = JSON.parse(Buffer.from(response.response.clientDataJSON, 'base64url').toString('utf8'));
       challenge = typeof clientData.challenge === 'string' ? clientData.challenge : '';
     } catch (e) {}
-    const stored = challenge ? passkeyChallenges.get(challenge) : null;
+    // Read and delete in one step: a challenge can be used once only
+    const stored = challenge ? await redisService.take(passkeyChallengeKey(challenge)) : null;
     if (!stored || Date.now() > stored.expiresAt) {
-      if (challenge) passkeyChallenges.delete(challenge);
       return res.status(400).json({ error: 'Passkey challenge expired. Please try again.' });
     }
-    passkeyChallenges.delete(challenge); // single-use
 
     // Find the user by the credential id
     const user = await User.findOne({ 'passkeys.credentialId': response.id });
