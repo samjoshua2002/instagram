@@ -1338,8 +1338,9 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
       return res.status(502).json({ error: `Message not sent: ${typeof reason === 'string' ? reason : JSON.stringify(reason)}` });
     }
 
-    // Save in DB
-    const newMsg = await Message.create({
+    // Save in DB. Meta's echo of this message can arrive first and store the same mid:
+    // merge into it (it is a manual send, not an AI one) instead of failing with a duplicate
+    const newMsg = {
       ownerId,
       senderId: 'me',
       recipientId: senderId,
@@ -1348,7 +1349,8 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
       mid: sendResult?.data?.message_id || `manual_${Date.now()}`,
       sentByAI: false,
       timestamp: new Date(),
-    });
+    };
+    await Message.record(newMsg, { update: { senderId: 'me', sentByAI: false } });
 
     // Cancel any active AI debounce queue so the bot doesn't reply over the creator
     const qKey = queueKey(ownerId, senderId);
