@@ -108,6 +108,8 @@ const UserSchema = new mongoose.Schema({
     secret: { type: String, default: '' },
     backupCodes: [{ type: String }],
     lastUsedStep: { type: Number, default: 0 },
+    failedAttempts: { type: Number, default: 0 },
+    lockedUntil: { type: Date, default: null },
   },
   passkeys: [{
     credentialId: { type: String, required: true },
@@ -131,12 +133,18 @@ const UserSchema = new mongoose.Schema({
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
     attempts: { type: Number, default: 0 },
+    sentAt: { type: Date, default: null },
   },
   resetOtp: {
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
     attempts: { type: Number, default: 0 },
+    sentAt: { type: Date, default: null },
+    // 'reset' (password) or 'oneauth_setup': a code for one flow never unlocks the other
+    purpose: { type: String, default: '' },
   },
+  // Bumped on password reset: every older login session stops working
+  tokenVersion: { type: Number, default: 0 },
   lastLogin: {
     type: Date,
     default: Date.now,
