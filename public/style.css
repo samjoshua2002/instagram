@@ -1,4 +1,7 @@
 :root {
+  /* Native controls (select dropdown lists, scrollbars) draw dark too: otherwise the open
+     dropdown is white with near-white option text */
+  color-scheme: dark;
   --bg-dark: #07090e;
   --bg-card: rgba(16, 20, 31, 0.75);
   --bg-card-hover: rgba(22, 28, 44, 0.85);
@@ -14,7 +17,7 @@
   
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-dim: #7c8aa0; /* was #64748b: below 4.5:1 for the small text that uses it */
 
   --sidebar-w: 270px;
   --radius-lg: 16px;
@@ -1419,6 +1422,11 @@ input:focus, textarea:focus {
 }
 
 .field-group input:focus,
+.field-group select option {
+  background: #1a2234;
+  color: var(--text-main);
+}
+
 .field-group select:focus,
 .field-group textarea:focus {
   border-color: var(--primary);
