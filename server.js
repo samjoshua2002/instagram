@@ -56,6 +56,14 @@ async function migrateOwnership() {
   } catch (e) { /* collection may not exist yet */ }
   await UserMemory.createIndexes().catch(e => console.warn('UserMemory index note:', e.message));
   await dedupePersonas();
+  // Message ids used to be unique across ALL creators; now they are unique per creator
+  try {
+    const midx = await Message.collection.indexes();
+    if (midx.some(i => i.name === 'mid_1')) {
+      await Message.collection.dropIndex('mid_1');
+      console.log('🔧 [Migration] Dropped legacy global unique index messages.mid_1');
+    }
+  } catch (e) { /* collection may not exist yet */ }
   await Message.createIndexes().catch(e => console.warn('Message index note:', e.message));
 
   // Legacy global persona belongs to the original owner (only if they have none yet)
@@ -511,6 +519,14 @@ async function handleCreatorEchoAsync(event, accountId) {
 
   const text = event.message?.text || (event.message?.attachments?.length ? '[Shared Media / Sticker]' : '');
   const mid = event.message?.mid || `echo_${Date.now()}`;
+
+  // Echo of a message THIS app sent (AI reply, reminder, dashboard send): store it once, nothing else
+  const appIds = [process.env.META_APP_ID, process.env.INSTAGRAM_APP_ID].filter(Boolean).map(String);
+  const sentByThisApp = event.message?.app_id && appIds.includes(String(event.message.app_id));
+  if (sentByThisApp || (event.message?.mid && await Message.exists({ ownerId, mid: event.message.mid }))) {
+    await Message.record({ ownerId, senderId: senderAccountId, recipientId: contactId, role: 'assistant', text: text || '[Media]', mid, sentByAI: true, timestamp: new Date() }).catch(() => {});
+    return;
+  }
   console.log(`📱 [Creator Echo]: Creator manually replied to ${contactId}: "${text}"`);
 
   // Cancel any active AI debounce queue so the bot doesn't reply over the creator
@@ -522,7 +538,7 @@ async function handleCreatorEchoAsync(event, accountId) {
   }
 
   // Record outgoing message in DB
-  Message.create({
+  Message.record({
     ownerId,
     senderId: senderAccountId,
     recipientId: contactId,
@@ -698,8 +714,8 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   }
   const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile, ownerId);
 
-  // 3. Save incoming user message in DB
-  await Message.create({
+  // 3. Save incoming user message in DB (Meta may deliver the same event twice)
+  const saved = await Message.record({
     ownerId,
     senderId,
     recipientId,
@@ -708,6 +724,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     mid: mid === 'random_mid' ? `test_${Date.now()}` : mid,
     timestamp: msgTime,
   });
+  if (!saved.inserted) {
+    console.log(`↩️ [Webhook] Duplicate delivery of ${mid} ignored.`);
+    return;
+  }
 
   // Re-activate conversation: update lastInteraction and clear lastReminderSentAt
   userMemory.lastInteraction = msgTime;
@@ -1077,8 +1097,8 @@ async function dispatchDebouncedReply(queueEntry) {
     if (textDelivered || stickerDelivered) {
       const persistedText = textDelivered ? replyText : `[Sent ${stickerType} sticker]`;
 
-      // Save outgoing message in DB
-      await Message.create({
+      // Save outgoing message in DB (the echo may already have stored it: mark it as the AI's)
+      await Message.record({
         ownerId,
         senderId: recipientId,
         recipientId: senderId,
@@ -1087,7 +1107,7 @@ async function dispatchDebouncedReply(queueEntry) {
         mid: sendResult?.data?.message_id || stickerSendResult?.data?.message_id || `out_${Date.now()}`,
         sentByAI: true,
         timestamp: new Date(),
-      });
+      }, { update: { sentByAI: true, text: persistedText } });
 
       // Also append outgoing assistant reply to UserMemory recentChatBuffer
       try {

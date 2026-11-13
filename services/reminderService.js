@@ -55,6 +55,7 @@ class ReminderService {
       const included = new Set(config.includedContactIds || []);
 
       for (const user of candidateUsers) {
+       try {
         // Do not send reminders to the bot itself or known non-contacts
         if (user.senderId === botAccountId || user.senderId === '17841445731016310') {
           continue;
@@ -106,8 +107,13 @@ class ReminderService {
         // Send via Instagram Graph API
         const sendResult = await instagramService.sendTextMessage(user.senderId, reminderText, token);
 
+        if (!sendResult || sendResult.success !== true) {
+          console.warn(`⚠️ [Reminder] Not delivered to ${user.senderId}; will retry next cycle.`);
+          continue;
+        }
+
         // Record reminder in DB
-        await Message.create({
+        await Message.record({
           ownerId: owner._id,
           senderId: botAccountId,
           recipientId: user.senderId,
@@ -117,13 +123,16 @@ class ReminderService {
           sentByAI: true,
           isReminder: true,
           timestamp: new Date(),
-        });
+        }, { update: { sentByAI: true, isReminder: true } });
 
         // Update user memory so no duplicate reminders are sent
-        user.lastReminderSentAt = new Date();
-        await user.save();
+        await UserMemory.updateOne({ _id: user._id }, { $set: { lastReminderSentAt: new Date() } });
 
         console.log(`✅ [Follow-up Reminder Sent] to @${user.username}: "${reminderText}"`);
+       } catch (contactErr) {
+        // One contact failing must not stop reminders for this creator's other contacts
+        console.error(`❌ Reminder failed for contact ${user?.senderId}:`, contactErr.message);
+       }
       }
     } catch (err) {
       console.error(`❌ Error in reminders for creator ${owner?.username}:`, err.message);
