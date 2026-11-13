@@ -1054,11 +1054,17 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     }
     if (businessProfile !== undefined && businessProfile !== null &&
         (typeof businessProfile !== 'object' ||
-         ['businessName', 'category', 'description'].some(k => businessProfile[k] !== undefined && businessProfile[k] !== null && typeof businessProfile[k] !== 'string'))) {
+         ['businessName', 'category', 'description', 'website', 'creatorBio', 'textingHabits', 'memeStyle'].some(k => businessProfile[k] !== undefined && businessProfile[k] !== null && typeof businessProfile[k] !== 'string'))) {
       return res.status(400).json({ error: 'Invalid business profile.' });
     }
     if (accountType && !['personal', 'creator', 'business', 'agency'].includes(accountType)) {
       return res.status(400).json({ error: 'Invalid account type.' });
+    }
+    if (chatMode && !['everyone', 'everyone_except', 'only_selected', 'paused'].includes(chatMode)) {
+      return res.status(400).json({ error: 'Invalid chat mode.' });
+    }
+    if (enableGlobalBot !== undefined && enableGlobalBot !== null && typeof enableGlobalBot !== 'boolean') {
+      return res.status(400).json({ error: 'Invalid bot setting.' });
     }
 
     if (accountType) {
@@ -1077,10 +1083,14 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       user.instagramAccountId = instagramAccountId.trim();
     }
     if (businessProfile) {
+      // Only overwrite the fields that were actually sent (a creator form must not wipe business details)
+      const bp = user.businessProfile || {};
+      const pick = (k) => (typeof businessProfile[k] === 'string' ? businessProfile[k].trim() : (bp[k] || ''));
       user.businessProfile = {
-        businessName: businessProfile.businessName || '',
-        category: businessProfile.category || '',
-        description: businessProfile.description || '',
+        businessName: pick('businessName'),
+        category: pick('category'),
+        description: pick('description'),
+        website: pick('website'),
       };
     }
     user.isOnboarded = true;
@@ -1093,18 +1103,34 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       if (!persona) {
         persona = new PersonaConfig({ ownerId: user._id });
       }
-      if (personaTone) {
-        persona.tone = personaTone;
+      // Everything the wizard asked for goes into fields the AI actually reads
+      const txt = (v) => (typeof v === 'string' ? v.trim() : '');
+      const bp = businessProfile || {};
+      const knowledge = [];
+      if (txt(bp.creatorBio)) {
+        persona.aboutMe = txt(bp.creatorBio);
+        persona.personaBio = txt(bp.creatorBio);
+      } else if (txt(bp.description)) {
+        persona.aboutMe = txt(bp.description);
+        persona.personaBio = txt(bp.description);
       }
-      if (greetingMessage) {
-        persona.greeting = greetingMessage;
+      if (txt(bp.textingHabits)) persona.textingHabits = txt(bp.textingHabits);
+      if (txt(bp.memeStyle)) persona.replyRules = `${persona.replyRules || ''}
+Meme / reaction style: ${txt(bp.memeStyle)}`.trim();
+      if (txt(bp.businessName)) knowledge.push(`Business: ${txt(bp.businessName)}`);
+      if (txt(bp.category)) knowledge.push(`Category: ${txt(bp.category)}`);
+      if (txt(bp.website)) knowledge.push(`Website: ${txt(bp.website)}`);
+      if (txt(greetingMessage)) knowledge.push(`Greeting for new people: ${txt(greetingMessage)}`);
+      if (knowledge.length) persona.customKnowledge = [persona.customKnowledge, ...knowledge].filter(Boolean).join(String.fromCharCode(10));
+      if (txt(personaTone)) {
+        const tones = { professional: 'Professional, clear and polite.', witty: 'Witty and playful.', friendly: 'Warm, friendly and approachable.', roast: 'Playful roasting banter, never mean.' };
+        persona.characteristics = tones[personaTone] ? `${tones[personaTone]} ${persona.characteristics || ''}`.trim() : persona.characteristics;
       }
-      if (accountType === 'business') {
-        persona.persona = 'helpful_assistant';
-      } else if (accountType === 'personal') {
-        persona.persona = 'friendly_peer';
-      }
+      if (chatMode) persona.chatMode = chatMode;
+      if (typeof enableGlobalBot === 'boolean') persona.globalBotActive = enableGlobalBot;
+      if (txt(instagramUsername)) persona.instagramHandle = `@${txt(instagramUsername).replace(/^@/, '')}`;
       await persona.save();
+      try { require('../services/redisService').invalidatePersonaConfig(user._id); } catch (_) {}
     } catch (e) {
       console.warn('Could not update persona during onboarding:', e.message);
     }
