@@ -434,6 +434,31 @@ class AuthService {
   }
 
   /**
+   * Checks a OneAuth code with an account lock: every guess is counted before it is checked
+   * (so parallel guesses all count) and 5 wrong codes lock OneAuth for 15 minutes.
+   * Returns { ok, locked }.
+   */
+  async checkTotpWithLock(user, token) {
+    const MAX_TOTP_ATTEMPTS = 5;
+    const LOCK_MS = 15 * 60 * 1000;
+    if (!user || !user.twoFactor?.secret || !user.twoFactor?.enabled) return { ok: false, locked: false };
+    const now = new Date();
+    const reserved = await User.findOneAndUpdate(
+      { _id: user._id, $or: [{ 'twoFactor.lockedUntil': null }, { 'twoFactor.lockedUntil': { $lte: now } }] },
+      { $inc: { 'twoFactor.failedAttempts': 1 } },
+      { new: true }
+    ).select('twoFactor.failedAttempts');
+    if (!reserved) return { ok: false, locked: true };
+    if ((reserved.twoFactor?.failedAttempts || 0) > MAX_TOTP_ATTEMPTS) {
+      await User.updateOne({ _id: user._id }, { $set: { 'twoFactor.lockedUntil': new Date(Date.now() + LOCK_MS), 'twoFactor.failedAttempts': 0 } });
+      return { ok: false, locked: true };
+    }
+    const ok = this.verifyTotp(user, token);
+    if (ok) await User.updateOne({ _id: user._id }, { $set: { 'twoFactor.failedAttempts': 0, 'twoFactor.lockedUntil': null } });
+    return { ok, locked: false };
+  }
+
+  /**
    * Verify a 6-digit TOTP code from OneAuth / Authenticator app
    */
   verifyTotp(user, token) {
