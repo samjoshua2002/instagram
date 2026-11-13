@@ -526,10 +526,10 @@ export default function ProfilePage() {
                 {formData.accountType} Tier
               </span>
             </div>
-            <div style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 10px' }}>
               <span>@{user?.instagramUsername || user?.username || 'user'}</span>
               <span>•</span>
-              <span>{user?.email}</span>
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{user?.email}</span>
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
               Tap or hover photo to update avatar

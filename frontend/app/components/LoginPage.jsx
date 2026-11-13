@@ -1759,7 +1759,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       }}
                     >
                       <ArrowLeft size={14} />
-                      <span>Back to saved account ({rememberedAccount.email})</span>
+                      <span style={{ minWidth: 0, overflowWrap: 'anywhere', textAlign: 'left' }}>Back to saved account ({rememberedAccount.email})</span>
                     </button>
                   )}
 
@@ -2445,7 +2445,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       Verify your Email Address
                     </h3>
                     <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-                      We sent a 6-digit confirmation code to <strong>{regForm.email}</strong>.
+                      We sent a 6-digit confirmation code to <strong style={{ overflowWrap: 'anywhere' }}>{regForm.email}</strong>.
                     </p>
                   </div>
 

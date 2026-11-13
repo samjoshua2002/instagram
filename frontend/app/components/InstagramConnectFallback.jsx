@@ -373,7 +373,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
           marginBottom: '24px',
           boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
             <div style={{
               width: '38px',
               height: '38px',
@@ -388,11 +388,11 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             }}>
               {username[0]?.toUpperCase() || 'U'}
             </div>
-            <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--color-text-primary)', overflowWrap: 'anywhere' }}>
                 @{username.replace(/^@/, '')}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', overflowWrap: 'anywhere' }}>
                 {user?.accountType ? `${user.accountType.charAt(0).toUpperCase() + user.accountType.slice(1)} Tier` : 'Creator Account'}
                 {user?.email ? ` • ${user.email}` : ''}
               </div>
