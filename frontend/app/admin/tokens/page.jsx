@@ -83,7 +83,7 @@ export default function TokenRadarPage() {
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <div>
-          <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>// TOKEN HEALTH RADAR</div>
+          <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--color-success)', fontWeight: 'bold' }}>// TOKEN HEALTH RADAR</div>
           <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '4px 0 0' }}>Meta Tokens</h1>
         </div>
         <button type="button" className="btn" onClick={load} disabled={loading}>

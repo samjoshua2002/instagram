@@ -359,7 +359,7 @@ export default function ProfilePage() {
             style={{
               background: 'color-mix(in srgb, #ef4444 12%, transparent)',
               border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
-              color: '#f87171',
+              color: 'var(--color-danger)',
               borderRadius: '12px',
               padding: '14px 18px',
               fontSize: '0.86rem',
@@ -381,7 +381,7 @@ export default function ProfilePage() {
             style={{
               background: 'color-mix(in srgb, #22c55e 12%, transparent)',
               border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
-              color: '#4ade80',
+              color: 'var(--color-success)',
               borderRadius: '12px',
               padding: '14px 18px',
               fontSize: '0.86rem',
@@ -947,7 +947,7 @@ export default function ProfilePage() {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#ef4444',
+                        color: 'var(--color-danger)',
                         cursor: 'pointer',
                         padding: '4px'
                       }}

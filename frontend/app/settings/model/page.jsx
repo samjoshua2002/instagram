@@ -33,7 +33,7 @@ export default function ModelSettingsPage() {
         <Link href="/settings" className="feature-back">
           <ArrowLeft size={14} /> Settings
         </Link>
-        <div className="mono" style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold' }}>// AI MODEL</div>
+        <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--color-success)', fontWeight: 'bold' }}>// AI MODEL</div>
         <h1 style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.6px', margin: '4px 0 6px' }}>
           Your AI model
         </h1>

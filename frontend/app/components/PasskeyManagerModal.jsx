@@ -483,7 +483,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
         </div>
 
         {/* Tab Body */}
-        <div style={{ padding: '24px', maxHeight: '500px', overflowY: 'auto' }}>
+        <div style={{ padding: '24px', maxHeight: 'min(500px, calc(100dvh - 170px))', overflowY: 'auto' }}>
           {/* TAB 1: PASSKEYS */}
           {activeTab === 'passkeys' && (
             <div>
@@ -601,7 +601,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                       </div>
                       <button
                         onClick={() => handleDeletePasskey(p.id)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '4px' }}
                         title="Remove passkey"
                       >
                         <Trash2 size={16} />
@@ -637,7 +637,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                     style={{ width: '180px', height: '180px', margin: '0 auto 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                   />
                   <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Manual Secret Key</div>
-                  <div style={{ fontFamily: 'var(--font-code)', fontWeight: '700', fontSize: '0.95rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 12px', display: 'inline-block', letterSpacing: '1.5px' }}>
+                  <div style={{ fontFamily: 'var(--font-code)', fontWeight: '600', fontSize: '0.95rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 12px', display: 'inline-block', letterSpacing: '1.5px' }}>
                     {totpData.secret}
                   </div>
                   <p style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)', marginTop: '12px' }}>
@@ -766,7 +766,7 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
                         style={{
                           background: 'var(--color-surface)',
                           border: '1px solid var(--color-border)',
-                          color: '#f87171',
+                          color: 'var(--color-danger)',
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: '0.76rem',

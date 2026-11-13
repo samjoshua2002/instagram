@@ -327,7 +327,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
               border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
               borderRadius: '8px',
               padding: '10px 14px',
-              color: '#f87171',
+              color: 'var(--color-danger)',
               fontSize: '0.8rem',
               marginBottom: '16px',
               display: 'flex',
@@ -378,7 +378,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontWeight: '800', fontSize: '0.94rem', color: '#4ade80' }}>
+                        <span style={{ fontWeight: '800', fontSize: '0.94rem', color: 'var(--color-success)' }}>
                           @{instagramUsername || 'Instagram Account'}
                         </span>
                         <span style={{
@@ -386,14 +386,14 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                           fontWeight: '800',
                           fontFamily: "var(--font-label)",
                           background: 'color-mix(in srgb, #22c55e 14%, transparent)',
-                          color: '#4ade80',
+                          color: 'var(--color-success)',
                           padding: '1px 6px',
                           borderRadius: '4px'
                         }}>
                           LINKED
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#4ade80', marginTop: '2px', fontFamily: "var(--font-label)" }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-success)', marginTop: '2px', fontFamily: "var(--font-label)" }}>
                         ID: {instagramAccountId || 'Connected'} • Page Token Active
                       </div>
                     </div>
@@ -409,7 +409,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
                       padding: '6px 12px',
                       fontSize: '0.74rem',
                       fontWeight: '700',
-                      color: '#4ade80',
+                      color: 'var(--color-success)',
                       cursor: 'pointer'
                     }}
                   >
