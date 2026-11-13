@@ -75,6 +75,7 @@ class InstagramService {
   constructor() {
     this.appSentMids = new Set();
     this.sendingTo = new Map(); // recipientId -> sends in flight
+    this.sendWaiters = new Map(); // recipientId -> callbacks waiting for those sends to finish
   }
 
   async trackSend(recipientId, send) {
@@ -89,13 +90,42 @@ class InstagramService {
       return result;
     } finally {
       const left = (this.sendingTo.get(recipientId) || 1) - 1;
-      if (left > 0) this.sendingTo.set(recipientId, left); else this.sendingTo.delete(recipientId);
+      if (left > 0) {
+        this.sendingTo.set(recipientId, left);
+      } else {
+        this.sendingTo.delete(recipientId);
+        const waiters = this.sendWaiters.get(recipientId) || [];
+        this.sendWaiters.delete(recipientId);
+        waiters.forEach(done => done());
+      }
     }
   }
 
-  /** True when an echo is for a message this app sent (or is sending right now) to the contact. */
-  isAppEcho(recipientId, mid) {
-    return (mid && this.appSentMids.has(mid)) || this.sendingTo.has(recipientId);
+  /** Resolves once no send to this contact is in flight (or after maxMs, whichever comes first). */
+  waitForSends(recipientId, maxMs = 30000) {
+    if (!this.sendingTo.has(recipientId)) return Promise.resolve();
+    return new Promise(resolve => {
+      let finished = false;
+      const done = () => { if (!finished) { finished = true; clearTimeout(timer); resolve(); } };
+      const timer = setTimeout(done, maxMs);
+      if (timer.unref) timer.unref();
+      const list = this.sendWaiters.get(recipientId) || [];
+      list.push(done);
+      this.sendWaiters.set(recipientId, list);
+    });
+  }
+
+  /**
+   * True when an echo is for a message this app sent. An echo can arrive before our own send has
+   * returned its message id, so while a send to this contact is in flight we wait for it to finish
+   * and then compare ids: the creator typing on the phone at the same moment is NOT our echo.
+   */
+  async isAppEcho(recipientId, mid) {
+    if (mid && this.appSentMids.has(mid)) return true;
+    if (!this.sendingTo.has(recipientId)) return false;
+    if (!mid) return true; // no id to compare: keep the old safe answer
+    await this.waitForSends(recipientId);
+    return this.appSentMids.has(mid);
   }
 
   /**
