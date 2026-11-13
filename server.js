@@ -1752,7 +1752,8 @@ app.delete('/api/conversations/:senderId/facts', async (req, res) => {
 
     const result = await UserMemory.updateOne(
       { ownerId: ownerOf(req), senderId },
-      { $pull: { facts: { fact } } }
+      { $pull: { facts: { fact } } },
+      { runValidators: false } // removing items cannot create invalid data
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: 'User not found' });
     res.json({ success: true });
@@ -2570,7 +2571,8 @@ app.delete('/api/social-graph/node/:identifier', async (req, res) => {
     if (!sameNameLeft) {
       await SocialGraph.updateMany(
         { ownerId, 'connections.targetName': new RegExp(`^${escapeRegex(targetName)}$`, 'i') },
-        { $pull: { connections: { targetName: new RegExp(`^${escapeRegex(targetName)}$`, 'i') } } }
+        { $pull: { connections: { targetName: new RegExp(`^${escapeRegex(targetName)}$`, 'i') } } },
+        { runValidators: false } // removing items cannot create invalid data
       );
     }
 
