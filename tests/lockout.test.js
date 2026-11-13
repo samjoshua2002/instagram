@@ -67,3 +67,36 @@ test('a missing address still works (counted as unknown)', () => {
   for (let i = 0; i < 5; i++) lock.recordFailure('pw:h', '');
   assert.equal(lock.status('pw:h', undefined).locked, true);
 });
+
+test('rotating IPv6 addresses inside one /64 counts as one address', () => {
+  const { lock } = make();
+  for (let i = 0; i < 5; i++) lock.recordFailure('pw:i', `2001:db8:1:2::${i + 1}`);
+  assert.equal(lock.status('pw:i', '2001:db8:1:2::ffff').locked, true);
+  assert.equal(lock.status('pw:i', '2001:db8:9:9::1').locked, false);
+});
+
+test('account-wide locks double on each repeat, and a success resets them', () => {
+  const { lock, clock } = make();
+  const lockAccount = () => { for (let i = 0; i < 30; i++) lock.recordFailure('code:j', `10.1.${i}.1`); };
+  lockAccount();
+  assert.ok(Math.abs(lock.status('code:j', '9.9.9.9').retryAfterMs - 15 * MINUTE) < 1000);
+  clock.advance(15 * MINUTE + 1);
+  lockAccount();
+  assert.ok(Math.abs(lock.status('code:j', '9.9.9.9').retryAfterMs - 30 * MINUTE) < 1000);
+  clock.advance(30 * MINUTE + 1);
+  lockAccount();
+  assert.ok(Math.abs(lock.status('code:j', '9.9.9.9').retryAfterMs - 60 * MINUTE) < 1000);
+  clock.advance(60 * MINUTE + 1);
+  lock.recordSuccess('code:j', '9.9.9.9');
+  lockAccount();
+  assert.ok(Math.abs(lock.status('code:j', '9.9.9.9').retryAfterMs - 15 * MINUTE) < 1000);
+});
+
+test('per-address locks do not escalate (a typo-prone owner is never locked for hours)', () => {
+  const { lock, clock } = make();
+  for (let round = 0; round < 3; round++) {
+    for (let i = 0; i < 5; i++) lock.recordFailure('pw:k', '1.2.3.4');
+    assert.ok(lock.status('pw:k', '1.2.3.4').retryAfterMs <= 15 * MINUTE);
+    clock.advance(15 * MINUTE + 1);
+  }
+});
