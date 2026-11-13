@@ -18,6 +18,7 @@ export default function AuthGate({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const {
+    mounted,
     user,
     token,
     authLoading,
@@ -32,11 +33,12 @@ export default function AuthGate({ children }) {
   const isInstagramLinked = isSuperadmin || Boolean(user?.hasInstagramToken || user?.isInstagramConnected || user?.instagramPageAccessToken);
 
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const userId = user?.id || user?._id;
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && user?._id) {
+    if (typeof window !== 'undefined' && userId) {
       try {
-        const userDismissKey = `chatter_onboarding_dismissed_${user._id}`;
+        const userDismissKey = `chatter_onboarding_dismissed_${userId}`;
         if (sessionStorage.getItem(userDismissKey) === 'true') {
           setWizardDismissed(true);
         } else {
@@ -44,7 +46,7 @@ export default function AuthGate({ children }) {
         }
       } catch (e) {}
     }
-  }, [user?._id]);
+  }, [userId]);
 
   // Fresh launch detector: when user closes tab/window and opens fresh,
   // sessionStorage is cleared. We automatically redirect them to start on Dashboard (/)!
@@ -72,8 +74,9 @@ export default function AuthGate({ children }) {
     }
   };
 
+  // Until mounted, render the same neutral shell on server and client (no hydration mismatch).
   // Only block the screen with full loader if there is no cached token or user
-  if (authLoading && (!token || !user)) {
+  if (!mounted || (authLoading && (!token || !user))) {
     return (
       <div style={{
         width: '100vw',
@@ -130,8 +133,8 @@ export default function AuthGate({ children }) {
         onClose={() => {
           setWizardDismissed(true);
           setIsOnboardingModalOpen(false);
-          if (user?._id) {
-            try { sessionStorage.setItem(`chatter_onboarding_dismissed_${user._id}`, 'true'); } catch (e) {}
+          if (userId) {
+            try { sessionStorage.setItem(`chatter_onboarding_dismissed_${userId}`, 'true'); } catch (e) {}
           }
         }}
       />

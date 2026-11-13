@@ -183,7 +183,7 @@ export default function InspectorDrawer() {
         background: '#09090b',
         borderLeft: '1px solid #27272a',
         padding: '24px',
-        zIndex: 70,
+        zIndex: 1000,
         overflowY: 'auto',
         boxShadow: '-20px 0 60px rgba(0,0,0,0.9)'
       }}
@@ -303,7 +303,7 @@ export default function InspectorDrawer() {
 
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
-            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'full_ai' })}
+            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.name, { aiMode: 'full_ai' })}
             style={{
               flex: 1,
               padding: '8px 6px',
@@ -325,7 +325,7 @@ export default function InspectorDrawer() {
           </button>
 
           <button
-            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'reels_only' })}
+            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.name, { aiMode: 'reels_only' })}
             style={{
               flex: 1,
               padding: '8px 6px',
@@ -347,7 +347,7 @@ export default function InspectorDrawer() {
           </button>
 
           <button
-            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.id, { aiMode: 'paused' })}
+            onClick={() => updateContactPreferences(selectedNode.senderId || selectedNode.name, { aiMode: 'paused' })}
             style={{
               flex: 1,
               padding: '8px 6px',

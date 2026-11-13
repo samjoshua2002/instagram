@@ -12,15 +12,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 
 export default function MediaVaultPage() {
-  const { API_BASE, token, showToast, user, isImpersonating } = useApp();
-
-  const getAuthHeaders = (extraHeaders = {}) => {
-    const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
-    return {
-      ...extraHeaders,
-      ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
-    };
-  };
+  const { user, isImpersonating } = useApp();
 
   // If pure superadmin (not inside an impersonated creator workspace), show creator selector
   if (user?.role === 'superadmin' && !isImpersonating) {
@@ -32,6 +24,20 @@ export default function MediaVaultPage() {
       />
     );
   }
+
+  return <MediaVaultPageInner />;
+}
+
+function MediaVaultPageInner() {
+  const { API_BASE, token, showToast } = useApp();
+
+  const getAuthHeaders = (extraHeaders = {}) => {
+    const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('chatter_jwt_token') : null);
+    return {
+      ...extraHeaders,
+      ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
+    };
+  };
 
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -79,18 +85,27 @@ export default function MediaVaultPage() {
 
   const fileInputRef = useRef(null);
 
+  // Latest vault request id: older responses (e.g. from a previous category) are ignored
+  const vaultRequestIdRef = useRef(0);
+
   useEffect(() => {
     fetchVaultData();
-    fetchPredefined();
   }, [activeCategory]);
 
+  // The predefined library does not depend on the category: load it once
+  useEffect(() => {
+    fetchPredefined();
+  }, []);
+
   const fetchVaultData = async () => {
+    const requestId = ++vaultRequestIdRef.current;
     try {
       const url = activeCategory && activeCategory !== 'all'
-        ? `${API_BASE}/api/media-vault?category=${activeCategory}`
+        ? `${API_BASE}/api/media-vault?category=${encodeURIComponent(activeCategory)}`
         : `${API_BASE}/api/media-vault`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       const data = await res.json();
+      if (requestId !== vaultRequestIdRef.current) return;
       if (data.success) {
         setItems(data.items || []);
         if (data.categories) {
@@ -98,10 +113,11 @@ export default function MediaVaultPage() {
         }
       }
     } catch (err) {
+      if (requestId !== vaultRequestIdRef.current) return;
       console.error('Failed to load media vault:', err);
       showToast('Failed to load media vault', 'error');
     } finally {
-      setLoading(false);
+      if (requestId === vaultRequestIdRef.current) setLoading(false);
     }
   };
 
@@ -511,7 +527,7 @@ export default function MediaVaultPage() {
             style={{ fontSize: '0.8rem', padding: '8px 14px' }}
           >
             <Plus size={14} />
-            <span>+ Add Category</span>
+            <span>Add Category</span>
           </button>
           <button
             onClick={fetchVaultData}

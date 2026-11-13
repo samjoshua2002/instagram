@@ -11,7 +11,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
-  const { user, token, API_BASE, updateUserProfile, showToast, setRoutingConfigState } = useApp();
+  const { user, token, API_BASE, updateUserProfile, showToast, setRoutingConfig, refreshAccount } = useApp();
 
   const TOTAL_STEPS = 5;
   const [step, setStep] = useState(1);
@@ -60,12 +60,17 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   // Listen for OAuth postMessage from login popup window
   useEffect(() => {
     const handleOAuthMessage = (event) => {
+      // Only trust messages coming from our own backend's OAuth popup
+      let apiOrigin = '';
+      try { apiOrigin = new URL(API_BASE).origin; } catch (e) {}
+      if (!apiOrigin || event.origin !== apiOrigin) return;
       if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
-        const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
+        const { instagramUsername: igUser, instagramAccountId: igId } = event.data.payload || {};
         if (igUser) setInstagramUsername(igUser);
         if (igId) setInstagramAccountId(igId);
-        if (igToken) setInstagramPageAccessToken(igToken);
         setOauthConnecting(false);
+        // Token stays on the server now: re-read account + persona
+        refreshAccount?.();
         showToast?.(`Instagram connected: @${igUser || 'account'}!`, 'success');
       } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
         setOauthConnecting(false);
@@ -74,7 +79,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
     };
     window.addEventListener('message', handleOAuthMessage);
     return () => window.removeEventListener('message', handleOAuthMessage);
-  }, [showToast]);
+  }, [API_BASE, showToast, refreshAccount]);
 
   if (!isOpen) return null;
 
@@ -98,7 +103,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
 
   const handleCloseOrSkip = async () => {
     try {
-      const dismissKey = user?._id ? `chatter_onboarding_dismissed_${user._id}` : 'chatter_onboarding_dismissed';
+      const uid = user?.id || user?._id;
+      const dismissKey = uid ? `chatter_onboarding_dismissed_${uid}` : 'chatter_onboarding_dismissed';
       sessionStorage.setItem(dismissKey, 'true');
     } catch (e) {}
 
@@ -181,11 +187,11 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         instagramId: data.user?.instagramId || instagramAccountId.trim(),
         hasInstagramToken: Boolean(data.user?.hasInstagramToken || instagramPageAccessToken.trim()),
         isInstagramConnected: Boolean(data.user?.isInstagramConnected || instagramPageAccessToken.trim()),
-        instagramPageAccessToken: instagramPageAccessToken.trim(),
+        ...(instagramPageAccessToken.trim() ? { instagramPageAccessToken: instagramPageAccessToken.trim() } : {}),
       });
 
-      if (setRoutingConfigState) {
-        setRoutingConfigState(prev => ({
+      if (setRoutingConfig) {
+        setRoutingConfig(prev => ({
           ...prev,
           chatMode,
           globalBotActive: enableGlobalBot

@@ -11,15 +11,7 @@ import {
 } from 'lucide-react';
 
 export default function ControlsPage() {
-  const {
-    nodes,
-    routingConfig,
-    saveRouting,
-    setRoutingConfig,
-    updateContactPreferences,
-    user,
-    isImpersonating
-  } = useApp();
+  const { user, isImpersonating } = useApp();
 
   // If pure superadmin (not inside an impersonated creator workspace), show creator selector
   if (user?.role === 'superadmin' && !isImpersonating) {
@@ -31,21 +23,32 @@ export default function ControlsPage() {
       />
     );
   }
+  return <ControlsPageInner />;
+}
+
+function ControlsPageInner() {
+  const {
+    nodes,
+    routingConfig,
+    saveRouting,
+    setRoutingConfig,
+    updateContactPreferences,
+    bulkUpdateContactPreferences
+  } = useApp();
+
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'full_ai' | 'reels_only' | 'manual'
 
   // Layout switcher state: 'dense' (ultra-compact mobile default) | 'grid' | 'list'
-  const [controlsLayout, setControlsLayout] = useState(() => {
-    if (typeof window === 'undefined') return 'dense';
+  const [controlsLayout, setControlsLayout] = useState('dense');
+  // Read saved layout / screen width after mount so server and client first render match
+  useEffect(() => {
     try {
       const saved = localStorage.getItem('chatter_controls_layout');
-      if (saved) return saved;
-      return window.innerWidth <= 768 ? 'dense' : 'grid';
-    } catch {
-      return 'dense';
-    }
-  });
+      setControlsLayout(saved || (window.innerWidth <= 768 ? 'dense' : 'grid'));
+    } catch {}
+  }, []);
 
   const handleSetControlsLayout = (mode) => {
     setControlsLayout(mode);
@@ -164,13 +167,13 @@ export default function ControlsPage() {
         const next = currentList.filter(id => !targetKeys.includes(id));
         const updated = { ...baseConfig, includedContactIds: next };
         queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' });
+        updateContactPreferences(contact.senderId || contact.name, { aiMode: 'paused' });
       } else {
         // CHECKING: Immediately add to whitelist AND set AI mode to 'full_ai'
         const next = [...currentList.filter(id => !targetKeys.includes(id)), key];
         const updated = { ...baseConfig, includedContactIds: next };
         queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
+        updateContactPreferences(contact.senderId || contact.name, { aiMode: 'full_ai' });
       }
     } else if (chatMode === 'everyone_except') {
       const currentlyExcluded = isExcluded(contact);
@@ -181,13 +184,13 @@ export default function ControlsPage() {
         const next = currentList.filter(id => !targetKeys.includes(id));
         const updated = { ...baseConfig, excludedContactIds: next };
         queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'full_ai' });
+        updateContactPreferences(contact.senderId || contact.name, { aiMode: 'full_ai' });
       } else {
         // CHECKING: Add to blacklist AND set AI mode to 'paused'
         const next = [...currentList.filter(id => !targetKeys.includes(id)), key];
         const updated = { ...baseConfig, excludedContactIds: next };
         queueSave(updated);
-        updateContactPreferences(contact.senderId || contact.id, { aiMode: 'paused' });
+        updateContactPreferences(contact.senderId || contact.name, { aiMode: 'paused' });
       }
     }
   }, [routingConfig, getContactKey, getTargetKeys, isIncluded, isExcluded, queueSave, updateContactPreferences]);
@@ -200,7 +203,7 @@ export default function ControlsPage() {
     const chatMode = baseConfig.chatMode;
 
     // 1. Update contact preferences (nodes)
-    updateContactPreferences(contact.senderId || contact.id, { aiMode: mode });
+    updateContactPreferences(contact.senderId || contact.name, { aiMode: mode });
 
     // 2. Synchronize routingConfig based on active chatMode
     let updated = { ...baseConfig };
@@ -238,26 +241,26 @@ export default function ControlsPage() {
     let updated;
     if (baseConfig.chatMode === 'everyone_except') {
       updated = { ...baseConfig, excludedContactIds: allKeys };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'paused' }));
+      bulkUpdateContactPreferences(friendNodes, 'paused');
     } else if (baseConfig.chatMode === 'only_selected') {
       updated = { ...baseConfig, includedContactIds: allKeys };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'full_ai' }));
+      bulkUpdateContactPreferences(friendNodes, 'full_ai');
     }
     if (updated) queueSave(updated);
-  }, [friendNodes, routingConfig, getContactKey, queueSave, updateContactPreferences]);
+  }, [friendNodes, routingConfig, getContactKey, queueSave, bulkUpdateContactPreferences]);
 
   const handleClearAll = useCallback(() => {
     const baseConfig = currentConfigRef.current || routingConfig;
     let updated;
     if (baseConfig.chatMode === 'everyone_except') {
       updated = { ...baseConfig, excludedContactIds: [] };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'full_ai' }));
+      bulkUpdateContactPreferences(friendNodes, 'full_ai');
     } else if (baseConfig.chatMode === 'only_selected') {
       updated = { ...baseConfig, includedContactIds: [] };
-      friendNodes.forEach(f => updateContactPreferences(f.senderId || f.id, { aiMode: 'paused' }));
+      bulkUpdateContactPreferences(friendNodes, 'paused');
     }
     if (updated) queueSave(updated);
-  }, [friendNodes, routingConfig, queueSave, updateContactPreferences]);
+  }, [friendNodes, routingConfig, queueSave, bulkUpdateContactPreferences]);
 
   const onSave = async () => {
     setIsSaving(true);

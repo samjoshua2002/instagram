@@ -12,7 +12,7 @@ import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import { motion } from 'framer-motion';
 
 export default function SettingsPage() {
-  const { API_BASE, token, showToast, user, isImpersonating, updateUserProfile } = useApp();
+  const { user, isImpersonating } = useApp();
 
   // If pure superadmin (not inside an impersonated creator workspace), show creator selector
   if (user?.role === 'superadmin' && !isImpersonating) {
@@ -24,6 +24,14 @@ export default function SettingsPage() {
       />
     );
   }
+  return <SettingsPageInner />;
+}
+
+function SettingsPageInner() {
+  const { API_BASE, token, showToast, user, updateUserProfile, refreshAccount } = useApp();
+  const userId = user?.id || user?._id;
+  // Persona cache is strictly per account; no shared fallback key
+  const userCacheKey = userId ? `chatter_persona_cached_${userId}` : null;
 
   const [activeTab, setActiveTab] = useState('about');
   const [loading, setLoading] = useState(true);
@@ -66,24 +74,20 @@ export default function SettingsPage() {
   // Listen for OAuth postMessage from login popup window
   useEffect(() => {
     const handleOAuthMessage = (event) => {
+      // Only trust messages coming from our own backend's OAuth popup
+      let apiOrigin = '';
+      try { apiOrigin = new URL(API_BASE).origin; } catch (e) {}
+      if (!apiOrigin || event.origin !== apiOrigin) return;
       if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
-        const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
+        const { instagramUsername: igUser, instagramAccountId: igId } = event.data.payload || {};
         setFormData(prev => ({
           ...prev,
           ...(igUser ? { instagramHandle: `@${igUser.replace(/^@/, '')}` } : {}),
           ...(igId ? { instagramAccountId: igId } : {}),
-          ...(igToken ? { instagramPageAccessToken: igToken } : {}),
         }));
         setOauthConnecting(false);
-        if (updateUserProfile) {
-          updateUserProfile({
-            hasInstagramToken: true,
-            isInstagramConnected: true,
-            instagramPageAccessToken: igToken,
-            instagramAccountId: igId,
-            instagramUsername: igUser,
-          });
-        }
+        // The token is no longer sent to the browser: re-read account + persona from the server
+        Promise.resolve(refreshAccount?.()).finally(() => fetchPersonaRef.current?.());
         showToast?.(`Instagram connected: @${igUser || 'account'}! Credentials updated.`, 'success');
       } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
         setOauthConnecting(false);
@@ -92,7 +96,7 @@ export default function SettingsPage() {
     };
     window.addEventListener('message', handleOAuthMessage);
     return () => window.removeEventListener('message', handleOAuthMessage);
-  }, [showToast, updateUserProfile]);
+  }, [API_BASE, showToast, refreshAccount]);
 
   const handleLaunchInstagramOAuth = () => {
     setErrorMsg('');
@@ -132,14 +136,14 @@ export default function SettingsPage() {
   ]);
 
   // Fetch current persona on mount
+  const fetchPersonaRef = React.useRef(null);
   useEffect(() => {
     fetchPersona();
-  }, [user?._id]);
+  }, [userId]);
 
   const fetchPersona = async () => {
-    const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
     // Only show cached persona if scoped to current user
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && userCacheKey) {
       try {
         const cached = localStorage.getItem(userCacheKey);
         if (cached) {
@@ -181,8 +185,10 @@ export default function SettingsPage() {
         };
         setFormData(updated);
         try {
-          localStorage.setItem(userCacheKey, JSON.stringify(updated));
+          if (userCacheKey) localStorage.setItem(userCacheKey, JSON.stringify(updated));
         } catch (e) {}
+      } else {
+        setErrorMsg('Could not load settings from server.');
       }
     } catch (err) {
       console.error('Failed to load persona config:', err);
@@ -191,6 +197,7 @@ export default function SettingsPage() {
       setLoading(false);
     }
   };
+  fetchPersonaRef.current = fetchPersona;
 
   const handleTestGiphyKey = async () => {
     setTestingGiphy(true);
@@ -218,16 +225,17 @@ export default function SettingsPage() {
     setSaving(true);
     setErrorMsg('');
     try {
+      // Never send an empty token: that would wipe a token the server keeps but no longer returns
+      const { instagramPageAccessToken: tokenField, ...restForm } = formData;
       const res = await fetch(`${API_BASE}/api/persona`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(formData),
+        body: JSON.stringify(tokenField ? formData : restForm),
       });
 
       if (res.ok) {
         setSaveSuccess(true);
-        if (typeof window !== 'undefined') {
-          const userCacheKey = user?._id ? `chatter_persona_cached_${user._id}` : 'chatter_persona_cached';
+        if (typeof window !== 'undefined' && userCacheKey) {
           try {
             localStorage.setItem(userCacheKey, JSON.stringify(formData));
           } catch (e) {}
@@ -235,9 +243,11 @@ export default function SettingsPage() {
 
         if (updateUserProfile) {
           updateUserProfile({
-            hasInstagramToken: Boolean(formData.instagramPageAccessToken),
-            isInstagramConnected: Boolean(formData.instagramPageAccessToken),
-            instagramPageAccessToken: formData.instagramPageAccessToken,
+            ...(tokenField ? {
+              hasInstagramToken: true,
+              isInstagramConnected: true,
+              instagramPageAccessToken: tokenField,
+            } : {}),
             instagramAccountId: formData.instagramAccountId,
             instagramUsername: formData.instagramHandle?.replace(/^@/, ''),
             firstName: formData.creatorName,
@@ -247,7 +257,7 @@ export default function SettingsPage() {
         showToast('Settings & Persona saved successfully! AI updated.', 'success');
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         setErrorMsg(err.error || 'Failed to save settings');
       }
     } catch (err) {

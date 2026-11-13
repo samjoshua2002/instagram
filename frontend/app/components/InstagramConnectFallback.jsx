@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 export default function InstagramConnectFallback({ onConnect, user }) {
-  const { token, API_BASE, updateUserProfile, showToast } = useApp();
+  const { token, API_BASE, updateUserProfile, showToast, refreshAccount } = useApp();
 
   const initialUsername = user?.instagramUsername || user?.username || '';
   const initialAccountId = user?.instagramId || user?.instagramAccountId || '';
@@ -121,21 +121,25 @@ export default function InstagramConnectFallback({ onConnect, user }) {
   // Listen for OAuth postMessage from login popup window
   React.useEffect(() => {
     const handleOAuthMessage = (event) => {
+      // Only trust messages coming from our own backend's OAuth popup
+      let apiOrigin = '';
+      try { apiOrigin = new URL(API_BASE).origin; } catch (e) {}
+      if (!apiOrigin || event.origin !== apiOrigin) return;
       if (event.data?.type === 'INSTAGRAM_OAUTH_SUCCESS') {
-        const { instagramUsername: igUser, instagramAccountId: igId, instagramPageAccessToken: igToken } = event.data.payload || {};
+        const { instagramUsername: igUser, instagramAccountId: igId } = event.data.payload || {};
         if (igUser) setHandle(igUser);
         if (igId) setAccountId(igId);
-        if (igToken) setAccessToken(igToken);
         setOauthConnecting(false);
         if (updateUserProfile) {
           updateUserProfile({
             hasInstagramToken: true,
             isInstagramConnected: true,
-            instagramPageAccessToken: igToken,
-            instagramAccountId: igId,
-            instagramUsername: igUser,
+            ...(igId ? { instagramAccountId: igId } : {}),
+            ...(igUser ? { instagramUsername: igUser } : {}),
           });
         }
+        // Token stays on the server now: re-read account + persona
+        refreshAccount?.();
         showToast?.(`Instagram connected: @${igUser || 'account'}! Automation active.`, 'success');
       } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
         setOauthConnecting(false);
@@ -144,7 +148,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
     };
     window.addEventListener('message', handleOAuthMessage);
     return () => window.removeEventListener('message', handleOAuthMessage);
-  }, [showToast, updateUserProfile]);
+  }, [API_BASE, showToast, updateUserProfile, refreshAccount]);
 
   const handleLaunchInstagramOAuth = () => {
     setErrorMsg('');
@@ -593,8 +597,9 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 type="button"
                 onClick={() => setSetupTab('oauth')}
                 style={{
-                  flex: 1,
-                  padding: '8px 12px',
+                  flex: '1 1 auto',
+                  whiteSpace: 'nowrap',
+                  padding: '8px 10px',
                   borderRadius: '7px',
                   border: 'none',
                   background: setupTab === 'oauth' ? '#ffffff' : 'transparent',
@@ -626,8 +631,9 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                 type="button"
                 onClick={() => setSetupTab('manual')}
                 style={{
-                  flex: 1,
-                  padding: '8px 12px',
+                  flex: '1 1 auto',
+                  whiteSpace: 'nowrap',
+                  padding: '8px 10px',
                   borderRadius: '7px',
                   border: 'none',
                   background: setupTab === 'manual' ? '#ffffff' : 'transparent',
@@ -652,7 +658,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             {setupTab === 'oauth' && (
               <div>
                 <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '18px', lineHeight: 1.5 }}>
-                  Log in directly through official Meta dialog to automatically grant permissions, link your Instagram business profile, and generate encrypted long-lived tokens.
+                  Log in directly through official Meta dialog to automatically grant permissions, link your Instagram business profile, and generate long-lived tokens.
                 </p>
 
                 <div style={{
@@ -669,7 +675,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <CheckCircle2 size={16} color="#15803d" />
-                      <span>60-day auto-refreshing encrypted Page Access Token</span>
+                      <span>60-day auto-refreshing Page Access Token</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <CheckCircle2 size={16} color="#15803d" />
@@ -975,7 +981,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
             }}>
               <Lock size={16} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.45 }}>
-                Your access token is encrypted in MongoDB and never shared. Only the authenticated automation engine communicates with Meta's official Graph API.
+                Your access token is stored securely on the server and only used to talk to Meta's Graph API.
               </div>
             </div>
           </div>

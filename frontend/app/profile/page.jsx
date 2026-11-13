@@ -159,13 +159,16 @@ export default function ProfilePage() {
 
   const handleDeletePasskey = async (credentialId) => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/passkey/${encodeURIComponent(credentialId)}`, {
+      const res = await fetch(`${API_BASE}/api/auth/passkeys/${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         showToast?.('Passkey deleted.', 'info');
         fetchPasskeys();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast?.(data.error || 'Failed to delete passkey', 'error');
       }
     } catch (e) {
       showToast?.('Failed to delete passkey', 'error');
@@ -477,7 +480,7 @@ export default function ProfilePage() {
                     padding: '2px 8px',
                     borderRadius: '4px'
                   }}>
-                    {(user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'ENCRYPTED & ACTIVE' : 'MISSING'}
+                    {(user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'STORED & ACTIVE' : 'MISSING'}
                   </span>
                 </div>
               </div>
