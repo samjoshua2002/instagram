@@ -32,7 +32,7 @@ async function checkOtp(user, field, code, messages = {}, purpose = '') {
     return { status: 400, error: messages.invalid || 'Invalid verification code' };
   }
   if (!otp.expiresAt || new Date() > new Date(otp.expiresAt)) {
-    user[field] = { code: '', expiresAt: null, attempts: 0 };
+    user[field] = { code: '', expiresAt: null, attempts: 0, sentAt: otp.sentAt };
     await user.save();
     return { status: 400, error: messages.expired || 'Verification code has expired. Please request a new one.' };
   }
@@ -43,8 +43,8 @@ async function checkOtp(user, field, code, messages = {}, purpose = '') {
     { new: true }
   ).select(field);
   if (!reserved) {
-    await User.updateOne({ _id: user._id, [`${field}.code`]: otp.code }, { $set: { [field]: { code: '', expiresAt: null, attempts: 0 } } });
-    user[field] = { code: '', expiresAt: null, attempts: 0 };
+    await User.updateOne({ _id: user._id, [`${field}.code`]: otp.code }, { $set: { [`${field}.code`]: '', [`${field}.expiresAt`]: null, [`${field}.attempts`]: 0 } });
+    user[field] = { code: '', expiresAt: null, attempts: 0, sentAt: otp.sentAt };
     return { status: 400, error: 'Too many attempts, request a new code' };
   }
   const a = Buffer.from(String(otp.code));
@@ -52,13 +52,13 @@ async function checkOtp(user, field, code, messages = {}, purpose = '') {
   const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
   if (!ok) {
     if ((reserved[field]?.attempts || 0) >= MAX_OTP_ATTEMPTS) {
-      await User.updateOne({ _id: user._id, [`${field}.code`]: otp.code }, { $set: { [field]: { code: '', expiresAt: null, attempts: 0 } } });
+      await User.updateOne({ _id: user._id, [`${field}.code`]: otp.code }, { $set: { [`${field}.code`]: '', [`${field}.expiresAt`]: null, [`${field}.attempts`]: 0 } });
       return { status: 400, error: 'Too many attempts, request a new code' };
     }
     return { status: 400, error: messages.invalid || 'Invalid verification code' };
   }
   // Success: OTP is single-use
-  user[field] = { code: '', expiresAt: null, attempts: 0 };
+  user[field] = { code: '', expiresAt: null, attempts: 0, sentAt: otp.sentAt };
   return null;
 }
 
@@ -67,8 +67,16 @@ const DUMMY_BCRYPT_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password'
 
 // A new code is sent at most once a minute per account (stops inbox flooding and code cycling)
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+// The cooldown also applies after a code was burned by wrong guesses (sentAt is kept when the code is wiped)
 function otpRecentlySent(otp) {
-  return Boolean(otp && otp.code && otp.sentAt && Date.now() - new Date(otp.sentAt).getTime() < OTP_RESEND_COOLDOWN_MS);
+  return Boolean(otp && otp.sentAt && Date.now() - new Date(otp.sentAt).getTime() < OTP_RESEND_COOLDOWN_MS);
+}
+
+// At most OTP_MAX_SENDS_PER_HOUR codes per account and flow, so codes can't be cycled to brute-force one
+const OTP_MAX_SENDS_PER_HOUR = 5;
+async function otpSendCapReached(user, field) {
+  const { count } = await redisService.hitWindow(`otp-send:${field}:${user._id}`, 60 * 60);
+  return count > OTP_MAX_SENDS_PER_HOUR;
 }
 
 // Rate limiter (per IP + route). Counts live in Redis so they survive restarts and are shared by
@@ -357,6 +365,9 @@ router.post('/register/resend-otp', authLimiter, async (req, res) => {
     if (otpRecentlySent(user.verificationOtp)) {
       return res.status(429).json({ error: 'A code was just sent. Please wait a minute before asking for another one.' });
     }
+    if (await otpSendCapReached(user, 'verificationOtp')) {
+      return res.status(429).json({ error: 'Too many codes requested. Please try again in an hour.' });
+    }
 
     const otpCode = generateOtp();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -568,7 +579,7 @@ router.post('/oneauth/request-setup-otp', authLimiter, async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const genericMessage = `If an account exists for ${cleanEmail}, a 6-digit verification code has been sent to unlock OneAuth setup.`;
     const user = await User.findOne({ email: cleanEmail });
-    if (!user || otpRecentlySent(user.resetOtp)) {
+    if (!user || otpRecentlySent(user.resetOtp) || await otpSendCapReached(user, 'resetOtp')) {
       return res.json({ success: true, message: genericMessage });
     }
 
@@ -730,7 +741,7 @@ router.post('/forgot-password/send-otp', authLimiter, async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const genericMessage = 'If this email exists, a verification code has been sent.';
     const user = await User.findOne({ email: cleanEmail });
-    if (!user || otpRecentlySent(user.resetOtp)) {
+    if (!user || otpRecentlySent(user.resetOtp) || await otpSendCapReached(user, 'resetOtp')) {
       return res.json({ success: true, message: genericMessage });
     }
 
