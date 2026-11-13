@@ -61,7 +61,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
   const sanitizeAccountRole = (acc) => {
     if (!acc) return acc;
-    const isSuper = acc.email === 'samjoshuacs2002@gmail.com' || acc.username === 'samjoshua2002';
+    const isSuper = acc.role === 'superadmin';
     return {
       ...acc,
       role: isSuper ? 'superadmin' : 'user'
@@ -350,7 +350,7 @@ export default function LoginPage({ onLoginSuccess }) {
       const record = {
         ...userData,
         email: userData.email,
-        role: (userData.email === 'samjoshuacs2002@gmail.com' || userData.username === 'samjoshua2002') ? 'superadmin' : 'user',
+        role: userData.role === 'superadmin' ? 'superadmin' : 'user',
         firstName: userData.firstName || '',
         lastName: userData.lastName || '',
         profilePicUrl: userData.profilePicUrl || '',
@@ -2250,7 +2250,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       type="text"
                       value={regForm.username}
                       onChange={(e) => setRegForm({ ...regForm, username: e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, '') })}
-                      placeholder="e.g. samjoshua"
+                      placeholder="e.g. yourname"
                       required
                       style={{
                         width: '100%',
