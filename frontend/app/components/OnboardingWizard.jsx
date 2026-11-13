@@ -23,7 +23,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   // STEP 1: Instagram Connection & Token
   const [instagramUsername, setInstagramUsername] = useState(user?.instagramUsername || '');
   const [instagramPageAccessToken, setInstagramPageAccessToken] = useState('');
-  const [instagramAccountId, setInstagramAccountId] = useState(user?.instagramId || '');
+  const [instagramAccountId, setInstagramAccountId] = useState(user?.instagramAccountId || user?.instagramId || '');
 
   // STEP 2: Account Purpose
   const [accountType, setAccountType] = useState('business'); // 'business' | 'personal'
@@ -51,7 +51,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   useEffect(() => {
     if (user) {
       if (user.instagramUsername && !instagramUsername) setInstagramUsername(user.instagramUsername);
-      if (user.instagramId && !instagramAccountId) setInstagramAccountId(user.instagramId);
+      if ((user.instagramAccountId || user.instagramId) && !instagramAccountId) setInstagramAccountId(user.instagramAccountId || user.instagramId);
       if (user.businessProfile?.businessName && !businessName) setBusinessName(user.businessProfile.businessName);
       if (user.businessProfile?.category && !businessCategory) setBusinessCategory(user.businessProfile.category);
     }
@@ -206,8 +206,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
           chatMode,
           enableGlobalBot,
           instagramUsername: instagramUsername.trim(),
-          instagramPageAccessToken: instagramPageAccessToken.trim(),
-          instagramAccountId: instagramAccountId.trim(),
+          // Only send what was typed: blanks would never disconnect, but no need to send them
+          ...(instagramPageAccessToken.trim() ? { instagramPageAccessToken: instagramPageAccessToken.trim() } : {}),
+          ...(instagramAccountId.trim() ? { instagramAccountId: instagramAccountId.trim() } : {}),
         })
       });
 
