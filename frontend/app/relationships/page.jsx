@@ -178,10 +178,12 @@ function RelationshipsPageInner() {
         roastStyle: selectedPerson.roastStyle || ''
       });
     }
-    // A different person: drop any half-finished raw chat extraction
+    // A different person: drop any half-finished raw chat extraction (and close its window)
+    rawChatPersonRef.current = `${selectedPerson?.id || ''}|${selectedPerson?.name || ''}`;
     setExtractedData(null);
     setRawChatText('');
     setUserClarification('');
+    setIsRawChatModalOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id, selectedPerson?.name]);
 
@@ -442,6 +444,10 @@ function RelationshipsPageInner() {
     }
   };
 
+  // Which person the raw-chat tool is open for: a slow result for someone else is dropped
+  const rawChatPersonRef = React.useRef('');
+  const personKey = () => `${selectedPerson?.id || ''}|${selectedPerson?.name || ''}`;
+
   // Trigger Raw Chat Extraction using AI
   const handleAnalyzeRawChat = async (e) => {
     e?.preventDefault();
@@ -451,8 +457,10 @@ function RelationshipsPageInner() {
     }
 
     setIsExtracting(true);
+    const startedFor = personKey();
     try {
       const extraction = await extractFromRawChat(rawChatText, selectedPerson, userClarification);
+      if (rawChatPersonRef.current !== startedFor) return;
       if (extraction) {
         setExtractedData(extraction);
         showToast('Chat analyzed! Review extracted attributes & confirm.');
@@ -473,8 +481,10 @@ function RelationshipsPageInner() {
       return;
     }
     try {
+      const startedFor = personKey();
       const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/messages`);
       const data = await res.json().catch(() => ({}));
+      if (rawChatPersonRef.current !== startedFor) return;
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.messages && data.messages.length > 0) {
         const ownerLabel = user?.firstName || 'You';
