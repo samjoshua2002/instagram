@@ -11,7 +11,18 @@ const llmAdapter = require('./llmAdapter');
 const storyboardService = require('./storyboardService');
 const voiceService = require('./voiceService');
 const { HUMAN_CHAT_RULES, humanChatRules, toHumanText } = require('./replyStyle');
+const { creatorIdentity, personalize } = require('./creatorIdentity');
 const { untrustedContactBlock, sanitizeFewShotExchanges, sanitizeLearnedText, getCompletionText, parseJsonCompletion, isContentFilterError, maskForFilter } = require('./promptSafety');
+
+// Sam's own gaming/anime knowledge: only for his account, never in another creator's prompt
+const ORIGINAL_OWNER_HANDLES = ['@catovidz'];
+const ORIGINAL_OWNER_KNOWLEDGE = `POP CULTURE, GENSHIN IMPACT & ANIME KNOWLEDGE (FURINA, GAMING):
+- You (Sam Joshua) play Genshin Impact, edit videos, and watch anime.
+- Furina de Fontaine: You know her well! She is the iconic former Hydro Archon (God of Justice) of Fontaine in Genshin Impact!
+- She is famous for being a dramatic, flamboyant theatrical drama queen, her flair for stage performances, love for sweets/cake, and her summons (Gentilhomme Usher, Chevalmarin, Mademoiselle Crabaletta).
+- When friends talk about Furina or Genshin, chat back naturally as a gamer who loves the game and character (e.g. "furina is the biggest drama queen in all of fontaine haha", "her stage theatrics are unmatched", "fontaine archon quest was peak fr").
+- NEVER confuse Furina with a cat, pet, or someone you don't know.
+- NEVER reply with sad, crying, or depressed reactions when talking about Furina!`;
 
 // gpt-5.x and o-series deployments are reasoning models (they spend tokens thinking before the reply)
 const isReasoningModel = (model) => /^(gpt-5|o\d)/i.test(String(model || ''));
@@ -58,8 +69,12 @@ class AzureOpenAIService {
     if (config) return config;
     config = await PersonaConfig.findOne({ ownerId: ownerId || null });
     if (!config) {
-      config = ownerId ? new PersonaConfig({ ownerId }) : await PersonaConfig.create({});
-      if (ownerId) return config.toObject();
+      if (ownerId) {
+        // Not saved yet: speak as this creator, never as the schema's default owner
+        const owner = await require('../models/User').findById(ownerId).select('firstName lastName username instagramUsername businessProfile').lean().catch(() => null);
+        return new PersonaConfig({ ownerId, ...PersonaConfig.starterFields(owner) }).toObject();
+      }
+      config = await PersonaConfig.create({});
     }
     await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600, ownerId || null);
     return config;
@@ -90,6 +105,20 @@ class AzureOpenAIService {
     const emptyErr = new Error(`AI returned an empty reply (finish_reason: ${second.finishReason || 'unknown'})`);
     if (second.finishReason === 'content_filter') emptyErr.code = 'content_filter';
     throw emptyErr;
+  }
+
+  /**
+   * JSON-mode call for the People tools: if the model fails or returns no usable JSON,
+   * the same request is retried once on gpt-4o (reasoning models get no temperature).
+   */
+  async jsonWithFallback(selectedModel, messages) {
+    try {
+      return parseJsonCompletion(await this.getClient(selectedModel).chat.completions.create({ messages, response_format: { type: 'json_object' } }));
+    } catch (modelErr) {
+      if (isContentFilterError(modelErr) || selectedModel === 'gpt-4o') throw modelErr;
+      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
+      return parseJsonCompletion(await this.getClient('gpt-4o').chat.completions.create({ messages, temperature: 0.3, response_format: { type: 'json_object' } }));
+    }
   }
 
   /**
@@ -399,8 +428,8 @@ GENDER & ADDRESSING (CRITICAL):
 BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - This person's specific banter/roast style: see "Banter / roast style" in the contact data above (style only), otherwise match their energy naturally
 - When they use slang, cuss words, or trash talk: match their exact language and energy.
-- STRICT ISOLATION: NEVER cross-contaminate banter across people. What you discuss or banter with Arun stays 100% with Arun. Never use rude banter or guy-slang with female friends or new contacts.
-- Female friends (Fami, Bhavani, Annie): Never harsh cussing. Sweet, playful, and affectionate tone by default. Gentle teasing only.
+- STRICT ISOLATION: NEVER cross-contaminate banter across people. What you discuss or banter with one person stays 100% with that person. Never use rude banter or guy-slang with female friends or new contacts.
+- Female friends: Never harsh cussing. Sweet, playful, and affectionate tone by default. Gentle teasing only.
 - Romantic interest/crush: Flirty and teasing, never crude.
 - Do NOT use cringe AI phrases. Never say "chose violence" or any variant.
 
@@ -434,18 +463,12 @@ REACTION GIFS & MEDIA ATTACHMENTS (SPARSE & OCCASIONAL — RATE LIMITED & PACED 
 ${categoriesMappingPrompt || availableCategoriesStr}
 - SYNTAX: Append [ATTACHMENT: <category>] at the very end of your message when the human's message calls for it.
 - REACTION MEDIA STYLE: Real-life pop-culture memes & funny GIFs (e.g. Leonardo DiCaprio laughing, Chloe side-eye, The Rock, El Risitas) from GIPHY/vault.
-
-POP CULTURE, GENSHIN IMPACT & ANIME KNOWLEDGE (FURINA, GAMING):
-- You (${config.creatorName}) play Genshin Impact, edit videos, and watch anime.
-- Furina de Fontaine: You know her well! She is the iconic former Hydro Archon (God of Justice) of Fontaine in Genshin Impact!
-- She is famous for being a dramatic, flamboyant theatrical drama queen, her flair for stage performances, love for sweets/cake, and her summons (Gentilhomme Usher, Chevalmarin, Mademoiselle Crabaletta).
-- When friends talk about Furina or Genshin, chat back naturally as a gamer who loves the game and character (e.g. "furina is the biggest drama queen in all of fontaine haha", "her stage theatrics are unmatched", "fontaine archon quest was peak fr").
-- NEVER confuse Furina with a cat, pet, or someone you don't know.
-- NEVER reply with sad, crying, or depressed reactions when talking about Furina!
-
+${ORIGINAL_OWNER_HANDLES.includes(String(config.instagramHandle || '').toLowerCase()) ? `
+${ORIGINAL_OWNER_KNOWLEDGE}
+` : ''}
 HUMAN TEXTING & AUTHENTIC TONE RULES:
 - Respond naturally as ${config.creatorName} texting from your phone in real life.
-- ZERO AI BUZZWORDS: Never use artificial cliches like "literally iconic", "chaotic energy and sass", "serving main character vibes", "aesthetic is unmatched fr", "chose violence". Talk like a real chill guy, not a marketer or ChatGPT.
+- ZERO AI BUZZWORDS: Never use artificial cliches like "literally iconic", "chaotic energy and sass", "serving main character vibes", "aesthetic is unmatched fr", "chose violence". Talk like a real person, not a marketer or ChatGPT.
 - DO NOT ARTIFICIALLY DUMP FACTS: Only mention their favorites or past topics if THEY brought it up in the current conversation or it flows 100% naturally. Never hijack a conversation about something else to give a trivia review about an anime, game, or character.
 - NATURAL BANTER: If someone asks you to talk about their face, beauty, or selfies, banter back casually (e.g. playful teasing, chill compliments, asking for a pic, or laughing it off).
 - STRICTLY FORBIDDEN: NEVER USE THE WORD "baddu" OR ANY VARIANT UNDER ANY CIRCUMSTANCES.
@@ -802,7 +825,8 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
   "summary": "Short 1-sentence recap of who this person is or what DB change was made"
 }`;
 
-    const messages = [{ role: 'system', content: systemPrompt }];
+    // The prompt was written for the original owner: name the signed-in creator instead
+    const messages = [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }];
 
     // Append prior conversation history
     if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -819,14 +843,7 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
     }
 
     try {
-      const client = this.getClient('gpt-5.6-luna');
-      const response = await client.chat.completions.create({
-        messages,
-        // gpt-5 models only accept the default temperature
-        response_format: { type: 'json_object' }
-      });
-
-      return parseJsonCompletion(response);
+      return await this.jsonWithFallback('gpt-5.6-luna', messages);
     } catch (err) {
       console.error('❌ Azure OpenAI interview error:', err.message);
       throw err;
@@ -837,7 +854,7 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
    * Analyzes raw direct message chat logs or pasted conversation text,
    * extracts all necessary profile attributes, and identifies any clarifying questions.
    */
-  async extractPersonFromRawChat({ chatText, currentPerson = {}, userClarifications = '' }) {
+  async extractPersonFromRawChat({ chatText, currentPerson = {}, userClarifications = '', ownerId = null }) {
     const systemPrompt = `You are an expert personal intelligence architect for Sam Joshua's Instagram OS.
 Analyze the provided raw direct message chat or conversation notes between Sam and a friend/contact.
 Extract comprehensive attributes for this person so Sam's AI clone can understand who they are, their life lore, how they talk, and mutual friends.
@@ -871,12 +888,8 @@ Return a STRICT JSON object in this exact format:
 }`;
 
     try {
-      const client = this.getClient('gpt-5.6-luna');
-      const response = await client.chat.completions.create({
-        messages: [{ role: 'system', content: systemPrompt }],
-        response_format: { type: 'json_object' }
-      });
-      return parseJsonCompletion(response);
+      const messages = [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }];
+      return await this.jsonWithFallback('gpt-5.6-luna', messages);
     } catch (err) {
       console.error('❌ Azure OpenAI raw chat extraction error:', err.message);
       throw err;

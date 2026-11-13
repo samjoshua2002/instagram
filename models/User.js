@@ -178,6 +178,7 @@ const UserSchema = new mongoose.Schema({
     code: { type: String, default: '' },
     expiresAt: { type: Date, default: null },
     attempts: { type: Number, default: 0 },
+    purpose: { type: String, default: '' }, // 'reset' or 'oneauth_setup'
   },
   lastLogin: {
     type: Date,

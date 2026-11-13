@@ -133,9 +133,7 @@ export default function Sidebar() {
   const isInstagramLinked = Boolean(
     user?.hasInstagramToken ||
     user?.isInstagramConnected ||
-    (user?.instagramPageAccessToken && user.instagramPageAccessToken.length > 5) ||
-    (user?.instagramUsername === 'catovidz') ||
-    (user?.username === 'samjoshua')
+    (user?.instagramPageAccessToken && user.instagramPageAccessToken.length > 5)
   );
 
   // Menu follows the Feature Store mode; pages behind a switched-off feature are hidden

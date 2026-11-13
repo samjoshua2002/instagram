@@ -255,6 +255,8 @@ function RelationshipsPageContent() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractedData, setExtractedData] = useState(null);
   const [userClarification, setUserClarification] = useState('');
+  // Which person the raw-chat tool is open for: a slow result for someone else is dropped
+  const rawChatPersonRef = useRef('');
   const [knowBirthYear, setKnowBirthYear] = useState(true);
   const [dobFocused, setDobFocused] = useState(false);
   // Last server values shown in the form; a field that still equals this is not being edited
@@ -303,6 +305,12 @@ function RelationshipsPageContent() {
       setIsMenuOpen(false);
       setSaveState('saved');
     }
+    // A different person: drop any half-finished raw chat extraction (and close its window)
+    rawChatPersonRef.current = selectedPerson?.id || '';
+    setExtractedData(null);
+    setRawChatText('');
+    setUserClarification('');
+    setIsRawChatModalOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPerson?.id]);
 
@@ -772,8 +780,10 @@ function RelationshipsPageContent() {
     }
 
     setIsExtracting(true);
+    const startedFor = selectedPerson?.id || '';
     try {
       const extraction = await extractFromRawChat(rawChatText, selectedPerson, userClarification);
+      if (rawChatPersonRef.current !== startedFor) return;
       if (extraction) {
         setExtractedData(extraction);
         showToast('Chat analyzed! Review extracted attributes & confirm.');
@@ -794,8 +804,10 @@ function RelationshipsPageContent() {
       return;
     }
     try {
+      const startedFor = selectedPerson?.id || '';
       const res = await fetch(`${API_BASE}/api/conversations/${selectedPerson.senderId}/messages`);
       const data = await res.json();
+      if (rawChatPersonRef.current !== startedFor) return;
       if (data.messages && data.messages.length > 0) {
         const text = data.messages.map(m => `${m.role === 'assistant' ? 'Sam' : selectedPerson.name}: ${m.text}`).join('\n');
         setRawChatText(text);
@@ -875,12 +887,12 @@ function RelationshipsPageContent() {
   // Remove custom fact from memory and update node
   const handleRemoveFact = async (factToRemove) => {
     if (!selectedPerson) return;
-    const currentFacts = (selectedPerson.facts || selectedPerson.lore || []);
-    const filtered = currentFacts.filter(f => f !== factToRemove);
+    // facts and lore are separate lists (lore also holds lines from personal notes):
+    // remove only this fact from each, never replace lore with the facts list
     const updated = {
       ...selectedPerson,
-      facts: filtered,
-      lore: filtered
+      facts: (selectedPerson.facts || selectedPerson.lore || []).filter(f => f !== factToRemove),
+      lore: (selectedPerson.lore || []).filter(l => l !== factToRemove)
     };
     const original = selectedPerson;
     await saveNode(updated);

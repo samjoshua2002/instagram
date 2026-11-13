@@ -23,8 +23,8 @@ export default function AiInterviewModal() {
   useEffect(() => {
     if (isAiModalOpen) {
       const greeting = editingNode
-        ? `Hey Sam! Let's update intel for ${editingNode.name}. What new life updates, inside jokes, exam dates, or relationship changes happened?`
-        : `Hey Sam! Who is this new person? Tell me their name, Instagram @username, relation to you (sister, homie, medicine friend), and what they're like!`;
+        ? `Hey! Let's update intel for ${editingNode.name}. What new life updates, inside jokes, exam dates, or relationship changes happened?`
+        : `Hey! Who is this new person? Tell me their name, Instagram @username, relation to you (sister, homie, medicine friend), and what they're like!`;
 
       setAiChat([{ role: 'assistant', content: greeting }]);
       setAccumulatedNode(editingNode ? { ...editingNode } : {
@@ -130,16 +130,17 @@ export default function AiInterviewModal() {
     const payload = {
       ...accumulatedNode,
       name: accumulatedNode.name.trim(),
-      handle: accumulatedNode.instagramHandle,
-      relationship: accumulatedNode.relationshipToSam,
+      // An existing person (editingNode) carries handle / relationship, not the interview's field names
+      handle: accumulatedNode.instagramHandle || accumulatedNode.handle,
+      relationship: accumulatedNode.relationshipToSam || accumulatedNode.relationship,
       category: accumulatedNode.category || 'online_friend',
       dob: accumulatedNode.dob || '',
       personalNotes: accumulatedNode.personalNotes || (accumulatedNode.lore || []).join('\n')
     };
 
-    await saveNode(payload);
+    const ok = await saveNode(payload);
     setIsAiModalOpen(false);
-    showToast(`Added ${payload.name} to People Directory`);
+    if (ok) showToast(`Added ${payload.name} to People Directory`, 'success'); // a failure already showed the real error
   };
 
   return (

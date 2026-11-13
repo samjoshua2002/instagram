@@ -134,9 +134,9 @@ class AuthService {
     const pass = rawPass ? rawPass.replace(/\s+/g, '') : null;
     if (user && pass) {
       this.transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: Number(process.env.SMTP_PORT) || 465,
+        secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : true,
         auth: { user, pass },
         connectionTimeout: 15000,
         greetingTimeout: 15000,
@@ -154,9 +154,9 @@ class AuthService {
     try {
       const superadminEmail = (process.env.OWNER_EMAIL || 'samjoshuacs2002@gmail.com').trim().toLowerCase();
       const ownerUsername = (process.env.OWNER_USERNAME || 'samjoshua2002').trim().toLowerCase();
-      let user = await User.findOne({
-        $or: [{ email: superadminEmail }, { username: ownerUsername }]
-      });
+      // Matched by email only: anyone can register a username, so a username match could hand
+      // a stranger the owner's Instagram token from env
+      let user = await User.findOne({ email: superadminEmail });
 
       const totpSecret = generateSecret();
 
@@ -514,7 +514,8 @@ class AuthService {
    * Returns { valid, timeStep } without consuming the code (see consumeTotp).
    */
   checkTotp(user, token) {
-    if (!user?.twoFactor?.secret) return { valid: false, timeStep: 0 };
+    // OneAuth only counts once the user has set it up (enabled), never just because a secret exists
+    if (!user?.twoFactor?.secret || user.twoFactor.enabled === false) return { valid: false, timeStep: 0 };
     const cleanToken = (token ?? '').toString().trim();
     if (!/^\d{6}$/.test(cleanToken)) return { valid: false, timeStep: 0 };
     try {
@@ -648,7 +649,7 @@ class AuthService {
       rpID,
       userID: new TextEncoder().encode(user._id.toString()),
       userName: user.email,
-      userDisplayName: `${user.firstName || 'Sam'} ${user.lastName || 'Joshua'}`,
+      userDisplayName: `${user.firstName || user.username || ''} ${user.lastName || ''}`.trim() || user.email,
       attestationType: 'none',
       excludeCredentials: (user.passkeys || []).map(p => ({
         id: p.credentialId,
@@ -705,14 +706,22 @@ class AuthService {
    * Login options. Every challenge is also kept server-side (5 min, single use), so a
    * discoverable "no username" login is checked against a challenge this server issued.
    */
-  async generatePasskeyAuthenticationOptions(user, req) {
+  async generatePasskeyAuthenticationOptions(user, req, identifier = '') {
     const rpID = this.getRpID(req);
-    const allowCredentials = user
+    let allowCredentials = user
       ? (user.passkeys || []).map(p => ({
           id: p.credentialId,
           transports: p.transports || ['internal'],
         }))
-      : undefined;
+      : [];
+    // Unknown accounts and accounts without passkeys get one stable fake credential id, so this
+    // public endpoint does not reveal which accounts exist or have passkeys
+    if (!allowCredentials.length && identifier) {
+      const fakeId = require('crypto').createHmac('sha256', JWT_SECRET).update(`passkey-decoy:${identifier}`)
+        .digest().subarray(0, 32).toString('base64url');
+      allowCredentials = [{ id: fakeId, transports: ['internal'] }];
+    }
+    if (!allowCredentials.length) allowCredentials = undefined; // no identifier: the browser offers any saved passkey
 
     const options = await generateAuthenticationOptions({
       rpID,
@@ -721,10 +730,6 @@ class AuthService {
     });
 
     passkeyChallenges.put(options.challenge, { userId: user ? user._id.toString() : null });
-    if (user) {
-      user.currentChallenge = options.challenge;
-      await user.save();
-    }
     return options;
   }
 
@@ -763,7 +768,6 @@ class AuthService {
 
     if (verification.verified) {
       passkey.counter = verification.authenticationInfo.newCounter;
-      user.currentChallenge = '';
       user.lastLogin = new Date();
       await user.save();
       return true;

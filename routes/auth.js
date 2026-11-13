@@ -9,6 +9,9 @@ const redisService = require('../services/redisService');
 const { setUserInstagram, getUserInstagramToken, clearUserInstagram } = require('../services/instagramTokenService');
 const { rateLimit, FailureLockout, SlidingWindowLimiter, track, MINUTE } = require('../services/rateLimiter');
 const { escapeHtml, safeJsonForScript, asString, resolveUploadPath, PasskeyError } = authService;
+const bcrypt = require('bcryptjs');
+// Real bcrypt hash (same cost as User.hashPassword) so an unknown account takes as long as a wrong password
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
 
 // ---- Brute-force protection (in memory, per server process) ----
 const loginIpLimit = rateLimit({ name: 'login', windowMs: 15 * MINUTE, max: 30 });
@@ -164,9 +167,11 @@ const MAX_OTP_ATTEMPTS = 5;
 
 // Checks an emailed 6-digit code stored on user[field]; wipes it after too many wrong tries.
 // Returns an error message, or null when the code matches.
-async function checkOtp(user, field, code) {
+async function checkOtp(user, field, code, purpose = '') {
   const otp = user[field];
   if (!otp?.code) return 'No pending code. Please request a new one.';
+  // A code only works for the flow it was sent for (password reset and OneAuth setup share resetOtp)
+  if (purpose && (otp.purpose || '') !== purpose) return 'Invalid 6-digit verification code.';
   if (new Date() > new Date(otp.expiresAt)) return 'Verification code expired. Please request a new one.';
   if (typeof code !== 'string' && typeof code !== 'number') return 'Invalid 6-digit verification code.';
   if (otp.code !== String(code).trim()) {
@@ -175,7 +180,7 @@ async function checkOtp(user, field, code) {
     const attempts = (otp.attempts || 0) + 1;
     user[field] = attempts >= MAX_OTP_ATTEMPTS
       ? { code: '', expiresAt: null, attempts: 0 }
-      : { code: otp.code, expiresAt: otp.expiresAt, attempts };
+      : { code: otp.code, expiresAt: otp.expiresAt, attempts, purpose: otp.purpose || '' };
     await user.save();
     return attempts >= MAX_OTP_ATTEMPTS
       ? 'Too many wrong codes. Please request a new one.'
@@ -314,7 +319,7 @@ router.post('/register/request-otp', registerIpLimit, async (req, res) => {
           expiresAt: otpExpires,
         },
         twoFactor: {
-          enabled: true,
+          enabled: false, // switched on when the user opens the OneAuth QR
           secret: totpSecret,
         },
       });
@@ -335,7 +340,7 @@ router.post('/register/request-otp', registerIpLimit, async (req, res) => {
       };
       if (!user.twoFactor?.secret) {
         user.twoFactor = {
-          enabled: true,
+          enabled: false, // switched on when the user opens the OneAuth QR
           secret: totpSecret,
         };
       }
@@ -435,6 +440,14 @@ router.post('/register/verify-otp', codeIpLimit, async (req, res) => {
     if (locked) return locked;
     const otpError = await checkOtp(user, 'verificationOtp', otpCode);
     if (otpError) return res.status(400).json({ error: otpError });
+    // The code alone is not enough: anyone can restart a pending sign-up with their own
+    // password, so the browser must also prove it knows the password this code was sent for
+    const signupPassword = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!signupPassword || !(await user.comparePassword(signupPassword))) {
+      user.verificationOtp = { code: '', expiresAt: null, attempts: 0 };
+      await user.save();
+      return res.status(400).json({ error: 'This sign-up was restarted with different details. Please request a new code.' });
+    }
     if (user.isBanned) {
       return res.status(403).json({ error: 'This account has been suspended. Please contact support.' });
     }
@@ -488,6 +501,7 @@ router.post('/login', loginIpLimit, async (req, res) => {
     });
 
     if (!user) {
+      if (typeof password === 'string') await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -605,7 +619,8 @@ router.post('/oneauth/request-setup-otp', sendIpLimit, async (req, res) => {
     if (!cleanEmail) return res.status(400).json({ error: 'Email or username is required' });
     const user = await User.findOne({ $or: [{ email: cleanEmail }, { username: cleanEmail }] });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      // Same answer as a real account, so this route does not reveal which accounts exist
+      return res.json({ success: true, message: 'If this account exists, a 6-digit code has been sent to its email to unlock OneAuth setup.' });
     }
     if (!emailSendAllowed(user.email)) return tooManyEmails(res);
 
@@ -614,6 +629,7 @@ router.post('/oneauth/request-setup-otp', sendIpLimit, async (req, res) => {
       code: otpCode,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       attempts: 0,
+      purpose: 'oneauth_setup',
     };
     await user.save();
 
@@ -644,7 +660,7 @@ router.post('/oneauth/verify-setup-otp', codeIpLimit, async (req, res) => {
     }
     const locked = codeLocked(res, user);
     if (locked) return locked;
-    const otpError = await checkOtp(user, 'resetOtp', otpCode);
+    const otpError = await checkOtp(user, 'resetOtp', otpCode, 'oneauth_setup');
     if (otpError) return res.status(400).json({ error: otpError });
 
     // Reset OTP code; first-time setup also creates the authenticator secret
@@ -653,8 +669,8 @@ router.post('/oneauth/verify-setup-otp', codeIpLimit, async (req, res) => {
       const { generateSecret } = require('otplib');
       user.twoFactor = user.twoFactor || {};
       user.twoFactor.secret = generateSecret();
-      user.twoFactor.enabled = true;
     }
+    user.twoFactor.enabled = true;
     await user.save();
 
     // Return QR code and secret
@@ -745,6 +761,7 @@ router.post('/forgot-password/send-otp', sendIpLimit, async (req, res) => {
       code: otpCode,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
       attempts: 0,
+      purpose: 'reset',
     };
     await user.save();
 
@@ -789,7 +806,7 @@ router.post('/forgot-password/verify-reset', codeIpLimit, async (req, res) => {
     }
     const locked = codeLocked(res, user);
     if (locked) return locked;
-    const otpError = await checkOtp(user, 'resetOtp', otpCode);
+    const otpError = await checkOtp(user, 'resetOtp', otpCode, 'reset');
     if (otpError) return res.status(400).json({ error: otpError });
 
     user.passwordHash = await User.hashPassword(newPassword);
@@ -817,7 +834,7 @@ router.get('/passkey/login-options', passkeyIpLimit, async (req, res) => {
         $or: [{ email: rawId }, { username: rawId }]
       });
     }
-    const options = await authService.generatePasskeyAuthenticationOptions(user, req);
+    const options = await authService.generatePasskeyAuthenticationOptions(user, req, rawId);
     res.json(options);
   } catch (err) {
     return serverError(res, 'Passkey login options error', err, 'Could not start passkey sign-in.');
@@ -936,6 +953,13 @@ router.post('/passkey/register-verify', requireAuth, ownerSessionOnly, async (re
  */
 router.get('/totp-setup', requireAuth, ownerSessionOnly, async (req, res) => {
   try {
+    // Opening the QR is how OneAuth gets switched on for this account
+    if (!req.user.twoFactor?.secret || !req.user.twoFactor?.enabled) {
+      req.user.twoFactor = req.user.twoFactor || {};
+      if (!req.user.twoFactor.secret) req.user.twoFactor.secret = authService.generateTotpSecret();
+      req.user.twoFactor.enabled = true;
+      await req.user.save();
+    }
     const totpData = await authService.getTotpQrCode(req.user);
     res.json({
       success: true,
@@ -985,6 +1009,29 @@ router.get('/me', requireAuth, async (req, res) => {
   });
 });
 
+// Instagram account ids a pasted access token really belongs to (empty when the token is invalid).
+// Same check as PUT /api/persona: an account id is only accepted when it is proven.
+async function accountIdsForToken(token) {
+  const { INSTAGRAM_GRAPH_URL, FACEBOOK_GRAPH_URL } = require('../services/graphApi');
+  const ids = new Set();
+  try {
+    const ig = await axios.get(`${INSTAGRAM_GRAPH_URL}/me`, {
+      params: { fields: 'id,user_id,username', access_token: token }, timeout: 8000,
+    });
+    [ig.data?.id, ig.data?.user_id].forEach(v => v && ids.add(String(v)));
+  } catch (_) { /* not an Instagram Login token */ }
+  if (!ids.size) {
+    try {
+      const fb = await axios.get(`${FACEBOOK_GRAPH_URL}/me`, {
+        params: { fields: 'id,instagram_business_account', access_token: token }, timeout: 8000,
+      });
+      const igb = fb.data?.instagram_business_account?.id;
+      if (igb) ids.add(String(igb));
+    } catch (_) { /* invalid token */ }
+  }
+  return [...ids];
+}
+
 /**
  * POST /api/auth/onboarding (Protected)
  * Configures new user account: Business vs Personal, AI Persona Tone, Chat Rules & Automation
@@ -994,7 +1041,7 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     const user = req.user;
     const {
       accountType, // 'business' | 'personal' | 'creator'
-      businessProfile, // { businessName, category, description }
+      businessProfile, // business: { businessName, category, description, website }; creator: { creatorBio, textingHabits, memeStyle }
       personaTone, // 'professional' | 'witty' | 'friendly' | 'roast'
       greetingMessage,
       chatMode, // 'everyone' | 'everyone_except' | 'only_selected'
@@ -1020,6 +1067,15 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     // An Instagram account can belong to one workspace only; check before storing anything
     const cleanAccountId = instagramAccountId !== undefined && instagramAccountId !== null ? String(instagramAccountId).trim() : undefined;
     if (cleanAccountId) {
+      // Only an account this user has proven: already linked by the Connect button, or owned by the
+      // token pasted with it. A typed-in id used to route another account's DMs to this workspace.
+      const provenIds = [user.instagram?.accountId, user.instagramAccountId].map(v => String(v || '').trim()).filter(Boolean);
+      const pastedToken = typeof instagramPageAccessToken === 'string' ? instagramPageAccessToken.trim() : '';
+      if (!provenIds.includes(cleanAccountId) && !(pastedToken && (await accountIdsForToken(pastedToken)).includes(cleanAccountId))) {
+        return res.status(400).json({
+          error: 'This Instagram account id could not be verified. Connect Instagram with the Connect button, or paste a valid access token for this account.',
+        });
+      }
       const conflictingUser = await User.exists({
         _id: { $ne: user._id },
         $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
@@ -1039,14 +1095,20 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     if (instagramPageAccessToken && instagramPageAccessToken.trim()) {
       setUserInstagram(user, { token: instagramPageAccessToken.trim(), accountId: cleanAccountId || '' });
     }
-    if (cleanAccountId !== undefined) {
+    // Blank means "unchanged": the wizard sends '' after an OAuth connect (it only knows instagramId)
+    if (cleanAccountId) {
       user.instagramAccountId = cleanAccountId;
     }
-    if (businessProfile) {
+    const bpIn = businessProfile && typeof businessProfile === 'object' ? businessProfile : {};
+    const txt = (v) => (typeof v === 'string' ? v.trim() : '');
+    if (['businessName', 'category', 'description'].some(k => typeof bpIn[k] === 'string')) {
+      // Only overwrite the fields that were sent (the creator form must not wipe business details)
+      const bp = user.businessProfile || {};
+      const pick = (k) => (typeof bpIn[k] === 'string' ? bpIn[k].trim() : (bp[k] || ''));
       user.businessProfile = {
-        businessName: businessProfile.businessName || '',
-        category: businessProfile.category || '',
-        description: businessProfile.description || '',
+        businessName: pick('businessName'),
+        category: pick('category'),
+        description: pick('description'),
       };
     }
     user.isOnboarded = true;
@@ -1057,7 +1119,21 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       const PersonaConfig = require('../models/PersonaConfig');
       let persona = await PersonaConfig.findOne({ ownerId: user._id });
       if (!persona) {
-        persona = new PersonaConfig({ ownerId: user._id });
+        // Seed from this account, never the schema defaults (they describe the original owner)
+        persona = new PersonaConfig({ ownerId: user._id, ...PersonaConfig.starterFields(user) });
+      }
+      // Creator answers go into the fields the AI reads
+      if (txt(bpIn.creatorBio)) {
+        persona.aboutMe = txt(bpIn.creatorBio);
+        persona.personaBio = txt(bpIn.creatorBio);
+      }
+      if (txt(bpIn.textingHabits)) persona.textingHabits = txt(bpIn.textingHabits);
+      if (txt(bpIn.memeStyle)) {
+        persona.replyRules = `${persona.replyRules || ''}
+Meme / reaction style: ${txt(bpIn.memeStyle)}`.trim();
+      }
+      if (txt(bpIn.website) && !String(persona.customKnowledge || '').includes(txt(bpIn.website))) {
+        persona.customKnowledge = [persona.customKnowledge, `Website: ${txt(bpIn.website)}`].filter(Boolean).join('\n');
       }
       if (['personal', 'creator', 'business', 'agency'].includes(accountType)) {
         persona.accountType = accountType;
@@ -1521,6 +1597,16 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
 
     // An Instagram account can belong to one workspace only
     if (instagramAccountId) {
+      // Meta just proved this login owns the account: claims nobody proved (an id typed in at sign-up
+      // or onboarding) are released instead of locking the real owner out with "Already Linked"
+      if (stateUserId) {
+        for (const field of ['instagramAccountId', 'instagramId', 'instagram.accountId', 'businessProfile.instagramId']) {
+          await User.updateMany(
+            { _id: { $ne: stateUserId }, [field]: instagramAccountId, $nor: [{ 'instagram.connected': true, 'instagram.accountId': instagramAccountId }] },
+            { $set: { [field]: '' } }
+          );
+        }
+      }
       const linkedElsewhere = await User.exists({
         ...(stateUserId ? { _id: { $ne: stateUserId } } : {}),
         $or: [{ instagramAccountId }, { instagramId: instagramAccountId }, { 'instagram.accountId': instagramAccountId }],
@@ -1554,9 +1640,13 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
           // Sync PersonaConfig as well; it keeps a plaintext copy only when encryption is off
           try {
             const PersonaConfig = require('../models/PersonaConfig');
+            // A persona created here starts from this account, never the schema defaults (the original owner)
+            const starter = PersonaConfig.starterFields(user);
+            if (instagramUsername) delete starter.instagramHandle; // $set below writes it
             await PersonaConfig.findOneAndUpdate(
               { ownerId: user._id },
               {
+                $setOnInsert: starter,
                 $set: {
                   ownerId: user._id,
                   instagramPageAccessToken: encrypted ? '' : linkedPageToken,
@@ -1761,7 +1851,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
  * PUT /api/auth/passkeys/:credentialId (Protected)
  * Renames a registered passkey
  */
-router.put('/passkeys/:credentialId', requireAuth, async (req, res) => {
+router.put('/passkeys/:credentialId', requireAuth, ownerSessionOnly, async (req, res) => {
   try {
     const { credentialId } = req.params;
     const { name } = req.body;
@@ -1784,7 +1874,7 @@ router.put('/passkeys/:credentialId', requireAuth, async (req, res) => {
  * DELETE /api/auth/passkeys/:credentialId (Protected)
  * Removes a registered passkey
  */
-router.delete('/passkeys/:credentialId', requireAuth, async (req, res) => {
+router.delete('/passkeys/:credentialId', requireAuth, ownerSessionOnly, async (req, res) => {
   try {
     const { credentialId } = req.params;
     req.user.passkeys = (req.user.passkeys || []).filter(p => p.credentialId !== credentialId);

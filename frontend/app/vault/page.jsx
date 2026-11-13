@@ -95,6 +95,8 @@ function MediaVaultPageContent() {
         if (data.categories) {
           setCategories(data.categories);
         }
+      } else {
+        showToast(data.error || 'Failed to load media vault', 'error');
       }
     } catch (err) {
       if (isStale()) return;
@@ -397,8 +399,14 @@ function MediaVaultPageContent() {
       const data = await res.json();
       if (data.success) {
         showToast(`Category renamed to "${renameTargetName}"!`, 'success');
+        // Items moved to the new name (same cleaning as the server): follow them if the old one was selected
+        const oldId = renameModalCategory.id;
+        const newId = renameTargetName.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
         setRenameModalCategory(null);
-        fetchVaultData();
+        if (Array.isArray(data.categories)) setCategories(data.categories);
+        if (selectedCategory === oldId) setSelectedCategory(newId);
+        if (activeCategory === oldId) setActiveCategory(newId); // refetches via the effect
+        else fetchVaultData();
       } else {
         showToast(data.error || 'Rename failed', 'error');
       }
@@ -424,6 +432,8 @@ function MediaVaultPageContent() {
         setCategories(prev => prev.filter(c => c.id !== catName));
         if (activeCategory === catName) setActiveCategory('all');
         if (selectedCategory === catName) setSelectedCategory('joy');
+      } else {
+        showToast(data.error || 'Failed to delete category', 'error');
       }
     } catch (err) {
       showToast('Failed to delete category', 'error');

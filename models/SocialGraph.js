@@ -112,6 +112,23 @@ const SocialGraphSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // Per-person AI settings (kept here too so they persist before the contact ever DMs)
+  aiEnabled: {
+    type: Boolean,
+    default: true,
+  },
+  replyToMessages: {
+    type: Boolean,
+    default: true,
+  },
+  replyToReelsAndPosts: {
+    type: Boolean,
+    default: true,
+  },
+  autoSendReels: {
+    type: Boolean,
+    default: false,
+  },
   reelsCount: {
     type: Number,
     default: 0,
@@ -123,5 +140,7 @@ const SocialGraphSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 SocialGraphSchema.index({ aliases: 1 });
+SocialGraphSchema.index({ ownerId: 1, updatedAt: -1 });
+SocialGraphSchema.index({ ownerId: 1, senderId: 1 });
 
 module.exports = mongoose.model('SocialGraph', SocialGraphSchema);

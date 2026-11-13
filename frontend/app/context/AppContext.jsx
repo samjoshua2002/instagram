@@ -300,8 +300,28 @@ export function AppProvider({ children }) {
     return id;
   }, [dismissToast]);
 
+  // Bumped on every login / logout / account switch: a sync that started for the previous
+  // account must never write its contacts or routing rules into the next one
+  const sessionGenRef = useRef(0);
+  const syncInFlightRef = useRef(false);
+  const resetSession = () => {
+    sessionGenRef.current += 1;
+    syncInFlightRef.current = false;
+    setSelectedNode(null);
+    setIsAiModalOpen(false);
+    setEditingNode(null);
+    setLinkingTargetPerson(null);
+    setIsPasskeyModalOpen(false);
+    setIsOnboardingModalOpen(false);
+  };
+
   const login = useCallback((jwtToken, userData) => {
+    resetSession();
     try { localStorage.setItem('chatter_jwt_token', jwtToken); } catch (e) { }
+    // A superadmin session left behind (expired workspace, Switch account) must never carry
+    // over to the next account: its "Exit to Superadmin Console" would hand them the admin token
+    try { localStorage.removeItem('chatter_admin_session'); } catch (e) { }
+    setAdminSession(null);
     if (userData) {
       try {
         storeUserRecord('chatter_user_profile', userData);
@@ -357,10 +377,12 @@ export function AppProvider({ children }) {
   }, [showToast]);
 
   const switchAccount = useCallback(() => {
+    resetSession();
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     localStorage.removeItem('chatter_remembered_account');
     try {
+      localStorage.removeItem('chatter_admin_session');
       sessionStorage.removeItem('chatter_session_active');
       localStorage.setItem('chatter_show_chooser', 'true');
       localStorage.removeItem(STORAGE_NODES_KEY);
@@ -377,6 +399,7 @@ export function AppProvider({ children }) {
       }
     } catch (e) { }
     setNodes(DEFAULT_GRAPH_DATA);
+    setAdminSession(null);
     setToken(null);
     setUser(null);
     setRoutingConfigState({
@@ -394,6 +417,7 @@ export function AppProvider({ children }) {
   // opts.expired: the server said the session is no longer valid (401)
   const logout = useCallback((opts) => {
     const expired = opts?.expired === true;
+    resetSession();
     localStorage.removeItem('chatter_jwt_token');
     localStorage.removeItem('chatter_user_profile');
     localStorage.removeItem('chatter_remembered_account');
@@ -498,6 +522,9 @@ export function AppProvider({ children }) {
       }
     }
   }, [adminSession, showToast]);
+  // The fetch interceptor and the start-up /me check are installed once, so they read it through a ref
+  const exitWorkspaceRef = useRef(exitWorkspace);
+  exitWorkspaceRef.current = exitWorkspace;
 
   const updateUserProfile = useCallback((updatedUser) => {
     setUser(prev => ({ ...prev, ...updatedUser }));
@@ -598,7 +625,10 @@ export function AppProvider({ children }) {
           localStorage.getItem('chatter_jwt_token') === storedToken
         ) {
           sessionExpiredRef.current = true;
-          logoutRef.current?.({ expired: true });
+          // An expired workspace (impersonation) token returns the superadmin to their own
+          // console instead of throwing away their still-valid admin session
+          if (localStorage.getItem('chatter_admin_session')) exitWorkspaceRef.current?.();
+          else logoutRef.current?.({ expired: true });
         }
         return res;
       } catch (err) {
@@ -630,6 +660,12 @@ export function AppProvider({ children }) {
       })
         .then(async res => {
           if (res.status === 401) {
+            // Expired workspace token: back to the superadmin's own session (never leave it
+            // stored for whoever signs in next)
+            if (localStorage.getItem('chatter_admin_session')) {
+              exitWorkspaceRef.current?.();
+              return null;
+            }
             // Token is genuinely invalid or expired on server
             localStorage.removeItem('chatter_jwt_token');
             localStorage.removeItem('chatter_user_profile');
@@ -721,17 +757,20 @@ export function AppProvider({ children }) {
     };
   }, [user?._id || user?.username]);
 
-  const syncInFlightRef = useRef(false);
   const syncBackend = async () => {
     // Signed out (login screen): polling would only collect 401s
     try { if (!localStorage.getItem('chatter_jwt_token')) return; } catch (e) { return; }
     // One sync at a time: on slow mobile data, overlapping syncs pile up and delay button requests
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
+    const gen = sessionGenRef.current;
+    const stale = () => gen !== sessionGenRef.current;
     try {
       // 1. Sync social graph directly from live MongoDB database
       const res = await fetch(`${API_BASE}/api/social-graph`);
+      if (stale()) return;
       const data = await res.json();
+      if (stale()) return;
       if (data.success && Array.isArray(data.nodes)) {
         const currentUser = userRef.current;
         const userKey = getStorageNodesKey(currentUser);
@@ -840,7 +879,9 @@ export function AppProvider({ children }) {
       // 2. Sync persona config
       const editTimestampBefore = lastRoutingEditTimeRef.current;
       const personaRes = await fetch(`${API_BASE}/api/persona`);
+      if (stale()) return;
       const pData = await personaRes.json();
+      if (stale()) return;
       if (pData && (pData.chatMode || pData.globalBotActive !== undefined)) {
         if (activeRoutingSavesRef.current === 0 && lastRoutingEditTimeRef.current === editTimestampBefore && Date.now() - editTimestampBefore > 6000) {
           const nextConfig = {
@@ -860,8 +901,11 @@ export function AppProvider({ children }) {
     } catch (e) {
       console.warn('Backend sync note (using cached):', e.message);
     } finally {
-      syncInFlightRef.current = false;
-      setIsSyncingInitial(false);
+      // A sync from the previous account leaves the new account's flags alone
+      if (!stale()) {
+        syncInFlightRef.current = false;
+        setIsSyncingInitial(false);
+      }
     }
   };
 
@@ -1082,7 +1126,8 @@ export function AppProvider({ children }) {
     }
 
     try {
-      const param = encodeURIComponent(targetName || targetSenderId || targetId);
+      // The database id first: a name can belong to more than one person
+      const param = encodeURIComponent(targetObj?._id || targetName || targetSenderId || targetId);
       const delRes = await fetch(`${API_BASE}/api/social-graph/node/${param}`, {
         method: 'DELETE'
       });
@@ -1339,20 +1384,15 @@ export function AppProvider({ children }) {
   };
 
   // AI Autofill fields for a person based on chat history
+  // Throws on a failed request so the People page shows the real error, not "no logs found"
   const aiAutofillPerson = async (personName) => {
     if (!personName) return null;
-    try {
-      const res = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(personName)}/ai-autofill`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.success && data.autofill) {
-        return data.autofill;
-      }
-    } catch (e) {
-      console.warn('AI autofill failed:', e.message);
-    }
-    return null;
+    const res = await fetch(`${API_BASE}/api/social-graph/node/${encodeURIComponent(personName)}/ai-autofill`, {
+      method: 'POST'
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) throw new Error(data.error || `server answered ${res.status}`);
+    return data.autofill || null;
   };
 
   // Link Instagram ID & Merge chatter records

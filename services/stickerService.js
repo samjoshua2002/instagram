@@ -5,14 +5,12 @@ const PersonaConfig = require('../models/PersonaConfig');
 
 /**
  * Media Vault filter for one owner. No user = legacy admin media (ownerId null), never every
- * tenant's media. The ownerUsername clause is only added when a username is actually known
- * ({ ownerUsername: undefined } is dropped by Mongoose and would match everything).
+ * tenant's media. Ownership is the account id only: a username can be changed and then taken
+ * by another account, which must not inherit the old owner's media or categories.
  */
 function vaultOwnerQuery(user) {
   if (!user || !user._id) return { ownerId: null };
-  return user.username
-    ? { $or: [{ ownerId: user._id }, { ownerUsername: user.username }] }
-    : { ownerId: user._id };
+  return { ownerId: user._id };
 }
 
 /**
