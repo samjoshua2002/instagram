@@ -74,6 +74,19 @@ async function migrateOwnership() {
     await PersonaConfig.updateOne({ ownerId: null }, { $set: { ownerId: owner._id } });
   }
 
+  // A GIPHY key used to be written into the code and copied into every creator's settings.
+  // It is matched by fingerprint (the key itself is no longer in the code) and cleared, so the
+  // server setting GIPHY_API_KEY is used instead and the key is never sent to browsers.
+  try {
+    const LEGACY_GIPHY_SHA256 = 'b9f46622315b13b312c8749a6b2efda7fd2fbc744c3d8dc1270de6073e8be0a7';
+    const withKey = await PersonaConfig.find({ giphyApiKey: { $nin: [null, ''] } }).select('giphyApiKey').lean();
+    const legacyIds = withKey.filter(c => crypto.createHash('sha256').update(c.giphyApiKey).digest('hex') === LEGACY_GIPHY_SHA256).map(c => c._id);
+    if (legacyIds.length) {
+      await PersonaConfig.updateMany({ _id: { $in: legacyIds } }, { $set: { giphyApiKey: '' } });
+      console.log(`🔧 [Migration] Cleared the old built-in GIPHY key from ${legacyIds.length} creator settings.`);
+    }
+  } catch (e) { console.warn('GIPHY key cleanup note:', e.message); }
+
   // Built-in GIFs that GIPHY has taken down (they show as broken images)
   const deadGifs = [
     'https://media.giphy.com/media/j9mqKgQvkNOziGICfd/giphy.gif',
@@ -1631,7 +1644,7 @@ app.get('/api/giphy/search', async (req, res) => {
   try {
     const { q, limit = 20, rating = 'pg-13' } = req.query;
     const config = await PersonaConfig.findOne({ ownerId: ownerOf(req) });
-    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
 
     if (!apiKey) {
       return res.status(400).json({ error: 'GIPHY API Key not configured' });
@@ -1656,7 +1669,7 @@ app.get('/api/giphy/trending', async (req, res) => {
   try {
     const { limit = 20, rating = 'pg-13' } = req.query;
     const config = await PersonaConfig.findOne({ ownerId: ownerOf(req) });
-    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+    const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
 
     if (!apiKey) {
       return res.status(400).json({ error: 'GIPHY API Key not configured' });
