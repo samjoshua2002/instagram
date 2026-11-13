@@ -15,10 +15,13 @@ export default function SimulatorPage() {
   const targetFriend = friendList.find(f => f.id === selectedFriendId) || friendList[0];
   const activeFriendId = targetFriend?.id || null;
 
-  // Each contact gets a fresh test thread
+  // Each contact gets a fresh test thread; a reply still in flight for the previous contact is dropped
+  const activeFriendRef = React.useRef(activeFriendId);
   useEffect(() => {
+    activeFriendRef.current = activeFriendId;
     setMessages([]);
     setInputMsg('');
+    setIsLoading(false);
   }, [activeFriendId]);
 
   const handleSend = async (e) => {
@@ -26,6 +29,8 @@ export default function SimulatorPage() {
     if (!inputMsg.trim() || !targetFriend) return;
 
     const userText = inputMsg.trim();
+    const sentFor = activeFriendId;
+    const stillActive = () => activeFriendRef.current === sentFor;
     setInputMsg('');
     setMessages(prev => [...prev, { role: 'user', text: userText, time: 'Just now' }]);
     setIsLoading(true);
@@ -44,17 +49,19 @@ export default function SimulatorPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (!data.replyText) throw new Error('The AI returned no reply');
+      if (!stillActive()) return;
       setMessages(prev => [
         ...prev,
         { role: 'assistant', text: data.replyText, time: 'Just now' }
       ]);
     } catch (err) {
+      if (!stillActive()) return;
       setMessages(prev => [
         ...prev,
         { role: 'error', text: `Simulator error: ${err.message || 'request failed'}`, time: 'Just now' }
       ]);
     } finally {
-      setIsLoading(false);
+      if (stillActive()) setIsLoading(false);
     }
   };
 
