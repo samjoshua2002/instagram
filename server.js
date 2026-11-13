@@ -27,6 +27,9 @@ const redisService = require('./services/redisService');
 const { router: authRouter, requireAuth } = require('./routes/auth');
 const authService = require('./services/authService');
 
+// Enum and type rules also apply to updates, so bad values are refused instead of stored
+mongoose.set('runValidators', true);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -176,6 +179,24 @@ function parseKeywords(keywords) {
   if (Array.isArray(keywords)) return keywords.filter(isStr).map(k => k.trim().toLowerCase()).filter(Boolean);
   if (isStr(keywords)) return keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
   return [];
+}
+
+// Errors caused by bad input are the caller's fault (4xx); everything else is a real server error
+function sendError(res, err) {
+  const name = err && err.name;
+  if (name === 'ValidationError' || name === 'CastError' || name === 'StrictModeError' || name === 'StrictPopulateError') {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err && err.code === 11000) return res.status(409).json({ error: 'This item already exists.' });
+  console.error('❌ [Server]', err && err.stack ? err.stack.split(String.fromCharCode(10)).slice(0, 3).join(' | ') : err);
+  return res.status(500).json({ error: (err && err.message) || 'Server error' });
+}
+
+// Keeps a value only if the schema allows it (used for values that come from users or the AI)
+function allowedEnum(model, path, value, fallback) {
+  const allowed = model.schema.path(path)?.enumValues || [];
+  const v = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return allowed.includes(v) ? v : fallback;
 }
 
 // Starting persona for a creator, built from their own account (never another person's details)
@@ -1167,7 +1188,7 @@ app.get('/api/status', async (req, res) => {
       azureModel: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1201,7 +1222,7 @@ app.get('/api/conversations', async (req, res) => {
 
     res.json(conversations);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1220,7 +1241,7 @@ app.get('/api/conversations/:senderId/messages', async (req, res) => {
 
     res.json({ memory, messages });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1236,7 +1257,7 @@ app.post('/api/conversations/:senderId/toggle-ai', async (req, res) => {
 
     res.json({ success: true, aiEnabled: memory.aiEnabled });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1289,7 +1310,7 @@ app.post('/api/conversations/:senderId/send', async (req, res) => {
 
     res.json({ success: true, message: newMsg, graphResult: sendResult });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1317,7 +1338,11 @@ app.post('/api/conversations/:senderId/preferences', async (req, res) => {
     if (typeof replyToReelsAndPosts === 'boolean') memory.replyToReelsAndPosts = replyToReelsAndPosts;
     if (typeof remindersEnabled === 'boolean') memory.remindersEnabled = remindersEnabled;
     if (typeof nickname === 'string') memory.nickname = nickname.trim();
-    if (typeof gender === 'string') memory.gender = gender;
+    if (typeof gender === 'string') {
+      const g = allowedEnum(UserMemory, 'gender', gender, null);
+      if (!g) return res.status(400).json({ error: `gender must be one of: ${UserMemory.schema.path('gender').enumValues.join(', ')}` });
+      memory.gender = g;
+    }
     if (typeof personalNotes === 'string') memory.personalNotes = personalNotes;
     if (typeof conversationStyle === 'string') memory.conversationStyle = conversationStyle;
     if (typeof relationshipType === 'string') memory.relationshipType = relationshipType;
@@ -1326,7 +1351,7 @@ app.post('/api/conversations/:senderId/preferences', async (req, res) => {
 
     res.json({ success: true, memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1351,7 +1376,7 @@ app.put('/api/conversations/:senderId/memory', async (req, res) => {
     await memory.save();
     res.json({ success: true, memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1377,7 +1402,7 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
     const updatedMemory = await UserMemory.findOne({ ownerId, senderId });
     res.json({ success: true, memory: updatedMemory, deletedMessages: deleted.deletedCount });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1387,7 +1412,7 @@ app.post('/api/memory/sync-all-history', async (req, res) => {
     const results = await memoryService.batchSyncAllChatsFromMongo(ownerOf(req), [req.user?.instagramAccountId]);
     res.json({ success: true, count: results.length, contacts: results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1400,7 +1425,7 @@ app.get('/api/conversations/:senderId/memory', async (req, res) => {
     if (!memory) return res.status(404).json({ error: 'Memory not found' });
     res.json({ memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1419,7 +1444,7 @@ app.post('/api/conversations/:senderId/fact', async (req, res) => {
     await memory.save();
     res.json({ success: true, memory });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1450,7 +1475,7 @@ app.get('/api/persona', async (req, res) => {
 
     res.json(config || {});
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1548,7 +1573,7 @@ app.put('/api/persona', async (req, res) => {
 
     res.json({ success: true, config });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1574,7 +1599,7 @@ app.get('/api/giphy/search', async (req, res) => {
     const data = await response.json();
     res.json({ success: true, data: data.data || [] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1598,7 +1623,7 @@ app.get('/api/giphy/trending', async (req, res) => {
     const data = await response.json();
     res.json({ success: true, data: data.data || [] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1673,7 +1698,7 @@ app.post('/api/simulator/chat', async (req, res) => {
       userMemory: updatedMemory,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1691,7 +1716,7 @@ app.delete('/api/conversations/:senderId/facts', async (req, res) => {
     if (result.matchedCount === 0) return res.status(404).json({ error: 'User not found' });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1736,14 +1761,14 @@ app.get('/api/media-vault', async (req, res) => {
           ? { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }, { ownerId: null }] }
           : { $or: [{ ownerId: req.user._id }, { ownerUsername: req.user.username }] })
       : {};
-    const filter = category && category !== 'all'
+    const filter = isStr(category) && category && category !== 'all'
       ? { ...ownerFilter, category: category.toLowerCase().trim() }
       : ownerFilter;
     const items = await MediaVault.find(filter).sort({ createdAt: -1 });
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, items, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1782,7 +1807,7 @@ app.post('/api/media-vault/upload', upload.single('media'), async (req, res) => 
     res.json({ success: true, item: newMedia });
   } catch (err) {
     console.error('❌ Media Vault upload error:', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1805,7 +1830,7 @@ app.post('/api/media-vault', async (req, res) => {
       name: isStr(name) && name.trim() ? name.trim().slice(0, 200) : 'Reaction Media',
       category: cleanCat,
       url: url.trim(),
-      mediaType: isStr(mediaType) && mediaType ? mediaType : 'gif',
+      mediaType: allowedEnum(MediaVault, 'mediaType', mediaType, 'gif'),
       caption: isStr(caption) ? caption : '',
       keywords: parsedKeywords,
       ownerId: req.user?._id || null,
@@ -1814,7 +1839,7 @@ app.post('/api/media-vault', async (req, res) => {
 
     res.json({ success: true, item: newMedia });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1841,7 +1866,7 @@ app.post('/api/media-vault/batch', async (req, res) => {
         name: isStr(item.name) && item.name.trim() ? item.name.trim() : 'Reaction GIF',
         category: cleanCat,
         url: item.url.trim(),
-        mediaType: isStr(item.mediaType) && item.mediaType ? item.mediaType : 'gif',
+        mediaType: allowedEnum(MediaVault, 'mediaType', item.mediaType, 'gif'),
         caption: isStr(item.caption) ? item.caption : '',
         keywords: parsedKeywords,
         ownerId: req.user?._id || null,
@@ -1852,7 +1877,7 @@ app.post('/api/media-vault/batch', async (req, res) => {
 
     res.json({ success: true, count: created.length, items: created });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1871,7 +1896,11 @@ app.put('/api/media-vault/:id', async (req, res) => {
     }
     const update = {};
     if (name !== undefined) update.name = name.trim();
-    if (category !== undefined) update.category = category.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+    if (category !== undefined) {
+      const cleanCat = category.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+      if (!cleanCat) return res.status(400).json({ error: 'Category must contain letters or numbers' });
+      update.category = cleanCat;
+    }
     if (caption !== undefined) update.caption = caption.trim();
     if (keywords !== undefined) {
       update.keywords = parseKeywords(keywords);
@@ -1881,7 +1910,7 @@ app.put('/api/media-vault/:id', async (req, res) => {
     if (!updated) return res.status(404).json({ error: 'Media not found or unauthorized' });
     res.json({ success: true, item: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1911,7 +1940,7 @@ app.delete('/api/media-vault/:id', async (req, res) => {
     await MediaVault.findByIdAndDelete(req.params.id);
     res.json({ success: true, deletedId: req.params.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1921,7 +1950,7 @@ app.get('/api/media-vault/predefined', (req, res) => {
     const predefined = stickerService.getPredefinedList();
     res.json({ success: true, predefined });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1931,7 +1960,7 @@ app.post('/api/media-vault/import-predefined', async (req, res) => {
     const results = await stickerService.seedPredefinedIntoVault(ids, req.user);
     res.json({ success: true, results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1941,7 +1970,7 @@ app.get('/api/media-vault/categories', async (req, res) => {
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1967,7 +1996,7 @@ app.post('/api/media-vault/categories', async (req, res) => {
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -1997,7 +2026,7 @@ app.put('/api/media-vault/categories/:name', async (req, res) => {
     const categories = await stickerService.getAllCategories(req.user);
     res.json({ success: true, categories });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2013,7 +2042,7 @@ app.delete('/api/media-vault/categories/:name', async (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2063,7 +2092,7 @@ app.post('/api/cleanup', async (req, res) => {
     const deletedCount = await memoryService.cleanOldMessages(days);
     res.json({ success: true, deletedCount, message: `Deleted ${deletedCount} messages older than ${days} days` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2201,7 +2230,7 @@ app.get('/api/social-graph', async (req, res) => {
 
     res.json({ success: true, nodes: deduplicatedNodes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2213,7 +2242,7 @@ app.post('/api/social-graph/sync', async (req, res) => {
     const nodes = await SocialGraph.find({ ownerId: ownerOf(req) });
     res.json({ success: true, message: 'Social knowledge tree synced from DB', count: nodes.length, nodes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2249,8 +2278,8 @@ app.post('/api/social-graph/node', async (req, res) => {
     const finalRelationship = relationshipToSam || req.body.relationship || 'Friend';
     const rawHandle = instagramHandle || (isStr(req.body.handle) ? req.body.handle : '') || '';
     const finalHandle = rawHandle ? (rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`) : '';
-    const finalCategory = category || req.body.category || 'online_friend';
-    const finalDob = dob || req.body.dateOfBirth || '';
+    const finalCategory = allowedEnum(SocialGraph, 'category', category || req.body.category, 'online_friend');
+    const finalDob = dob || (isStr(req.body.dateOfBirth) ? req.body.dateOfBirth : '') || '';
     const finalPersonalNotes = personalNotes || '';
 
     let parsedAliases = [];
@@ -2273,10 +2302,11 @@ app.post('/api/social-graph/node', async (req, res) => {
         if (typeof c === 'string') {
           return { targetName: c.trim(), relationship: 'connected', notes: '' };
         }
+        const txt = (v) => (isStr(v) ? v.trim() : '');
         return {
-          targetName: c.targetName || c.name || '',
-          relationship: c.relationship || c.rel || 'friend',
-          notes: c.notes || ''
+          targetName: txt(c.targetName) || txt(c.name),
+          relationship: txt(c.relationship) || txt(c.rel) || 'friend',
+          notes: txt(c.notes)
         };
       }).filter(c => c.targetName);
     } else if (typeof connections === 'string') {
@@ -2294,7 +2324,7 @@ app.post('/api/social-graph/node', async (req, res) => {
     }
 
     let finalSenderId = senderId || req.body.senderId || '';
-    let finalProfilePic = req.body.profilePic || '';
+    let finalProfilePic = isStr(req.body.profilePic) ? req.body.profilePic : '';
     if (!finalSenderId && finalHandle) {
       const cleanU = finalHandle.replace(/^@/, '').toLowerCase().trim();
       const matchedMem = await UserMemory.findOne({ ownerId, username: new RegExp(`^${escapeRegex(cleanU)}$`, 'i') });
@@ -2338,7 +2368,7 @@ app.post('/api/social-graph/node', async (req, res) => {
           aliases: parsedAliases,
           instagramHandle: finalHandle,
           senderId: finalSenderId || '',
-          gender: gender || 'unknown',
+          gender: allowedEnum(SocialGraph, 'gender', gender, 'unknown'),
           relationshipToSam: finalRelationship,
           category: finalCategory,
           dob: finalDob,
@@ -2346,8 +2376,6 @@ app.post('/api/social-graph/node', async (req, res) => {
           lore: parsedLore,
           roastStyle: roastStyle || 'Banter back naturally matching their energy.',
           connections: parsedConnections,
-          ...(typeof req.body.chatsCount === 'number' ? { chatsCount: req.body.chatsCount } : {}),
-          ...(typeof req.body.reelsCount === 'number' ? { reelsCount: req.body.reelsCount } : {}),
           ...(finalProfilePic ? { profilePic: finalProfilePic } : {}),
           ...(req.user ? { ownerId: req.user._id, ownerUsername: req.user.username } : {}),
           updatedAt: new Date()
@@ -2356,15 +2384,7 @@ app.post('/api/social-graph/node', async (req, res) => {
       { upsert: true, returnDocument: 'after' }
     );
 
-    // Keep UserMemory in sync with any custom counts
-    if (finalSenderId) {
-      const memUpdates = {};
-      if (typeof req.body.chatsCount === 'number') memUpdates.messageCount = req.body.chatsCount;
-      if (typeof req.body.reelsCount === 'number') memUpdates.reelsCount = req.body.reelsCount;
-      if (Object.keys(memUpdates).length > 0) {
-        UserMemory.updateOne({ ownerId, senderId: finalSenderId }, { $set: memUpdates }).catch(() => {});
-      }
-    }
+    // Chat and reel counts are counted by the server from real DMs; the client never overwrites them
 
     // If this node was renamed, clean up any old name documents in SocialGraph
     if (cleanOldName && cleanOldName.toLowerCase() !== cleanName.toLowerCase()) {
@@ -2409,7 +2429,7 @@ app.post('/api/social-graph/node', async (req, res) => {
     socialGraphService.clearCache(ownerId);
     res.json({ success: true, node: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2443,7 +2463,7 @@ app.get('/api/contacts/lookup', async (req, res) => {
 
     res.json({ found: false });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2465,7 +2485,7 @@ app.post('/api/social-graph/extract-from-chat', async (req, res) => {
     res.json({ success: true, extraction });
   } catch (err) {
     console.error('Raw chat extraction error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2516,7 +2536,7 @@ app.delete('/api/social-graph/node/:identifier', async (req, res) => {
     res.json({ success: true, message: `Deleted ${targetName} from database` });
   } catch (err) {
     console.error('Delete node error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2582,12 +2602,17 @@ Return ONLY raw JSON.`;
     });
 
     const raw = completion.choices[0].message.content.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (parseErr) {
+      return res.status(502).json({ error: 'The AI returned an unreadable answer. Please try again.' });
+    }
 
     res.json({ success: true, autofill: parsed });
   } catch (err) {
     console.error('AI autofill error:', err.message);
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2701,7 +2726,7 @@ app.post('/api/social-graph/link-id', async (req, res) => {
       node
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2724,7 +2749,7 @@ app.get('/api/social-graph/unlinked-chatters', async (req, res) => {
 
     res.json({ success: true, chatters });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2833,7 +2858,7 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -2876,8 +2901,8 @@ app.post('/api/social-graph/ai-interview', async (req, res) => {
             name: node.name.trim(),
             aliases: node.aliases || [],
             instagramHandle: node.instagramHandle || '',
-            gender: node.gender || 'unknown',
-            relationshipToSam: node.relationshipToSam || 'friend',
+            gender: allowedEnum(SocialGraph, 'gender', node.gender, 'unknown'),
+            relationshipToSam: isStr(node.relationshipToSam) && node.relationshipToSam ? node.relationshipToSam : 'friend',
             lore: node.lore || [],
             roastStyle: node.roastStyle || '',
             connections: node.connections || [],
@@ -2891,7 +2916,7 @@ app.post('/api/social-graph/ai-interview', async (req, res) => {
 
     res.json({ success: true, ...interviewResult });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
