@@ -308,9 +308,37 @@ async function loadPalette(url) {
   return viaProxy === undefined ? null : viaProxy;
 }
 
+// '#rrggbb' or 'hsl(h s% l%)' -> [r, g, b] (0-255), or null
+function toRgb(c) {
+  const s = String(c || '').trim();
+  let m = s.match(/^#([0-9a-f]{6})$/i);
+  if (m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+  m = s.match(/^hsl\(\s*([\d.]+)[\s,]+([\d.]+)%[\s,]+([\d.]+)%\s*\)$/i);
+  if (!m) return null;
+  const h = Number(m[1]) / 360, sat = Number(m[2]) / 100, l = Number(m[3]) / 100;
+  const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat, p = 2 * l - q;
+  const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return [f(h + 1 / 3), f(h), f(h - 1 / 3)].map(v => Math.round(v * 255));
+}
+
+// Black or white, whichever reads better on this colour (darkened by `keep`, as the light theme mixes it with black)
+function readableOn(c, keep = 1) {
+  const rgb = toRgb(c);
+  if (!rgb) return '';
+  const lin = (v) => { v = (v * keep) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? '#000000' : '#ffffff';
+}
+
 function applyPalette(palette, imageUrl) {
   const root = document.documentElement.style;
   const p = palette || THEME;
+  // Text on the photo-coloured buttons and selected pills: the accent changes with every photo,
+  // so a fixed black or white was unreadable on some pages (e.g. black on dark red, white on bright green)
+  root.setProperty('--on-ambient-accent', readableOn(p.accent) || '#000000');
+  root.setProperty('--on-ambient-dominant', readableOn(p.dominant) || '#000000');
+  root.setProperty('--on-ambient-dominant-85', readableOn(p.dominant, 0.85) || '#ffffff');
+  root.setProperty('--on-ambient-dominant-70', readableOn(p.dominant, 0.7) || '#ffffff');
   root.setProperty('--ambient-dominant', p.dominant);
   root.setProperty('--ambient-secondary', p.secondary);
   root.setProperty('--ambient-accent', p.accent);

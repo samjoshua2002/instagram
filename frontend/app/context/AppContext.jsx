@@ -582,6 +582,10 @@ export function AppProvider({ children }) {
       let opts = options || {};
       // Only our own API gets the session token; third parties (Giphy, avatars...) never see it
       const apiUrl = apiRequestUrl(url);
+      // Only our API needs the token, retries and time limits. Next.js page / prefetch requests go
+      // straight through: wrapping them turned a cancelled prefetch into "Could not reach the server",
+      // and Next.js then fell back to a full page reload instead of instant in-app navigation
+      if (!apiUrl) return originalFetch(url, options);
       if (storedToken && apiUrl) {
         const baseHeaders = opts.headers || (typeof Request !== 'undefined' && url instanceof Request ? url.headers : {});
         const headers = new Headers(baseHeaders);
@@ -642,7 +646,7 @@ export function AppProvider({ children }) {
         if (timedOut) {
           throw new Error('The server is taking too long to answer. Please try again.');
         }
-        if (err?.name === 'AbortError') throw err;
+        if (err?.name === 'AbortError' || callerAborted) throw err;
         throw new Error(navigator.onLine === false
           ? 'You are offline. Check your internet connection and try again.'
           : 'Could not reach the server. Please try again in a moment.');

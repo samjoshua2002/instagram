@@ -24,6 +24,9 @@
    the shared .seg-indicator paints it and morphs between items. */
 :where(.sheet-segment, .mode-segment) { --seg-bg: var(--color-text-primary); }
 :where(.spx-pills, .people-pills) { --seg-bg: var(--sp-green-press); }
+/* The selected pill's text sits on that accent: use the readable colour picked for it */
+:where(.spx-pills, .people-pills) :is(button, a, [role='tab']):has(> .seg-indicator),
+:where(.spx-pills, .people-pills) :is(button, a, [role='tab']):has(> .seg-indicator) .spx-pill-count { color: var(--sp-on-green-press, #000); }
 :where(.sp-chips) { --seg-bg: var(--sp-green); }
 :where(.sh-chips) { --seg-bg: var(--sh-accent); }
 

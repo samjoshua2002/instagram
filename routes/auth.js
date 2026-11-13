@@ -64,6 +64,8 @@ function sessionUser(user) {
     whatsappNumber: user.whatsappNumber,
     instagramUsername: user.instagramUsername,
     instagramId: user.instagramId || '',
+    // The linked account id (not secret; the token itself never leaves the server)
+    instagramAccountId: user.instagramAccountId || user.instagram?.accountId || '',
     role: user.role === 'superadmin' ? 'superadmin' : 'user',
     accountType: user.accountType,
     isOnboarded: user.isOnboarded ?? false,
@@ -989,6 +991,7 @@ router.get('/me', requireAuth, async (req, res) => {
     whatsappNumber: user.whatsappNumber,
     instagramUsername: user.instagramUsername,
     instagramId: user.instagramId || '',
+    instagramAccountId: user.instagramAccountId || user.instagram?.accountId || '',
     role: isSuper ? 'superadmin' : 'user',
     accountType: user.accountType,
     isOnboarded: user.isOnboarded ?? false,
