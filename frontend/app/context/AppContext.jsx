@@ -207,7 +207,7 @@ export function AppProvider({ children }) {
   // Authentication & Session State
   const [token, setToken] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('chatter_jwt_token') || null;
+      try { return localStorage.getItem('chatter_jwt_token') || null; } catch { return null; }
     }
     return null;
   });
@@ -226,8 +226,11 @@ export function AppProvider({ children }) {
   }, [user]);
   const [authLoading, setAuthLoading] = useState(() => {
     if (typeof window !== 'undefined') {
-      const hasToken = !!localStorage.getItem('chatter_jwt_token');
-      const hasUser = !!(localStorage.getItem('chatter_user_profile') || localStorage.getItem('chatter_remembered_account'));
+      let hasToken = false, hasUser = false;
+      try {
+        hasToken = !!localStorage.getItem('chatter_jwt_token');
+        hasUser = !!(localStorage.getItem('chatter_user_profile') || localStorage.getItem('chatter_remembered_account'));
+      } catch { }
       // If we already have token and user, do NOT block the UI with a full-screen authenticating screen
       return hasToken && !hasUser;
     }
@@ -371,16 +374,23 @@ export function AppProvider({ children }) {
     setUser(userData);
     setAuthLoading(false);
     showToast?.(`Welcome back, ${userData?.firstName || userData?.username || 'User'}!`, 'success');
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.href = '/';
-    }
+    // No redirect: AuthGate now shows the page that was asked for, so deep links survive sign-in
   }, [showToast]);
+
+  // Swaps in a fresh session token (e.g. after a password change) without the full sign-in flow
+  const setSessionToken = useCallback((jwtToken) => {
+    if (!jwtToken) return;
+    try { localStorage.setItem('chatter_jwt_token', jwtToken); } catch (e) { }
+    setToken(jwtToken);
+  }, []);
 
   const switchAccount = useCallback(() => {
     resetSession();
-    localStorage.removeItem('chatter_jwt_token');
-    localStorage.removeItem('chatter_user_profile');
-    localStorage.removeItem('chatter_remembered_account');
+    try {
+      localStorage.removeItem('chatter_jwt_token');
+      localStorage.removeItem('chatter_user_profile');
+      localStorage.removeItem('chatter_remembered_account');
+    } catch (e) { }
     try {
       localStorage.removeItem('chatter_admin_session');
       sessionStorage.removeItem('chatter_session_active');
@@ -418,9 +428,11 @@ export function AppProvider({ children }) {
   const logout = useCallback((opts) => {
     const expired = opts?.expired === true;
     resetSession();
-    localStorage.removeItem('chatter_jwt_token');
-    localStorage.removeItem('chatter_user_profile');
-    localStorage.removeItem('chatter_remembered_account');
+    try {
+      localStorage.removeItem('chatter_jwt_token');
+      localStorage.removeItem('chatter_user_profile');
+      localStorage.removeItem('chatter_remembered_account');
+    } catch (e) { }
     try {
       localStorage.removeItem('chatter_admin_session');
       localStorage.removeItem(STORAGE_DELETED_KEY);
@@ -527,7 +539,12 @@ export function AppProvider({ children }) {
   exitWorkspaceRef.current = exitWorkspace;
 
   const updateUserProfile = useCallback((updatedUser) => {
-    setUser(prev => ({ ...prev, ...updatedUser }));
+    // Also refresh the cached copy, or a reload during a slow start shows the old profile
+    setUser(prev => {
+      const next = { ...prev, ...updatedUser };
+      storeUserRecord('chatter_user_profile', { ...next, instagramPageAccessToken: undefined });
+      return next;
+    });
   }, []);
 
   // Feature Store (PLAN.md §4): mode + toggles that drive the nav and the reply pipeline
@@ -578,7 +595,8 @@ export function AppProvider({ children }) {
     // Every request gets a time limit, so a slow or dropped mobile connection
     // can never leave a button spinning forever. Uploads get longer.
     window.fetch = async (url, options = {}) => {
-      const storedToken = localStorage.getItem('chatter_jwt_token');
+      let storedToken = null;
+      try { storedToken = localStorage.getItem('chatter_jwt_token'); } catch (e) { }
       let opts = options || {};
       // Only our own API gets the session token; third parties (Giphy, avatars...) never see it
       const apiUrl = apiRequestUrl(url);
@@ -1281,7 +1299,7 @@ export function AppProvider({ children }) {
         }
         return n;
       });
-      localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(next));
+      try { localStorage.setItem(getStorageNodesKey(userRef.current), JSON.stringify(next)); } catch (e) { }
       return next;
     });
 
@@ -1443,9 +1461,8 @@ export function AppProvider({ children }) {
       }));
     }
 
-    setLinkingTargetPerson(null);
-
-    // Call backend to persist merge and link in MongoDB
+    // Call backend to persist merge and link in MongoDB (the popup closes only once this works,
+    // so a failed link keeps what the user typed)
     try {
       const res = await fetch(`${API_BASE}/api/social-graph/link-id`, {
         method: 'POST',
@@ -1456,6 +1473,7 @@ export function AppProvider({ children }) {
       if (!res.ok || !data.success) {
         throw new Error(data.error || `server answered ${res.status}`);
       }
+      setLinkingTargetPerson(null);
       showToast(`Merged & linked ${personName}! AI will recognize them in DMs.`, 'success');
       syncBackend();
       return true;
@@ -1587,6 +1605,7 @@ export function AppProvider({ children }) {
     token,
     authLoading,
     login,
+    setSessionToken,
     logout,
     switchAccount,
     updateUserProfile,
@@ -1603,7 +1622,7 @@ export function AppProvider({ children }) {
     isImpersonating,
     enterWorkspace,
     exitWorkspace,
-  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, setFavouriteStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, requestFreshPhoto, isSyncingInitial, API_BASE, user, token, authLoading, login, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
+  }), [nodes, selectedNode, setSelectedNode, routingConfig, setRoutingConfig, saveRoutingStable, toggleGlobalBotStable, saveNodeStable, deleteNodeStable, updateContactPreferencesStable, setFavouriteStable, addFactStable, showToast, dismissToast, toasts, isAiModalOpen, setIsAiModalOpen, editingNode, startAiInterviewStable, aiAutofillPersonStable, linkingTargetPerson, setLinkingTargetPerson, linkContactIdStable, lookupContactStable, extractFromRawChatStable, syncBackendStable, requestFreshPhoto, isSyncingInitial, API_BASE, user, token, authLoading, login, setSessionToken, logout, switchAccount, updateUserProfile, workspaceFeatures, workspaceFeaturesError, reloadWorkspaceFeatures, updateWorkspaceFeatures, isPasskeyModalOpen, setIsPasskeyModalOpen, isOnboardingModalOpen, setIsOnboardingModalOpen, openOnboardingWizard, adminSession, isImpersonating, enterWorkspace, exitWorkspace]);
 
   return (
     <AppContext.Provider value={contextValue}>

@@ -87,9 +87,7 @@ export default function AuthGate({ children }) {
     try {
       sessionStorage.setItem('chatter_session_active', 'true');
     } catch (e) {}
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.location.href = '/';
-    }
+    // No redirect: the page that was asked for (a shared /vault link etc.) opens after sign-in
   };
 
   // Prevent SSR hydration mismatch: render loader until client mounts

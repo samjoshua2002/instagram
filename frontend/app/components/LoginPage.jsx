@@ -253,7 +253,7 @@ export default function LoginPage({ onLoginSuccess }) {
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`${API_BASE}/api/auth/instagram/check-handle?handle=${encodeURIComponent(handle)}`, { signal: controller.signal });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
         if (cancelled) return;
         if (data.alreadyRegistered) {
           setInstaError(data.message || `@${handle} is already registered on Chatter OS.`);
@@ -534,7 +534,7 @@ export default function LoginPage({ onLoginSuccess }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) {
         throw new Error(data.error || 'Invalid email or password.');
       }
@@ -587,7 +587,7 @@ export default function LoginPage({ onLoginSuccess }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) {
         throw new Error(data.error || 'Zoho OneAuth verification failed.');
       }
@@ -780,7 +780,7 @@ export default function LoginPage({ onLoginSuccess }) {
       });
       clearTimeout(timeoutId);
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
 
       if (!res.ok) {
         // Explicit check if account already exists
@@ -813,7 +813,7 @@ export default function LoginPage({ onLoginSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: regForm.email.trim() })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) throw new Error(data.error || 'Failed to resend code.');
       setRegSuccess(data.message || 'New verification code sent. Check your inbox!');
     } catch (err) {
@@ -847,7 +847,7 @@ export default function LoginPage({ onLoginSuccess }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) {
         throw new Error(data.error || 'Verification code failed or expired.');
       }
@@ -957,12 +957,13 @@ export default function LoginPage({ onLoginSuccess }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) throw new Error(data.error || 'Reset failed.');
 
       setForgotSuccess('Password updated successfully! You can now log in.');
       setPassword(newPassword);
       setIdentifier(forgotEmail);
+      if (forgotEmail && rememberedAccount?.email && forgotEmail.trim().toLowerCase() !== rememberedAccount.email.toLowerCase()) setUseAnotherAccount(true);
       setTimeout(() => {
         setShowForgotModal(false);
         setForgotTotpCode('');
@@ -988,7 +989,7 @@ export default function LoginPage({ onLoginSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail.trim() }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) throw new Error(data.error || 'Failed to send verification code.');
 
       setOtpSent(true);
@@ -1016,12 +1017,13 @@ export default function LoginPage({ onLoginSuccess }) {
           newPassword,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: res.status >= 500 ? 'The server is waking up. Please try again in a few seconds.' : '' }));
       if (!res.ok) throw new Error(data.error || 'Failed to reset password.');
 
       setForgotSuccess('Password updated! Returning to login...');
       setPassword(newPassword);
       setIdentifier(forgotEmail);
+      if (forgotEmail && rememberedAccount?.email && forgotEmail.trim().toLowerCase() !== rememberedAccount.email.toLowerCase()) setUseAnotherAccount(true);
       setTimeout(() => {
         setShowForgotModal(false);
         setForgotOtpCode('');
@@ -1193,7 +1195,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div style={{
                   background: 'color-mix(in srgb, #ef4444 12%, transparent)',
                   border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
-                  color: '#f87171',
+                  color: 'var(--color-danger)',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -1212,7 +1214,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div style={{
                   background: 'color-mix(in srgb, #22c55e 12%, transparent)',
                   border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
-                  color: '#4ade80',
+                  color: 'var(--color-success)',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -2073,7 +2075,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div style={{
                   background: 'color-mix(in srgb, #ef4444 12%, transparent)',
                   border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)',
-                  color: '#f87171',
+                  color: 'var(--color-danger)',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -2098,7 +2100,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           marginTop: '6px',
                           background: 'none',
                           border: 'none',
-                          color: '#f87171',
+                          color: 'var(--color-danger)',
                           textDecoration: 'underline',
                           fontWeight: '700',
                           fontSize: '0.78rem',
@@ -2117,7 +2119,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 <div style={{
                   background: 'color-mix(in srgb, #22c55e 12%, transparent)',
                   border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
-                  color: '#4ade80',
+                  color: 'var(--color-success)',
                   borderRadius: '10px',
                   padding: '11px 14px',
                   fontSize: '0.82rem',
@@ -2344,7 +2346,7 @@ export default function LoginPage({ onLoginSuccess }) {
                           @{instaPreview.username} {instaPreview.instagramId ? `• ID: ${instaPreview.instagramId}` : ''}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4ade80', fontSize: '0.68rem', fontWeight: '800', fontFamily: "var(--font-label)", flexShrink: 0, background: 'color-mix(in srgb, #22c55e 14%, transparent)', padding: '3px 7px', borderRadius: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-success)', fontSize: '0.68rem', fontWeight: '800', fontFamily: "var(--font-label)", flexShrink: 0, background: 'color-mix(in srgb, #22c55e 14%, transparent)', padding: '3px 7px', borderRadius: '4px' }}>
                         <Check size={12} strokeWidth={3} />
                         <span>{instaPreview.isVerified ? 'VERIFIED' : 'READY'}</span>
                       </div>
@@ -2362,7 +2364,7 @@ export default function LoginPage({ onLoginSuccess }) {
                       alignItems: 'center',
                       gap: '6px',
                       fontSize: '0.74rem',
-                      color: '#f87171'
+                      color: 'var(--color-danger)'
                     }}>
                       <AlertCircle size={14} style={{ flexShrink: 0 }} />
                       <span>{instaError}</span>
@@ -2573,7 +2575,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     <div style={{
                       background: 'color-mix(in srgb, #22c55e 12%, transparent)',
                       border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)',
-                      color: '#4ade80',
+                      color: 'var(--color-success)',
                       borderRadius: '8px',
                       padding: '12px',
                       fontSize: '0.84rem',
@@ -2736,12 +2738,12 @@ export default function LoginPage({ onLoginSuccess }) {
             </div>
 
             {forgotError && (
-              <div style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)', border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)', color: '#f87171', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
+              <div style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)', border: '1px solid color-mix(in srgb, #ef4444 35%, transparent)', color: 'var(--color-danger)', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
                 {forgotError}
               </div>
             )}
             {forgotSuccess && (
-              <div style={{ background: 'color-mix(in srgb, #22c55e 12%, transparent)', border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)', color: '#4ade80', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
+              <div style={{ background: 'color-mix(in srgb, #22c55e 12%, transparent)', border: '1px solid color-mix(in srgb, #22c55e 35%, transparent)', color: 'var(--color-success)', borderRadius: '8px', padding: '9px 12px', fontSize: '0.78rem', marginBottom: '14px' }}>
                 {forgotSuccess}
               </div>
             )}
