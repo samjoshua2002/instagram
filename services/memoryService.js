@@ -77,7 +77,10 @@ class MemoryService {
    * Asynchronously updates the user's memory, conversation style analysis,
    * facts extracted, and rolling summary.
    */
+  // Returns true when there was nothing to learn or the learned memory was saved, false on failure
+  // (callers that delete raw messages afterwards must check this)
   async updateMemoryAsync(senderId, ownerId = null) {
+    let saved = false;
     try {
       let memory = await this.getOrCreateUserMemory(senderId, null, ownerId);
       const convoQuery = this.conversationQuery(senderId, ownerId);
@@ -94,7 +97,7 @@ class MemoryService {
             text: b.text
           }));
         } else {
-          return;
+          return true;
         }
       } else if (totalMsgCount <= 100) {
         messagesToAnalyze = await Message.find(convoQuery).sort({ createdAt: 1 });
@@ -115,7 +118,7 @@ class MemoryService {
       }
 
       if (!messagesToAnalyze || messagesToAnalyze.length === 0) {
-        return;
+        return true;
       }
 
       const creator = await creatorIdentity(ownerId);
@@ -380,6 +383,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           throw saveErr;
         }
       }
+      saved = true;
 
       // Immediate cache sync in Redis
       await redisService.cacheUserMemory(this.cacheKey(senderId, ownerId), memory.toObject ? memory.toObject() : memory, 3600);
@@ -477,6 +481,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
     } catch (err) {
       console.error('❌ Error updating user memory:', err.message);
     }
+    return saved;
   }
 
   /**

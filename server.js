@@ -1445,7 +1445,11 @@ app.post('/api/conversations/:senderId/learn', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Conversation not found' });
 
     // 1. Run memory extraction from current messages
-    await memoryService.updateMemoryAsync(senderId, ownerId);
+    const learned = await memoryService.updateMemoryAsync(senderId, ownerId);
+    if (!learned) {
+      // Never delete the only copy of the chat when nothing was learned from it
+      return res.status(502).json({ error: 'Could not learn from this chat right now. Nothing was deleted, please try again.' });
+    }
 
     // 2. After learning, delete raw message TEXT from DB for this contact (this creator only)
     //    but do NOT touch messageCount / reelsCount (those are on UserMemory, not Message docs)
