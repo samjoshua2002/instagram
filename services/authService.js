@@ -124,10 +124,12 @@ class AuthService {
   /**
    * Sign a JWT session token (valid for 30 days)
    */
-  generateToken(user) {
+  generateToken(user, { expiresIn = '30d', impersonatedBy = null } = {}) {
     const isSuper = user.role === 'superadmin';
     return jwt.sign(
       {
+        tv: user.tokenVersion || 0, // session version: a password reset makes older sessions invalid
+        ...(impersonatedBy ? { impBy: String(impersonatedBy) } : {}),
         userId: user._id.toString(),
         username: user.username,
         email: user.email,
@@ -138,7 +140,7 @@ class AuthService {
         lastName: user.lastName,
       },
       JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn }
     );
   }
 

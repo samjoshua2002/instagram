@@ -173,7 +173,11 @@ const requireAuth = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: User not found' });
     }
+    if ((decoded.tv || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ error: 'Unauthorized: Session ended after a password change. Please sign in again.' });
+    }
     req.user = user;
+    req.impersonatedBy = decoded.impBy || null;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Unauthorized: Authentication error' });
@@ -1156,6 +1160,39 @@ router.post('/onboarding/skip', requireAuth, async (req, res) => {
   }
 });
 
+// Single-use, 60-second tickets that start the Instagram connect popup (the session JWT never goes in a URL)
+const connectTickets = new Map(); // ticket -> { userId, expiresAt }
+// OAuth nonces already used once (a callback can never be replayed)
+const usedOAuthNonces = new Map(); // nonce -> expiresAt
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of connectTickets) if (now > v.expiresAt) connectTickets.delete(k);
+  for (const [k, exp] of usedOAuthNonces) if (now > exp) usedOAuthNonces.delete(k);
+}, 60 * 1000).unref();
+
+function readCookie(req, name) {
+  const raw = req.headers.cookie || '';
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return '';
+}
+function isHttps(req) {
+  return req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+}
+const OAUTH_NONCE_COOKIE = 'ig_oauth_nonce';
+
+/**
+ * POST /api/auth/instagram/connect-ticket (Protected)
+ * Gives the logged-in user a single-use ticket for /instagram/connect
+ */
+router.post('/instagram/connect-ticket', requireAuth, (req, res) => {
+  const ticket = crypto.randomBytes(24).toString('hex');
+  connectTickets.set(ticket, { userId: String(req.user._id), expiresAt: Date.now() + 60 * 1000 });
+  res.json({ success: true, ticket });
+});
+
 /**
  * GET /api/auth/instagram/connect
  * Redirects to Meta OAuth login dialog for in-app Instagram connection
@@ -1164,10 +1201,11 @@ router.get('/instagram/connect', (req, res) => {
   try {
     const metaAppId = process.env.META_APP_ID || process.env.INSTAGRAM_APP_ID;
     const clientOrigin = resolveAllowedOrigin(req.query.origin);
-    // The popup cannot set headers, so the session JWT arrives as ?token= — it is verified here
-    // and only the userId goes into the signed state (never the JWT itself).
-    const userJwt = typeof req.query.token === 'string' ? req.query.token : '';
-    const decodedSession = userJwt ? authService.verifyToken(userJwt) : null;
+    // The popup cannot set headers: it carries a single-use ticket from POST /instagram/connect-ticket
+    const ticket = typeof req.query.ticket === 'string' ? req.query.ticket : '';
+    const ticketData = ticket ? connectTickets.get(ticket) : null;
+    if (ticket) connectTickets.delete(ticket);
+    const decodedSession = ticketData && Date.now() <= ticketData.expiresAt ? { userId: ticketData.userId } : null;
 
     if (!metaAppId) {
       return res.status(500).send(renderOAuthResultPage({ ok: false, origin: clientOrigin, message: 'Instagram connection is not configured on the server (META_APP_ID missing).' }));
@@ -1180,11 +1218,20 @@ router.get('/instagram/connect', (req, res) => {
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
     const redirectUri = `${backendUrl}/api/auth/instagram/callback`;
 
+    const nonce = crypto.randomBytes(16).toString('hex');
     const state = authService.signOAuthState({
       userId: String(decodedSession.userId),
       origin: clientOrigin,
       redirectUri,
-      nonce: crypto.randomBytes(16).toString('hex'),
+      nonce,
+    });
+    // Tie the flow to THIS browser: the callback only succeeds in the browser holding this cookie
+    res.cookie(OAUTH_NONCE_COOKIE, nonce, {
+      httpOnly: true,
+      secure: isHttps(req),
+      sameSite: 'lax',
+      path: '/api/auth/instagram',
+      maxAge: 10 * 60 * 1000,
     });
 
     const scopes = [
@@ -1271,6 +1318,13 @@ router.get('/instagram/callback', async (req, res) => {
       return res.status(400).send(renderOAuthResultPage({ ok: false, origin: null, message: 'Invalid or expired authorization request. Please start the connection again.' }));
     }
     const origin = resolveAllowedOrigin(decodedState.origin);
+    // The state must come back to the same browser that started it, and only once
+    const cookieNonce = readCookie(req, OAUTH_NONCE_COOKIE);
+    res.clearCookie(OAUTH_NONCE_COOKIE, { path: '/api/auth/instagram' });
+    if (!decodedState.nonce || cookieNonce !== decodedState.nonce || usedOAuthNonces.has(decodedState.nonce)) {
+      return res.status(400).send(renderOAuthResultPage({ ok: false, origin, message: 'This Instagram connection link was not started in this browser or was already used. Please start the connection again from your dashboard.' }));
+    }
+    usedOAuthNonces.set(decodedState.nonce, Date.now() + 15 * 60 * 1000);
     const stateUserId = String(decodedState.userId);
     const savedRedirectUri = typeof decodedState.redirectUri === 'string' ? decodedState.redirectUri : '';
 
@@ -2055,7 +2109,8 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'User account not found.' });
     }
 
-    const token = authService.generateToken(targetUser);
+    const token = authService.generateToken(targetUser, { expiresIn: '1h', impersonatedBy: req.user._id });
+    console.log(`🕵️ [Audit] Superadmin ${req.user._id} opened workspace of user ${targetUser._id} (1h session)`);
     res.json({
       success: true,
       token,
