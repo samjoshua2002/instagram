@@ -1074,11 +1074,13 @@ router.post('/onboarding', requireAuth, async (req, res) => {
     if (instagramUsername) {
       user.instagramUsername = instagramUsername.trim().replace(/^@/, '');
     }
-    if (instagramPageAccessToken !== undefined && instagramPageAccessToken !== null) {
+    // Blank values are ignored: the wizard sends '' after an OAuth connect (the token stays on the
+    // server), and finishing onboarding must never disconnect Instagram
+    if (isNonEmptyString(instagramPageAccessToken)) {
       user.instagramPageAccessToken = instagramPageAccessToken.trim();
     }
-    if (instagramAccountId !== undefined && instagramAccountId !== null) {
-      if (instagramAccountId.trim() && await User.accountIdHolder(instagramAccountId, user._id)) {
+    if (isNonEmptyString(instagramAccountId)) {
+      if (await User.accountIdHolder(instagramAccountId, user._id)) {
         return res.status(409).json({ error: 'This Instagram account is already connected to another Chatter account.' });
       }
       user.instagramAccountId = instagramAccountId.trim();
