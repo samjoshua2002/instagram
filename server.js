@@ -1536,7 +1536,7 @@ app.get('/api/persona', async (req, res) => {
         userConfig.instagramPageAccessToken = config.instagramPageAccessToken || req.user.instagramPageAccessToken || '';
         userConfig.instagramAccountId = config.instagramAccountId || req.user.instagramAccountId || req.user.instagramId || '';
       }
-      return res.json(userConfig);
+      return res.json(publicPersona(userConfig));
     }
 
     res.json(config || {});
@@ -1637,11 +1637,17 @@ app.put('/api/persona', async (req, res) => {
       await req.user.save();
     }
 
-    res.json({ success: true, config });
+    res.json({ success: true, config: publicPersona(config.toObject()) });
   } catch (err) {
     sendError(res, err);
   }
 });
+
+// Persona as sent to the browser: secrets stay on the server, only whether they are set
+function publicPersona(obj) {
+  const { instagramPageAccessToken, giphyApiKey, ...rest } = obj || {};
+  return { ...rest, hasInstagramToken: Boolean(instagramPageAccessToken), hasGiphyKey: Boolean(giphyApiKey) };
+}
 
 // GIPHY API Proxy: lets frontend search & preview trending reaction GIFs securely
 app.get('/api/giphy/search', async (req, res) => {

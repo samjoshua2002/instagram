@@ -43,7 +43,7 @@ function SettingsPageInner() {
   const [formData, setFormData] = useState({
     creatorName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user?.username || ''),
     instagramHandle: user?.instagramUsername ? `@${user.instagramUsername.replace(/^@/, '')}` : '',
-    instagramPageAccessToken: user?.instagramPageAccessToken || '',
+    instagramPageAccessToken: '',
     instagramAccountId: user?.instagramId || user?.instagramAccountId || '',
     personaBio: '',
     aboutMe: '',
@@ -57,6 +57,9 @@ function SettingsPageInner() {
     typingDelaySeconds: 1.5,
     giphyApiKey: '',
   });
+  // The server never sends the token or GIPHY key back, only whether one is saved.
+  // The input fields hold only a NEW value typed by the user (blank = keep the saved one).
+  const [savedSecrets, setSavedSecrets] = useState({ token: Boolean(user?.hasInstagramToken), giphy: false });
 
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
@@ -204,7 +207,7 @@ function SettingsPageInner() {
         const updated = {
           creatorName: data.creatorName || defaultName,
           instagramHandle: data.instagramHandle || defaultHandle,
-          instagramPageAccessToken: data.instagramPageAccessToken || user?.instagramPageAccessToken || '',
+          instagramPageAccessToken: '',
           instagramAccountId: data.instagramAccountId || user?.instagramId || user?.instagramAccountId || '',
           personaBio: data.personaBio || '',
           aboutMe: data.aboutMe || '',
@@ -216,9 +219,10 @@ function SettingsPageInner() {
           forbiddenWords: Array.isArray(data.forbiddenWords) ? data.forbiddenWords : [],
           sampleConversations: Array.isArray(data.sampleConversations) ? data.sampleConversations : [],
           typingDelaySeconds: data.typingDelaySeconds || 1.5,
-          giphyApiKey: data.giphyApiKey || '',
+          giphyApiKey: '',
         };
         setFormData(updated);
+        setSavedSecrets({ token: Boolean(data.hasInstagramToken), giphy: Boolean(data.hasGiphyKey) });
         try {
           if (userCacheKey) localStorage.setItem(userCacheKey, JSON.stringify(updated));
         } catch (e) {}
@@ -263,19 +267,28 @@ function SettingsPageInner() {
     setSaving(true);
     setErrorMsg('');
     try {
-      // Never send an empty token: that would wipe a token the server keeps but no longer returns
-      const { instagramPageAccessToken: tokenField, ...restForm } = formData;
+      // Never send an empty token or key: blank means "keep the one saved on the server"
+      const { instagramPageAccessToken: rawToken, giphyApiKey: rawGiphy, ...restForm } = formData;
+      const tokenField = (rawToken || '').trim();
+      const giphyField = (rawGiphy || '').trim();
       const res = await fetch(`${API_BASE}/api/persona`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(tokenField ? formData : restForm),
+        body: JSON.stringify({
+          ...restForm,
+          ...(tokenField ? { instagramPageAccessToken: tokenField } : {}),
+          ...(giphyField ? { giphyApiKey: giphyField } : {}),
+        }),
       });
 
       if (res.ok) {
         setSaveSuccess(true);
+        setSavedSecrets(prev => ({ token: prev.token || Boolean(tokenField), giphy: prev.giphy || Boolean(giphyField) }));
+        setFormData(prev => ({ ...prev, instagramPageAccessToken: '', giphyApiKey: '' }));
         if (typeof window !== 'undefined' && userCacheKey) {
           try {
-            localStorage.setItem(userCacheKey, JSON.stringify(formData));
+            // Secrets are never cached in the browser
+            localStorage.setItem(userCacheKey, JSON.stringify({ ...restForm, instagramPageAccessToken: '', giphyApiKey: '' }));
           } catch (e) {}
         }
 
@@ -284,11 +297,9 @@ function SettingsPageInner() {
             ...(tokenField ? {
               hasInstagramToken: true,
               isInstagramConnected: true,
-              instagramPageAccessToken: tokenField,
             } : {}),
             instagramAccountId: formData.instagramAccountId,
             instagramUsername: formData.instagramHandle?.replace(/^@/, ''),
-            firstName: formData.creatorName,
           });
         }
 
@@ -654,15 +665,15 @@ function SettingsPageInner() {
               </h3>
               <span style={{
                 fontSize: '0.72rem',
-                background: formData.instagramPageAccessToken ? 'var(--success-bg)' : 'var(--warning-bg)',
-                color: formData.instagramPageAccessToken ? 'var(--success)' : 'var(--warning)',
-                border: formData.instagramPageAccessToken ? '1px solid var(--success-border)' : '1px solid var(--warning-border)',
+                background: (formData.instagramPageAccessToken || savedSecrets.token) ? 'var(--success-bg)' : 'var(--warning-bg)',
+                color: (formData.instagramPageAccessToken || savedSecrets.token) ? 'var(--success)' : 'var(--warning)',
+                border: (formData.instagramPageAccessToken || savedSecrets.token) ? '1px solid var(--success-border)' : '1px solid var(--warning-border)',
                 padding: '2px 8px',
                 borderRadius: '6px',
                 fontWeight: '700',
                 fontFamily: "'JetBrains Mono', monospace"
               }}>
-                {formData.instagramPageAccessToken ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
+                {(formData.instagramPageAccessToken || savedSecrets.token) ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
               </span>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
@@ -753,7 +764,7 @@ function SettingsPageInner() {
                     type={showAccessToken ? 'text' : 'password'}
                     value={formData.instagramPageAccessToken}
                     onChange={e => setFormData({ ...formData, instagramPageAccessToken: e.target.value })}
-                    placeholder="EAA... (Meta Page Access Token)"
+                    placeholder={savedSecrets.token ? 'Token saved on the server. Paste a new one to replace it' : 'EAA... (Meta Page Access Token)'}
                     style={{
                       fontFamily: 'monospace',
                       fontSize: '0.85rem',
@@ -1277,7 +1288,7 @@ function SettingsPageInner() {
                   type={showGiphyKey ? 'text' : 'password'}
                   value={formData.giphyApiKey || ''}
                   onChange={e => setFormData({ ...formData, giphyApiKey: e.target.value })}
-                  placeholder="Your own GIPHY API key (optional; leave empty to use the shared key)"
+                  placeholder={savedSecrets.giphy ? 'Your own key is saved on the server. Paste a new one to replace it' : 'Your own GIPHY API key (optional; leave empty to use the shared key)'}
                   style={{
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: '0.86rem',
