@@ -25,7 +25,7 @@ export default function Toast() {
         borderRadius: '8px',
         fontSize: '0.82rem',
         fontWeight: '600',
-        zIndex: 10000,
+        zIndex: 100000,
         boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
         display: 'flex',
         alignItems: 'center',

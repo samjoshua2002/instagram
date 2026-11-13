@@ -668,5 +668,14 @@ input:focus, textarea:focus, select:focus {
   }
 }
 
-
-
+/* Vault: comfortable tap targets on phones */
+@media (max-width: 640px) {
+  .vault-page button,
+  .vault-page .vault-tap {
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .vault-page button {
+    justify-content: center;
+  }
+}

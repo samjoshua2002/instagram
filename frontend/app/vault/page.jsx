@@ -111,6 +111,8 @@ function MediaVaultPageInner() {
         if (data.categories) {
           setCategories(data.categories);
         }
+      } else {
+        showToast(data.error || 'Failed to load media vault', 'error');
       }
     } catch (err) {
       if (requestId !== vaultRequestIdRef.current) return;
@@ -474,6 +476,8 @@ function MediaVaultPageInner() {
         setCategories(prev => prev.filter(c => c.id !== catName));
         if (activeCategory === catName) setActiveCategory('all');
         if (selectedCategory === catName) setSelectedCategory('joy');
+      } else {
+        showToast(data.error || 'Failed to delete category', 'error');
       }
     } catch (err) {
       showToast('Failed to delete category', 'error');
@@ -499,7 +503,7 @@ function MediaVaultPageInner() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="page-container settings-fullwidth"
+      className="page-container settings-fullwidth vault-page"
       style={{ maxWidth: '1400px', width: '100%' }}
     >
 
@@ -808,6 +812,7 @@ function MediaVaultPageInner() {
                           alt={gif.title || 'GIF'}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           loading="lazy"
+                          decoding="async"
                         />
 
                         {/* Top Selection Pill */}
@@ -1127,6 +1132,7 @@ function MediaVaultPageInner() {
             return (
               <div
                 key={cat.id}
+                className="vault-tap"
                 onClick={() => setActiveCategory(cat.id)}
                 style={{
                   display: 'flex',
@@ -1271,6 +1277,7 @@ function MediaVaultPageInner() {
                     alt={pred.name}
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                     loading="lazy"
+                    decoding="async"
                   />
                   <span
                     style={{
@@ -1419,6 +1426,7 @@ function MediaVaultPageInner() {
                   alt={item.name}
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   loading="lazy"
+                  decoding="async"
                 />
                 <span
                   style={{

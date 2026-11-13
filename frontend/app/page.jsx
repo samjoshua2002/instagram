@@ -206,12 +206,13 @@ export default function AnalyticsPage() {
         },
         body: JSON.stringify({ userId: targetUser.id })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to enter workspace.');
 
       enterWorkspace(data.token, data.user);
     } catch (err) {
       console.error('Workspace impersonation error:', err);
+      showToast?.(err.message || 'Could not open workspace', 'error');
       setImpersonatingId(null);
     }
   };

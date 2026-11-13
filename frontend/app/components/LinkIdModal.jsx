@@ -6,7 +6,7 @@ import { X, Link2, Search, UserCheck } from 'lucide-react';
 import ContactAvatar from './ContactAvatar';
 
 export default function LinkIdModal() {
-  const { linkingTargetPerson, setLinkingTargetPerson, linkContactId, API_BASE } = useApp();
+  const { linkingTargetPerson, setLinkingTargetPerson, linkContactId, API_BASE, showToast } = useApp();
 
   const [handleInput, setHandleInput] = useState('');
   const [senderIdInput, setSenderIdInput] = useState('');
@@ -31,12 +31,14 @@ export default function LinkIdModal() {
     setIsLoadingChatters(true);
     try {
       const res = await fetch(`${API_BASE}/api/social-graph/unlinked-chatters`);
-      const data = await res.json();
-      if (data.success && Array.isArray(data.chatters)) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`);
+      if (Array.isArray(data.chatters)) {
         setUnlinkedChatters(data.chatters);
       }
     } catch (e) {
       console.warn('Could not fetch unlinked chatters:', e.message);
+      showToast?.(`Could not load chatters: ${e.message}`, 'error');
     } finally {
       setIsLoadingChatters(false);
     }

@@ -99,7 +99,8 @@ export default function InstagramConnectFallback({ onConnect, user }) {
       const res = await fetch(`${API_BASE}/api/auth/me`, {
         headers: activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data && data.igApprovalStatus) {
         setApprovalStatus(data.igApprovalStatus);
         if (updateUserProfile) {
@@ -113,6 +114,7 @@ export default function InstagramConnectFallback({ onConnect, user }) {
       }
     } catch (err) {
       console.error(err);
+      showToast?.(`Could not check approval status: ${err.message}`, 'error');
     } finally {
       setCheckingStatus(false);
     }
@@ -236,7 +238,6 @@ export default function InstagramConnectFallback({ onConnect, user }) {
           headers,
           body: JSON.stringify({
             instagramUsername: cleanHandle,
-            instagramId: cleanAccountId,
           })
         });
       } catch (profileErr) {
