@@ -1,5 +1,4 @@
 const axios = require('axios');
-const PersonaConfig = require('../models/PersonaConfig');
 
 // ── Shared axios config ────────────────────────────────────────────────────
 const TIMEOUT_MS = 12000; // 12 seconds max per request
@@ -33,42 +32,43 @@ async function withRetry(fn, maxRetries = 2, label = 'API call') {
   throw lastErr;
 }
 
+// token -> Instagram/Page account ID, filled in as creators are resolved
+const tokenAccounts = new Map();
+
 class InstagramService {
   /**
-   * Retrieves the current Page Access Token either from DB or .env
+   * Remembers which Instagram/Page account a creator's token belongs to,
+   * so every send goes out from that creator's own account.
    */
-  async getAccessToken() {
-    try {
-      const config = await PersonaConfig.findOne();
-      if (config && config.instagramPageAccessToken && config.instagramPageAccessToken.trim() !== '') {
-        return config.instagramPageAccessToken.trim();
-      }
-    } catch (e) {
-      // fallback to process.env
-    }
-    return process.env.INSTAGRAM_PAGE_ACCESS_TOKEN || '';
+  registerAccount(token, accountId) {
+    if (token && accountId) tokenAccounts.set(String(token).trim(), String(accountId).trim());
   }
 
   /**
-   * Retrieves Instagram Account ID if configured
+   * Never guesses a token: a send must always say which creator's token to use.
+   * (Previously this returned whichever creator's persona the DB returned first.)
    */
-  async getAccountId() {
-    try {
-      const config = await PersonaConfig.findOne();
-      if (config && config.instagramAccountId && config.instagramAccountId.trim() !== '') {
-        return config.instagramAccountId.trim();
-      }
-    } catch (e) {
-      // fallback
+  async getAccessToken() {
+    return '';
+  }
+
+  /**
+   * Account ID for the given creator token
+   */
+  async getAccountId(token = '') {
+    const t = String(token || '').trim();
+    if (t && tokenAccounts.has(t)) return tokenAccounts.get(t);
+    if (t && t === (process.env.INSTAGRAM_PAGE_ACCESS_TOKEN || '').trim() && process.env.INSTAGRAM_ACCOUNT_ID) {
+      return process.env.INSTAGRAM_ACCOUNT_ID;
     }
-    return process.env.INSTAGRAM_ACCOUNT_ID || 'me';
+    return 'me';
   }
 
   /**
    * Send a text message to a user on Instagram (supports swipe-to-reply via replyToMid)
    */
   async sendTextMessage(recipientId, text, customToken = null, replyToMid = null) {
-    const token = customToken || await this.getAccessToken();
+    const token = customToken || '';
     if (!token) {
       console.warn("⚠️ Warning: Instagram Page Access Token not configured yet. Response stored in DB, but not sent via Graph API.");
       return { success: false, reason: "No access token configured" };
@@ -76,7 +76,7 @@ class InstagramService {
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = isInstagramToken ? 'me' : await this.getAccountId(token);
     const url = `${baseUrl}/${accountId}/messages`;
 
     const requestBody = {
@@ -130,12 +130,12 @@ class InstagramService {
    * Send a sticker or meme image attachment
    */
   async sendImageMessage(recipientId, imageUrl, customToken = null, replyToMid = null) {
-    const token = customToken || await this.getAccessToken();
+    const token = customToken || '';
     if (!token || !imageUrl) return { success: false };
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = isInstagramToken ? 'me' : await this.getAccountId(token);
     const url = `${baseUrl}/${accountId}/messages`;
 
     const requestBody = {
@@ -187,12 +187,12 @@ class InstagramService {
    * Send typing indicator to create a realistic chatting effect
    */
   async sendSenderAction(recipientId, action = 'typing_on', customToken = null) {
-    const token = customToken || await this.getAccessToken();
+    const token = customToken || '';
     if (!token) return;
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = isInstagramToken ? 'me' : await this.getAccountId(token);
     const url = `${baseUrl}/${accountId}/messages`;
 
     try {
@@ -218,12 +218,12 @@ class InstagramService {
    * React to a message with an emoji (e.g. '😂', '❤️', '🔥')
    */
   async sendMessageReaction(recipientId, messageId, emoji = '😂', customToken = null) {
-    const token = customToken || await this.getAccessToken();
+    const token = customToken || '';
     if (!token || !messageId) return;
 
     const isInstagramToken = token.startsWith('IG');
     const baseUrl = isInstagramToken ? 'https://graph.instagram.com/v26.0' : 'https://graph.facebook.com/v26.0';
-    const accountId = isInstagramToken ? 'me' : await this.getAccountId();
+    const accountId = isInstagramToken ? 'me' : await this.getAccountId(token);
     const url = `${baseUrl}/${accountId}/messages`;
 
     try {
@@ -254,7 +254,7 @@ class InstagramService {
    * Fetch user profile (username, name, profile pic) from Graph API
    */
   async getUserProfile(senderId, customToken = null) {
-    const token = customToken || await this.getAccessToken();
+    const token = customToken || '';
     if (!token) return null;
 
     try {

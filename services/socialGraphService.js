@@ -2,8 +2,34 @@ const SocialGraph = require('../models/SocialGraph');
 
 class SocialGraphService {
   constructor() {
-    this.cache = new Map();
-    this.lastCacheTime = 0;
+    // Per-creator lookup caches: ownerKey -> { time, map }. Never shared between tenants.
+    this.ownerCaches = new Map();
+  }
+
+  ownerKey(ownerId) {
+    return ownerId ? String(ownerId) : 'none';
+  }
+
+  buildLookup(nodes) {
+    const map = new Map();
+    for (const n of nodes) {
+      map.set(n.name.toLowerCase(), n);
+      if (n.senderId) map.set(n.senderId, n);
+      for (const a of n.aliases || []) {
+        map.set(a.toLowerCase(), n);
+      }
+    }
+    return map;
+  }
+
+  async getOwnerLookup(ownerId) {
+    const key = this.ownerKey(ownerId);
+    const cached = this.ownerCaches.get(key);
+    if (cached && Date.now() - cached.time < 60000) return cached.map;
+    const nodes = ownerId ? await SocialGraph.find({ ownerId }) : [];
+    const map = this.buildLookup(nodes);
+    this.ownerCaches.set(key, { time: Date.now(), map });
+    return map;
   }
 
   /**
@@ -13,18 +39,10 @@ class SocialGraphService {
     try {
       await this.sanitizeExistingNodes();
 
-      // Read purely from live MongoDB database
-      const allNodes = await SocialGraph.find({});
+      // Per-creator caches are built lazily on first use
       this.clearCache();
-      for (const n of allNodes) {
-        this.cache.set(n.name.toLowerCase(), n);
-        if (n.senderId) this.cache.set(n.senderId, n);
-        for (const a of n.aliases || []) {
-          this.cache.set(a.toLowerCase(), n);
-        }
-      }
-      this.lastCacheTime = Date.now();
-      console.log(`✅ [SocialGraph] Connected live to MongoDB: loaded ${allNodes.length} contacts dynamically from DB (zero hardcoded).`);
+      const total = await SocialGraph.countDocuments({});
+      console.log(`✅ [SocialGraph] Connected live to MongoDB: ${total} contacts across all creators.`);
     } catch (err) {
       console.error('❌ [SocialGraph] Error loading graph from MongoDB:', err.message);
     }
@@ -59,12 +77,16 @@ class SocialGraphService {
           console.log(`🧼 [Sanitized Node]: Cleaned outdated roast words for ${node.name}`);
         }
       }
-      // Clean up any duplicate records sharing senderId or instagramHandle in MongoDB
+      // Clean up duplicate records sharing senderId or instagramHandle WITHIN the same creator only
+      // (the same fan can legitimately be a contact of several creators)
       const seenSenderIds = new Map();
       const seenHandles = new Map();
       for (const node of allNodes) {
-        const sId = (node.senderId || '').trim();
-        const h = (node.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
+        const owner = node.ownerId ? String(node.ownerId) : 'none';
+        const sIdRaw = (node.senderId || '').trim();
+        const hRaw = (node.instagramHandle || '').replace(/^@/, '').toLowerCase().trim();
+        const sId = sIdRaw ? `${owner}:${sIdRaw}` : '';
+        const h = hRaw ? `${owner}:${hRaw}` : '';
         if (sId) {
           if (seenSenderIds.has(sId)) {
             const prevNode = seenSenderIds.get(sId);
@@ -99,9 +121,9 @@ class SocialGraphService {
     }
   }
 
-  clearCache() {
-    this.cache.clear();
-    this.lastCacheTime = 0;
+  clearCache(ownerId = null) {
+    if (ownerId) this.ownerCaches.delete(this.ownerKey(ownerId));
+    else this.ownerCaches.clear();
   }
 
   /**
@@ -111,8 +133,10 @@ class SocialGraphService {
     try {
       if (!UserMemoryModel) return;
 
-      const memories = await UserMemoryModel.find({});
+      // Only memories that belong to a creator are linked, and only into that creator's graph
+      const memories = await UserMemoryModel.find({ ownerId: { $ne: null } });
       for (const mem of memories) {
+        const ownerId = mem.ownerId;
         const usernameLower = (mem.username || '').replace(/^@/, '').toLowerCase().trim();
         const nameLower = (mem.name || '').toLowerCase().trim();
         const nicknameLower = (mem.nickname || '').toLowerCase().trim();
@@ -142,7 +166,7 @@ class SocialGraphService {
         }
 
         // Check if this memory belongs to an existing node
-        const matchingNode = await SocialGraph.findOne({ $or: orConditions });
+        const matchingNode = await SocialGraph.findOne({ ownerId, $or: orConditions });
 
         if (matchingNode) {
           let updated = false;
@@ -173,6 +197,7 @@ class SocialGraphService {
 
           // Extra safety duplicate check by name, handle, or senderId
           const exists = await SocialGraph.findOne({
+            ownerId,
             $or: [
               { name: new RegExp(`^${escapeRegex(cleanDisplayName)}$`, 'i') },
               { instagramHandle: cleanHandle },
@@ -182,6 +207,7 @@ class SocialGraphService {
 
           if (!exists) {
             await SocialGraph.create({
+              ownerId,
               name: cleanDisplayName,
               aliases: [usernameLower, nameLower, nicknameLower].filter(Boolean),
               instagramHandle: cleanHandle,
@@ -211,9 +237,10 @@ class SocialGraphService {
   /**
    * Dynamically add or update a friend connection in the graph
    */
-  async recordConnection(personAName, personBName, relationship, notes = '') {
+  async recordConnection(personAName, personBName, relationship, notes = '', ownerId = null) {
     try {
-      const nodeA = await SocialGraph.findOne({ name: new RegExp(`^${personAName}$`, 'i') });
+      if (!ownerId || typeof personAName !== 'string' || typeof personBName !== 'string') return;
+      const nodeA = await SocialGraph.findOne({ ownerId, name: new RegExp(`^${escapeRegex(personAName)}$`, 'i') });
       if (!nodeA) return;
 
       const existingIndex = (nodeA.connections || []).findIndex(
@@ -228,7 +255,7 @@ class SocialGraphService {
       }
 
       await nodeA.save();
-      this.clearCache();
+      this.clearCache(ownerId);
     } catch (err) {
       console.error('❌ [SocialGraph] Error recording connection:', err.message);
     }
@@ -237,30 +264,19 @@ class SocialGraphService {
   /**
    * Find relevant entities and social tree connections for an incoming message
    */
-  async getContextForConversation(senderId, currentText = '', history = []) {
+  async getContextForConversation(senderId, currentText = '', history = [], ownerId = null) {
     try {
-      const now = Date.now();
-      if (now - this.lastCacheTime > 60000 || this.cache.size === 0) {
-        const allNodes = await SocialGraph.find({});
-        this.cache.clear();
-        for (const n of allNodes) {
-          this.cache.set(n.name.toLowerCase(), n);
-          if (n.senderId) this.cache.set(n.senderId, n);
-          for (const a of n.aliases || []) {
-            this.cache.set(a.toLowerCase(), n);
-          }
-        }
-        this.lastCacheTime = now;
-      }
+      // Only this creator's own contacts are ever used as AI context
+      const lookup = await this.getOwnerLookup(ownerId);
 
       // 1. Identify the current sender in the graph
-      let senderNode = this.cache.get(senderId) || null;
+      let senderNode = lookup.get(senderId) || null;
 
       // 2. Identify all people mentioned in the incoming text + recent history
       const fullCorpus = (currentText + ' ' + (history || []).slice(-4).map(m => m.text || '').join(' ')).toLowerCase();
       const mentionedNodes = new Map();
 
-      for (const [key, node] of this.cache.entries()) {
+      for (const [key, node] of lookup.entries()) {
         // Skip senderId keys
         if (key === senderId || /^\d+$/.test(key)) continue;
 

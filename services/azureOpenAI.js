@@ -15,6 +15,21 @@ class AzureOpenAIService {
   }
 
   /**
+   * Loads a creator's persona (cached per creator). Never falls back to another tenant's persona.
+   */
+  async loadPersonaForOwner(ownerId = null) {
+    let config = await redisService.getCachedPersonaConfig(ownerId);
+    if (!config) {
+      config = await PersonaConfig.findOne({ ownerId: ownerId || null });
+      if (!config) {
+        config = await PersonaConfig.create({ ownerId: ownerId || null });
+      }
+      await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600, ownerId);
+    }
+    return config;
+  }
+
+  /**
    * Retrieves or instantiates an AzureOpenAI client dedicated to a specific deployment
    */
   getClient(deploymentName) {
@@ -38,21 +53,14 @@ class AzureOpenAIService {
     // 1. Fetch persona config (use passed creator config or fallback)
     let config = passedConfig;
     if (!config) {
-      config = await redisService.getCachedPersonaConfig();
-      if (!config) {
-        config = await PersonaConfig.findOne();
-        if (!config) {
-          config = await PersonaConfig.create({});
-        }
-        await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
-      }
+      config = await this.loadPersonaForOwner(userMemory?.ownerId || null);
     }
 
     // 1b. Fetch active reaction categories from user's Media Vault
     let availableCategoriesStr = 'joy, lol, wonder, sad, happy, side_eye, confused, cool';
     let categoriesMappingPrompt = '';
     try {
-      const allCats = await stickerService.getAllCategories();
+      const allCats = await stickerService.getAllCategories(config?.ownerId ? { _id: config.ownerId } : null);
       if (allCats && allCats.length > 0) {
         availableCategoriesStr = allCats.map(c => c.id).join(', ');
         const triggerGuide = {
@@ -76,7 +84,8 @@ class AzureOpenAIService {
     const socialTreeContext = await socialGraphService.getContextForConversation(
       userMemory.senderId,
       incomingText,
-      messageHistory
+      messageHistory,
+      config?.ownerId || userMemory?.ownerId || null
     );
 
     // 3. Prepare facts, dates, favorites, events, and personal notes
@@ -432,15 +441,8 @@ ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WOR
   /**
    * Generates a natural, friendly follow-up check-in when a conversation has been inactive for 5-6 hours
    */
-  async generateFollowUpReminder({ userMemory, messageHistory }) {
-    let config = await redisService.getCachedPersonaConfig();
-    if (!config) {
-      config = await PersonaConfig.findOne();
-      if (!config) {
-        config = await PersonaConfig.create({});
-      }
-      await redisService.cachePersonaConfig(config.toObject ? config.toObject() : config, 600);
-    }
+  async generateFollowUpReminder({ userMemory, messageHistory, config: passedConfig }) {
+    const config = passedConfig || await this.loadPersonaForOwner(userMemory?.ownerId || null);
 
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}).
 You are sending a thoughtful, casual follow-up or check-in to someone on Instagram DM because your previous conversation stopped 5 to 6 hours ago.
@@ -499,11 +501,11 @@ RULES:
    * Conversational AI Assistant that interviews the user when adding/editing a friend
    * to get full clarity on relationships, connections, lore, and roast style.
    */
-  async interviewPersonForSocialTree({ conversationHistory = [], userInput = '', existingNode = null }) {
+  async interviewPersonForSocialTree({ conversationHistory = [], userInput = '', existingNode = null, ownerId = null }) {
     const SocialGraph = require('../models/SocialGraph');
     let dbCircleSummary = '';
     try {
-      const allDbNodes = await SocialGraph.find({}).limit(50);
+      const allDbNodes = ownerId ? await SocialGraph.find({ ownerId }).limit(50) : [];
       dbCircleSummary = allDbNodes.map(n => `- ${n.name} (${n.instagramHandle || 'no handle'}) - ${n.relationshipToSam || 'Friend'}: ${(n.lore || []).slice(0, 2).join('; ')}`).join('\n');
     } catch (e) {}
 

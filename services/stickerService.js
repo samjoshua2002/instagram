@@ -515,7 +515,7 @@ class StickerService {
     // 3. THIRD PRIORITY: Direct live GIPHY API search (only if not rate-limited)
     if (!this.isGiphyRateLimited || Date.now() > this.rateLimitResetTime) {
       try {
-        const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText);
+        const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText, user);
         if (liveGiphyUrl) return liveGiphyUrl;
       } catch (err) {
         console.warn('⚠️ Live Giphy API search failed, falling back:', err.message);
@@ -556,9 +556,10 @@ class StickerService {
   /**
    * Queries GIPHY API live using the stored API key and context
    */
-  async fetchFromGiphyApi(category, contextText = '') {
+  async fetchFromGiphyApi(category, contextText = '', user = null) {
     try {
-      const config = await PersonaConfig.findOne();
+      // Only this creator's own GIPHY key (or the server key) — never another tenant's
+      const config = user?._id ? await PersonaConfig.findOne({ ownerId: user._id }) : null;
       const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
       if (!apiKey) return null;
 
@@ -614,9 +615,6 @@ class StickerService {
       let config = null;
       if (user) {
         config = await PersonaConfig.findOne({ ownerId: user._id });
-      }
-      if (!config) {
-        config = await PersonaConfig.findOne();
       }
       if (config && config.customReactionCategories) {
         customList = config.customReactionCategories;

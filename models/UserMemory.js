@@ -1,10 +1,15 @@
 const mongoose = require('mongoose');
 
 const UserMemorySchema = new mongoose.Schema({
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
   senderId: {
     type: String,
     required: true,
-    unique: true,
     index: true,
   },
   username: {
@@ -124,5 +129,9 @@ const UserMemorySchema = new mongoose.Schema({
     default: null,
   },
 }, { timestamps: true });
+
+// One memory per contact PER CREATOR (the same fan can DM several creators)
+UserMemorySchema.index({ ownerId: 1, senderId: 1 }, { unique: true });
+UserMemorySchema.index({ ownerId: 1, lastInteraction: -1 });
 
 module.exports = mongoose.model('UserMemory', UserMemorySchema);

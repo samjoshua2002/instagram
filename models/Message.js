@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const MessageSchema = new mongoose.Schema({
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true,
+  },
   senderId: {
     type: String,
     required: true,
@@ -38,5 +44,9 @@ const MessageSchema = new mongoose.Schema({
     default: Date.now,
   },
 }, { timestamps: true });
+
+// Fast per-creator conversation lookups (inbox, history, reply context)
+MessageSchema.index({ ownerId: 1, senderId: 1, createdAt: -1 });
+MessageSchema.index({ ownerId: 1, recipientId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Message', MessageSchema);
