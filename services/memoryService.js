@@ -211,6 +211,10 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
 
       const parsed = JSON.parse(response.choices[0].message.content.trim());
 
+      // The AI call takes seconds and new DMs may have saved this contact meanwhile:
+      // apply what was learned to the LATEST copy so the save does not hit a version conflict
+      memory = (await UserMemory.findById(memory._id)) || memory;
+
       if (parsed.name && parsed.name.trim() !== '') {
         const cleanExtractedName = parsed.name.trim();
         if (!memory.name || memory.name.startsWith('User_') || memory.name.startsWith('ig_tester_')) {
@@ -354,7 +358,18 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         }
       }
 
-      await memory.save();
+      try {
+        await memory.save();
+      } catch (saveErr) {
+        if (saveErr && saveErr.name === 'VersionError') {
+          // A DM landed in the last milliseconds: keep what was learned, never discard it
+          const fresh = memory.toObject({ depopulate: true });
+          delete fresh._id; delete fresh.__v; delete fresh.recentChatBuffer; delete fresh.messageCount; delete fresh.lastInteraction;
+          await UserMemory.updateOne({ _id: memory._id }, { $set: fresh });
+        } else {
+          throw saveErr;
+        }
+      }
 
       // Immediate cache sync in Redis
       await redisService.cacheUserMemory(this.cacheKey(senderId, ownerId), memory.toObject ? memory.toObject() : memory, 3600);
