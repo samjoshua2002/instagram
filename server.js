@@ -965,12 +965,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
 
   // ─────────────────────────────────────────────────────────────────────────
   // ALWAYS LEARN — regardless of AI being paused, enabled, or globally off.
-  // Memory extraction runs in background on EVERY incoming DM.
   // This ensures the profile auto-fills even when you manually manage chats.
+  // One background run per contact once the chat goes quiet (not one full AI analysis per DM).
   // ─────────────────────────────────────────────────────────────────────────
-  memoryService.updateMemoryAsync(senderId, ownerId).catch(err => {
-    console.error('Background memory update failed (non-critical):', err.message);
-  });
+  memoryService.scheduleMemoryUpdate(senderId, ownerId);
 
   // 4. Global pause, routing mode (everyone / except / only selected) and per-person toggles
   const blockedReason = aiReplyBlockedReason(config, userMemory, senderId, isReelOrShare);
@@ -1304,9 +1302,8 @@ async function writeAndSendReply(queueEntry, flight, qKey) {
 
   // Memory update already triggered earlier (ALWAYS-LEARN block) — no duplicate needed here.
   // But re-trigger if the reply itself contained new info (e.g. we asked a curiosity question)
-  setTimeout(() => {
-    memoryService.updateMemoryAsync(senderId, ownerId).catch(() => {});
-  }, 3000); // slight delay so the outgoing message is saved first
+  // (merged with the run already queued by the incoming DM: no extra AI call)
+  memoryService.scheduleMemoryUpdate(senderId, ownerId);
 }
 
 /**

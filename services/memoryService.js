@@ -4,9 +4,21 @@ const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const redisService = require('./redisService');
 
+// Background learning waits for the chat to go quiet, then runs once per contact (not once per DM)
+const MEMORY_LEARN_QUIET_MS = 45 * 1000;
+// ...but a chat that never pauses still gets learned at least this often
+const MEMORY_LEARN_MAX_WAIT_MS = 5 * 60 * 1000;
+// Fields learning must never write back from its (possibly stale) copy: the creator's toggles and
+// live counters are changed elsewhere while the AI call runs
+const LEARN_PROTECTED_FIELDS = new Set([
+  '_id', '__v', 'ownerId', 'senderId', 'recentChatBuffer', 'messageCount', 'reelsCount', 'lastInteraction',
+  'aiEnabled', 'replyToMessages', 'replyToReelsAndPosts', 'remindersEnabled', 'lastReminderSentAt',
+]);
+
 class MemoryService {
   constructor() {
     this._client = null;
+    this._learnQueue = new Map(); // ownerId:senderId -> { timer, firstAt, running, dirty }
   }
 
   // Created on first use so a missing AI key never crashes server startup
@@ -71,6 +83,45 @@ class MemoryService {
     // Sync with Redis cache
     await redisService.cacheUserMemory(this.cacheKey(senderId, ownerId), memory.toObject ? memory.toObject() : memory, 3600);
     return memory;
+  }
+
+  /**
+   * Asks for a background learning run for this contact. Bursts of DMs are merged into one run after
+   * the chat has been quiet for MEMORY_LEARN_QUIET_MS (or MEMORY_LEARN_MAX_WAIT_MS at the latest),
+   * and only one run per contact happens at a time (a request during a run queues exactly one more).
+   */
+  scheduleMemoryUpdate(senderId, ownerId = null, { quietMs = MEMORY_LEARN_QUIET_MS, maxWaitMs = MEMORY_LEARN_MAX_WAIT_MS } = {}) {
+    const key = `${ownerId || ''}:${senderId}`;
+    let job = this._learnQueue.get(key);
+    if (!job) {
+      job = { timer: null, firstAt: Date.now(), running: false, dirty: false };
+      this._learnQueue.set(key, job);
+    }
+    if (job.running) {
+      job.dirty = true; // learn again once the current run ends (new messages arrived meanwhile)
+      return;
+    }
+    clearTimeout(job.timer);
+    const waited = Date.now() - job.firstAt;
+    const delay = waited >= maxWaitMs ? 0 : Math.min(quietMs, maxWaitMs - waited);
+    job.timer = setTimeout(async () => {
+      job.timer = null;
+      job.running = true;
+      try {
+        await this.updateMemoryAsync(senderId, ownerId);
+      } catch (err) {
+        console.error('Background memory update failed (non-critical):', err.message);
+      } finally {
+        job.running = false;
+        if (job.dirty) {
+          job.dirty = false;
+          job.firstAt = Date.now();
+          this.scheduleMemoryUpdate(senderId, ownerId, { quietMs, maxWaitMs });
+        } else if (this._learnQueue.get(key) === job) {
+          this._learnQueue.delete(key);
+        }
+      }
+    }, delay);
   }
 
   /**
@@ -376,10 +427,10 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         await memory.save();
       } catch (saveErr) {
         if (saveErr && saveErr.name === 'VersionError') {
-          // A DM landed in the last milliseconds: keep what was learned, never discard it
-          const fresh = memory.toObject({ depopulate: true });
-          delete fresh._id; delete fresh.__v; delete fresh.recentChatBuffer; delete fresh.messageCount; delete fresh.lastInteraction;
-          await UserMemory.updateOne({ _id: memory._id }, { $set: fresh });
+          // A DM landed in the last milliseconds: keep what was learned, never discard it, but write
+          // ONLY the fields this run changed (never the whole document: that would undo a toggle the
+          // creator flipped meanwhile, or facts another run just added)
+          await UserMemory.updateOne({ _id: memory._id }, { $set: this.learnedChanges(memory) });
         } else {
           throw saveErr;
         }
@@ -483,6 +534,21 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
       console.error('❌ Error updating user memory:', err.message);
     }
     return saved;
+  }
+
+  /**
+   * The top-level fields this learning run actually changed on `memory`, as a $set object,
+   * leaving out the creator's toggles and live counters.
+   */
+  learnedChanges(memory) {
+    const plain = memory.toObject({ depopulate: true });
+    const out = {};
+    for (const path of memory.modifiedPaths()) {
+      const top = path.split('.')[0];
+      if (LEARN_PROTECTED_FIELDS.has(top) || top in out) continue;
+      out[top] = plain[top];
+    }
+    return out;
   }
 
   /**
