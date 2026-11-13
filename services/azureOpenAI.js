@@ -39,6 +39,9 @@ class AzureOpenAIService {
         apiKey: this.apiKey,
         apiVersion: this.apiVersion,
         deployment: deployment,
+        // Replies are live: fail fast instead of the library default (2 retries, 10-minute timeout)
+        maxRetries: 1,
+        timeout: 30 * 1000,
       });
     }
     return this.clients[deployment];
