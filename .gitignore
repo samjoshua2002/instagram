@@ -7,3 +7,6 @@ Thumbs.db
 scratch/
 .next/
 frontend/.next/
+
+# User-uploaded media (never commit)
+public/uploads/
