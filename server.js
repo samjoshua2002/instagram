@@ -588,7 +588,7 @@ function handleCreatorEcho(event, accountId) {
     try {
       // Echo of a reply this app just sent: already saved, and it must not cancel the next AI reply.
       // (Waits for an in-flight send to finish, so the creator typing at the same moment still counts.)
-      if (await instagramService.isAppEcho(contactId, event.message?.mid)) return;
+      if (await instagramService.isAppEcho(contactId, event.message?.mid, event.message?.text)) return;
       console.log(`📱 [Creator Echo]: Creator manually replied to ${contactId} (${text.length} chars)`);
 
       const { user: ownerUser, ambiguous } = await findOwnerByInstagramAccountId(senderAccountId);
@@ -1213,6 +1213,8 @@ async function writeAndSendReply(queueEntry, flight) {
         if (sendResult?.success !== true || flight.cancelled) break;
         instagramService.sendSenderAction(senderId, 'typing_on', creatorAccessToken).catch(() => {});
         await new Promise(resolve => setTimeout(resolve, bubbleGapMs()));
+        // The creator may have taken over during the gap (their echo is checked after our last send)
+        if (flight.cancelled) break;
         const bubbleResult = await instagramService.sendTextMessage(senderId, bubble, creatorAccessToken);
         if (bubbleResult?.success !== true) break;
         deliveredBubbles.push(bubble);
@@ -1228,6 +1230,10 @@ async function writeAndSendReply(queueEntry, flight) {
       if (stickerUrl) {
         if (hasText) {
           await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        if (flight.cancelled) {
+          console.log(`🛑 [Sticker Dispatch]: Creator took over ${senderId}; sticker not sent.`);
+        } else if (hasText) {
           try {
             console.log(`🖼️ [Sticker Dispatch]: Sending accessory ${stickerType} sticker (${stickerUrl}) to ${senderId}...`);
             const accRes = await instagramService.sendImageMessage(senderId, stickerUrl, creatorAccessToken);

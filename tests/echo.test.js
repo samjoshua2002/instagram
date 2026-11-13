@@ -82,3 +82,20 @@ test('waitForSends gives up after the time limit', async () => {
   s.finish();
   await sending;
 });
+
+test('a send that timed out on our side but was delivered: its echo is matched by text', async () => {
+  await instagramService.trackSend('c10', async () => ({ success: false, error: 'timeout' }), 'see you at 6');
+  assert.equal(await instagramService.isAppEcho('c10', 'mid_unknown_1', 'see you at 6'), true);
+  // only once: the same text typed again by the creator later is theirs
+  assert.equal(await instagramService.isAppEcho('c10', 'mid_unknown_2', 'see you at 6'), false);
+});
+
+test('text fallback never swallows a different message from the creator', async () => {
+  await instagramService.trackSend('c11', async () => ({ success: false }), 'bot text');
+  assert.equal(await instagramService.isAppEcho('c11', 'mid_phone_5', 'creator text'), false);
+});
+
+test('a send with a confirmed id leaves nothing for the text fallback', async () => {
+  await instagramService.trackSend('c12', async () => ({ success: true, data: { message_id: 'mid_app_8' } }), 'hello');
+  assert.equal(await instagramService.isAppEcho('c12', 'mid_phone_6', 'hello'), false);
+});

@@ -70,25 +70,32 @@ function findAdminConfig() {
 
 // Echo webhooks for messages this app sent must not be read as the creator typing by hand
 const APP_SENT_MID_LIMIT = 2000;
+const UNCONFIRMED_TTL_MS = 2 * 60 * 1000;
 
 class InstagramService {
   constructor() {
     this.appSentMids = new Set();
     this.sendingTo = new Map(); // recipientId -> sends in flight
     this.sendWaiters = new Map(); // recipientId -> callbacks waiting for those sends to finish
+    // Texts whose send gave us no message id (e.g. timed out on our side but may still have been
+    // delivered): an echo with the same text shortly after is ours, not the creator's
+    this.unconfirmedTexts = new Map(); // recipientId -> [{ text, at }]
   }
 
-  async trackSend(recipientId, send) {
+  async trackSend(recipientId, send, text = '') {
     this.sendingTo.set(recipientId, (this.sendingTo.get(recipientId) || 0) + 1);
+    let gotMid = false;
     try {
       const result = await send();
       const mid = result?.data?.message_id;
       if (mid) {
+        gotMid = true;
         this.appSentMids.add(mid);
         if (this.appSentMids.size > APP_SENT_MID_LIMIT) this.appSentMids.delete(this.appSentMids.values().next().value);
       }
       return result;
     } finally {
+      if (!gotMid && text) this.rememberUnconfirmed(recipientId, text);
       const left = (this.sendingTo.get(recipientId) || 1) - 1;
       if (left > 0) {
         this.sendingTo.set(recipientId, left);
@@ -99,6 +106,27 @@ class InstagramService {
         waiters.forEach(done => done());
       }
     }
+  }
+
+  rememberUnconfirmed(recipientId, text) {
+    const now = Date.now();
+    const list = (this.unconfirmedTexts.get(recipientId) || []).filter(e => now - e.at < UNCONFIRMED_TTL_MS);
+    list.push({ text: String(text).trim(), at: now });
+    this.unconfirmedTexts.set(recipientId, list.slice(-5));
+    if (this.unconfirmedTexts.size > APP_SENT_MID_LIMIT) this.unconfirmedTexts.delete(this.unconfirmedTexts.keys().next().value);
+  }
+
+  /** True (and forgets it) when this text was just sent by the app without a confirmed message id. */
+  takeUnconfirmed(recipientId, text) {
+    const list = this.unconfirmedTexts.get(recipientId);
+    if (!list || !text) return false;
+    const now = Date.now();
+    const t = String(text).trim();
+    const i = list.findIndex(e => now - e.at < UNCONFIRMED_TTL_MS && e.text === t);
+    if (i === -1) return false;
+    list.splice(i, 1);
+    if (list.length === 0) this.unconfirmedTexts.delete(recipientId);
+    return true;
   }
 
   /** Resolves once no send to this contact is in flight (or after maxMs, whichever comes first). */
@@ -120,12 +148,15 @@ class InstagramService {
    * returned its message id, so while a send to this contact is in flight we wait for it to finish
    * and then compare ids: the creator typing on the phone at the same moment is NOT our echo.
    */
-  async isAppEcho(recipientId, mid) {
+  async isAppEcho(recipientId, mid, text = '') {
     if (mid && this.appSentMids.has(mid)) return true;
-    if (!this.sendingTo.has(recipientId)) return false;
-    if (!mid) return true; // no id to compare: keep the old safe answer
-    await this.waitForSends(recipientId);
-    return this.appSentMids.has(mid);
+    if (this.sendingTo.has(recipientId)) {
+      if (!mid) return true; // no id to compare: keep the old safe answer
+      await this.waitForSends(recipientId);
+      if (this.appSentMids.has(mid)) return true;
+    }
+    // A send of ours that ended without an id but was delivered anyway: match it by its text
+    return this.takeUnconfirmed(recipientId, text);
   }
 
   /**
@@ -163,7 +194,7 @@ class InstagramService {
    * Send a text message to a user on Instagram (supports swipe-to-reply via replyToMid)
    */
   sendTextMessage(recipientId, text, customToken = null, replyToMid = null) {
-    return this.trackSend(recipientId, () => this.postTextMessage(recipientId, text, customToken, replyToMid));
+    return this.trackSend(recipientId, () => this.postTextMessage(recipientId, text, customToken, replyToMid), text);
   }
 
   async postTextMessage(recipientId, text, customToken = null, replyToMid = null) {
