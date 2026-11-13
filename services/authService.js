@@ -13,6 +13,11 @@ const {
 const User = require('../models/User');
 
 let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  // A random secret would silently log everyone out on every restart: refuse to run instead
+  console.error('❌ [AuthService] JWT_SECRET is not set. Set JWT_SECRET in the environment and restart.');
+  process.exit(1);
+}
 if (!JWT_SECRET) {
   JWT_SECRET = crypto.randomBytes(64).toString('hex');
   console.warn('⚠️⚠️⚠️ [AuthService] JWT_SECRET is NOT set! Using a random secret generated at startup. All sessions will be invalidated on every restart. Set JWT_SECRET in the environment.');
@@ -511,7 +516,13 @@ class AuthService {
 
   // --- WebAuthn / Passkey Methods ---
 
+  // Optional fixed passkey domain: RP_ID=example.com, EXPECTED_ORIGINS=https://app.example.com,https://example.com
+  allowedOrigins() {
+    return String(process.env.EXPECTED_ORIGINS || '').split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  }
+
   getRpID(req) {
+    if (process.env.RP_ID) return process.env.RP_ID.trim();
     const origin = req.get('origin') || req.get('referer');
     if (origin) {
       try {
@@ -524,6 +535,11 @@ class AuthService {
   }
 
   getOrigin(req) {
+    const allowed = this.allowedOrigins();
+    if (allowed.length) {
+      const o = req.get('origin') || '';
+      return allowed.includes(o) ? o : allowed[0];
+    }
     const origin = req.get('origin') || req.get('referer');
     if (origin) {
       try {
