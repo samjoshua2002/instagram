@@ -234,7 +234,9 @@ const requireAuth = async (req, res, next) => {
     req.tokenClaims = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: Authentication error' });
+    // A database hiccup is not an expired session: 401 here would sign every user out
+    console.error('requireAuth:', err.message);
+    return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
   }
 };
 
@@ -665,13 +667,13 @@ router.post('/oneauth/verify-setup-otp', codeIpLimit, async (req, res) => {
     const otpError = await checkOtp(user, 'resetOtp', otpCode, 'oneauth_setup');
     if (otpError) return res.status(400).json({ error: otpError });
 
-    // Reset OTP code; first-time setup also creates the authenticator secret
+    // Reset OTP code and always issue a fresh authenticator secret: the new QR is shown below, and
+    // anyone who saw an older secret loses passwordless access
     user.resetOtp = { code: '', expiresAt: null, attempts: 0 };
-    if (!user.twoFactor?.secret) {
-      const { generateSecret } = require('otplib');
-      user.twoFactor = user.twoFactor || {};
-      user.twoFactor.secret = generateSecret();
-    }
+    const { generateSecret } = require('otplib');
+    user.twoFactor = user.twoFactor || {};
+    user.twoFactor.secret = generateSecret();
+    user.twoFactor.lastUsedStep = 0;
     user.twoFactor.enabled = true;
     await user.save();
 
@@ -918,7 +920,7 @@ router.post('/passkey/register-options', requireAuth, ownerSessionOnly, async (r
  */
 router.post('/passkey/register-verify', requireAuth, ownerSessionOnly, async (req, res) => {
   try {
-    const { response, name } = req.body;
+    const { response, name } = req.body || {};
     if (!response) return res.status(400).json({ error: 'Registration response required' });
 
     const verified = await authService.verifyPasskeyRegistration(req.user, response, req);
@@ -1052,7 +1054,7 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       instagramUsername,
       instagramPageAccessToken,
       instagramAccountId,
-    } = req.body;
+    } = req.body || {};
 
     const VALID_ACCOUNT_TYPES = ['personal', 'creator', 'business', 'agency'];
     if (accountType !== undefined && accountType !== null && accountType !== '' && !VALID_ACCOUNT_TYPES.includes(accountType)) {
@@ -1260,16 +1262,8 @@ router.get('/instagram/connect', oauthIpLimit, async (req, res) => {
       userId = ticketUser._id.toString();
     }
 
-    // Legacy: older app builds still send the session JWT as ?token=
-    const queryToken = userId ? '' : asString(req.query.token);
-    if (queryToken) {
-      const decoded = authService.verifyToken(queryToken);
-      const tokenUser = decoded?.userId && mongoose.isValidObjectId(decoded.userId) ? await User.findById(decoded.userId) : null;
-      if (!tokenUser || !authService.isTokenCurrent(decoded, tokenUser) || tokenUser.isBanned) {
-        return res.status(401).send('Your session has expired. Please log in again and retry.');
-      }
-      userId = tokenUser._id.toString();
-    }
+    // The old ?token=<session JWT> form is no longer accepted: a 30-day link someone else sends
+    // you would connect YOUR Instagram to THEIR workspace. The app uses single-use tickets.
 
     let backendUrl = process.env.BACKEND_URL || (req.headers.host ? `https://${req.headers.host}` : 'https://instagram-ai-bot-64tf.onrender.com');
     backendUrl = backendUrl.replace(/\/+$/, '').replace(/^http:\/\/(.*onrender\.com)/i, 'https://$1');
@@ -1764,7 +1758,7 @@ router.post('/instagram/disconnect', requireAuth, async (req, res) => {
 router.put('/profile', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl, accountType } = req.body;
+    const { firstName, lastName, mobileNumber, whatsappNumber, instagramUsername, address, profilePicUrl, accountType } = req.body || {};
 
     if (accountType !== undefined) {
       const validTiers = ['personal', 'business', 'agency', 'creator'];
@@ -1857,8 +1851,8 @@ router.post('/change-password', requireAuth, async (req, res) => {
 router.put('/passkeys/:credentialId', requireAuth, ownerSessionOnly, async (req, res) => {
   try {
     const { credentialId } = req.params;
-    const { name } = req.body;
-    if (!name || !name.trim()) {
+    const { name } = req.body || {};
+    if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Passkey name is required' });
     }
     const passkey = (req.user.passkeys || []).find(p => p.credentialId === credentialId);
@@ -2147,7 +2141,7 @@ router.post('/admin/approve-ig-access', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
     }
 
-    const { userId, instagramUsername } = req.body;
+    const { userId, instagramUsername } = req.body || {};
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ error: 'Target userId is required.' });
     }
@@ -2202,7 +2196,7 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
     if (req.user.role !== 'superadmin') {
       return res.status(403).json({ error: 'Access denied: Superadmin privileges required.' });
     }
-    const { userId } = req.body;
+    const { userId } = req.body || {};
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ error: 'Target userId is required.' });
     }

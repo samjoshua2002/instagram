@@ -93,6 +93,7 @@ router.get('/files/:filename', async (req, res) => {
     // New links end in /api/knowledge/files/<name>, old ones in /uploads/<name>
     const owned = await KnowledgeDoc.exists({
       ownerId: req.user._id,
+      sourceType: { $ne: 'link' }, // a saved link can point anywhere, so it never proves file ownership
       fileUrl: new RegExp(`/(api/knowledge/files|uploads)/${escapeRegex(filename)}$`),
     });
     if (!owned) return res.status(404).json({ error: 'Document not found.' });

@@ -87,7 +87,12 @@ router.get('/leads', async (req, res) => {
 
     if (req.query.format === 'csv') {
       const all = await Lead.find({ ownerId }).sort({ createdAt: -1 }).lean();
-      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      // Cells starting with = + - @ are formulas in Excel/Sheets; DM text must never run as one
+      const esc = (v) => {
+        let s = String(v ?? '');
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return `"${s.replace(/"/g, '""')}"`;
+      };
       const rows = [['Handle', 'Phone', 'Email', 'Intent', 'Captured'].join(',')]
         .concat(all.map(l => [l.handle, l.phone, l.email, l.intentSummary, new Date(l.capturedAt || l.createdAt).toISOString()].map(esc).join(',')));
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

@@ -187,9 +187,12 @@ class AuthService {
         let changed = false;
         const envAccountId = (process.env.INSTAGRAM_ACCOUNT_ID || '').trim();
         if (envAccountId) {
+          // Only proven links count: an id typed in at sign-up (instagramId) proves nothing and must
+          // never be able to wipe the owner's real connection
           const claimedByOther = await User.exists({
             _id: { $ne: user._id },
-            $or: [{ instagramAccountId: envAccountId }, { instagramId: envAccountId }, { 'instagram.accountId': envAccountId }]
+            isVerified: { $ne: false },
+            $or: [{ instagramAccountId: envAccountId }, { 'instagram.accountId': envAccountId }]
           });
           if (claimedByOther) {
             // Another workspace owns this Instagram account: drop only the owner's own env-based link
