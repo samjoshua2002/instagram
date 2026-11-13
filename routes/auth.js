@@ -429,6 +429,13 @@ router.post('/register/verify-otp', authLimiter, async (req, res) => {
     if (otpErr) {
       return res.status(otpErr.status).json({ error: otpErr.error });
     }
+    // The code alone is not enough: a pending sign-up can be restarted by anyone with a new
+    // password, so the browser must also prove it knows the password this code was issued for
+    const { password } = req.body || {};
+    if (typeof password !== 'string' || !(await user.comparePassword(password))) {
+      await user.save(); // the code is used up either way
+      return res.status(400).json({ error: 'This sign-up was restarted with different details. Please request a new code.' });
+    }
 
     user.isVerified = true;
     user.lastLogin = new Date();

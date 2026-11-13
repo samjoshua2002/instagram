@@ -854,6 +854,7 @@ export default function LoginPage({ onLoginSuccess }) {
         body: JSON.stringify({
           email: regForm.email.trim(),
           otpCode: regOtpCode.trim(),
+          password: regForm.password,
         }),
       });
 
