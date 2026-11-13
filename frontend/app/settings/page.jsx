@@ -434,7 +434,7 @@ function SettingsPageInner() {
         </div>
 
         {/* Skeleton Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', borderBottom: '1px solid #e4e4e7' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', borderBottom: '1px solid var(--border)' }}>
           {[120, 140, 110, 115, 125, 135, 120].map((w, idx) => (
             <div
               key={idx}
@@ -451,7 +451,7 @@ function SettingsPageInner() {
 
         {/* Skeleton Form Cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div className="skeleton" style={{ width: '180px', height: '20px', marginBottom: '16px' }} />
             <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
               <div>
@@ -469,7 +469,7 @@ function SettingsPageInner() {
             </div>
           </div>
 
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
               <div className="skeleton" style={{ width: '220px', height: '20px' }} />
               <div className="skeleton" style={{ width: '100px', height: '20px' }} />
@@ -478,7 +478,7 @@ function SettingsPageInner() {
             <div className="skeleton" style={{ width: '100%', height: '130px' }} />
           </div>
 
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div className="skeleton" style={{ width: '280px', height: '20px', marginBottom: '12px' }} />
             <div className="skeleton" style={{ width: '60%', height: '14px', marginBottom: '16px' }} />
             <div className="skeleton" style={{ width: '100%', height: '110px' }} />
@@ -501,14 +501,14 @@ function SettingsPageInner() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           
-            <span style={{ fontSize: '0.76rem', color: '#71717a', fontWeight: '600' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: '600' }}>
               AI PERSONA & STYLING ENGINE
             </span>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#09090b', letterSpacing: '-0.03em', margin: 0 }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text)', letterSpacing: '-0.03em', margin: 0 }}>
             My Persona & Texting Profile
           </h1>
-          <p style={{ fontSize: '0.86rem', color: '#71717a', marginTop: '4px', maxWidth: '640px' }}>
+          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '640px' }}>
             Teach your AI clone who you are, how you text, your characteristics, and reply rules so it talks, banters, and reacts exactly like you.
           </p>
         </div>
@@ -528,7 +528,7 @@ function SettingsPageInner() {
             onClick={handleSave}
             disabled={saving}
             className="btn btn-primary"
-            style={{ fontSize: '0.8rem', padding: '8px 18px', background: saveSuccess ? '#16a34a' : '#09090b' }}
+            style={{ fontSize: '0.8rem', padding: '8px 18px', background: saveSuccess ? 'var(--success)' : 'var(--primary)' }}
           >
             {saving ? (
               <>
@@ -552,14 +552,14 @@ function SettingsPageInner() {
 
       {/* Error alert if any */}
       {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: '8px', color: '#991b1b', marginBottom: '20px', fontSize: '0.85rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', padding: '12px 16px', borderRadius: '8px', color: 'var(--danger)', marginBottom: '20px', fontSize: '0.85rem' }}>
           <AlertCircle size={18} />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', borderBottom: '1px solid #e4e4e7' }}>
+      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '24px', borderBottom: '1px solid var(--border)' }}>
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -574,8 +574,8 @@ function SettingsPageInner() {
                 padding: '10px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: isActive ? '#09090b' : 'transparent',
-                color: isActive ? '#ffffff' : '#71717a',
+                background: isActive ? 'var(--primary)' : 'transparent',
+                color: isActive ? 'var(--primary-fg)' : 'var(--text-muted)',
                 fontSize: '0.84rem',
                 fontWeight: isActive ? '700' : '500',
                 cursor: 'pointer',
@@ -594,18 +594,18 @@ function SettingsPageInner() {
       {activeTab === 'about' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Identity Header Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <UserCheck size={18} />
               <span>Identity & Social Presence</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
               Your basic name and handle that the AI introduces itself as.
             </p>
 
             <div className="responsive-form-grid" style={{ marginBottom: '18px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Creator Full Name
                 </label>
                 <input
@@ -617,7 +617,7 @@ function SettingsPageInner() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Instagram Handle
                 </label>
                 <input
@@ -630,7 +630,7 @@ function SettingsPageInner() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Elevator Bio / One-Liner
               </label>
               <input
@@ -643,17 +643,17 @@ function SettingsPageInner() {
           </div>
 
           {/* Instagram API & Page Access Token Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Key size={18} />
                 <span>Instagram API &amp; Direct Message Credentials</span>
               </h3>
               <span style={{
                 fontSize: '0.72rem',
-                background: formData.instagramPageAccessToken ? '#ecfdf5' : '#fef3c7',
-                color: formData.instagramPageAccessToken ? '#047857' : '#b45309',
-                border: formData.instagramPageAccessToken ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                background: formData.instagramPageAccessToken ? 'var(--success-bg)' : 'var(--warning-bg)',
+                color: formData.instagramPageAccessToken ? 'var(--success)' : 'var(--warning)',
+                border: formData.instagramPageAccessToken ? '1px solid var(--success-border)' : '1px solid var(--warning-border)',
                 padding: '2px 8px',
                 borderRadius: '6px',
                 fontWeight: '700',
@@ -662,15 +662,15 @@ function SettingsPageInner() {
                 {formData.instagramPageAccessToken ? 'TOKEN CONFIGURED' : 'ACTION REQUIRED: TOKEN MISSING'}
               </span>
             </div>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
               Your Instagram Page Access Token and Instagram Account ID enable Chatter AI to send and receive messages on your behalf. You can view, copy, or update your credentials directly below.
             </p>
 
             {/* Meta OAuth Auto-Connect Action */}
             <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '10px',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
               padding: '14px 18px',
               marginBottom: '20px',
               display: 'flex',
@@ -679,22 +679,23 @@ function SettingsPageInner() {
               gap: '12px'
             }}>
               <div>
-                <div style={{ fontSize: '0.84rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ fontSize: '0.84rem', fontWeight: '700', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Instagram size={15} />
                   <span>Automatic Token Generation</span>
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                   Log in with Meta to auto-fetch and renew your Page Access Token &amp; Account ID without manual copy-pasting.
                 </div>
               </div>
 
               <button
                 type="button"
+                className="is-primary"
                 onClick={handleLaunchInstagramOAuth}
                 disabled={oauthConnecting}
                 style={{
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)',
-                  color: '#ffffff',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '9px 16px',
@@ -704,7 +705,7 @@ function SettingsPageInner() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 3px 10px rgba(124, 58, 237, 0.2)',
+                  boxShadow: 'var(--shadow-sm)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0
                 }}
@@ -725,7 +726,7 @@ function SettingsPageInner() {
 
             <div className="responsive-form-grid" style={{ marginBottom: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Instagram Account / Page ID
                 </label>
                 <input
@@ -735,13 +736,13 @@ function SettingsPageInner() {
                   placeholder="e.g. 17841400000000000"
                   style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
                 />
-                <span style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px', display: 'block' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   The Meta Graph API Instagram Business Account ID.
                 </span>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                   Page Access Token
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -764,7 +765,7 @@ function SettingsPageInner() {
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#71717a',
+                        color: 'var(--text-muted)',
                         cursor: 'pointer',
                         padding: '4px 6px',
                         display: 'flex',
@@ -789,7 +790,7 @@ function SettingsPageInner() {
                         style={{
                           background: 'transparent',
                           border: 'none',
-                          color: copiedToken ? '#16a34a' : '#71717a',
+                          color: copiedToken ? 'var(--success)' : 'var(--text-muted)',
                           cursor: 'pointer',
                           padding: '4px 6px',
                           display: 'flex',
@@ -803,7 +804,7 @@ function SettingsPageInner() {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px', display: 'block' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   Click the eye icon to view/edit your token. Click Save Settings in the top right to commit updates.
                 </span>
               </div>
@@ -811,17 +812,17 @@ function SettingsPageInner() {
           </div>
 
           {/* Deep About Me Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <BookOpen size={18} />
                 <span>About Me & Life Background</span>
               </h3>
-              <span style={{ fontSize: '0.72rem', background: '#f4f4f5', color: '#71717a', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
+              <span style={{ fontSize: '0.72rem', background: 'var(--bg-hover)', color: '#52525b', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>
                 AI Brain Context
               </span>
             </div>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '14px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
               Describe everything the AI should know about your real life: where you live, what you study or work on, your hobbies, favorite video games, tech stack, what projects you are currently building, etc.
             </p>
 
@@ -835,12 +836,12 @@ function SettingsPageInner() {
           </div>
 
           {/* Custom Knowledge & FAQs Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Info size={18} />
               <span>My Knowledge Base & Frequent Questions</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '14px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
               List specific answers to questions people ask you frequently (collaborations, software, pricing, camera gear, tutorial plans).
             </p>
 
@@ -858,18 +859,18 @@ function SettingsPageInner() {
       {/* TAB 2: MY CHARACTERISTICS */}
       {activeTab === 'characteristics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Smile size={18} />
               <span>My Personality Traits & Characteristics</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               How do you come across to people? Are you witty, chill, humble, sarcastic, enthusiastic? Tell the AI how your inner vibe works.
             </p>
 
             {/* Quick Trait Chips */}
             <div style={{ marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
                 Quick Click to Add Trait:
               </span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -891,9 +892,9 @@ function SettingsPageInner() {
                     type="button"
                     onClick={() => addTraitChip(trait)}
                     style={{
-                      background: '#f4f4f5',
-                      border: '1px solid #e4e4e7',
-                      color: '#09090b',
+                      background: 'var(--bg-hover)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text)',
                       padding: '4px 10px',
                       borderRadius: '16px',
                       fontSize: '0.76rem',
@@ -918,12 +919,12 @@ function SettingsPageInner() {
           </div>
 
           {/* Overall Tone Guidelines Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sliders size={18} />
               <span>Overall Tone Guidelines & Rules</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '14px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
               Core numbered rules guiding the AI tone across all conversations.
             </p>
 
@@ -942,18 +943,18 @@ function SettingsPageInner() {
       {activeTab === 'texting' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Texting Habits */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MessageSquare size={18} />
               <span>How I Text (Texting Habits & Grammar Rules)</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Specify your typing quirks: lowercase text, no ending periods, message length, shortcuts (rn, fr, tbh, idk, wbu), and slang usage.
             </p>
 
             {/* Quick Texting Habits Chips */}
             <div style={{ marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.74rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
                 Quick Click to Add Texting Rule:
               </span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -972,9 +973,9 @@ function SettingsPageInner() {
                     type="button"
                     onClick={() => addTextingRuleChip(rule)}
                     style={{
-                      background: '#f4f4f5',
-                      border: '1px solid #e4e4e7',
-                      color: '#09090b',
+                      background: 'var(--bg-hover)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text)',
                       padding: '4px 10px',
                       borderRadius: '16px',
                       fontSize: '0.76rem',
@@ -999,12 +1000,12 @@ function SettingsPageInner() {
           </div>
 
           {/* Forbidden & Banned Words */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} style={{ color: '#dc2626' }} />
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} style={{ color: 'var(--danger)' }} />
               <span>Forbidden & Banned Words / Phrases</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Phrases the AI is strictly prohibited from ever typing (e.g. AI assistant cliches or words you never use).
             </p>
 
@@ -1037,9 +1038,9 @@ function SettingsPageInner() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#991b1b',
+                    background: 'var(--danger-bg)',
+                    border: '1px solid var(--danger-border)',
+                    color: 'var(--danger)',
                     padding: '5px 12px',
                     borderRadius: '20px',
                     fontSize: '0.8rem',
@@ -1050,7 +1051,7 @@ function SettingsPageInner() {
                   <button
                     type="button"
                     onClick={() => handleRemoveForbiddenWord(word)}
-                    style={{ background: 'none', border: 'none', color: '#991b1b', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
                     title="Remove banned phrase"
                   >
                     ×
@@ -1058,7 +1059,7 @@ function SettingsPageInner() {
                 </span>
               ))}
               {formData.forbiddenWords.length === 0 && (
-                <span style={{ fontSize: '0.82rem', color: '#a1a1aa' }}>No forbidden words added.</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>No forbidden words added.</span>
               )}
             </div>
           </div>
@@ -1068,12 +1069,12 @@ function SettingsPageInner() {
       {/* TAB 4: HOW TO REPLY */}
       {activeTab === 'replying' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Zap size={18} />
               <span>How I Reply (Reaction Rules & Behaviors)</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Specify your rules for replying to different types of Instagram messages (reels, compliments, memes, questions, story replies).
             </p>
 
@@ -1087,12 +1088,12 @@ function SettingsPageInner() {
           </div>
 
           {/* Typing Speed & Latency */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sliders size={18} />
               <span>Human Typing Delay & Pacing</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Simulates realistic human typing delay with active Instagram "typing..." status before dispatching replies.
             </p>
 
@@ -1110,7 +1111,7 @@ function SettingsPageInner() {
                 {formData.typingDelaySeconds}s
               </span>
             </div>
-            <span style={{ fontSize: '0.76rem', color: '#71717a', marginTop: '8px', display: 'block' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '8px', display: 'block' }}>
               {formData.typingDelaySeconds <= 1
                 ? '⚡ Fast response (great for active testing)'
                 : formData.typingDelaySeconds <= 2.5
@@ -1124,12 +1125,12 @@ function SettingsPageInner() {
       {/* TAB 5: FEW-SHOT CHAT EXAMPLES */}
       {activeTab === 'examples' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Code size={18} />
               <span>Real Chat Examples (Few-Shot Prompting)</span>
             </h3>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '20px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
               These message pairs teach the AI exactly how you reply to real DM scenarios. The AI studies these examples to copy your speech rhythm.
             </p>
 
@@ -1139,8 +1140,8 @@ function SettingsPageInner() {
                 <div
                   key={idx}
                   style={{
-                    background: '#fafafa',
-                    border: '1px solid #e4e4e7',
+                    background: 'var(--bg-subtle)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '14px 16px',
                     display: 'flex',
@@ -1152,11 +1153,11 @@ function SettingsPageInner() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#71717a', textTransform: 'uppercase' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                           Incoming User DM:
                         </span>
                       </div>
-                      <p style={{ fontSize: '0.84rem', color: '#09090b', background: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e4e4e7' }}>
+                      <p style={{ fontSize: '0.84rem', color: 'var(--text)', background: 'var(--bg)', padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                         "{item.userMessage}"
                       </p>
                     </div>
@@ -1164,7 +1165,7 @@ function SettingsPageInner() {
                     <button
                       type="button"
                       onClick={() => handleRemoveSampleConversation(idx)}
-                      style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px', marginLeft: '12px' }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', marginLeft: '12px' }}
                       title="Delete example"
                     >
                       <Trash2 size={16} />
@@ -1173,11 +1174,11 @@ function SettingsPageInner() {
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase' }}>
                         How {formData.creatorName} Replies:
                       </span>
                     </div>
-                    <p style={{ fontSize: '0.84rem', color: '#09090b', background: '#f0fdf4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #bbf7d0', fontWeight: '500' }}>
+                    <p style={{ fontSize: '0.84rem', color: 'var(--text)', background: 'var(--success-bg)', padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--success-border)', fontWeight: '500' }}>
                       "{item.myReply}"
                     </p>
                   </div>
@@ -1186,13 +1187,13 @@ function SettingsPageInner() {
             </div>
 
             {/* Add New Example Card */}
-            <div style={{ background: '#ffffff', border: '1px dashed #d4d4d8', borderRadius: '8px', padding: '16px' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#09090b', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+            <div style={{ background: 'var(--bg)', border: '1px dashed var(--border-strong)', borderRadius: '8px', padding: '16px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
                 + Add New Chat Example
               </span>
               <div className="responsive-form-grid" style={{ marginBottom: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#71717a', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     User's Message:
                   </label>
                   <input
@@ -1203,7 +1204,7 @@ function SettingsPageInner() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: '#71717a', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     Your Real Reply:
                   </label>
                   <input
@@ -1232,40 +1233,40 @@ function SettingsPageInner() {
       {activeTab === 'integrations' && isSuperadmin && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* GIPHY Developer Key Card */}
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Key size={18} style={{ color: '#09090b' }} />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', margin: 0 }}>
+                <Key size={18} style={{ color: 'var(--text)' }} />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', margin: 0 }}>
                   GIPHY API & Reaction GIFs
                 </h3>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {giphyStatus === 'success' ? (
-                  <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.72rem', background: 'var(--success-bg)', color: 'var(--success)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <CheckCircle2 size={12} />
                     <span>Connected & Verified</span>
                   </span>
                 ) : giphyStatus === 'error' ? (
-                  <span style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '0.72rem', background: 'var(--danger-bg)', color: 'var(--danger)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertCircle size={12} />
                     <span>Connection Failed</span>
                   </span>
                 ) : (
-                  <span style={{ fontSize: '0.72rem', background: '#f4f4f5', color: '#09090b', padding: '4px 10px', borderRadius: '20px', fontWeight: '700' }}>
+                  <span style={{ fontSize: '0.72rem', background: 'var(--bg-hover)', color: 'var(--text)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700' }}>
                     Saved in Database
                   </span>
                 )}
               </div>
             </div>
 
-            <p style={{ fontSize: '0.84rem', color: '#71717a', marginBottom: '18px', maxWidth: '720px' }}>
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '18px', maxWidth: '720px' }}>
               Your Giphy API Key powers instant GIF searches, predefined reactions, and automatically attaches relevant comedic media at 50% priority frequency in Instagram DMs when friends text trigger keywords (e.g., &quot;u sus&quot;, &quot;why chatting like ai&quot;, &quot;lol&quot;).
             </p>
 
             {/* Input with Show/Hide toggle */}
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: '#71717a', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 GIPHY API Key
               </label>
               <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
@@ -1291,7 +1292,7 @@ function SettingsPageInner() {
                     transform: 'translateY(-50%)',
                     background: 'transparent',
                     border: 'none',
-                    color: '#71717a',
+                    color: 'var(--text-muted)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center'
@@ -1338,11 +1339,11 @@ function SettingsPageInner() {
             </div>
 
             {/* Features callout */}
-            <div style={{ marginTop: '20px', padding: '16px', background: '#fafafa', borderRadius: '8px', border: '1px solid #f4f4f5' }}>
-              <div style={{ fontSize: '0.76rem', fontWeight: '800', color: '#09090b', textTransform: 'uppercase', marginBottom: '8px' }}>
+            <div style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-subtle)', borderRadius: '8px', border: '1px solid var(--bg-hover)' }}>
+              <div style={{ fontSize: '0.76rem', fontWeight: '800', color: 'var(--text)', textTransform: 'uppercase', marginBottom: '8px' }}>
                 How This Key Is Used In Real Chats
               </div>
-              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: '#71717a', lineHeight: 1.6 }}>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                 <li><strong>50% Priority Attachments:</strong> In ~2 out of 5 DMs, the bot automatically selects a GIF matching the emotional context instead of sending plain text.</li>
                 <li><strong>Trigger Words:</strong> Friend says &quot;u sus&quot; or &quot;why like ai&quot; &rarr; Bot automatically replies with side-eye / Chloe / dog doubt GIF.</li>
                 <li><strong>Curated & Custom Vault:</strong> Browse, preview, and 1-click import trending reaction GIFs in the Media Vault tab.</li>
@@ -1355,25 +1356,25 @@ function SettingsPageInner() {
       {/* TAB 6: LIVE TEST SIMULATOR */}
       {activeTab === 'simulator' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#09090b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Send size={18} />
                 <span>Test How AI Talks As You</span>
               </h3>
-              <span style={{ fontSize: '0.74rem', background: '#f4f4f5', color: '#09090b', padding: '3px 8px', borderRadius: '4px', fontWeight: '700' }}>
+              <span style={{ fontSize: '0.74rem', background: 'var(--bg-hover)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontWeight: '700' }}>
                 LIVE PREVIEW
               </span>
             </div>
-            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '18px' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '18px' }}>
               Send any test DM below to verify how your AI clone texts back using your saved persona and reply rules.
             </p>
 
             {/* Chat Messages Window */}
             <div
               style={{
-                background: '#fafafa',
-                border: '1px solid #e4e4e7',
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
                 padding: '16px',
                 minHeight: '260px',
@@ -1396,14 +1397,14 @@ function SettingsPageInner() {
                       alignItems: isUser ? 'flex-end' : 'flex-start'
                     }}
                   >
-                    <span style={{ fontSize: '0.7rem', color: '#a1a1aa', marginBottom: '3px', padding: '0 4px' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '3px', padding: '0 4px' }}>
                       {isUser ? 'Friend / User' : `${formData.creatorName} (AI Clone)`}
                     </span>
                     <div
                       style={{
-                        background: isUser ? '#09090b' : '#ffffff',
-                        color: isUser ? '#ffffff' : '#09090b',
-                        border: isUser ? 'none' : '1px solid #e4e4e7',
+                        background: isUser ? 'var(--primary)' : 'var(--bg)',
+                        color: isUser ? 'var(--primary-fg)' : 'var(--text)',
+                        border: isUser ? 'none' : '1px solid var(--border)',
                         padding: '9px 14px',
                         borderRadius: isUser ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
                         fontSize: '0.85rem',
@@ -1419,7 +1420,7 @@ function SettingsPageInner() {
               })}
 
               {testSending && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#71717a', fontSize: '0.8rem', fontStyle: 'italic', padding: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic', padding: '4px' }}>
                   <RefreshCw size={13} className="animate-spin" />
                   <span>{formData.creatorName} is typing...</span>
                 </div>

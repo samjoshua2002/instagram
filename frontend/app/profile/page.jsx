@@ -190,7 +190,7 @@ export default function ProfilePage() {
             fontSize: '0.68rem',
             fontWeight: '800',
             fontFamily: "'JetBrains Mono', monospace",
-            color: '#a1a1aa',
+            color: 'var(--text-muted)',
             letterSpacing: '0.8px',
             textTransform: 'uppercase',
             marginBottom: '6px'
@@ -200,13 +200,13 @@ export default function ProfilePage() {
           <h1 style={{
             fontSize: '1.75rem',
             fontWeight: '800',
-            color: '#09090b',
+            color: 'var(--text)',
             letterSpacing: '-0.5px',
             margin: '0 0 6px 0'
           }}>
             Profile &amp; Security Settings
           </h1>
-          <p style={{ fontSize: '0.86rem', color: '#71717a', margin: 0 }}>
+          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0 }}>
             Manage your personal identity details, connected Instagram account, and biometric passkeys.
           </p>
         </div>
@@ -214,10 +214,10 @@ export default function ProfilePage() {
         {/* Alerts */}
         {errorMsg && (
           <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#b91c1c',
-            borderRadius: '10px',
+            background: 'var(--danger-bg)',
+            border: '1px solid var(--danger-border)',
+            color: 'var(--danger)',
+            borderRadius: 'var(--r-lg)',
             padding: '12px 16px',
             fontSize: '0.84rem',
             marginBottom: '20px',
@@ -232,10 +232,10 @@ export default function ProfilePage() {
 
         {successMsg && (
           <div style={{
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            color: '#15803d',
-            borderRadius: '10px',
+            background: 'var(--success-bg)',
+            border: '1px solid var(--success-border)',
+            color: 'var(--success)',
+            borderRadius: 'var(--r-lg)',
             padding: '12px 16px',
             fontSize: '0.84rem',
             marginBottom: '20px',
@@ -253,15 +253,15 @@ export default function ProfilePage() {
           {/* Column 1: Personal Details */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '14px',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
               padding: '24px'
             }}>
               <h2 style={{
                 fontSize: '1.05rem',
                 fontWeight: '700',
-                color: '#09090b',
+                color: 'var(--text)',
                 margin: '0 0 16px 0',
                 display: 'flex',
                 alignItems: 'center',
@@ -285,8 +285,8 @@ export default function ProfilePage() {
                         width: '100%',
                         padding: '9px 12px',
                         borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
                         fontSize: '0.84rem',
                         boxSizing: 'border-box'
                       }}
@@ -304,8 +304,8 @@ export default function ProfilePage() {
                         width: '100%',
                         padding: '9px 12px',
                         borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
                         fontSize: '0.84rem',
                         boxSizing: 'border-box'
                       }}
@@ -325,9 +325,9 @@ export default function ProfilePage() {
                       width: '100%',
                       padding: '9px 12px',
                       borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      background: '#f4f4f5',
-                      color: '#71717a',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-hover)',
+                      color: '#52525b',
                       fontSize: '0.84rem',
                       boxSizing: 'border-box',
                       cursor: 'not-allowed'
@@ -349,8 +349,8 @@ export default function ProfilePage() {
                         width: '100%',
                         padding: '9px 12px',
                         borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
                         fontSize: '0.84rem',
                         boxSizing: 'border-box'
                       }}
@@ -369,8 +369,8 @@ export default function ProfilePage() {
                         width: '100%',
                         padding: '9px 12px',
                         borderRadius: '8px',
-                        border: '1px solid #e4e4e7',
-                        background: '#ffffff',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
                         fontSize: '0.84rem',
                         boxSizing: 'border-box'
                       }}
@@ -401,8 +401,8 @@ export default function ProfilePage() {
                           width: '100%',
                           padding: '9px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #e4e4e7',
-                          background: '#ffffff',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg)',
                           fontSize: '0.84rem',
                           boxSizing: 'border-box'
                         }}
@@ -415,8 +415,8 @@ export default function ProfilePage() {
                   type="submit"
                   disabled={saving}
                   style={{
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--primary)',
+                    color: 'var(--primary-fg)',
                     border: 'none',
                     borderRadius: '8px',
                     padding: '11px 18px',
@@ -450,15 +450,15 @@ export default function ProfilePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Instagram Connection Card */}
             <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '14px',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
               padding: '24px'
             }}>
               <h2 style={{
                 fontSize: '1.05rem',
                 fontWeight: '700',
-                color: '#09090b',
+                color: 'var(--text)',
                 margin: '0 0 16px 0',
                 display: 'flex',
                 alignItems: 'center',
@@ -469,21 +469,21 @@ export default function ProfilePage() {
               </h2>
 
               <div style={{
-                background: '#ffffff',
-                border: '1px solid #e4e4e7',
-                borderRadius: '10px',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-lg)',
                 padding: '16px',
                 marginBottom: '14px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#52525b' }}>Handle</span>
-                  <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#09090b' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: '800', color: 'var(--text)' }}>
                     @{user?.instagramUsername || user?.username || 'None'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#52525b' }}>Account ID</span>
-                  <span style={{ fontSize: '0.76rem', fontFamily: "'JetBrains Mono', monospace", color: '#71717a' }}>
+                  <span style={{ fontSize: '0.76rem', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-muted)' }}>
                     {user?.instagramId || user?.instagramAccountId || 'Unlinked'}
                   </span>
                 </div>
@@ -493,8 +493,8 @@ export default function ProfilePage() {
                     fontSize: '0.68rem',
                     fontWeight: '800',
                     fontFamily: "'JetBrains Mono', monospace",
-                    background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? '#dcfce7' : '#fee2e2',
-                    color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? '#15803d' : '#b91c1c',
+                    background: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success-bg)' : 'var(--danger-bg)',
+                    color: (user?.hasInstagramToken || user?.instagramPageAccessToken) ? 'var(--success)' : 'var(--danger)',
                     padding: '2px 8px',
                     borderRadius: '4px'
                   }}>
@@ -503,23 +503,23 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <p style={{ fontSize: '0.75rem', color: '#71717a', lineHeight: 1.45, margin: 0 }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45, margin: 0 }}>
                 To change your AI persona, texting tone, or access token, visit the <strong>Persona &amp; Style</strong> tab in the navigation menu.
               </p>
             </div>
 
             {/* Passkeys & Security Card */}
             <div style={{
-              background: '#fafafa',
-              border: '1px solid #e4e4e7',
-              borderRadius: '14px',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
               padding: '24px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <h2 style={{
                   fontSize: '1.05rem',
                   fontWeight: '700',
-                  color: '#09090b',
+                  color: 'var(--text)',
                   margin: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -533,10 +533,10 @@ export default function ProfilePage() {
                   onClick={handleRegisterPasskey}
                   disabled={passkeyLoading}
                   style={{
-                    background: '#09090b',
-                    color: '#ffffff',
+                    background: 'var(--primary)',
+                    color: 'var(--primary-fg)',
                     border: 'none',
-                    borderRadius: '7px',
+                    borderRadius: 'var(--r-md)',
                     padding: '6px 12px',
                     fontSize: '0.74rem',
                     fontWeight: '700',
@@ -551,7 +551,7 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              <p style={{ fontSize: '0.78rem', color: '#71717a', marginBottom: '14px', lineHeight: 1.45 }}>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.45 }}>
                 Log in instantly without typing passwords using Face ID, Touch ID, Windows Hello, or hardware security keys.
               </p>
 
@@ -561,8 +561,8 @@ export default function ProfilePage() {
                     <div
                       key={pk.id}
                       style={{
-                        background: '#ffffff',
-                        border: '1px solid #e4e4e7',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
                         borderRadius: '8px',
                         padding: '10px 14px',
                         display: 'flex',
@@ -573,10 +573,10 @@ export default function ProfilePage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Laptop size={15} color="#71717a" />
                         <div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#09090b' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text)' }}>
                             {pk.deviceType || pk.name || 'Biometric Passkey'}
                           </div>
-                          <div style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                             Created: {new Date(pk.createdAt).toLocaleDateString()}
                           </div>
                         </div>
@@ -588,7 +588,7 @@ export default function ProfilePage() {
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#ef4444',
+                          color: 'var(--danger)',
                           cursor: 'pointer',
                           padding: '4px'
                         }}
@@ -601,13 +601,13 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <div style={{
-                  background: '#ffffff',
-                  border: '1px dashed #d4d4d8',
+                  background: 'var(--bg)',
+                  border: '1px dashed var(--border-strong)',
                   borderRadius: '8px',
                   padding: '16px',
                   textAlign: 'center',
                   fontSize: '0.78rem',
-                  color: '#71717a'
+                  color: 'var(--text-muted)'
                 }}>
                   No biometric passkeys enrolled yet. Click &quot;Add Passkey&quot; above to enroll Touch ID or Face ID.
                 </div>

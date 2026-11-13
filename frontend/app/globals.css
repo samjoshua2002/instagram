@@ -6,11 +6,34 @@
   --bg-hover: #f4f4f5;
   --bg-subtle: #fafafa;
   --border: #e4e4e7;
+  --border-strong: #d4d4d8;
   --border-focus: #09090b;
   --text: #09090b;
   --text-muted: #71717a;
   --text-dim: #a1a1aa;
-  --accent: #000000;
+  --accent: #09090b;
+  --primary: #09090b;
+  --primary-hover: #27272a;
+  --primary-fg: #ffffff;
+  --ring: #09090b;
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+  --success-border: #bbf7d0;
+  --danger: #b91c1c;
+  --danger-solid: #dc2626;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --warning: #b45309;
+  --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
+  --info: #0369a1;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg: 0 20px 40px rgba(0,0,0,.15);
 }
 
 * {
@@ -96,14 +119,14 @@ html, body {
 }
 
 .btn-primary {
-  background: #09090b;
-  color: #ffffff;
-  border: 1px solid #09090b;
+  background: var(--primary);
+  color: var(--primary-fg);
+  border: 1px solid var(--primary);
 }
 
 .btn-primary:hover {
-  background: #27272a;
-  border-color: #27272a;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 /* Form Inputs */
@@ -120,9 +143,42 @@ input, textarea, select {
   width: 100%;
 }
 
-input:focus, textarea:focus, select:focus {
-  border-color: #09090b;
-  box-shadow: 0 0 0 1px #09090b;
+input:focus, textarea:focus, select:focus,
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
+/* Visual states: keyboard focus, disabled, generic hover */
+:where(button, a, [role=button], [tabindex], summary):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+button:disabled, button[aria-disabled=true] {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(0.96);
+}
+
+/* Dark (primary) buttons get lighter on hover instead of darker */
+button.btn-primary:not(:disabled):hover,
+button.is-primary:not(:disabled):hover {
+  filter: brightness(1.15);
+}
+
+/* Input wrapper whose inner input has no border/outline of its own */
+.input-focus-ring:focus-within {
+  border-color: var(--ring) !important;
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
+.input-focus-ring input:focus,
+.input-focus-ring input:focus-visible {
+  box-shadow: none;
 }
 
 /* Spinner */
