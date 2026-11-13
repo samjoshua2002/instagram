@@ -34,7 +34,7 @@ export default function BusinessStoryboardPage() {
       />
       <div className="story-layout">
         <StoryboardCanvas kind="business" nodeTypes={NODE_TYPES} templates={BUSINESS_TEMPLATES} />
-        <SandboxChat senderId="sandbox_customer" senderName="a new customer" placeholder="Hi, what are your prices?" />
+        <SandboxChat senderId="test_sandbox_customer" senderName="a new customer" placeholder="Hi, what are your prices?" />
       </div>
     </div>
   );

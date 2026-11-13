@@ -283,6 +283,8 @@ class SocialGraphService {
       for (const [key, node] of cache.entries()) {
         // Skip senderId keys
         if (key === senderId || /^\d+$/.test(key)) continue;
+        // 1-2 letter nicknames would match almost any message
+        if (key.length < 3) continue;
 
         // Check if key or alias appears as a word boundary in corpus
         const regex = new RegExp(`(^|[^a-zA-Z0-9_])${escapeRegex(key)}([^a-zA-Z0-9_]|$)`, 'i');
@@ -342,17 +344,19 @@ class SocialGraphService {
         for (const [name, node] of mentionedNodes.entries()) {
           lines.push(`  - ${name} (${node.instagramHandle || 'Friend'}):`);
           lines.push(`    * Relationship to you: ${clean(node.relationshipToSam, 80)}`);
-          if (senderNode) {
-            const directConn = (senderNode.connections || []).find(c => c.targetName.toLowerCase() === name.toLowerCase());
-            if (directConn) {
-              lines.push(`    * Connection to ${senderNode.name}: ${clean(directConn.relationship, 40)} (${clean(directConn.notes, 200)})`);
-            }
+          const directConn = senderNode
+            ? (senderNode.connections || []).find(c => (c.targetName || '').toLowerCase() === name.toLowerCase())
+            : null;
+          if (directConn) {
+            lines.push(`    * Connection to ${senderNode.name}: ${clean(directConn.relationship, 40)} (${clean(directConn.notes, 200)})`);
           }
-          if (node.lore && node.lore.length > 0) {
+          // A friend's private lore (facts, birthday, school...) is only shared with someone already
+          // connected to them, never with a stranger who just types their name
+          if (directConn && node.lore && node.lore.length > 0) {
             lines.push(`    * Shared Lore/Jokes: ${clean(node.lore.join(' '), 600)}`);
           }
         }
-        lines.push(`CRITICAL: You KNOW these friends! Never say "who is ${Array.from(mentionedNodes.keys()).join('/')}". Reference their shared inside jokes naturally!`);
+        lines.push(`You KNOW these friends, so never say "who is ${Array.from(mentionedNodes.keys()).join('/')}". But never share their private details (birthday, school, location, contact info, personal facts) with the person you are chatting with.`);
       }
 
       return lines.join('\n');

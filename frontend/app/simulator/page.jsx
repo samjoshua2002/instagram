@@ -1,27 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { MessageSquare, Send, Sparkles } from 'lucide-react';
 
 export default function SimulatorPage() {
   const { nodes, API_BASE } = useApp();
-  const [selectedFriendId, setSelectedFriendId] = useState('bhavani');
+  const [selectedFriendId, setSelectedFriendId] = useState(null);
   const [inputMsg, setInputMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: 'user', text: 'hey sam! how is everything going with the video projects?', time: '10:45 AM' },
-    { role: 'assistant', text: 'yoo! going good fr! just finishing up a motion graphic reel. hows your medicine study going? how are the hamsters doing haha 🐹', time: '10:46 AM' }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const friendList = nodes.filter(n => !n.isRoot);
   const targetFriend = friendList.find(f => f.id === selectedFriendId) || friendList[0];
+  const activeFriendId = targetFriend?.id || null;
+
+  // A reply still on its way for the previously selected contact is dropped, never shown as this one's
+  const activeFriendRef = useRef(activeFriendId);
+  useEffect(() => {
+    activeFriendRef.current = activeFriendId;
+    setIsLoading(false);
+    // Each contact gets a fresh test thread
+    setMessages([]);
+    setInputMsg('');
+  }, [activeFriendId]);
 
   const handleSend = async (e) => {
     e?.preventDefault();
-    if (!inputMsg.trim()) return;
+    if (!inputMsg.trim() || !targetFriend) return;
 
     const userText = inputMsg.trim();
+    const sentFor = activeFriendId;
+    const stillActive = () => activeFriendRef.current === sentFor;
     setInputMsg('');
     setMessages(prev => [...prev, { role: 'user', text: userText, time: 'Just now' }]);
     setIsLoading(true);
@@ -31,24 +41,28 @@ export default function SimulatorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          testSenderId: targetFriend?.senderId || 'test_sim_id',
-          testUsername: targetFriend?.name || 'Friend',
+          // test_ prefix: the server keeps it as a separate per-account test sender, so these
+          // made-up DMs never land in the real contact's chat history or memory
+          testSenderId: `test_sim_${targetFriend.senderId || targetFriend.id}`,
+          testUsername: targetFriend.name || 'Friend',
           messageText: userText
         })
       });
       const data = await res.json().catch(() => ({}));
+      if (!stillActive()) return;
       // Never invent a reply: a failure must look like a failure, not a working bot
       setMessages(prev => [
         ...prev,
         { role: 'assistant', text: (res.ok && data.replyText) || `(No reply: ${data.error || 'the AI returned nothing'})`, time: 'Just now' }
       ]);
     } catch (e) {
+      if (!stillActive()) return;
       setMessages(prev => [
         ...prev,
         { role: 'assistant', text: '(No reply: could not reach the server)', time: 'Just now' }
       ]);
     } finally {
-      setIsLoading(false);
+      if (stillActive()) setIsLoading(false);
     }
   };
 
@@ -73,8 +87,8 @@ export default function SimulatorPage() {
             key={f.id}
             onClick={() => setSelectedFriendId(f.id)}
             style={{
-              background: selectedFriendId === f.id ? 'var(--color-surface)' : 'var(--color-text-primary)',
-              color: selectedFriendId === f.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              background: activeFriendId === f.id ? 'var(--color-surface)' : 'var(--color-text-primary)',
+              color: activeFriendId === f.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
               border: '1px solid var(--color-text-secondary)',
               padding: '6px 14px',
               borderRadius: '8px',
@@ -123,14 +137,15 @@ export default function SimulatorPage() {
         <form onSubmit={handleSend} style={{ padding: '14px', borderTop: '1px solid var(--color-text-secondary)', display: 'flex', gap: '10px', background: 'var(--color-text-primary)' }}>
           <input
             type="text"
-            placeholder={`Type a DM as ${targetFriend?.name || 'Friend'}...`}
+            placeholder={targetFriend ? `Type a DM as ${targetFriend.name}...` : 'Add a contact in People first'}
+            disabled={!targetFriend}
             value={inputMsg}
             onChange={(e) => setInputMsg(e.target.value)}
             style={{ flex: 1, background: 'var(--color-text-primary)', border: '1px solid var(--color-text-secondary)', borderRadius: '8px', color: 'var(--color-surface)', padding: '12px 16px', fontSize: '0.85rem', outline: 'none' }}
           />
           <button
             type="submit"
-            disabled={isLoading || !inputMsg.trim()}
+            disabled={isLoading || !inputMsg.trim() || !targetFriend}
             style={{ background: 'var(--color-surface)', color: 'var(--color-text-primary)', border: 'none', borderRadius: '8px', padding: '0 20px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Send size={15} />

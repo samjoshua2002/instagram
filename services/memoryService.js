@@ -92,6 +92,11 @@ function changedFields(snapshot, doc) {
 // more accurate than gpt-4o on names, ages and dates); without it the platform default deployment is used.
 const DEPLOYMENT = process.env.MEMORY_MODEL || process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
 
+// Background learning waits for the chat to go quiet, then runs once per contact (not once per DM)
+const MEMORY_LEARN_QUIET_MS = 45 * 1000;
+// ...but a chat that never pauses still gets learned at least this often
+const MEMORY_LEARN_MAX_WAIT_MS = 5 * 60 * 1000;
+
 class MemoryService {
   constructor() {
     this.client = traceOpenAI(
@@ -209,6 +214,30 @@ class MemoryService {
     })();
     this._runs.set(runKey, state);
     return state.done;
+  }
+
+  /**
+   * Background learning for live chats: a burst of DMs (and the AI's own replies) waits until the chat
+   * has been quiet for quietMs, then runs ONE updateMemoryAsync (a chat that never pauses still learns
+   * every maxWaitMs). Before, every DM and every reply started a full AI read of up to 100 messages.
+   */
+  scheduleMemoryUpdate(senderId, options = {}, { quietMs = MEMORY_LEARN_QUIET_MS, maxWaitMs = MEMORY_LEARN_MAX_WAIT_MS } = {}) {
+    if (!this._learnQueue) this._learnQueue = new Map();
+    const key = `${options.ownerId === undefined ? '*' : String(options.ownerId || 'legacy')}|${senderId}`;
+    let job = this._learnQueue.get(key);
+    if (!job) {
+      job = { timer: null, firstAt: Date.now() };
+      this._learnQueue.set(key, job);
+    }
+    clearTimeout(job.timer);
+    const waited = Date.now() - job.firstAt;
+    job.timer = setTimeout(() => {
+      if (this._learnQueue.get(key) === job) this._learnQueue.delete(key);
+      // updateMemoryAsync already allows one run per person and queues one more for DMs during a run
+      this.updateMemoryAsync(senderId, options).catch(err => {
+        console.error('Background memory update failed (non-critical):', err.message);
+      });
+    }, waited >= maxWaitMs ? 0 : Math.min(quietMs, maxWaitMs - waited));
   }
 
   async _updateMemoryOnce(senderId, options = {}) {
@@ -563,13 +592,13 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         }
       }
 
-      // Write only the learned fields this run changed ($set) plus the counter ($inc). A full save
-      // after the slow AI call used to overwrite edits made in the meantime (manual edits, new DMs).
+      // Write only the learned fields this run changed ($set). A full save after the slow AI call used
+      // to overwrite edits made in the meantime (manual edits, new DMs). messageCount is NOT bumped here:
+      // the webhook already counts each DM, so a learning run counting one more inflated it.
       const changes = changedFields(snapshot, memory);
-      await UserMemory.updateOne({ _id: memory._id }, {
-        ...(Object.keys(changes).length ? { $set: changes } : {}),
-        $inc: { messageCount: 1 },
-      });
+      if (Object.keys(changes).length) {
+        await UserMemory.updateOne({ _id: memory._id }, { $set: changes });
+      }
       memory = (await UserMemory.findById(memory._id)) || memory;
 
       // Immediate cache sync in Redis
@@ -656,7 +685,8 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           node.updatedAt = new Date();
           await node.save();
           console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for ${node.name} (DOB: "${node.dob || ''}", Rel: "${node.relationshipToSam}", Lore: ${node.lore.length})`);
-        } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU)) {
+        } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU) && !/^(test_|ig_tester_)/i.test(memory.senderId || '')) {
+          // Simulator / sandbox contacts (senderId test_...) never become People cards, whatever name they use
           await SocialGraph.create({
             ownerId: memory.ownerId || null,
             name: displayName,

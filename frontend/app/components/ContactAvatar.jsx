@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 
 /**
@@ -12,6 +12,14 @@ import { unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 export default function ContactAvatar({ contact, size = 40, showStatus = true, style = {} }) {
   const [imgError, setImgError] = useState(false);
   const [unavatarError, setUnavatarError] = useState(false);
+  const handleKey = (contact && (contact.handle || contact.instagramHandle || contact.username)) || '';
+  const profilePicKey = (contact && contact.profilePic) || '';
+
+  // A new person, handle or refreshed photo link gets a fresh try (an earlier failure must not block it)
+  useEffect(() => {
+    setImgError(false);
+    setUnavatarError(false);
+  }, [handleKey, profilePicKey]);
 
   if (!contact) return null;
 

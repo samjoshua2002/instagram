@@ -924,7 +924,7 @@ export default function ProfilePage() {
                       <Laptop size={16} color="var(--color-text-secondary)" />
                       <div>
                         <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                          {pk.deviceType || pk.name || 'Biometric Device'}
+                          {pk.name || 'Biometric Device'}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
                           Registered on {new Date(pk.createdAt).toLocaleDateString()}

@@ -72,15 +72,19 @@ Topics: Content creation, AI tools, video editing, coding
 Inquiries: DMs open for cool collaborations & tech discussions`,
   },
 
-  forbiddenWords: [
-    "as an ai",
-    "language model",
-    "how may i assist you",
-    "i do not have personal feelings",
-    "delighted to help",
-    "certainly!",
-    "baddu",
-  ],
+  // { type, default } form: a bare array here is only a type declaration and new personas got []
+  forbiddenWords: {
+    type: [String],
+    default: [
+      "as an ai",
+      "language model",
+      "how may i assist you",
+      "i do not have personal feelings",
+      "delighted to help",
+      "certainly!",
+      "baddu",
+    ],
+  },
   globalBotActive: {
     type: Boolean,
     default: true,
@@ -150,5 +154,25 @@ PersonaConfigSchema.index(
   // Named so it doesn't clash with the plain ownerId_1 index older databases already have
   { unique: true, name: 'ownerId_unique', partialFilterExpression: { ownerId: { $type: 'objectId' } } }
 );
+
+// Starting persona for a creator's own workspace. The schema defaults above describe the original
+// owner (Sam Joshua, @catovidz) and must never become another creator's AI identity.
+PersonaConfigSchema.statics.starterFields = function (user) {
+  const u = user || {};
+  const displayName = u.firstName ? `${u.firstName} ${u.lastName || ''}`.trim() : (u.username || 'the creator');
+  const handle = u.instagramUsername ? `@${String(u.instagramUsername).replace(/^@/, '')}` : (u.username ? `@${u.username}` : '');
+  return {
+    creatorName: displayName,
+    instagramHandle: handle,
+    personaBio: u.businessProfile?.description || `I am ${displayName}${handle ? `, creator of ${handle}` : ''}.`,
+    aboutMe: `I am ${displayName}${handle ? `, creator of ${handle}` : ''}.`,
+    characteristics: 'Friendly, helpful, approachable, authentic.',
+    textingHabits: 'Casual lowercase, friendly, short messages.',
+    replyRules: 'Default to natural friendly replies without sounding robotic.',
+    toneGuidelines: '1. Talk naturally like a real human.\n2. Keep replies engaging and warm.\n3. Never sound like a robot.',
+    customKnowledge: `Account: ${handle}\nCreator: ${displayName}`,
+    sampleConversations: [],
+  };
+};
 
 module.exports = mongoose.model('PersonaConfig', PersonaConfigSchema);

@@ -12,3 +12,6 @@ frontend/.next-*/
 
 # Private uploaded knowledge documents (served only through /api/knowledge/files)
 storage/
+
+# User-uploaded media (never commit)
+public/uploads/

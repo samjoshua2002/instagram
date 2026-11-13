@@ -57,7 +57,8 @@ export default function PersonalStoryboardPage() {
       <div className="story-layout">
         <StoryboardCanvas kind="personal" nodeTypes={NODE_TYPES} templates={PERSONAL_TEMPLATES} templateContext={{ people, user }} onSelect={setChatWith} extraAdd={addContact} />
         <SandboxChat
-          senderId={contact?.senderId || `sandbox_${contact?.id || 'friend'}`}
+          // test_ prefix: sandbox DMs never land in the real contact's chat history or memory
+          senderId={`test_sandbox_${contact?.senderId || contact?.id || 'friend'}`}
           senderName={contact?.name || 'a new friend'}
         />
       </div>
