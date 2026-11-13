@@ -1032,6 +1032,9 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       user.instagramPageAccessToken = instagramPageAccessToken.trim();
     }
     if (instagramAccountId !== undefined && instagramAccountId !== null) {
+      if (instagramAccountId.trim() && await User.accountIdHolder(instagramAccountId, user._id)) {
+        return res.status(409).json({ error: 'This Instagram account is already connected to another Chatter account.' });
+      }
       user.instagramAccountId = instagramAccountId.trim();
     }
     if (businessProfile) {
@@ -1443,6 +1446,12 @@ router.get('/instagram/callback', async (req, res) => {
         {
           const user = await User.findById(stateUserId);
           if (user) {
+            // Meta just proved this person owns the account: release it from anyone who claimed it before
+            if (instagramAccountId) {
+              const PersonaConfigModel = require('../models/PersonaConfig');
+              await User.updateMany({ _id: { $ne: user._id }, instagramAccountId }, { $set: { instagramAccountId: '', instagramPageAccessToken: '', hasInstagramToken: false, isInstagramConnected: false } });
+              await PersonaConfigModel.updateMany({ ownerId: { $ne: user._id }, instagramAccountId }, { $set: { instagramAccountId: '', instagramPageAccessToken: '' } });
+            }
             if (linkedPageToken) user.instagramPageAccessToken = linkedPageToken;
             if (instagramAccountId) user.instagramAccountId = instagramAccountId;
             if (instagramUsername) user.instagramUsername = instagramUsername;

@@ -148,6 +148,24 @@ UserSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
+// Who else already holds this Instagram account? (one account can belong to only one creator)
+UserSchema.statics.accountIdHolder = async function(accountId, exceptUserId) {
+  const id = String(accountId || '').trim();
+  if (!id) return null;
+  const notMe = exceptUserId ? { _id: { $ne: exceptUserId } } : {};
+  const user = await this.findOne({ ...notMe, $or: [{ instagramAccountId: id }, { instagramId: id }, { 'businessProfile.instagramId': id }] }).select('_id username');
+  if (user) return user;
+  const PersonaConfig = mongoose.model('PersonaConfig');
+  const cfg = await PersonaConfig.findOne({ instagramAccountId: id, ownerId: { $ne: null, ...(exceptUserId ? { $nin: [exceptUserId] } : {}) } }).select('ownerId');
+  if (cfg) return { _id: cfg.ownerId };
+  // The legacy account from the server settings belongs to the original owner only
+  if (process.env.INSTAGRAM_ACCOUNT_ID && id === String(process.env.INSTAGRAM_ACCOUNT_ID)) {
+    const me = exceptUserId ? await this.findById(exceptUserId).select('role') : null;
+    if (!me || me.role !== 'superadmin') return { _id: null };
+  }
+  return null;
+};
+
 UserSchema.statics.hashPassword = async function(password) {
   const salt = await bcrypt.genSalt(10);
   return bcrypt.hash(password, salt);

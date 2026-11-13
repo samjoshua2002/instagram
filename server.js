@@ -205,13 +205,14 @@ async function resolveCreatorForAccount(accountId) {
   if (!key) return null;
   const hit = creatorCache.get(key);
   if (hit && Date.now() - hit.time < 60000) return hit.owner;
+  // Oldest claim wins if legacy data still has duplicates (new claims are refused)
   let owner = await User.findOne({
     $or: [
       { instagramAccountId: key },
       { 'businessProfile.instagramId': key },
       { instagramId: key }
     ]
-  });
+  }).sort({ createdAt: 1 });
   if (!owner) {
     const cfg = await PersonaConfig.findOne({ instagramAccountId: key, ownerId: { $ne: null } });
     if (cfg) owner = await User.findById(cfg.ownerId);
@@ -1496,7 +1497,12 @@ app.put('/api/persona', async (req, res) => {
     if (includedContactIds !== undefined) config.includedContactIds = includedContactIds;
     if (typingDelaySeconds !== undefined) config.typingDelaySeconds = typingDelaySeconds;
     if (instagramPageAccessToken !== undefined) config.instagramPageAccessToken = instagramPageAccessToken;
-    if (instagramAccountId !== undefined) config.instagramAccountId = instagramAccountId;
+    if (instagramAccountId !== undefined) {
+      if (isStr(instagramAccountId) && instagramAccountId.trim() && await User.accountIdHolder(instagramAccountId, req.user?._id)) {
+        return res.status(409).json({ error: 'This Instagram account is already connected to another Chatter account.' });
+      }
+      config.instagramAccountId = instagramAccountId;
+    }
     if (autoShareReelsEnabled !== undefined) config.autoShareReelsEnabled = autoShareReelsEnabled;
     if (autoShareReelsFrequencyHours !== undefined) config.autoShareReelsFrequencyHours = autoShareReelsFrequencyHours;
     if (autoShareReelsTopics !== undefined) config.autoShareReelsTopics = autoShareReelsTopics;
