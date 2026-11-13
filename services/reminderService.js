@@ -145,9 +145,18 @@ class ReminderService {
   startScheduler(intervalMinutes = 15) {
     console.log(`⏱️ Reminder scheduler active: checking every ${intervalMinutes}m for 5-6h inactive conversations.`);
     // Run an initial scan 1 minute after server starts
-    setTimeout(() => this.checkAndSendReminders(), 60 * 1000);
+    // One run at a time: a slow run (AI + sends for many contacts) must not overlap the next tick,
+    // or both could see the same contact as due and send it two reminders
+    let running = false;
+    const run = async () => {
+      if (running) return;
+      running = true;
+      try { await this.checkAndSendReminders(); } catch (err) { console.error('❌ Reminder run failed:', err.message); }
+      finally { running = false; }
+    };
+    setTimeout(run, 60 * 1000);
     // Recurring interval check
-    setInterval(() => this.checkAndSendReminders(), intervalMinutes * 60 * 1000);
+    setInterval(run, intervalMinutes * 60 * 1000);
   }
 }
 
