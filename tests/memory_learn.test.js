@@ -20,6 +20,14 @@ const { changedFields } = require('../services/memoryService');
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const FAST = { quietMs: 40, maxWaitMs: 400 };
+// Wider quiet window for burst tests: when every test file runs at once, a 5 ms sleep can take
+// longer than 40 ms and split one burst into two runs (a test timing flake, not an app bug)
+const BURST = { quietMs: 250, maxWaitMs: 3000 };
+// Polls until check() is true or the time runs out
+const waitFor = async (check, maxMs = 2000) => {
+  const end = Date.now() + maxMs;
+  while (!check() && Date.now() < end) await sleep(10);
+};
 
 // Replaces the slow AI run with a recorder; restores it afterwards
 function recordRuns(t, runMs = 0) {
@@ -38,8 +46,9 @@ function recordRuns(t, runMs = 0) {
 
 test('burst of 10 DMs -> ONE learning run', async (t) => {
   const rec = recordRuns(t);
-  for (let i = 0; i < 10; i++) { memoryService.scheduleMemoryUpdate('fan1', { ownerId: 'o1' }, FAST); await sleep(5); }
-  await sleep(150);
+  for (let i = 0; i < 10; i++) { memoryService.scheduleMemoryUpdate('fan1', { ownerId: 'o1' }, BURST); await sleep(5); }
+  await waitFor(() => rec.runs.length >= 1);
+  await sleep(BURST.quietMs + 100); // room for a wrong second run to show up
   assert.equal(rec.runs.length, 1);
 });
 
@@ -99,7 +108,7 @@ test('a failing run does not wedge the queue', async (t) => {
 test('queue is empty after runs finish (no leak)', async (t) => {
   recordRuns(t);
   for (let i = 0; i < 20; i++) memoryService.scheduleMemoryUpdate('leak' + i, { ownerId: 'o1' }, FAST);
-  await sleep(150);
+  await waitFor(() => memoryService._learnQueue.size === 0 && memoryService._runs.size === 0);
   assert.equal(memoryService._learnQueue.size, 0);
   assert.equal(memoryService._runs.size, 0);
 });
