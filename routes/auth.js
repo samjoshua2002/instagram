@@ -517,9 +517,11 @@ router.post('/login', loginIpLimit, async (req, res) => {
     const lock = passwordLockout.status(lockKey, clientIp(req));
     if (lock.locked) return lockedResponse(res, lock);
 
+    // Count the try before the slow password check so parallel guesses cannot all slip past
+    // the cap; a correct password clears it again just below
+    const after = passwordLockout.recordFailure(lockKey, clientIp(req));
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      const after = passwordLockout.recordFailure(lockKey, clientIp(req));
       if (after.locked) return lockedResponse(res, after);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -1828,9 +1830,16 @@ router.post('/change-password', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 8 characters.' });
     }
     const user = req.user;
+    // Same wrong-password lock as sign-in, so a stolen session cannot guess the password
+    const lockKey = `pw:${user._id}`;
+    const lock = passwordLockout.status(lockKey, clientIp(req));
+    if (lock.locked) return lockedResponse(res, lock);
+    const after = passwordLockout.recordFailure(lockKey, clientIp(req));
     if (!(await user.comparePassword(String(currentPassword)))) {
+      if (after.locked) return lockedResponse(res, after);
       return res.status(400).json({ error: 'Current password is incorrect.' });
     }
+    passwordLockout.recordSuccess(lockKey, clientIp(req));
     if (await user.comparePassword(String(newPassword))) {
       return res.status(400).json({ error: 'New password must be different from the current one.' });
     }

@@ -67,8 +67,10 @@ class FailureLockout {
     if (!this.escalate) return this.lockMs;
     const prev = this.strikes.get(key);
     const count = prev && this.now() - prev.at < 24 * 60 * MINUTE ? prev.count + 1 : 1;
-    this.strikes.set(key, { count, at: this.now() });
-    return Math.min(this.maxLockMs, this.lockMs * 2 ** (count - 1));
+    const ms = Math.min(this.maxLockMs, this.lockMs * 2 ** (count - 1));
+    // Counted from the end of the lock, so the strike outlives even a full 24h lock
+    this.strikes.set(key, { count, at: this.now() + ms });
+    return ms;
   }
 
   status(key) {
@@ -112,9 +114,18 @@ class FailureLockout {
 function networkOf(ip) {
   let s = String(ip || '').trim().toLowerCase();
   if (!s) return 'unknown';
-  if (s.startsWith('::ffff:') && s.includes('.')) return s.slice(7); // IPv4 written as IPv6
-  if (!s.includes(':')) return s;
+  // Some proxies add a port: "1.2.3.4:5555" or "[2001:db8::1]:5555"
+  const bracketed = s.match(/^\[([^\]]+)\](?::\d+)?$/);
+  if (bracketed) s = bracketed[1];
+  else if (/^\d{1,3}(\.\d{1,3}){3}:\d+$/.test(s)) s = s.split(':')[0];
   s = s.split('%')[0];
+  if (s.startsWith('::ffff:') && s.includes('.')) return s.slice(7); // IPv4 written as IPv6
+  const hexMapped = s.match(/^(?:(?:0{1,4}:){5}|::)ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hexMapped) { // ::ffff:0102:0304 is 1.2.3.4
+    const [a, b] = [parseInt(hexMapped[1], 16), parseInt(hexMapped[2], 16)];
+    return [a >> 8, a & 255, b >> 8, b & 255].join('.');
+  }
+  if (!s.includes(':')) return s;
   const [head, tail] = s.split('::');
   const h = head ? head.split(':') : [];
   const t = tail !== undefined && tail ? tail.split(':') : [];
@@ -125,39 +136,66 @@ function networkOf(ip) {
 /**
  * Account lockout that a stranger cannot use against the owner. Wrong tries are counted per
  * account AND network address (strict), so they lock only the place they come from; a much higher
- * per-account cap still stops guessing spread over many addresses. Success clears both.
+ * per-account cap still stops guessing spread over many addresses. Networks the owner signed in
+ * from before skip that account-wide cap (they keep their own per-address lock), so spread-out
+ * guessing by a stranger cannot lock the owner out at home. Success clears both.
  */
 class AccountLockout {
-  constructor({ perIp = 5, perAccount = 30, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now } = {}) {
+  constructor({ perIp = 5, perAccount = 30, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now, knownForMs = 30 * 24 * 60 * MINUTE, maxKnown = 10 } = {}) {
+    this.now = now;
     this.ipLock = new FailureLockout({ maxFailures: perIp, windowMs, lockMs, now });
     // Account-wide locks double on each repeat, so spread-out guessing slows to a crawl
     this.accountLock = new FailureLockout({ maxFailures: perAccount, windowMs, lockMs, now, escalate: true });
+    this.knownForMs = knownForMs;
+    this.maxKnown = maxKnown;
+    this.known = new Map(); // key -> Map(network -> time of the last correct password/code from it)
   }
 
   static ipKey(key, ip) {
     return `${key}|${networkOf(ip)}`;
   }
 
+  // True when this account had a correct password/code from this network recently
+  isKnown(key, ip) {
+    const net = networkOf(ip);
+    if (net === 'unknown') return false;
+    const at = this.known.get(key)?.get(net);
+    return at !== undefined && this.now() - at < this.knownForMs;
+  }
+
   status(key, ip) {
     const here = this.ipLock.status(AccountLockout.ipKey(key, ip));
-    return here.locked ? here : this.accountLock.status(key);
+    if (here.locked || this.isKnown(key, ip)) return here;
+    return this.accountLock.status(key);
   }
 
   // Records one failure; returns the lock status after it
   recordFailure(key, ip) {
     const here = this.ipLock.recordFailure(AccountLockout.ipKey(key, ip));
     const account = this.accountLock.recordFailure(key);
-    return here.locked ? here : account;
+    if (here.locked || this.isKnown(key, ip)) return here;
+    return account;
   }
 
   recordSuccess(key, ip) {
     this.ipLock.recordSuccess(AccountLockout.ipKey(key, ip));
     this.accountLock.recordSuccess(key);
+    const net = networkOf(ip);
+    if (net === 'unknown') return;
+    const nets = this.known.get(key) || new Map();
+    nets.delete(net); // re-insert so the newest is last
+    nets.set(net, this.now());
+    while (nets.size > this.maxKnown) nets.delete(nets.keys().next().value);
+    this.known.set(key, nets);
   }
 
   prune() {
     this.ipLock.prune();
     this.accountLock.prune();
+    for (const [key, nets] of this.known) {
+      for (const [net, at] of nets) if (this.now() - at >= this.knownForMs) nets.delete(net);
+      if (!nets.size) this.known.delete(key);
+    }
   }
 }
 
