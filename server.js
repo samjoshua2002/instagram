@@ -793,7 +793,12 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     text: messageText,
     timestamp: msgTime,
   });
-  await userMemory.save();
+  // One atomic update: quick bursts of DMs can never overwrite each other's counts or hit a version conflict
+  await UserMemory.updateOne({ _id: userMemory._id }, {
+    $set: { lastInteraction: msgTime, lastReminderSentAt: null },
+    $inc: { messageCount: 1, ...(isReelOrShare ? { reelsCount: 1 } : {}) },
+    $push: { recentChatBuffer: { $each: [{ role: 'user', text: messageText, timestamp: msgTime }], $slice: -10 } },
+  });
   await redisService.pushMessage(queueKey(ownerId, senderId), { role: 'user', text: messageText, timestamp: msgTime });
 
   // Atomically persist cumulative counts to this creator's SocialGraph node or auto-create it
@@ -824,17 +829,20 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
           matched = res2.matchedCount > 0;
         }
         if (!matched && ownerUser) {
-          await SocialGraph.create({
-            ownerId: ownerUser._id,
-            ownerUsername: ownerUser.username,
-            senderId,
-            name: userMemory.name || userMemory.username || `User_${senderId.slice(-4)}`,
-            instagramHandle: cleanU ? `@${cleanU}` : '',
-            profilePic: userMemory.profilePic || '',
-            category: 'online_friend',
-            chatsCount: 1,
-            reelsCount: isReelOrShare ? 1 : 0
-          });
+          // Upsert by sender: two first DMs arriving together create ONE person, and both are counted
+          await SocialGraph.updateOne({ ownerId: ownerUser._id, senderId }, {
+            $setOnInsert: {
+              ownerId: ownerUser._id,
+              ownerUsername: ownerUser.username,
+              senderId,
+              name: userMemory.name || userMemory.username || `User_${senderId.slice(-4)}`,
+              instagramHandle: cleanU ? `@${cleanU}` : '',
+              profilePic: userMemory.profilePic || '',
+              category: 'online_friend',
+              ...(isReelOrShare ? {} : { reelsCount: 0 })
+            },
+            $inc: incPayload
+          }, { upsert: true });
         }
       }
     } catch (_) {}
