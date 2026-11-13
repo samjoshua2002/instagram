@@ -5,21 +5,40 @@ const redisService = require('./redisService');
 
 class MemoryService {
   constructor() {
-    this.client = new AzureOpenAI({
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
-      deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o",
-    });
+    this._client = null;
+  }
+
+  // Created on first use so a missing AI key never crashes server startup
+  get client() {
+    if (!this._client) {
+      this._client = new AzureOpenAI({
+        endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+        apiKey: process.env.AZURE_OPENAI_API_KEY,
+        apiVersion: process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview",
+        deployment: process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o",
+      });
+    }
+    return this._client;
+  }
+
+  // Cache key for a contact, unique per creator
+  cacheKey(senderId, ownerId) {
+    return `${ownerId || 'none'}:${senderId}`;
+  }
+
+  // Message filter for one contact's conversation inside one creator's inbox
+  conversationQuery(senderId, ownerId) {
+    return { ownerId: ownerId || null, $or: [{ senderId }, { recipientId: senderId }] };
   }
 
   /**
    * Get or create memory record for an Instagram user
    */
-  async getOrCreateUserMemory(senderId, profileData = null) {
-    let memory = await UserMemory.findOne({ senderId });
+  async getOrCreateUserMemory(senderId, profileData = null, ownerId = null) {
+    let memory = await UserMemory.findOne({ ownerId: ownerId || null, senderId });
     if (!memory) {
       memory = new UserMemory({
+        ownerId: ownerId || null,
         senderId,
         username: profileData?.username || `User_${senderId.slice(-4)}`,
         name: profileData?.name || '',
@@ -39,7 +58,7 @@ class MemoryService {
       await memory.save();
     }
     // Sync with Redis cache
-    await redisService.cacheUserMemory(senderId, memory.toObject ? memory.toObject() : memory, 3600);
+    await redisService.cacheUserMemory(this.cacheKey(senderId, ownerId), memory.toObject ? memory.toObject() : memory, 3600);
     return memory;
   }
 
@@ -47,14 +66,13 @@ class MemoryService {
    * Asynchronously updates the user's memory, conversation style analysis,
    * facts extracted, and rolling summary.
    */
-  async updateMemoryAsync(senderId) {
+  async updateMemoryAsync(senderId, ownerId = null) {
     try {
-      let memory = await this.getOrCreateUserMemory(senderId);
+      let memory = await this.getOrCreateUserMemory(senderId, null, ownerId);
+      const convoQuery = this.conversationQuery(senderId, ownerId);
 
       // Intelligent message sampling: if > 100 messages, capture first 25 (origin/lore) + latest 75 (current style/inside jokes)
-      const totalMsgCount = await Message.countDocuments({
-        $or: [{ senderId }, { recipientId: senderId }]
-      });
+      const totalMsgCount = await Message.countDocuments(convoQuery);
 
       let messagesToAnalyze = [];
       if (totalMsgCount === 0) {
@@ -68,17 +86,11 @@ class MemoryService {
           return;
         }
       } else if (totalMsgCount <= 100) {
-        messagesToAnalyze = await Message.find({
-          $or: [{ senderId }, { recipientId: senderId }]
-        }).sort({ createdAt: 1 });
+        messagesToAnalyze = await Message.find(convoQuery).sort({ createdAt: 1 });
       } else {
-        const firstBatch = await Message.find({
-          $or: [{ senderId }, { recipientId: senderId }]
-        }).sort({ createdAt: 1 }).limit(25);
+        const firstBatch = await Message.find(convoQuery).sort({ createdAt: 1 }).limit(25);
 
-        const recentBatch = await Message.find({
-          $or: [{ senderId }, { recipientId: senderId }]
-        }).sort({ createdAt: -1 }).limit(75);
+        const recentBatch = await Message.find(convoQuery).sort({ createdAt: -1 }).limit(75);
         recentBatch.reverse();
 
         const seenIds = new Set();
@@ -277,7 +289,8 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
                 senderName,
                 p.name.trim(),
                 p.relationship || 'friend',
-                p.notes || ''
+                p.notes || '',
+                ownerId
               );
             }
           }
@@ -339,17 +352,16 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
         }
       }
 
-      memory.messageCount = (memory.messageCount || 0) + 1;
-      memory.lastInteraction = new Date();
       await memory.save();
 
       // Immediate cache sync in Redis
-      await redisService.cacheUserMemory(senderId, memory.toObject ? memory.toObject() : memory, 3600);
+      await redisService.cacheUserMemory(this.cacheKey(senderId, ownerId), memory.toObject ? memory.toObject() : memory, 3600);
 
       console.log(`🧠 [Deep Memory Updated] @${memory.username}: Dates=${memory.importantDates.length}, Favs=${memory.favoriteThings.length}, Events=${memory.lifeEvents.length}, Exchanges=${(memory.fewShotExchanges || []).length}`);
 
       // Dynamically sync updated memory into SocialGraph so People Menu cards update in real time!
       try {
+        if (!ownerId) throw new Error('no creator for this contact; skipping People sync');
         const SocialGraph = require('../models/SocialGraph');
         const socialGraphService = require('./socialGraphService');
         const cleanU = (memory.username || '').replace(/^@/, '').toLowerCase().trim();
@@ -373,7 +385,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           orConditions.push({ name: new RegExp(`^${nk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
         }
 
-        const node = await SocialGraph.findOne({ $or: orConditions });
+        const node = await SocialGraph.findOne({ ownerId, $or: orConditions });
 
         const allFacts = [
           ...(memory.facts || []).map(f => f.fact),
@@ -411,6 +423,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           console.log(`🌳 [SocialGraph Dynamic Sync]: Live updated card for ${node.name} (DOB: "${node.dob || ''}", Rel: "${node.relationshipToSam}", Lore: ${node.lore.length})`);
         } else if (!/^(test_|ig_tester_|catovidz$|me$|user_\d+)/i.test(cleanU)) {
           await SocialGraph.create({
+            ownerId,
             name: displayName,
             aliases: [cleanU, (memory.name || '').toLowerCase(), (memory.nickname || '').toLowerCase()].filter(Boolean),
             instagramHandle: cleanU ? `@${cleanU}` : '',
@@ -429,7 +442,7 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
           });
           console.log(`✨ [SocialGraph Dynamic Sync]: Created new card for ${displayName} (DOB: "${activeDob}")`);
         }
-        socialGraphService.clearCache();
+        socialGraphService.clearCache(ownerId);
       } catch (sgSyncErr) {
         console.warn('⚠️ Dynamic SocialGraph sync note:', sgSyncErr.message);
       }
@@ -442,12 +455,13 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
    * Deletes raw chat messages older than specified days (default 3 days)
    * to conserve database storage while keeping summarized intelligence intact.
    */
-  async cleanOldMessages(days = 3) {
+  async cleanOldMessages(days = 3, ownerId = undefined) {
     try {
-      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      const result = await Message.deleteMany({
-        createdAt: { $lt: cutoff }
-      });
+      const safeDays = Math.max(1, Number(days) || 3);
+      const cutoff = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+      const filter = { createdAt: { $lt: cutoff } };
+      if (ownerId !== undefined) filter.ownerId = ownerId;
+      const result = await Message.deleteMany(filter);
 
       console.log(`🧹 [DB Cleanup] Purged ${result.deletedCount || 0} messages older than ${days} days to optimize database space.`);
       return result.deletedCount || 0;
@@ -478,20 +492,24 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
    * analyzes their complete message streams, and updates their UserMemory,
    * SocialGraph lore, and Redis cache.
    */
-  async batchSyncAllChatsFromMongo() {
+  async batchSyncAllChatsFromMongo(ownerId, botIdsExtra = []) {
     console.log('🔄 [Batch Memory Sync]: Starting full backfill from 1-month chat data in MongoDB...');
-    const botIds = ['me', '17841446877896232'];
-    const senders = await Message.distinct('senderId', { senderId: { $nin: botIds } });
-    const recipients = await Message.distinct('recipientId', { recipientId: { $nin: botIds } });
-    const memoryUsers = await UserMemory.distinct('senderId', { senderId: { $nin: botIds } });
-    const rawIds = [...new Set([...senders, ...recipients, ...memoryUsers])];
+    if (!ownerId) return [];
+    const botIds = ['me', '17841446877896232', ...botIdsExtra.filter(Boolean)];
+    const memoryUsers = await UserMemory.distinct('senderId', { ownerId, senderId: { $nin: botIds } });
 
-    // Compute message counts and sort contacts by chat activity (most active first)
+    // Message counts per contact in ONE aggregate (no per-contact query), most active first
+    const counts = await Message.aggregate([
+      { $match: { ownerId } },
+      { $project: { contact: { $cond: [{ $in: ['$senderId', botIds] }, '$recipientId', '$senderId'] } } },
+      { $match: { contact: { $nin: botIds } } },
+      { $group: { _id: '$contact', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map(c => [c._id, c.count]));
+    const rawIds = [...new Set([...countMap.keys(), ...memoryUsers])];
     const contactsWithCounts = [];
     for (const id of rawIds) {
-      const count = await Message.countDocuments({
-        $or: [{ senderId: id }, { recipientId: id }]
-      });
+      const count = countMap.get(id) || 0;
       if (count > 0) {
         contactsWithCounts.push({ id, count });
       }
@@ -505,8 +523,8 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
       const { id: senderId, count } = contactsWithCounts[i];
       try {
         console.log(`\n🧠 [${i + 1}/${contactsWithCounts.length}] Processing contact ${senderId} (${count} historical messages)...`);
-        await this.updateMemoryAsync(senderId);
-        const mem = await UserMemory.findOne({ senderId });
+        await this.updateMemoryAsync(senderId, ownerId);
+        const mem = await UserMemory.findOne({ ownerId, senderId });
         results.push({
           senderId,
           username: mem?.username,

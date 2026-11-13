@@ -150,16 +150,17 @@ class RedisService {
     await this.del(`user:memory:${senderId}`);
   }
 
-  async getCachedPersonaConfig() {
-    return await this.get('persona:config');
+  // Persona cache is keyed per creator so one tenant's persona is never served to another
+  async getCachedPersonaConfig(ownerId = null) {
+    return await this.get(`persona:config:${ownerId || 'global'}`);
   }
 
-  async cachePersonaConfig(config, ttlSeconds = 600) {
-    await this.set('persona:config', config, ttlSeconds);
+  async cachePersonaConfig(config, ttlSeconds = 600, ownerId = null) {
+    await this.set(`persona:config:${ownerId || config?.ownerId || 'global'}`, config, ttlSeconds);
   }
 
-  async invalidatePersonaConfig() {
-    await this.del('persona:config');
+  async invalidatePersonaConfig(ownerId = null) {
+    await this.del(`persona:config:${ownerId || 'global'}`);
   }
 }
 
