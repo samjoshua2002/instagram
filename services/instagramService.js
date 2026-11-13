@@ -8,21 +8,26 @@ const TIMEOUT_MS = 12000; // 12 seconds max per request
  * Only retries on network errors (ECONNRESET, ETIMEDOUT, ECONNABORTED) – not on
  * 4xx/5xx HTTP errors from the Graph API (those are real app errors, not flakes).
  */
-async function withRetry(fn, maxRetries = 2, label = 'API call') {
+// Errors where the request certainly never reached Meta, so sending again cannot duplicate a DM
+const NEVER_SENT_CODES = new Set(['ECONNREFUSED', 'ENETUNREACH', 'ENOTFOUND', 'EAI_AGAIN']);
+
+// sendsMessage: true for POSTs that deliver a DM. Those are only retried when the request never
+// left (a timeout or reset may come after Meta already delivered it, and a retry would send it twice)
+async function withRetry(fn, maxRetries = 2, label = 'API call', sendsMessage = false) {
   let lastErr;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       lastErr = err;
-      const isNetworkFlake = !err.response && (
+      const isNetworkFlake = !err.response && (sendsMessage ? NEVER_SENT_CODES.has(err.code) : (
         err.code === 'ECONNRESET' ||
         err.code === 'ETIMEDOUT' ||
         err.code === 'ECONNABORTED' ||
         err.code === 'ENETUNREACH' ||
         err.message?.includes('wsarecv') ||
         err.message?.includes('stream reading error')
-      );
+      ));
       if (!isNetworkFlake || attempt === maxRetries) break;
       const delay = 1000 * Math.pow(2, attempt); // 1s, 2s
       console.warn(`⚠️ [${label}] Network flake (attempt ${attempt + 1}), retrying in ${delay}ms… (${err.code || err.message})`);
@@ -99,19 +104,22 @@ class InstagramService {
       const response = await withRetry(
         () => axios.post(url, requestBody, axiosConfig),
         2,
-        `sendTextMessage → ${recipientId}`
+        `sendTextMessage → ${recipientId}`,
+        true
       );
       console.log(`📤 Message sent successfully to ${recipientId} (swipe-reply: ${!!requestBody.reply_to}):`, response.data);
       return { success: true, data: response.data };
     } catch (error) {
-      // If reply_to caused an issue on this message type, retry without reply_to
-      if (requestBody.reply_to) {
+      // If Meta rejected reply_to on this message type, retry without it (only on an HTTP 400:
+      // after a timeout the first message may already have been delivered)
+      if (requestBody.reply_to && error.response?.status === 400) {
         delete requestBody.reply_to;
         try {
           const retryRes = await withRetry(
             () => axios.post(url, requestBody, axiosConfig),
             1,
-            `sendTextMessage fallback → ${recipientId}`
+            `sendTextMessage fallback → ${recipientId}`,
+        true
           );
           console.log(`📤 Standard message sent successfully (fallback):`, retryRes.data);
           return { success: true, data: retryRes.data };
@@ -162,19 +170,21 @@ class InstagramService {
       const response = await withRetry(
         () => axios.post(url, requestBody, axiosConfig),
         2,
-        `sendImageMessage → ${recipientId}`
+        `sendImageMessage → ${recipientId}`,
+        true
       );
       console.log(`🖼️ [Sticker/Image Sent] to ${recipientId}:`, response.data);
       return { success: true, data: response.data };
     } catch (err) {
-      // If reply_to failed, retry without reply_to
-      if (requestBody.reply_to) {
+      // If Meta rejected reply_to, retry without it (HTTP 400 only, never after a timeout)
+      if (requestBody.reply_to && err.response?.status === 400) {
         delete requestBody.reply_to;
         try {
           const r2 = await withRetry(
             () => axios.post(url, requestBody, axiosConfig),
             1,
-            `sendImageMessage fallback → ${recipientId}`
+            `sendImageMessage fallback → ${recipientId}`,
+        true
           );
           return { success: true, data: r2.data };
         } catch (e2) {}
