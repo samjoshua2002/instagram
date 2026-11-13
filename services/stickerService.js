@@ -97,14 +97,6 @@ class StickerService {
         mediaType: 'gif'
       },
       {
-        id: 'pred_lol_risitas',
-        name: 'El Risitas Wheezing KEKW',
-        category: 'lol',
-        url: 'https://media.giphy.com/media/j9mqKgQvkNOziGICfd/giphy.gif',
-        keywords: ['risitas', 'kekw', 'lol', 'wheezing', 'hysterical', 'lmao'],
-        mediaType: 'gif'
-      },
-      {
         id: 'pred_lol_gosling',
         name: 'Ryan Gosling Giggle',
         category: 'lol',
@@ -188,14 +180,6 @@ class StickerService {
         category: 'happy',
         url: 'https://media.giphy.com/media/pa37AAGzKXoek/giphy.gif',
         keywords: ['carlton', 'dance', 'groove', 'hype', 'party', 'happy'],
-        mediaType: 'gif'
-      },
-      {
-        id: 'pred_happy_cheer',
-        name: 'Kids Cheering High Five',
-        category: 'happy',
-        url: 'https://media.giphy.com/media/26BRv0ThflsDTjDUs/giphy.gif',
-        keywords: ['cheer', 'yay', 'party', 'woohoo', 'hype', 'celebrate'],
         mediaType: 'gif'
       },
 
@@ -320,7 +304,6 @@ class StickerService {
       ],
       lol: [
         'https://media.giphy.com/media/vjjCsx3izfRSq4Ze05/giphy.gif',
-        'https://media.giphy.com/media/j9mqKgQvkNOziGICfd/giphy.gif',
         'https://media.giphy.com/media/oubM1tKqnLW5G/giphy.gif',
       ],
       skull: [
@@ -348,7 +331,6 @@ class StickerService {
         'https://media.giphy.com/media/GCLlQnV7dXZ2E/giphy.gif',
         'https://media.giphy.com/media/nrXif9YExO9EI/giphy.gif',
         'https://media.giphy.com/media/pa37AAGzKXoek/giphy.gif',
-        'https://media.giphy.com/media/26BRv0ThflsDTjDUs/giphy.gif',
       ],
       side_eye: [
         'https://media.giphy.com/media/H5C8CevNMbpBqNqFjl/giphy.gif',
