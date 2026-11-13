@@ -1402,11 +1402,11 @@ export default function AnalyticsPage() {
                 <Shield size={14} style={{ color: 'var(--text-muted)' }} />
               </div>
               <div style={{ background: 'var(--primary)', borderRadius: 'var(--r-lg)', padding: '16px 18px', marginBottom: '12px' }}>
-                <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em', marginBottom: '5px' }}>CURRENT MODE</div>
+                <div style={{ fontSize: '0.58rem', color: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace", fontWeight: '700', letterSpacing: '0.08em', marginBottom: '5px' }}>CURRENT MODE</div>
                 <div style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--primary-fg)', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>
                   {routingConfig.chatMode.replace(/_/g, ' ')}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '3px', fontFamily: "'JetBrains Mono', monospace" }}>
                   {routingConfig.chatMode === 'everyone_except' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} excluded`}
                   {routingConfig.chatMode === 'only_selected' && `${activeModeCount} contact${activeModeCount !== 1 ? 's' : ''} selected`}
                   {routingConfig.chatMode === 'everyone' && 'All contacts — global auto-reply'}

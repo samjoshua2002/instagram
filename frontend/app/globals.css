@@ -9,7 +9,7 @@
   --border-strong: #d4d4d8;
   --border-focus: #09090b;
   --text: #09090b;
-  --text-muted: #71717a;
+  --text-muted: #68686f; /* passes WCAG AA (>=5:1) on white and on the light grey surfaces */
   --text-dim: #a1a1aa;
   --accent: #09090b;
   --primary: #09090b;
@@ -733,5 +733,17 @@ button.is-primary:not(:disabled):hover {
   }
   .vault-page button {
     justify-content: center;
+  }
+}
+
+/* Phones: every link and button has at least a 24px touch area (WCAG 2.2 target size).
+   Inline padding grows the tap area without moving the surrounding layout. */
+@media (max-width: 640px) {
+  a[href] {
+    padding-block: 5px;
+  }
+  button {
+    min-width: 24px;
+    min-height: 24px;
   }
 }
