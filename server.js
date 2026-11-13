@@ -905,7 +905,8 @@ async function writeAndSendReply(queueEntry, flight) {
   // Fetch recent conversation history
   // History and workspace features load together (one DB wait instead of two)
   const [recentHistory, { enabledFeatures, activeMode }] = await Promise.all([
-    Message.find(conversationMessages(ownerUser?._id, senderId)).sort({ createdAt: -1 }).limit(10),
+    // last 40 messages: enough of the real chat for replies that follow the conversation, not just the last line
+    Message.find(conversationMessages(ownerUser?._id, senderId)).sort({ createdAt: -1 }).limit(40),
     workspaceFeatureService.getFeaturesSafe(ownerUser),
   ]);
   let history = recentHistory;
