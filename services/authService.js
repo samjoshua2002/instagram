@@ -563,7 +563,7 @@ class AuthService {
       rpID,
       userID: new TextEncoder().encode(user._id.toString()),
       userName: user.email,
-      userDisplayName: `${user.firstName || 'Sam'} ${user.lastName || 'Joshua'}`,
+      userDisplayName: `${user.firstName || user.username || ''} ${user.lastName || ''}`.trim() || user.email,
       attestationType: 'none',
       excludeCredentials: (user.passkeys || []).map(p => ({
         id: p.credentialId,
@@ -617,12 +617,22 @@ class AuthService {
 
   async generatePasskeyAuthenticationOptions(user, req) {
     const rpID = this.getRpID(req);
-    const allowCredentials = user
+    let allowCredentials = user
       ? (user.passkeys || []).map(p => ({
           id: p.credentialId,
           transports: p.transports || ['internal'],
         }))
-      : undefined;
+      : [];
+    // Unknown accounts and accounts without passkeys get one stable, fake credential id, so this
+    // public endpoint cannot be used to find out which accounts exist or have passkeys
+    const identifier = typeof req.query?.identifier === 'string' ? req.query.identifier
+      : (typeof req.query?.email === 'string' ? req.query.email : '');
+    if (!allowCredentials.length && identifier.trim()) {
+      const fakeId = crypto.createHmac('sha256', JWT_SECRET).update('passkey-decoy:' + identifier.trim().toLowerCase())
+        .digest().subarray(0, 32).toString('base64url');
+      allowCredentials = [{ id: fakeId, transports: ['internal'] }];
+    }
+    if (!allowCredentials.length) allowCredentials = undefined; // no identifier: let the browser offer any saved passkey
 
     const options = await generateAuthenticationOptions({
       rpID,
