@@ -682,9 +682,18 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     const history = (messageHistory && messageHistory.length > 0)
       ? messageHistory
       : (userMemory.recentChatBuffer || []).map(b => ({ role: b.role, text: b.text }));
-    for (const msg of history || []) {
+    // Drop only the trailing saved copies of this batch (grouped DMs were sent twice, and an
+    // older message that happened to match was wrongly removed)
+    const incomingLines = new Set(incomingText.split('\n').map(t => t.trim()).filter(Boolean));
+    const businessHistory = [...(history || [])];
+    while (businessHistory.length) {
+      const last = businessHistory[businessHistory.length - 1];
+      const t = (last.text || '').trim();
+      if (last.role === 'assistant' || !(t === incomingText.trim() || incomingLines.has(t))) break;
+      businessHistory.pop();
+    }
+    for (const msg of businessHistory) {
       if (!msg.text) continue;
-      if (msg.role === 'user' && msg.text.trim() === incomingText.trim()) continue;
       messages.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: msg.text });
     }
     messages.push({ role: 'user', content: incomingText });
