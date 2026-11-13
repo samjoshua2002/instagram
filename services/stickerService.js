@@ -542,7 +542,7 @@ class StickerService {
     try {
       // Only this creator's own GIPHY key (or the server key) — never another tenant's
       const config = user?._id ? await PersonaConfig.findOne({ ownerId: user._id }) : null;
-      const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
+      const apiKey = (config && config.giphyApiKey) || process.env.GIPHY_API_KEY || '';
       if (!apiKey) return null;
 
       // Extract trigger words from conversation context

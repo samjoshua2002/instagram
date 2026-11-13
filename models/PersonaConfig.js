@@ -106,7 +106,7 @@ const PersonaConfigSchema = new mongoose.Schema({
   }],
   giphyApiKey: {
     type: String,
-    default: 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
+    default: '', // a creator's own key; the shared key lives only in the server setting GIPHY_API_KEY
   },
 }, { timestamps: true });
 

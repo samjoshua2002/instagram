@@ -216,7 +216,7 @@ function SettingsPageInner() {
           forbiddenWords: Array.isArray(data.forbiddenWords) ? data.forbiddenWords : [],
           sampleConversations: Array.isArray(data.sampleConversations) ? data.sampleConversations : [],
           typingDelaySeconds: data.typingDelaySeconds || 1.5,
-          giphyApiKey: data.giphyApiKey || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2',
+          giphyApiKey: data.giphyApiKey || '',
         };
         setFormData(updated);
         try {
@@ -238,10 +238,13 @@ function SettingsPageInner() {
     setTestingGiphy(true);
     setGiphyStatus(null);
     try {
-      const keyToTest = formData.giphyApiKey?.trim() || 'qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2';
-      const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${keyToTest}&limit=1`);
-      const data = await res.json();
-      if (res.ok && data.meta?.status === 200) {
+      // Own key: test it directly. No own key: test the server's shared key through the backend
+      const ownKey = formData.giphyApiKey?.trim();
+      const res = ownKey
+        ? await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${encodeURIComponent(ownKey)}&limit=1`)
+        : await fetch(`${API_BASE}/api/giphy/trending?limit=1`, { headers: getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && (data.meta?.status === 200 || Array.isArray(data.gifs) || Array.isArray(data.data) || data.success)) {
         setGiphyStatus('success');
         showToast('GIPHY API key is valid and working!', 'success');
       } else {
@@ -1274,7 +1277,7 @@ function SettingsPageInner() {
                   type={showGiphyKey ? 'text' : 'password'}
                   value={formData.giphyApiKey || ''}
                   onChange={e => setFormData({ ...formData, giphyApiKey: e.target.value })}
-                  placeholder="Enter Giphy API Key (e.g. qClDLN6qTZiRydbfmkuXgaenPeHIi9Q2)"
+                  placeholder="Your own GIPHY API key (optional; leave empty to use the shared key)"
                   style={{
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: '0.86rem',
