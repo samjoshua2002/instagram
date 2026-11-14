@@ -170,7 +170,9 @@ export default function Sidebar() {
       ...workspaceNav[mode],
       { href: mode === 'business' ? '/storyboard/business' : '/storyboard/personal', label: 'Storyboard', icon: Workflow },
       { href: '/settings/features', label: 'Feature Store', icon: Layers },
-      isSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
+      // Admin pages check the signed-in role, so while viewing a workspace they would only say "access required";
+      // the Exit workspace button is the way back
+      isPureSuperadmin && { href: '/admin', label: 'Superadmin', icon: Shield },
     ])
     .filter(Boolean)
     .map((item, i) => ({ ...item, code: String(i + 1).padStart(2, '0') }));
@@ -208,7 +210,7 @@ export default function Sidebar() {
   const sheetItems = [
     ...navItems,
     { href: '/profile', label: 'Profile & Passkeys', icon: Fingerprint },
-    ...(isSuperadmin && !navItems.some(i => i.href === '/admin/tokens')
+    ...(isPureSuperadmin && !navItems.some(i => i.href === '/admin/tokens')
       ? [{ href: '/admin/tokens', label: 'Token Health Radar', icon: Activity }]
       : []),
   ];

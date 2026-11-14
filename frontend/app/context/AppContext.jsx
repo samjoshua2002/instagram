@@ -364,8 +364,10 @@ export function AppProvider({ children }) {
       localStorage.removeItem('chatter_show_chooser');
       localStorage.removeItem(STORAGE_NODES_KEY);
       localStorage.removeItem(STORAGE_CONFIG_KEY);
-      if (typeof sessionStorage !== 'undefined' && userData?._id) {
-        sessionStorage.removeItem(`chatter_onboarding_dismissed_${userData._id}`);
+      // Sign-in responses carry id; older cached users carry _id
+      const signedInId = userData?._id || userData?.id;
+      if (typeof sessionStorage !== 'undefined' && signedInId) {
+        sessionStorage.removeItem(`chatter_onboarding_dismissed_${signedInId}`);
         sessionStorage.removeItem('chatter_onboarding_dismissed');
       }
     } catch (e) { }

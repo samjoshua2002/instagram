@@ -32,8 +32,9 @@ export default function SuperadminWorkspacePrompt({ sectionTitle, sectionCode, s
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load creator accounts.');
         if (isMounted) {
-          // Filter to creator/user accounts
-          setAccounts(data.accounts || []);
+          // Only workspaces the server lets you enter: other superadmins and banned accounts are refused
+          const myId = String(user?.id || user?._id || '');
+          setAccounts((data.accounts || []).filter(a => !a.isBanned && (a.role !== 'superadmin' || String(a.id) === myId)));
         }
       } catch (err) {
         if (isMounted) setError(err.message || 'Error fetching platform accounts.');

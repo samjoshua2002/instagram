@@ -28,7 +28,9 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   // STEP 1: Instagram Connection & Token
   const [instagramUsername, setInstagramUsername] = useState(user?.instagramUsername || '');
   const [instagramPageAccessToken, setInstagramPageAccessToken] = useState('');
-  const [instagramAccountId, setInstagramAccountId] = useState(user?.instagramId || '');
+  // Only an id Instagram proved (Connect button); the sign-up id is unproven and the server refuses it
+  const [instagramAccountId, setInstagramAccountId] = useState(user?.instagramAccountId || '');
+  const [oauthLinked, setOauthLinked] = useState(false);
 
   // STEP 2: Account Purpose
   const [accountType, setAccountType] = useState('business'); // 'business' | 'personal'
@@ -56,7 +58,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
   useEffect(() => {
     if (user) {
       if (user.instagramUsername && !instagramUsername) setInstagramUsername(user.instagramUsername);
-      if (user.instagramId && !instagramAccountId) setInstagramAccountId(user.instagramId);
+      if (user.instagramAccountId && !instagramAccountId) setInstagramAccountId(user.instagramAccountId);
       if (user.businessProfile?.businessName && !businessName) setBusinessName(user.businessProfile.businessName);
       if (user.businessProfile?.category && !businessCategory) setBusinessCategory(user.businessProfile.category);
     }
@@ -71,6 +73,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
         if (igUser) setInstagramUsername(igUser);
         if (igId) setInstagramAccountId(igId);
         if (igToken) setInstagramPageAccessToken(igToken);
+        setOauthLinked(true);
         setOauthConnecting(false);
         showToast?.(`Instagram connected: @${igUser || 'account'}!`, 'success');
       } else if (event.data?.type === 'INSTAGRAM_OAUTH_ERROR') {
@@ -213,7 +216,7 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
     }
   };
 
-  const isConnected = Boolean(instagramPageAccessToken || (instagramAccountId && instagramUsername));
+  const isConnected = Boolean(instagramPageAccessToken || oauthLinked || user?.isInstagramConnected);
 
   return (
     <motion.div

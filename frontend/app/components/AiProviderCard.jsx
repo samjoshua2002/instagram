@@ -24,6 +24,7 @@ export default function AiProviderCard() {
   const [savedProvider, setSavedProvider] = useState('azure');
   const [savedEndpoint, setSavedEndpoint] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -37,13 +38,15 @@ export default function AiProviderCard() {
     fetch(`${API_BASE}/api/settings/ai-provider`, { headers: authHeader() })
       .then(r => r.json())
       .then(data => {
-        if (!data?.config) return;
+        // Without the saved settings, Save would overwrite them with the defaults shown here
+        if (!data?.config) { setLoadFailed(true); return; }
+        setLoadFailed(false);
         setForm({ provider: data.config.provider, model: data.config.model, endpoint: data.config.endpoint, apiKey: '' });
         setHasApiKey(data.config.hasApiKey);
         setSavedProvider(data.config.provider);
         setSavedEndpoint(data.config.endpoint || '');
       })
-      .catch(() => {})
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, [API_BASE, token]);
 
@@ -157,7 +160,8 @@ export default function AiProviderCard() {
             type="button"
             className="btn btn-primary"
             onClick={save}
-            disabled={saving}
+            disabled={saving || loadFailed}
+            title={loadFailed ? 'Could not load your saved AI settings. Refresh the page to try again.' : undefined}
             style={{
               display: 'inline-flex',
               alignItems: 'center',

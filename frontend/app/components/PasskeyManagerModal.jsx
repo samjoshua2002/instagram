@@ -51,6 +51,17 @@ function detectCurrentDevice() {
   return 'Security Key / Biometrics';
 }
 
+// The login page remembers whether an account has passkeys; clear that once the last one is removed
+function forgetPasskeyOnLogin(user) {
+  const same = (a) => a && ((user?.email && a.email === user.email) || (user?.username && a.username === user.username));
+  try {
+    const one = JSON.parse(localStorage.getItem('chatter_remembered_account') || 'null');
+    if (same(one)) localStorage.setItem('chatter_remembered_account', JSON.stringify({ ...one, hasPasskeys: false }));
+    const list = JSON.parse(localStorage.getItem('chatter_saved_accounts') || 'null');
+    if (Array.isArray(list)) localStorage.setItem('chatter_saved_accounts', JSON.stringify(list.map(a => (same(a) ? { ...a, hasPasskeys: false } : a))));
+  } catch (e) { /* storage blocked: the login page just offers the passkey once more */ }
+}
+
 export default function PasskeyManagerModal({ isOpen, onClose }) {
   // Pops out of the button that opened it and shrinks back into it on close
   const reduce = useReducedMotion();
@@ -98,6 +109,14 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       loadUserData();
     }
   }, [isOpen]);
+
+  // Escape closes it, like the app's other popups
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   const getAuthHeaders = () => {
     let authToken = token;
@@ -201,7 +220,12 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       });
       if (res.ok) {
         showToast?.('Passkey removed', 'success');
-        setPasskeys(prev => prev.filter(p => p.id !== credentialId));
+        setPasskeys(prev => {
+          const left = prev.filter(p => p.id !== credentialId);
+          // Last one gone: the login page must stop offering passkey sign-in for this account
+          if (!left.length) forgetPasskeyOnLogin(user);
+          return left;
+        });
       } else {
         const d = await res.json().catch(() => ({}));
         showToast?.(d.error || 'Could not remove passkey.', 'error');
@@ -238,10 +262,9 @@ export default function PasskeyManagerModal({ isOpen, onClose }) {
       const res = await fetch(`${API_BASE}/api/auth/totp-setup`, {
         headers: getAuthHeaders(),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setTotpData(data);
-      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setTotpData(data);
+      else showToast?.(data.error || 'Failed to load TOTP setup', 'error');
     } catch (err) {
       showToast?.('Failed to load TOTP setup', 'error');
     } finally {

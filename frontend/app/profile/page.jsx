@@ -281,11 +281,12 @@ export default function ProfilePage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(regResponse)
+        // The server reads { response, name } and names the device itself when name is blank
+        body: JSON.stringify({ response: regResponse, name: '' })
       });
 
-      const verifyData = await verifyRes.json();
-      if (verifyRes.ok && verifyData.verified) {
+      const verifyData = await verifyRes.json().catch(() => ({}));
+      if (verifyRes.ok && verifyData.success !== false) {
         showToast?.('Biometric Passkey registered successfully!', 'success');
         fetchPasskeys();
       } else {
