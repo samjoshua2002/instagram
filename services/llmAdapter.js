@@ -120,6 +120,9 @@ const allowPrivateEndpoints = () => String(process.env.ALLOW_PRIVATE_LLM_ENDPOIN
  * Rejects endpoints that are not http(s)/ws(s) or that resolve to an internal address
  * (every resolved address is checked). `lookup` is injectable for tests.
  */
+// The address check runs once, so a redirect must not lead the request (and the API key) somewhere else
+const noRedirectFetch = (url, init = {}) => fetch(url, { ...init, redirect: 'error' });
+
 async function assertSafeEndpoint(endpoint, { lookup = dns.lookup } = {}) {
   if (!endpoint) return;
   let url;
@@ -194,7 +197,7 @@ async function completeOpenAICompatible(messages, cfg, apiKey, { maxTokens, temp
     if (!ping.ok) throw new Error(`Local model server answered ${ping.status}`);
   }
 
-  const client = traceOpenAI(new OpenAI({ apiKey: apiKey || 'not-needed', baseURL, timeout: REQUEST_TIMEOUT_MS, maxRetries: 0 }), { generationName: `${cfg.provider}-chat`, tags: [cfg.provider] });
+  const client = traceOpenAI(new OpenAI({ apiKey: apiKey || 'not-needed', baseURL, timeout: REQUEST_TIMEOUT_MS, maxRetries: 0, fetch: noRedirectFetch }), { generationName: `${cfg.provider}-chat`, tags: [cfg.provider] });
   const response = await client.chat.completions.create(
     buildOpenAIParams(cfg.model || defaults.model, messages, { maxTokens, temperature })
   );
@@ -240,8 +243,8 @@ async function completeMcp(messages, cfg, apiKey) {
   const transport = /^wss?:$/.test(url.protocol)
     ? new WebSocketClientTransport(url)
     : /\/sse\/?$/.test(url.pathname)
-      ? new SSEClientTransport(url, { requestInit: { headers } })
-      : new StreamableHTTPClientTransport(url, { requestInit: { headers } });
+      ? new SSEClientTransport(url, { requestInit: { headers, redirect: 'error' } })
+      : new StreamableHTTPClientTransport(url, { requestInit: { headers, redirect: 'error' } });
 
   const client = new McpClient({ name: 'chatter-ai', version: '1.0.0' });
   try {

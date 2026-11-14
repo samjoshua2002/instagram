@@ -162,6 +162,7 @@ function recordTextSent(senderId) {
   const tracker = userMediaTracker.get(senderId) || { textCountSinceMedia: 0, lastMediaTime: 0 };
   tracker.textCountSinceMedia = (tracker.textCountSinceMedia || 0) + 1;
   userMediaTracker.set(senderId, tracker);
+  trimMediaTracker(); // text-only workspaces never send media, so trim here too
 }
 
 // Ensure public/uploads directory exists
@@ -425,6 +426,8 @@ if (!VERIFY_TOKEN) console.warn('⚠️ WEBHOOK_VERIFY_TOKEN is not set: Meta we
 
 // Cache for recent message IDs to prevent duplicate processing
 const processedMids = new Set();
+const recentProfileLookups = new Map(); // owner:sender -> time of the last profile lookup
+const PROFILE_REFRESH_MS = 6 * 60 * 60 * 1000;
 
 // Anti-spam debounce queue: aggregates rapid-fire/spam messages and replies once
 // Keyed by contactKey(ownerId, senderId) (also inFlightReplies and the media governor) so two
@@ -606,15 +609,9 @@ function handleCreatorEcho(event, accountId) {
         console.log(`🛑 [Creator Intervened]: Cancelled pending AI auto-reply for ${contactId}`);
       }
 
-      // Update contact's memory: fresh interaction reactivates the conversation & resets reminder cycle
-      await UserMemory.updateOne({ ownerId: ownerUser?._id || null, senderId: contactId }, {
-        lastInteraction: new Date(),
-        lastReminderSentAt: null,
-        $inc: { messageCount: 1 }
-      }).catch(() => {});
-
-      // Record outgoing message in DB (owned, so business stats count the human reply)
-      await Message.create({
+      // Record outgoing message in DB (owned, so business stats count the human reply).
+      // Meta can deliver the same echo twice: the unique mid makes the second insert fail, and then nothing is counted again
+      const isNewEcho = await Message.create({
         ownerId: ownerUser?._id || null,
         senderId: senderAccountId,
         recipientId: contactId,
@@ -623,6 +620,14 @@ function handleCreatorEcho(event, accountId) {
         mid,
         sentByAI: false,
         timestamp: new Date(),
+      }).then(() => true, (e) => e?.code !== 11000);
+      if (!isNewEcho) return;
+
+      // Update contact's memory: fresh interaction reactivates the conversation & resets reminder cycle
+      await UserMemory.updateOne({ ownerId: ownerUser?._id || null, senderId: contactId }, {
+        lastInteraction: new Date(),
+        lastReminderSentAt: null,
+        $inc: { messageCount: 1 }
       }).catch(() => {});
 
       await SocialGraph.updateOne({ senderId: contactId, ...graphOwnerFilter(ownerUser) }, { $inc: { chatsCount: 1 } });
@@ -774,12 +779,22 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     }
   }
 
-  // 2. Fetch or create user memory
+  // 2. Fetch or create user memory. The profile lookup can take many seconds with retries, so it runs
+  // at most every 6 hours per contact: a burst of DMs then reaches the debounce queue on time and in order
   let userProfile = null;
-  try {
-    userProfile = await instagramService.getUserProfile(senderId, creatorAccessToken);
-  } catch (e) {
-    // ignore
+  const profileKey = `${ownerUser?._id || ''}:${senderId}`;
+  const lastProfileAt = recentProfileLookups.get(profileKey);
+  if (!lastProfileAt || Date.now() - lastProfileAt > PROFILE_REFRESH_MS) {
+    recentProfileLookups.delete(profileKey);
+    recentProfileLookups.set(profileKey, Date.now());
+    while (recentProfileLookups.size > 5000) recentProfileLookups.delete(recentProfileLookups.keys().next().value);
+    try {
+      userProfile = await instagramService.getUserProfile(senderId, creatorAccessToken);
+    } catch (e) {
+      // ignore
+    }
+    // A failed lookup is tried again after 30 minutes, not on every message
+    if (!userProfile) recentProfileLookups.set(profileKey, Date.now() - PROFILE_REFRESH_MS + 30 * 60 * 1000);
   }
   const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile, memOptsFor(ownerUser));
   if (ownerUser && !userMemory.ownerId) userMemory.ownerId = ownerUser._id;
@@ -1147,6 +1162,9 @@ async function writeAndSendReply(queueEntry, flight) {
 
     // Stickers, GIFs and meme drops are never sent for business accounts or with the Media Vault feature off
     if (isBusinessTenant || !enabledFeatures.mediaStickerVault) stickerType = null;
+    if (stickerType && !stickerService.hasSticker(stickerType)) stickerType = null;
+    // A reply that was only a sticker tag, with the sticker then held back, must still say something
+    if (!stickerType && !String(replyText || '').trim()) replyText = fallbackReply;
 
     // Fast replies (2026-11-05): the AI call is already the wait, so only a tiny typing pause is added.
     // - Emojis / reactions (<= 4 chars or pure emoji): 300ms
@@ -1210,6 +1228,12 @@ async function writeAndSendReply(queueEntry, flight) {
     if (hasText) {
       // Personal replies with two distinct thoughts go out as 2-3 bubbles, 1-2s apart (§15.6.5)
       const bubbles = (isBusinessTenant || !enabledFeatures.antiAiHumanMimicry) ? [replyText] : splitIntoBubbles(replyText);
+      // The database checks above take time too: the creator may have taken over meanwhile
+      if (flight.cancelled) {
+        console.log(`🛑 [Reply Superseded]: The creator took over ${senderId} just before sending; not sending.`);
+        await afterTurn('');
+        return;
+      }
       sendResult = await instagramService.sendTextMessage(senderId, bubbles[0], creatorAccessToken, lastMid);
       if (sendResult?.success === true) deliveredBubbles.push(bubbles[0]);
       for (const bubble of bubbles.slice(1)) {
@@ -1266,9 +1290,16 @@ async function writeAndSendReply(queueEntry, flight) {
       }
     }
 
+    // A sticker-only reply whose sticker could not be found or sent falls back to text, so nobody is left on read
+    let fallbackSent = false;
+    if (!hasText && stickerSendResult?.success !== true && !flight.cancelled) {
+      sendResult = await instagramService.sendTextMessage(senderId, fallbackReply, creatorAccessToken, lastMid);
+      if (sendResult?.success === true) { deliveredBubbles.push(fallbackReply); fallbackSent = true; }
+    }
+
     // Only persist if text delivery succeeded, or if sticker-only dispatch succeeded
-    const textDelivered = hasText && sendResult?.success === true;
-    const stickerDelivered = !hasText && stickerSendResult?.success === true;
+    const textDelivered = (hasText || fallbackSent) && sendResult?.success === true;
+    const stickerDelivered = !hasText && !fallbackSent && stickerSendResult?.success === true;
 
     // Track conversational text count if text was delivered without media
     if (textDelivered && !mediaWasSent) {
@@ -2233,12 +2264,13 @@ app.put('/api/media-vault/categories/:name', async (req, res) => {
       return res.status(400).json({ error: 'New category name is required' });
     }
     const cleanNew = newCategory.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
+    // "!!!" cleans to nothing, which would move every item into a nameless category
+    if (!cleanNew) return res.status(400).json({ error: 'Category must contain letters or numbers' });
 
-    // 1. Update in PersonaConfig
-    const personaQuery = req.user ? { ownerId: req.user._id } : {};
-    let config = await PersonaConfig.findOne(personaQuery);
+    // 1. Update in PersonaConfig (the same persona adding a category uses, legacy one included)
+    const config = await findOwnPersona(req);
     if (config && config.customReactionCategories) {
-      config.customReactionCategories = config.customReactionCategories.map(c => c === oldCat ? cleanNew : c);
+      config.customReactionCategories = [...new Set(config.customReactionCategories.map(c => c === oldCat ? cleanNew : c))];
       await config.save();
     }
 
@@ -2257,8 +2289,7 @@ app.put('/api/media-vault/categories/:name', async (req, res) => {
 app.delete('/api/media-vault/categories/:name', async (req, res) => {
   try {
     const catName = req.params.name.toLowerCase().trim();
-    const personaQuery = req.user ? { ownerId: req.user._id } : {};
-    let config = await PersonaConfig.findOne(personaQuery);
+    const config = await findOwnPersona(req);
     if (config && config.customReactionCategories) {
       config.customReactionCategories = config.customReactionCategories.filter(c => c !== catName);
       await config.save();
