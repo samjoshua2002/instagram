@@ -687,6 +687,8 @@ class AuthService {
       const { credential } = verification.registrationInfo;
       const credentialIDStr = credential.id;
       const publicKeyBase64 = Buffer.from(credential.publicKey).toString('base64');
+      // Credential ids are public (login-options shows them): a copied id must not shadow the real owner's passkey
+      if (await User.exists({ 'passkeys.credentialId': credentialIDStr })) return false;
 
       user.passkeys.push({
         credentialId: credentialIDStr,

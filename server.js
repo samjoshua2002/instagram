@@ -1718,7 +1718,8 @@ app.put('/api/persona', async (req, res) => {
     if (cleanAccountId) {
       const conflictingUser = await User.exists({
         _id: { $ne: req.user._id },
-        $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
+        // instagramId alone is an unproven sign-up claim; the token above proves this owner
+        $or: [{ instagramAccountId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
       });
       if (conflictingUser) {
         return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
