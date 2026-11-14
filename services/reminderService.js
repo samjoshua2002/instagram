@@ -65,8 +65,10 @@ class ReminderService {
   async loadOwner(ownerId, ownerCache) {
     const key = String(ownerId || '');
     if (!ownerCache.has(key)) {
-      const config = await PersonaConfig.findOne({ ownerId: ownerId || null });
       const ownerUser = ownerId ? await User.findById(ownerId) : null;
+      // Live replies for the superadmin fall back to the legacy persona, so reminders do too
+      const config = await PersonaConfig.findOne({ ownerId: ownerId || null })
+        || (ownerUser?.role === 'superadmin' ? await PersonaConfig.findOne({ ownerId: null }) : null);
       const features = ownerUser ? await workspaceFeatureService.getFeaturesSafe(ownerUser) : null;
       ownerCache.set(key, { config, activeMode: features?.activeMode || 'personal' });
     }

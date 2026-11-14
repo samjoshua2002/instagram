@@ -332,7 +332,7 @@ CRITICAL STYLE RULES:
     }
 
     // 5. Evaluate dynamic talking style & anti-dossier rules using CEL Engine
-    const isReelOrShare = /\[Shared Reel|\[Shared Post|instagram\.com\/(?:p|reel|tv)\//i.test(incomingText);
+    const isReelOrShare = /\[Shared (?:an Instagram )?(?:Reel|Post)|instagram\.com\/(?:p|reel|tv)\//i.test(incomingText);
     const celResult = celRuleEngine.evaluate({
       userMemory,
       incomingText,

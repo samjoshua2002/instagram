@@ -150,6 +150,7 @@ class MemoryService {
         || (ownerId && options.adoptLegacy ? await UserMemory.findOne({ senderId, ownerId: null }) : null);
     };
     let memory = await find();
+    if (!memory && options.onlyExisting) return null;
     if (!memory) {
       memory = new UserMemory({
         ...(scoped ? { ownerId } : {}),
@@ -234,7 +235,8 @@ class MemoryService {
     job.timer = setTimeout(() => {
       if (this._learnQueue.get(key) === job) this._learnQueue.delete(key);
       // updateMemoryAsync already allows one run per person and queues one more for DMs during a run
-      this.updateMemoryAsync(senderId, options).catch(err => {
+      // A contact deleted while this waited stays deleted (never recreated by background learning)
+      this.updateMemoryAsync(senderId, { ...options, onlyExisting: true }).catch(err => {
         console.error('Background memory update failed (non-critical):', err.message);
       });
     }, waited >= maxWaitMs ? 0 : Math.min(quietMs, maxWaitMs - waited));
@@ -243,6 +245,7 @@ class MemoryService {
   async _updateMemoryOnce(senderId, options = {}) {
     try {
       let memory = await this.getOrCreateUserMemory(senderId, null, options);
+      if (!memory) return null;
       const snapshot = Object.fromEntries(LEARNED_FIELDS.map(f => [f, plain(memory[f])]));
       const owner = await this._ownerProfile(memory.ownerId, options.owner);
       const previousName = memory.name || '';
