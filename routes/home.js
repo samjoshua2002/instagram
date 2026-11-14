@@ -9,6 +9,8 @@ const { parseTzOffset, tzString, localDay } = require('../lib/tzOffset');
 const DAY_MS = 864e5;
 const DAYS = 14; // this week + last week, one bucket per local day
 const HANDOFF_LIMIT = 8;
+// Chats from the in-app test sandbox (test_… senders) are not real conversations
+const REAL_CHATS = { $nor: [{ senderId: /^test_/ }, { recipientId: /^test_/ }] };
 
 const sum = arr => arr.reduce((s, n) => s + n, 0);
 const share = (ai, human) => (ai + human ? Math.round((ai / (ai + human)) * 100) : null);
@@ -31,11 +33,11 @@ router.get('/summary', async (req, res) => {
 
     const [replyRows, senderRows, handoffTotal, handoffDocs] = await Promise.all([
       Message.aggregate([
-        { $match: { ownerId, role: 'assistant', createdAt: { $gte: since } } },
+        { $match: { ownerId, role: 'assistant', createdAt: { $gte: since }, ...REAL_CHATS } },
         { $group: { _id: { day: dayExpr, ai: { $eq: ['$sentByAI', true] } }, n: { $sum: 1 } } },
       ]),
       Message.aggregate([
-        { $match: { ownerId, role: 'user', createdAt: { $gte: since } } },
+        { $match: { ownerId, role: 'user', createdAt: { $gte: since }, ...REAL_CHATS } },
         { $group: { _id: '$senderId', days: { $addToSet: dayExpr } } },
       ]),
       UserMemory.countDocuments({ ownerId, handoffRequestedAt: { $ne: null } }),

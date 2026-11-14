@@ -20,9 +20,12 @@ export default function SimulatorPage() {
   useEffect(() => {
     activeFriendRef.current = activeFriendId;
     setIsLoading(false);
-    // Each contact gets a fresh test thread
+    // Each contact gets a fresh test thread, on the server too (otherwise the bot keeps the old test's context)
     setMessages([]);
     setInputMsg('');
+    if (targetFriend) {
+      fetch(`${API_BASE}/api/simulator/chat?testSenderId=${encodeURIComponent(`test_sim_${targetFriend.senderId || targetFriend.id}`)}`, { method: 'DELETE' }).catch(() => {});
+    }
   }, [activeFriendId]);
 
   const handleSend = async (e) => {

@@ -46,7 +46,7 @@ export const PERSONAL_TEMPLATES = [
         const from = `t${i}`;
         const to = byName[(c.targetName || '').toLowerCase()];
         if (to && to !== from && !board.edges.some(e => (e.from === to && e.to === from) || (e.from === from && e.to === to))) {
-          board.edges.push({ id: `e-${from}-${to}`, from, to, label: c.relationship || '' });
+          board.edges.push({ id: `e-${from}-${to}`, from, to, label: c.rel || c.relationship || '' });
         }
       }));
       return board;

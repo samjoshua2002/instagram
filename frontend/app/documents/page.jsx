@@ -195,7 +195,7 @@ export default function DocumentsPage() {
         )}
 
         {tab === 'link' && (
-          <form className="spx-form" onSubmit={(e) => { e.preventDefault(); postJson('link', form, 'Link added'); }}>
+          <form className="spx-form" onSubmit={(e) => { e.preventDefault(); postJson('link', { title: form.title, url: form.url, description: form.text, category: form.category }, 'Link added'); }}>
             <input placeholder="Title, e.g. Spring brochure" value={form.title} onChange={setField('title')} required />
             <input type="url" placeholder="https://…" value={form.url} onChange={setField('url')} required />
             <textarea rows={3} placeholder="What is in this link? (helps the AI decide when to share it)" value={form.text} onChange={setField('text')} />

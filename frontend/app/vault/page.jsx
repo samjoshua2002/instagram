@@ -487,7 +487,9 @@ function MediaVaultPageContent() {
   const renderCard = ({ key, url, name, category, badge, keywords, date, footer }) => (
     <div key={key} className="vx-card">
       <a className="vx-card-art" href={url} target="_blank" rel="noreferrer" title="Open full size">
-        <img src={url} alt={name} loading="lazy" />
+        {/\.mp4(?:[?#]|$)/i.test(url || '')
+          ? <video src={url} muted playsInline preload="metadata" aria-label={name} />
+          : <img src={url} alt={name} loading="lazy" />}
         <span className="vx-badge vx-badge-cat">{getCategoryIcon(category)}{categoryLabel(category)}</span>
         <span className="vx-badge vx-badge-type">{badge}</span>
       </a>

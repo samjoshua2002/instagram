@@ -9,7 +9,8 @@ export default function MemoriesPage() {
 
   useEffect(() => {
     // Seamless redirect to unified people directory table
-    router.replace('/relationships');
+    // Keep ?person=… so deep links still open that person
+    router.replace(`/relationships${typeof window !== 'undefined' ? window.location.search : ''}`);
   }, [router]);
 
   return <RelationshipsPage />;

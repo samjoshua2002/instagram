@@ -62,7 +62,7 @@ function FunnelCard({ biz }) {
           <li key={st.label} style={{ display: 'block' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
               <span>{st.label}</span>
-              <b>{fmt(st.value)}{i > 0 && <span style={{ color: 'var(--sp-text-2)', fontWeight: 600 }}> · {pct(st.value, steps[i - 1].value)}%</span>}</b>
+              <b>{fmt(st.value)}{i > 0 && <span style={{ color: 'var(--sp-text-2)', fontWeight: 600 }}> · {Math.min(100, pct(st.value, steps[i - 1].value))}%</span>}</b>
             </div>
             <div className="an-lb-track"><div style={{ width: `${(st.value / top) * 100}%`, opacity: 1 - i * 0.22 }} /></div>
           </li>
@@ -171,7 +171,7 @@ export default function BusinessView({ biz, routingConfig, range, activity }) {
   const highlights = [];
   const peak = heatPeak(data?.heatmap);
   if (peak) highlights.push({ badge: peak.day[0], title: `Staff up on ${peak.dayName}s`, text: `${peak.windowShare}% of customer messages arrive ${peak.window}.` });
-  if (chats) highlights.push({ badge: '%', title: `${pct(leadsN, chats)}% lead rate`, text: `${plural(leadsN, 'lead')} from ${plural(chats, 'conversation')}${leadsN ? `, ${pct(booked, leadsN)}% of them booked` : ''}.` });
+  if (chats) highlights.push({ badge: '%', title: `${pct(leadsN, chats)}% lead rate`, text: `${plural(leadsN, 'lead')} from ${plural(chats, 'conversation')}${leadsN ? `, ${Math.min(100, pct(booked, leadsN))}% of them booked` : ''}.` });
   if (data?.totals && data.totals.ai + data.totals.human > 0) {
     highlights.push({ badge: 'AI', title: `AI sent ${pct(data.totals.ai, data.totals.ai + data.totals.human)}% of replies`, text: `${fmt(data.totals.ai)} by AI and ${fmt(data.totals.human)} by your team in the ${rangeWords(range)}.` });
   }

@@ -1887,6 +1887,20 @@ app.get('/api/banners', async (req, res) => {
   res.json({ success: true, topic, photos });
 });
 
+// Clears a test chat (Clear button / new thread), so the next test does not reply with the old test's context
+app.delete('/api/simulator/chat', async (req, res) => {
+  try {
+    const raw = String(req.query?.testSenderId || '');
+    if (!/^test_[A-Za-z0-9_-]{1,120}$/.test(raw)) return res.status(400).json({ error: 'Only test chats can be cleared.' });
+    const testSenderId = `${raw}_${req.user._id}`;
+    await Message.deleteMany(conversationMessages(req.user._id, testSenderId));
+    await UserMemory.deleteOne({ ownerId: req.user._id, senderId: testSenderId });
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // Interactive Simulator: lets Sam test his AI clone without needing live Instagram DMs first!
 app.post('/api/simulator/chat', async (req, res) => {
   try {
@@ -3110,7 +3124,8 @@ app.get('/api/social-graph/unlinked-chatters', async (req, res) => {
   try {
     const memories = await UserMemory.find(inMemories(req, {
       username: { $not: /^(test_|ig_tester_|catovidz$|me$|user_\d+)/i },
-      senderId: { $ne: 'me' }
+      // Test sandbox senders carry a real contact's name as username, so the id is checked too
+      senderId: { $nin: ['me'], $not: /^test_/ }
     })).sort({ lastInteraction: -1 }).limit(30);
 
     const chatters = memories.map(m => ({

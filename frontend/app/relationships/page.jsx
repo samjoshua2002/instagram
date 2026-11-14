@@ -29,7 +29,9 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 function getNextBirthday(dob) {
   if (!dob) return null;
   const hasYear = /\b(19|20)\d{2}\b/.test(dob);
-  const parsed = new Date(hasYear ? dob : `${dob} 2000`);
+  // "2002-05-14" alone is read as UTC midnight (a day early west of UTC), so ISO dates are built locally
+  const iso = String(dob).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const parsed = iso ? new Date(+iso[1], +iso[2] - 1, +iso[3]) : new Date(hasYear ? dob : `${dob} 2000`);
   if (Number.isNaN(parsed.getTime())) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -945,8 +947,8 @@ function RelationshipsPageContent() {
           throw new Error(data.error || `server answered ${res.status}`);
         }
       } catch (e) {
-        // The AI memory still has the fact: put it back on the profile too
-        setSelectedPerson(original);
+        // The AI memory still has the fact: put it back on the profile too (only if it is still open)
+        setSelectedPerson(prev => (prev && prev.id === original.id ? original : prev));
         await saveNode(original);
         showToast(`Could not remove the fact: ${e.message}`, 'error');
         return;
@@ -997,7 +999,7 @@ function RelationshipsPageContent() {
     };
 
     await saveNode(updated);
-    setSelectedPerson(updated);
+    setSelectedPerson(prev => (prev && prev.id === updated.id ? updated : prev));
     setNewConnTarget('');
     setNewConnRel('');
     setIsAddingPerson(false);

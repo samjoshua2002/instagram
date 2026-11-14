@@ -310,7 +310,7 @@ function NeedsAttention({ summary, people, onDone }) {
     <section aria-label="Needs your attention">
       <div className="sh-row-head">
         <h2>Needs your attention</h2>
-        {handoffs.total > handoffs.items.length && <Link href="/controls" className="sh-link">All {fmt(handoffs.total)}</Link>}
+        {handoffs.total > handoffs.items.length && <Link href="/relationships" className="sh-link">All {fmt(handoffs.total)}</Link>}
       </div>
       <ul className="sh-follow">
         {tokenIssue && (
@@ -334,7 +334,8 @@ function NeedsAttention({ summary, people, onDone }) {
         {handoffs.items.map(h => {
           const p = bySender.get(String(h.senderId));
           const name = p?.name || h.name || (h.username ? `@${h.username}` : 'Someone');
-          const href = p ? personHref(p) : '/controls';
+          // The inbox lists every conversation; Controls has no handoff list
+          const href = p ? personHref(p) : '/relationships';
           const why = [waitText(h.waitingMinutes), h.reason].filter(Boolean).join(' · ');
           return (
             <li key={h.senderId} className="sh-follow-item">

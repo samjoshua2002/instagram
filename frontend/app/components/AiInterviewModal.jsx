@@ -139,7 +139,8 @@ export default function AiInterviewModal() {
     };
 
     const ok = await saveNode(payload);
-    setIsAiModalOpen(false);
+    // On failure the interview stays open so the answers are not lost
+    if (ok !== false) setIsAiModalOpen(false);
     if (ok) showToast(`Added ${payload.name} to People Directory`, 'success'); // a failure already showed the real error
   };
 

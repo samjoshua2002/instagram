@@ -30,7 +30,8 @@ router.get('/', async (req, res) => {
       f.leadExtraction ? Lead.find({ ownerId, createdAt: { $gt: since } }).sort({ createdAt: 1 }).limit(20).lean() : [],
       f.bookingScheduler ? Booking.find({ ownerId, createdAt: { $gt: since } }).sort({ createdAt: 1 }).limit(20).lean() : [],
       f.humanHandoffInbox ? UserMemory.find({ ownerId, handoffRequestedAt: { $gt: since } }).sort({ handoffRequestedAt: 1 }).limit(20).lean() : [],
-      Message.find({ ownerId, role: 'user', createdAt: { $gt: since } }).sort({ createdAt: 1 }).limit(100).lean(),
+      // Test sandbox chats (test_… senders) never raise "people messaged you" alerts
+      Message.find({ ownerId, role: 'user', createdAt: { $gt: since }, senderId: { $not: /^test_/ } }).sort({ createdAt: 1 }).limit(100).lean(),
     ]);
 
     // New DMs: one alert per person (latest text + count), flagged when it is their first ever message

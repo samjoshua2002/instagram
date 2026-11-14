@@ -10,6 +10,9 @@ const { parseTzOffset, tzString, localDay } = require('../lib/tzOffset');
 
 // Mounted behind requireAuth; every query is scoped to the signed-in tenant
 const ownerOf = (req) => req.user._id;
+// Chats from the in-app test sandbox (test_… senders) are not real conversations
+const REAL_CHATS = { $nor: [{ senderId: /^test_/ }, { recipientId: /^test_/ }] };
+const REAL_CONTACT = { senderId: { $not: /^test_/ } };
 
 const TREND_DAYS = 14;
 
@@ -40,14 +43,14 @@ router.get('/overview', async (req, res) => {
 
     const [totalConversations, leads, leadsLast30d, confirmedBookings, upcomingBookings, handoffsOpen, aiReplies, humanReplies] = await Promise.all([
       // Same contacts the inbox lists, so the card matches what the owner sees
-      UserMemory.countDocuments({ ownerId }),
+      UserMemory.countDocuments({ ownerId, ...REAL_CONTACT }),
       Lead.countDocuments({ ownerId }),
       Lead.countDocuments({ ownerId, createdAt: { $gte: since30d } }),
       Booking.countDocuments({ ownerId, status: 'confirmed' }),
       Booking.countDocuments({ ownerId, status: { $in: ['pending', 'confirmed'] }, bookingTime: { $gte: new Date() } }),
-      UserMemory.countDocuments({ ownerId, handoffRequestedAt: { $ne: null } }),
-      Message.countDocuments({ ownerId, role: 'assistant', sentByAI: true }),
-      Message.countDocuments({ ownerId, role: 'assistant', sentByAI: { $ne: true } }),
+      UserMemory.countDocuments({ ownerId, handoffRequestedAt: { $ne: null }, ...REAL_CONTACT }),
+      Message.countDocuments({ ownerId, role: 'assistant', sentByAI: true, ...REAL_CHATS }),
+      Message.countDocuments({ ownerId, role: 'assistant', sentByAI: { $ne: true }, ...REAL_CHATS }),
     ]);
 
     const [conversationTrend, leadTrend, bookingTrend, aiReplyTrend] = await Promise.all([
@@ -236,7 +239,7 @@ router.get('/activity', async (req, res) => {
       ];
     }
 
-    const match = { ...(platform ? {} : { ownerId: ownerOf(req) }), ...inRange };
+    const match = { ...(platform ? {} : { ownerId: ownerOf(req) }), ...inRange, ...REAL_CHATS };
     const [out = {}] = await Message.aggregate([{ $match: match }, { $facet: facets }]);
 
     const totals = { received: 0, ai: 0, human: 0 };
