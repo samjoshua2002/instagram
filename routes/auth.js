@@ -628,11 +628,10 @@ router.post('/oneauth/request-setup-otp', sendIpLimit, async (req, res) => {
     const cleanEmail = rawEmail.toLowerCase();
     if (!cleanEmail) return res.status(400).json({ error: 'Email or username is required' });
     const user = await User.findOne({ $or: [{ email: cleanEmail }, { username: cleanEmail }] });
-    if (!user) {
-      // Same answer as a real account, so this route does not reveal which accounts exist
-      return res.json({ success: true, message: 'If this account exists, a 6-digit code has been sent to its email to unlock OneAuth setup.' });
-    }
-    if (!emailSendAllowed(user.email)) return tooManyEmails(res);
+    const genericOk = { success: true, message: 'If this account exists, a 6-digit code has been sent to its email to unlock OneAuth setup.' };
+    // Same answers (including the send limit) for real and unknown accounts, so this route does not reveal which exist
+    if (!emailSendAllowed(user ? user.email : cleanEmail)) return tooManyEmails(res);
+    if (!user) return res.json(genericOk);
 
     const otpCode = newOtpCode();
     user.resetOtp = {
@@ -649,7 +648,7 @@ router.post('/oneauth/request-setup-otp', sendIpLimit, async (req, res) => {
       console.error('❌ [OneAuth Setup OTP] Email sending failed:', mailErr.message);
       return res.status(502).json({ error: 'We could not send the verification email. Please try again later.' });
     }
-    res.json({ success: true, message: `A 6-digit verification code has been sent to ${maskEmail(user.email)} to unlock OneAuth setup.` });
+    res.json(genericOk);
   } catch (err) {
     return serverError(res, 'Request OneAuth Setup OTP error', err);
   }
@@ -760,10 +759,9 @@ router.post('/forgot-password/send-otp', sendIpLimit, async (req, res) => {
     const cleanEmail = email.toLowerCase();
     const genericOk = { success: true, message: 'If this email exists, a verification code has been sent.' };
     const user = await User.findOne({ email: cleanEmail });
-    if (!user) {
-      return res.json(genericOk);
-    }
+    // Same answers (including the send limit) for real and unknown emails, so this route does not reveal which exist
     if (!emailSendAllowed(cleanEmail)) return tooManyEmails(res);
+    if (!user) return res.json(genericOk);
 
     // Generate secure 6-digit OTP
     const otpCode = newOtpCode();
@@ -778,10 +776,7 @@ router.post('/forgot-password/send-otp', sendIpLimit, async (req, res) => {
     // Send verification email
     try {
       await authService.sendOtpEmail(user.email, otpCode, 'Password Reset');
-      res.json({
-        success: true,
-        message: `A 6-digit verification code has been sent to ${user.email}. Please check your inbox.`
-      });
+      res.json(genericOk);
     } catch (mailErr) {
       console.error('❌ [Password Reset OTP] Email delivery failed:', mailErr.message);
       return res.status(502).json({ error: 'We could not send the verification email. Please try again later.' });
@@ -936,7 +931,7 @@ router.post('/passkey/register-verify', requireAuth, ownerSessionOnly, async (re
 
     // Set device name from client or detect dynamically from User-Agent
     const userAgent = req.get('user-agent') || '';
-    let resolvedName = (name || '').trim();
+    let resolvedName = typeof name === 'string' ? name.trim().slice(0, 60) : '';
     if (!resolvedName) {
       if (/iPhone/i.test(userAgent)) resolvedName = 'iPhone (Touch ID / Face ID)';
       else if (/iPad/i.test(userAgent)) resolvedName = 'iPad (Touch ID)';
@@ -1089,7 +1084,8 @@ router.post('/onboarding', requireAuth, async (req, res) => {
       }
       const conflictingUser = await User.exists({
         _id: { $ne: user._id },
-        $or: [{ instagramAccountId: cleanAccountId }, { instagramId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
+        // instagramId alone is an unproven sign-up claim; the token above proves this owner
+        $or: [{ instagramAccountId: cleanAccountId }, { 'instagram.accountId': cleanAccountId }],
       });
       if (conflictingUser) {
         return res.status(409).json({ error: 'This Instagram account is already linked to another workspace.' });
@@ -1829,6 +1825,9 @@ router.post('/change-password', requireAuth, async (req, res) => {
     if (String(newPassword).length < 8) {
       return res.status(400).json({ error: 'New password must be at least 8 characters.' });
     }
+    if (req.impersonatedBy) {
+      return res.status(403).json({ error: 'Passwords cannot be changed while viewing another workspace.' });
+    }
     const user = req.user;
     // Same wrong-password lock as sign-in, so a stolen session cannot guess the password
     const lockKey = `pw:${user._id}`;
@@ -1842,9 +1841,6 @@ router.post('/change-password', requireAuth, async (req, res) => {
     passwordLockout.recordSuccess(lockKey, clientIp(req));
     if (await user.comparePassword(String(newPassword))) {
       return res.status(400).json({ error: 'New password must be different from the current one.' });
-    }
-    if (req.impersonatedBy) {
-      return res.status(403).json({ error: 'Passwords cannot be changed while viewing another workspace.' });
     }
     user.passwordHash = await User.hashPassword(String(newPassword));
     authService.bumpTokenVersion(user); // other devices are signed out
@@ -2423,11 +2419,14 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
     const uploadsDir = path.join(__dirname, '..', 'public', 'uploads');
     const [mediaItems, docs] = await Promise.all([
       MediaVault.find({ ownerId }).select('url').lean(),
-      KnowledgeDoc.find({ ownerId }).select('fileUrl').lean(),
+      KnowledgeDoc.find({ ownerId, sourceType: { $ne: 'link' } }).select('fileUrl').lean(),
     ]);
+    const knowledgeDir = path.join(__dirname, '..', 'storage', 'knowledge');
     const candidateFiles = new Map(); // absolute path -> basename
     for (const url of [...mediaItems.map((m) => m.url), ...docs.map((d) => d.fileUrl)]) {
-      const filePath = resolveUploadPath(url, uploadsDir);
+      const filePath = resolveUploadPath(url, uploadsDir)
+        // Private documents live in storage/knowledge behind /api/knowledge/files/<name>
+        || resolveUploadPath(String(url || '').replace('/api/knowledge/files/', '/uploads/'), knowledgeDir);
       if (filePath) candidateFiles.set(filePath, path.basename(filePath));
     }
 

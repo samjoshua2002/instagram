@@ -22,6 +22,7 @@ export default function AiProviderCard() {
   const [form, setForm] = useState({ provider: 'azure', model: '', endpoint: '', apiKey: '' });
   const [hasApiKey, setHasApiKey] = useState(false);
   const [savedProvider, setSavedProvider] = useState('azure');
+  const [savedEndpoint, setSavedEndpoint] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -40,6 +41,7 @@ export default function AiProviderCard() {
         setForm({ provider: data.config.provider, model: data.config.model, endpoint: data.config.endpoint, apiKey: '' });
         setHasApiKey(data.config.hasApiKey);
         setSavedProvider(data.config.provider);
+        setSavedEndpoint(data.config.endpoint || '');
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -47,7 +49,8 @@ export default function AiProviderCard() {
 
   const meta = PROVIDERS.find(p => p.id === form.provider) || PROVIDERS[0];
   const set = (key, value) => { setForm(prev => ({ ...prev, [key]: value })); setTestResult(null); };
-  const keySaved = hasApiKey && savedProvider === form.provider;
+  // The server only reuses a saved key for the same provider and endpoint
+  const keySaved = hasApiKey && savedProvider === form.provider && savedEndpoint === (form.endpoint || '').trim();
 
   const body = () => ({ provider: form.provider, model: form.model, endpoint: form.endpoint, apiKey: form.apiKey });
 
@@ -63,6 +66,7 @@ export default function AiProviderCard() {
       if (!res.ok) throw new Error(data.error || 'Could not save AI provider');
       setHasApiKey(data.config.hasApiKey);
       setSavedProvider(data.config.provider);
+      setSavedEndpoint(data.config.endpoint || '');
       setForm(prev => ({ ...prev, apiKey: '' }));
       showToast?.('AI provider configuration updated.', 'success');
     } catch (err) {

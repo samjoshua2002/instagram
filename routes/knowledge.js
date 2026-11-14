@@ -142,8 +142,19 @@ router.post('/text', async (req, res) => {
 /** DELETE /api/knowledge/:sourceId */
 router.delete('/:sourceId', async (req, res) => {
   try {
-    const deleted = await ragService.deleteDocument(req.user._id, req.params.sourceId);
+    const sourceId = String(req.params.sourceId || '');
+    const fileDocs = await KnowledgeDoc.find({
+      ownerId: req.user._id,
+      sourceType: { $ne: 'link' },
+      $or: [{ sourceId }, ...(/^[0-9a-f]{24}$/i.test(sourceId) ? [{ _id: sourceId }] : [])],
+    }).select('fileUrl').lean();
+    const deleted = await ragService.deleteDocument(req.user._id, sourceId);
     if (!deleted) return res.status(404).json({ error: 'Document not found.' });
+    // The uploaded file goes too, so deleted business documents do not stay on the server
+    for (const name of new Set(fileDocs.map(d => String(d.fileUrl || '').split('/api/knowledge/files/')[1]))) {
+      const filePath = name && DOC_NAME.test(name) && resolveInsideDir(storageDir, name);
+      if (filePath) fs.promises.unlink(filePath).catch(() => {});
+    }
     res.json({ success: true, deleted });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete document' });

@@ -33,6 +33,8 @@ router.put('/ai-provider', async (req, res) => {
     }
 
     const cfg = req.user.aiProviderConfig || {};
+    // A saved key only ever goes to the provider and endpoint it was saved for
+    const keyTargetChanged = cfg.provider !== provider || clean(cfg.endpoint) !== clean(endpoint);
     cfg.provider = provider;
     cfg.model = clean(model);
     cfg.endpoint = clean(endpoint);
@@ -44,7 +46,7 @@ router.put('/ai-provider', async (req, res) => {
       }
       const { encryptedData, iv, authTag } = cryptoService.encrypt(key);
       Object.assign(cfg, { apiKeyEncrypted: encryptedData, iv, authTag });
-    } else if (clearApiKey) {
+    } else if (clearApiKey || keyTargetChanged) {
       Object.assign(cfg, { apiKeyEncrypted: '', iv: '', authTag: '' });
     }
 
@@ -72,7 +74,8 @@ router.post('/test-llm', async (req, res) => {
 
   const saved = req.user.aiProviderConfig || {};
   const cfg = { provider, model: clean(model), endpoint: clean(endpoint) };
-  const key = clean(apiKey) || (saved.provider === provider ? llmAdapter.getApiKey(saved) : '');
+  const sameTarget = saved.provider === provider && clean(saved.endpoint) === cfg.endpoint;
+  const key = clean(apiKey) || (sameTarget ? llmAdapter.getApiKey(saved) : '');
 
   try {
     const result = await llmAdapter.testConnection(cfg, key);
