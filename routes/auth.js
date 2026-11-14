@@ -25,8 +25,9 @@ const oauthIpLimit = rateLimit({ name: 'oauth', windowMs: 15 * MINUTE, max: 30 }
 // lock that address out of that account for 15 min, so a stranger cannot lock the real owner out.
 // Per account (any address): 10 wrong codes or 50 wrong passwords still lock it, and each repeat lock
 // doubles (15 min, 30, 60 ... up to 24 h), so a 6-digit code cannot be guessed by spreading attempts.
-const codeLockout = track(new AccountLockout({ perIp: 5, perAccount: 10, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
-const passwordLockout = track(new AccountLockout({ perIp: 10, perAccount: 50, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE }));
+const knownNetworks = new Map(); // shared, so signing in by password at home also shields the code lock
+const codeLockout = track(new AccountLockout({ perIp: 5, perAccount: 10, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE, known: knownNetworks }));
+const passwordLockout = track(new AccountLockout({ perIp: 10, perAccount: 50, windowMs: 15 * MINUTE, lockMs: 15 * MINUTE, known: knownNetworks }));
 // Per email address: at most 3 emailed codes per 15 min
 const emailSendLimiter = track(new SlidingWindowLimiter({ windowMs: 15 * MINUTE, max: 3 }));
 
@@ -576,6 +577,10 @@ async function handleOneAuthDirectLogin(req, res, identifier, code) {
 
   const result = await authService.consumeTotp(user, cleanCode);
   if (result !== 'ok') {
+    // No code can be right before OneAuth is switched on, so those tries never lock the real owner out
+    if (user.twoFactor.enabled === false) {
+      return res.status(401).json({ error: 'Invalid or expired 6-digit code from Zoho OneAuth app. Please check your app and try again.' });
+    }
     const after = codeLockout.recordFailure(`code:${user._id}`, clientIp(req));
     if (after.locked) return lockedResponse(res, after);
     return res.status(401).json({
