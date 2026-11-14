@@ -28,7 +28,7 @@ const reminderService = require('./services/reminderService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
-const { shouldSendAiTextReply, preferencesForMode } = require('./lib/replyPolicy');
+const { shouldSendAiTextReply, preferencesForMode, routingAfterMode } = require('./lib/replyPolicy');
 const workspaceFeatureService = require('./services/workspaceFeatureService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
@@ -2539,7 +2539,11 @@ app.get('/api/social-graph', async (req, res) => {
         messageCount: chatsCount,
         chatsCount,
         reelsCount,
-        lastInteraction: memory?.lastInteraction || n.updatedAt
+        lastInteraction: memory?.lastInteraction || n.updatedAt,
+        // newest things learned from the chat, with when (the person page shows these first)
+        learned: (memory?.facts || []).slice(-8).reverse().map(f => ({ fact: f.fact, at: f.addedAt })),
+        factsCount: memory?.facts?.length || 0,
+        chatSummary: memory?.rollingSummary && memory.rollingSummary !== 'First time contacting.' ? memory.rollingSummary : ''
       };
     }));
 
@@ -3232,6 +3236,26 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
       }
     );
 
+    // The chat rules follow the switch (so it works from the person page, Controls, anywhere): "only selected
+    // people" needs them on the list, "everyone except" needs them off it
+    let routing = null;
+    if (modePrefs) {
+      const [mems, people, config] = await Promise.all([
+        UserMemory.find({ ...memoryOwner, $or: [{ senderId: cleanId }, { username: new RegExp(`^${escapeRegex(cleanHandle)}$`, 'i') }, { name: new RegExp(`^${escapeRegex(cleanId)}$`, 'i') }] }, { senderId: 1 }).lean(),
+        SocialGraph.find({ $and: [graphOwner], $or: [{ senderId: cleanId }, { instagramHandle: new RegExp(`^@?${escapeRegex(cleanHandle)}$`, 'i') }, { name: new RegExp(`^${escapeRegex(cleanId)}$`, 'i') }, { aliases: cleanHandle.toLowerCase() }] }, { senderId: 1, name: 1, instagramHandle: 1 }).lean(),
+        findOwnPersona(req),
+      ]);
+      const senderIds = [...mems.map(m => m.senderId), ...people.map(n => n.senderId)];
+      const otherKeys = people.flatMap(n => [String(n._id), n.instagramHandle ? n.instagramHandle.replace(/^@/, '').toLowerCase() : '', n.name ? n.name.toLowerCase().replace(/[^a-z0-9]/g, '_') : '']);
+      const change = routingAfterMode(config, { senderIds, otherKeys }, modePrefs.aiEnabled);
+      if (change && config) {
+        Object.assign(config, change);
+        await config.save();
+        await redisService.invalidatePersonaConfig();
+      }
+      if (config) routing = { chatMode: config.chatMode, includedContactIds: config.includedContactIds || [], excludedContactIds: config.excludedContactIds || [], globalBotActive: config.globalBotActive !== false };
+    }
+
     socialGraphService.clearCache();
     res.json({
       success: true,
@@ -3240,7 +3264,9 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
         replyToMessages: finalReplyMessages,
         replyToReelsAndPosts: finalReplyReels,
         autoSendReels
-      }
+      },
+      // the chat rules after this change, so every open page shows the same state
+      routing
     });
   } catch (err) {
     sendServerError(res, err);

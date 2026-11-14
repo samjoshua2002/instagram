@@ -7,14 +7,22 @@
 // (busy marble, sand, canyons) and text on top was hard to read (asked 2026-11-06).
 // The page also tints every photo one colour (banners.css .ub-tint), so they all match.
 const QUERY = 'smooth abstract waves';
+// Several art styles, so pages don't all look alike (asked 2026-11-15: "always the same, so boring"). Each is
+// one search a week. The plain/scene filters below still keep them abstract and readable under text.
 const TOPICS = {
   abstract: QUERY,
-  colorful: QUERY,
   fluid: QUERY,
-  // Light theme: the same smooth waves in bright pastel colours (frontend asks "<topic>-light")
+  colorful: 'colorful abstract fluid art',
+  shapes: 'abstract 3d render shapes',
+  glass: 'abstract iridescent glass',
+  paint: 'abstract acrylic paint texture',
+  // Light theme: the same styles in bright pastel colours (frontend asks "<topic>-light")
   'abstract-light': `pastel ${QUERY}`,
-  'colorful-light': `pastel ${QUERY}`,
   'fluid-light': `pastel ${QUERY}`,
+  'colorful-light': 'pastel abstract fluid art',
+  'shapes-light': 'pastel abstract 3d render shapes',
+  'glass-light': 'light abstract iridescent glass',
+  'paint-light': 'pastel abstract acrylic paint texture',
 };
 
 // One list per Unsplash colour filter ("tone-yellow", ...), so a contact's banner can match
@@ -22,7 +30,7 @@ const TOPICS = {
 const TONES = ['black_and_white', 'black', 'white', 'yellow', 'orange', 'red', 'purple', 'magenta', 'green', 'teal', 'blue'];
 for (const tone of TONES) TOPICS[`tone-${tone}`] = { query: QUERY, color: tone };
 
-const STORE_VERSION = 'smooth1';
+const STORE_VERSION = 'mix1';
 const REFRESH_MS = 7 * 24 * 60 * 60 * 1000; // ask Unsplash for a new list at most once a week per topic
 const RETRY_MS = 10 * 60 * 1000; // after a network/server error
 const LIMIT_MS = 60 * 60 * 1000; // after 429/403 or when the hourly quota is nearly used up

@@ -2654,6 +2654,59 @@ body {
 .person-fact + .person-fact { border-top: 1px solid var(--person-line); }
 .person-fact > span { min-width: 0; overflow-wrap: anywhere; }
 
+/* What the AI just learned (top of the facts card) */
+.person-learned {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--person-line);
+  background: color-mix(in srgb, var(--color-accent, #ff6b5e) 7%, transparent);
+}
+.person-learned-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.person-learned-summary {
+  margin: 8px 0 4px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+.person-learned-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-text-primary);
+  border-top: 1px solid var(--person-line);
+  animation: person-learned-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.person-learned-fact { min-width: 0; overflow-wrap: anywhere; }
+.person-learned-when { flex-shrink: 0; font-size: 0.72rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--color-text-secondary); }
+.person-learned-new {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-accent, #ff6b5e);
+}
+@keyframes person-learned-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .person-learned-row { animation: none; } }
+
 /* People in their life */
 .person-people-grid {
   display: grid;

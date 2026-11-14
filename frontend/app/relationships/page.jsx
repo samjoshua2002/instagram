@@ -326,7 +326,7 @@ function RelationshipsPageContent() {
       || nodes.find(n => !n.isRoot && selectedPerson.senderId && n.senderId === selectedPerson.senderId)
       || nodes.find(n => !n.isRoot && (n.name || '').toLowerCase() === (selectedPerson.name || '').toLowerCase());
     if (!fresh) return;
-    const watched = ['name', 'dob', 'age', 'gender', 'personalNotes', 'facts', 'lore', 'chatsCount', 'reelsCount', 'messageCount', 'handle', 'profilePic', 'aiEnabled', 'replyToMessages'];
+    const watched = ['name', 'dob', 'age', 'gender', 'personalNotes', 'facts', 'lore', 'learned', 'chatSummary', 'chatsCount', 'reelsCount', 'messageCount', 'handle', 'profilePic', 'aiEnabled', 'replyToMessages'];
     if (!watched.some(k => JSON.stringify(fresh[k] ?? null) !== JSON.stringify(selectedPerson[k] ?? null))) return;
 
     // Keep the open id so the person-switch effect (keyed on id) does not reset the page
@@ -560,9 +560,9 @@ function RelationshipsPageContent() {
   // Direct Message Automation mode for selectedPerson
   const currentAiMode = useMemo(() => {
     if (!selectedPerson) return 'full_ai';
-    if (selectedPerson.aiEnabled === false || selectedPerson.replyToMessages === false) return 'paused';
-    return 'full_ai';
-  }, [selectedPerson]);
+    // the same answer the server gives: the person's own switch AND the chat rules on the Controls page
+    return isAiOnFor(selectedPerson, routingConfig) ? 'full_ai' : 'paused';
+  }, [selectedPerson, routingConfig]);
 
   // Set AI mode with instant state reflection
   const handleSetAiMode = async (mode) => {
@@ -1096,9 +1096,21 @@ function RelationshipsPageContent() {
       : toneName === 'Playful'
         ? `${sampleOpen} relax relax, I'm here now`
         : `${sampleOpen} sorry sorry, I'm here now`;
-    const allFacts = selectedPerson.facts || selectedPerson.lore || [];
+    // newest first: what the AI learned last is what you want to see first
+    const allFacts = [...(selectedPerson.facts || selectedPerson.lore || [])].reverse();
     const factQuery = factSearch.trim().toLowerCase();
     const shownFacts = factQuery ? allFacts.filter(f => String(f).toLowerCase().includes(factQuery)) : allFacts;
+    // the latest things learned from the chat, with when (fresh ones are marked New)
+    const learned = (selectedPerson.learned || []).filter(l => l && l.fact);
+    const ago = (at) => {
+      const s = Math.max(0, (Date.now() - new Date(at).getTime()) / 1000);
+      if (!Number.isFinite(s)) return '';
+      if (s < 90) return 'just now';
+      if (s < 3600) return `${Math.round(s / 60)} min ago`;
+      if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+      return `${Math.round(s / 86400)} d ago`;
+    };
+    const isFresh = (at) => Date.now() - new Date(at).getTime() < 6 * 3600 * 1000;
     const connections = selectedPerson.connections || [];
     const groupCounts = connections.reduce((acc, c) => { acc[connectionGroup(c)] += 1; return acc; }, { friends: 0, family: 0, mentioned: 0 });
     const peopleQuery = peopleSearch.trim().toLowerCase();
@@ -1510,8 +1522,24 @@ function RelationshipsPageContent() {
             <h2 className="person-card-title">What the AI knows</h2>
             <div className="person-card-sub person-live">
               <span className="person-live-dot" aria-hidden="true" />
-              {allFacts.length.toLocaleString()} fact{allFacts.length === 1 ? '' : 's'} · auto-syncing
+              {allFacts.length.toLocaleString()} fact{allFacts.length === 1 ? '' : 's'} · newest first · updates live
             </div>
+
+            {(learned.length > 0 || selectedPerson.chatSummary) && !factQuery && (
+              <div className="person-learned" aria-live="polite">
+                <div className="person-learned-head">
+                  <span>Just learned from your chat</span>
+                  {learned[0]?.at && <span className="person-learned-when">{ago(learned[0].at)}</span>}
+                </div>
+                {selectedPerson.chatSummary && <p className="person-learned-summary">{selectedPerson.chatSummary}</p>}
+                {learned.slice(0, 5).map(l => (
+                  <div key={`${l.at}-${l.fact}`} className={`person-learned-row${isFresh(l.at) ? ' is-fresh' : ''}`}>
+                    <span className="person-learned-fact">{l.fact}</span>
+                    {isFresh(l.at) ? <span className="person-learned-new">New</span> : <span className="person-learned-when">{ago(l.at)}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <input
               type="search"

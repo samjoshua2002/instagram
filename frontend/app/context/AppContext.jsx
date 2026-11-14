@@ -1244,6 +1244,11 @@ export function AppProvider({ children }) {
         const data = await prefRes.json().catch(() => ({}));
         throw new Error(data.error || `server answered ${prefRes.status}`);
       }
+      // the server keeps the chat rules (included / excluded lists) in step with the switch: show its version
+      const saved = await prefRes.json().catch(() => null);
+      if (saved?.routing) {
+        setRoutingConfig(prev => ({ ...prev, includedContactIds: saved.routing.includedContactIds, excludedContactIds: saved.routing.excludedContactIds }));
+      }
       if (silent) return;
       if (typeof autoSendReels === 'boolean') {
         showToast(autoSendReels ? `Auto-Reels ENABLED for ${nameStr}!` : `Auto-Reels PAUSED for ${nameStr}!`);

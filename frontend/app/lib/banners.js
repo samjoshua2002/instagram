@@ -156,7 +156,15 @@ export function useBannerTheme() {
   return theme;
 }
 
-const LIGHT_TOPICS = new Set(['abstract', 'colorful', 'fluid']);
+const LIGHT_TOPICS = new Set(['abstract', 'colorful', 'fluid', 'shapes', 'glass', 'paint']);
+
+/** The art styles pages rotate through, so banners don't all look alike. */
+export const STYLES = ['abstract', 'shapes', 'colorful', 'glass', 'paint'];
+
+/** The default topic becomes one of the styles: the same for a seed (a page or person keeps its look), varied across seeds. */
+export function styleFor(topic, seed) {
+  return topic === 'abstract' && seed !== null && seed !== undefined ? STYLES[hashSeed(`style|${seed}`) % STYLES.length] : topic;
+}
 
 /** The server topic to ask for in this theme ("abstract" -> "abstract-light"). */
 export function themedTopic(topic, theme) {
@@ -198,7 +206,7 @@ export function bannerSrc(photo, width = 1600) {
 export function useBanner(seed, topic = 'abstract') {
   useVisit();
   const theme = useBannerTheme();
-  const t = themedTopic(topic, theme);
+  const t = themedTopic(styleFor(topic, seed), theme);
   const [loaded, setLoaded] = useState(null); // { topic, photos } (may be an old saved list)
   useEffect(() => {
     let alive = true;
@@ -219,7 +227,9 @@ export function useFreshBanner(slot, topic = 'abstract') {
   const [photo, setPhoto] = useState(null);
   useEffect(() => {
     let alive = true;
-    loadBanners(themedTopic(topic, theme)).then(list => {
+    // the default topic picks a random art style each open, so the page never looks the same twice in a row
+    const style = topic === 'abstract' ? STYLES[Math.floor(Math.random() * STYLES.length)] : topic;
+    loadBanners(themedTopic(style, theme)).then(list => {
       const photos = forTheme(list, theme) || [];
       if (!alive || !photos.length) return;
       const key = `chatter_banner_last_${slot}`;
@@ -386,7 +396,7 @@ export function pickBannerByColor(photos, color, seed) {
 export function useMatchedBanner(seed, color, baseTopic = 'abstract') {
   useVisit();
   const theme = useBannerTheme();
-  const topic = themedTopic(baseTopic, theme);
+  const topic = themedTopic(styleFor(baseTopic, seed), theme);
   const tone = color ? toneFor(color) : null;
   const toneTopic = tone ? `tone-${tone}` : null;
   const [, setTick] = useState(0); // re-render when a list arrives

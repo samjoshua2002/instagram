@@ -38,7 +38,8 @@ html.theme-vt .ub-tint { transition: none !important; }
   opacity: 0;
   transition: opacity 0.5s ease;
 }
-.ub-tint.in { opacity: 1; }
+/* a light wash only: photos keep their own colours (a full tint made every banner look the same) */
+.ub-tint.in { opacity: 0.22; }
 .ub-shade {
   position: absolute;
   inset: 0;

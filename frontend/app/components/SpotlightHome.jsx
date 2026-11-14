@@ -11,6 +11,7 @@ import { prefetchAmbientImages } from './AmbientBackground';
 import { savedPhotoUrl, unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 import { abstractArt, useFreshBanner } from '../lib/banners';
 import UnsplashBanner from './UnsplashBanner';
+import HomeBento from './HomeBento';
 import PageCover from './PageCover';
 
 /**
@@ -763,10 +764,19 @@ export default function SpotlightHome() {
       <NeedsAttention summary={summary} people={people} onDone={doneHandoff} />
 
       <div className="sh-row-head">
-        <h2>This week</h2>
+        <h2>Your dashboard</h2>
         <Link href="/analytics" className="sh-link">Full analytics</Link>
       </div>
-      <KpiRow summary={summary} />
+      <HomeBento
+        summary={summary}
+        people={people}
+        routingConfig={routingConfig}
+        botOn={botOn}
+        personHref={personHref}
+        Photo={Photo}
+        labels={CATEGORY_LABEL}
+        kpis={<KpiRow summary={summary} />}
+      />
 
       {people.length > 0 && <FollowUps items={followOpen.slice(0, 4)} later={later} pressProps={pressProps} />}
 

@@ -326,17 +326,30 @@ class SocialGraphService {
         if (senderNode.roastStyle) {
           lines.push(`  - How to banter/roast them: ${clean(senderNode.roastStyle, 300)}`);
         }
+      }
+
+      // The owner's own choices on this person's page (tone slider, greeting, words to avoid). These are settings,
+      // not learned text: they get their own section and beat the general tone rules.
+      const style = [];
+      if (senderNode) {
         if (Number.isFinite(senderNode.roastiness)) {
           const r = senderNode.roastiness;
-          const tone = r >= 75 ? 'savage, roast them hard (still affectionate)' : r >= 45 ? 'playful teasing' : r >= 20 ? 'light, gentle teasing' : 'kind and warm, no roasting';
-          lines.push(`  - Roastiness ${r}/100: ${tone}`);
+          const tone =
+            r >= 75 ? 'SAVAGE: roast them hard and often, sharp comebacks, still clearly affectionate'
+            : r >= 45 ? 'PLAYFUL: tease them, joke around, light roasts'
+            : r >= 20 ? 'GENTLE: mostly warm, only a little soft teasing'
+            : 'SWEET: kind, warm and caring. No roasting, no sarcasm at their expense';
+          style.push(`- Tone ${r}/100 -> ${tone}. Write this reply in that tone.`);
         }
         if (senderNode.greetingStyle) {
-          lines.push(`  - Greet / open chats with them like: "${clean(senderNode.greetingStyle, 80)}"`);
+          style.push(`- When you greet them or open a chat, use: "${clean(senderNode.greetingStyle, 80)}" (only as a greeting, not in every message).`);
         }
         if (Array.isArray(senderNode.avoidWords) && senderNode.avoidWords.length > 0) {
-          lines.push(`  - NEVER call them: ${senderNode.avoidWords.slice(0, 30).map(w => `"${clean(w, 40)}"`).join(', ')}`);
+          style.push(`- NEVER call them or say to them: ${senderNode.avoidWords.slice(0, 30).map(w => `"${clean(w, 40)}"`).join(', ')}.`);
         }
+      }
+      if (style.length) {
+        lines.push('', `=== HOW YOU CHOSE TO TALK TO ${String(senderNode.name || 'THIS PERSON').toUpperCase()} (YOUR OWN SETTINGS: FOLLOW THEM; THEY OVERRIDE THE GENERAL TONE, BANTER AND GENDER RULES) ===`, ...style);
       }
 
       if (mentionedNodes.size > 0) {
