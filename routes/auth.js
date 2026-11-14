@@ -1659,7 +1659,7 @@ router.get('/instagram/callback', oauthIpLimit, async (req, res) => {
                   globalBotActive: true
                 }
               },
-              { upsert: true, new: true }
+              { upsert: true, returnDocument: 'after' }
             );
             await redisService.invalidatePersonaConfig();
           } catch (personaErr) {

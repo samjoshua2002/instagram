@@ -227,7 +227,7 @@ async function processConversationTurn({ ownerId, senderId, handle = '', incomin
           },
           $setOnInsert: { capturedAt: new Date() },
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     }
   } catch (err) {

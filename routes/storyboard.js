@@ -56,7 +56,7 @@ router.put('/:kind', async (req, res) => {
     const doc = await Storyboard.findOneAndUpdate(
       { ownerId: req.user._id, kind: req.params.kind },
       { $set: clean },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     ).lean();
     storyboardService.clearCache(req.user._id, req.params.kind);
     res.json({ success: true, nodes: doc.nodes, edges: doc.edges, updatedAt: doc.updatedAt });

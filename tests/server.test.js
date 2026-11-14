@@ -7,8 +7,18 @@ const os = require('os');
 
 const {
   checkMetaSignature, resolveInsideDir, isHttpUrl, randomFilename, serializePersona,
-  parseDateParam, validatePersonaUpdate, ownerFilter, contactKey, safeEqual, cleanPhotoIds,
+  parseDateParam, validatePersonaUpdate, ownerFilter, contactKey, safeEqual, cleanPhotoIds, cleanInterviewHistory,
 } = require('../lib/serverSecurity');
+
+test('AI interview history: junk and empty AI turns skipped, capped, non-list refused', () => {
+  assert.deepStrictEqual(cleanInterviewHistory(undefined), []);
+  assert.strictEqual(cleanInterviewHistory('hi'), null);
+  assert.strictEqual(cleanInterviewHistory({ role: 'user' }), null);
+  const kept = cleanInterviewHistory([null, 5, { role: 'assistant' }, { role: 'assistant', content: '  ' }, { role: 'user', content: { $gt: '' } }, { role: 'user', content: 'Mia is my sister' }]);
+  assert.deepStrictEqual(kept, [{ role: 'user', content: 'Mia is my sister' }]);
+  const long = Array.from({ length: 150 }, (_, i) => ({ role: 'user', content: 'm' + i }));
+  assert.deepStrictEqual(cleanInterviewHistory(long).map(m => m.content), long.slice(-100).map(m => m.content));
+});
 
 const sign = (body, secret) => 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
 
