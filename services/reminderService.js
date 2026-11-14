@@ -141,7 +141,7 @@ class ReminderService {
     const claimed = await UserMemory.findOneAndUpdate(
       { _id: user._id, lastReminderSentAt: previousSentAt, lastInteraction: user.lastInteraction },
       { $set: { lastReminderSentAt: claimedAt } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!claimed) {
       console.log(`⏭️ [Reminder Service] @${user.username} already claimed or active again; skipping.`);

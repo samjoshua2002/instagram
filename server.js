@@ -35,7 +35,7 @@ const cryptoService = require('./services/cryptoService');
 const { getUserInstagramToken, getOwnerSendToken, setUserInstagram } = require('./services/instagramTokenService');
 const {
   isProduction, checkMetaSignature, resolveInsideDir, isHttpUrl, randomFilename, serializePersona,
-  validatePersonaUpdate, ownerFilter, contactKey, cleanPhotoIds,
+  validatePersonaUpdate, ownerFilter, contactKey, cleanPhotoIds, cleanInterviewHistory,
 } = require('./lib/serverSecurity');
 const { router: authRouter, requireAuth } = require('./routes/auth');
 const authService = require('./services/authService');
@@ -217,6 +217,8 @@ app.use(cors());
 // Keep the raw body so the Meta webhook signature can be checked byte-for-byte
 app.use(express.json({ limit: '25mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+// Express 5 leaves req.body undefined when nothing was sent; routes read it as an object
+app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); });
 
 const { safeEqual } = require('./lib/serverSecurity');
 
@@ -2179,7 +2181,7 @@ app.put('/api/media-vault/:id', async (req, res) => {
         : String(keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
     }
 
-    const updated = await MediaVault.findOneAndUpdate(query, update, { new: true });
+    const updated = await MediaVault.findOneAndUpdate(query, update, { returnDocument: 'after' });
     if (!updated) return res.status(404).json({ error: 'Media not found or unauthorized' });
     res.json({ success: true, item: updated });
   } catch (err) {
@@ -3247,7 +3249,14 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
 // AI Conversational Interview to clarify friend details, relationships & lore
 app.post('/api/social-graph/ai-interview', async (req, res) => {
   try {
-    const { conversationHistory, userInput, existingNode, autoSave } = req.body;
+    const { userInput, existingNode, autoSave } = req.body || {};
+    if (userInput != null && typeof userInput !== 'string') return res.status(400).json({ error: 'userInput must be text.' });
+    const conversationHistory = cleanInterviewHistory(req.body.conversationHistory);
+    if (!conversationHistory) return res.status(400).json({ error: 'conversationHistory must be a list of messages.' });
+    if (existingNode != null && (typeof existingNode !== 'object' || Array.isArray(existingNode))) {
+      return res.status(400).json({ error: 'existingNode must be an object.' });
+    }
+    if (!userInput?.trim() && !conversationHistory?.length) return res.status(400).json({ error: 'Say something about the person first.' });
     const interviewResult = await azureOpenAI.interviewPersonForSocialTree({
       conversationHistory,
       userInput,

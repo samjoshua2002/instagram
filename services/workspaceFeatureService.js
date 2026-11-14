@@ -93,7 +93,7 @@ async function getFeatures(user) {
           },
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   }
   const view = toView(doc);

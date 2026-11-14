@@ -106,7 +106,7 @@ export default function AiInterviewModal() {
             profilePic: matchedPic || prev.profilePic
           }));
         }
-        const reply = data.question || (data.isComplete ? `Got all details saved to preview. Review the attributes and click Save Person!` : data.summary);
+        const reply = data.question || (data.isComplete ? `Got all details saved to preview. Review the attributes and click Save Person!` : data.summary) || 'Got it. Tell me more about them.';
         setAiChat(prev => [...prev, { role: 'assistant', content: reply }]);
       } else {
         throw new Error(data.error || 'The AI did not answer');
