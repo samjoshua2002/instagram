@@ -88,9 +88,10 @@ function changedFields(snapshot, doc) {
   return out;
 }
 
-// Model that reads a chat and updates what the AI knows about the person. MEMORY_MODEL picks it (e.g. gpt-5.1-chat:
-// more accurate than gpt-4o on names, ages and dates); without it the platform default deployment is used.
-const DEPLOYMENT = process.env.MEMORY_MODEL || process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
+// Model that reads a chat and updates what the AI knows about the person: the top model unless MEMORY_MODEL says
+// otherwise (memory quality decides how personal every later reply can be).
+const { TOP_MODEL } = require('./models');
+const DEPLOYMENT = process.env.MEMORY_MODEL || TOP_MODEL;
 
 // Background learning waits for the chat to go quiet, then runs once per contact (not once per DM)
 const MEMORY_LEARN_QUIET_MS = 45 * 1000;

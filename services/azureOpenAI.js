@@ -1,5 +1,6 @@
 const { AzureOpenAI } = require('openai');
 const { traceOpenAI, instrument, annotate } = require('./langfuse');
+const { TOP_MODEL, FALLBACK_MODEL } = require('./models');
 const repeatGuard = require('./repeatGuard');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
@@ -33,7 +34,8 @@ class AzureOpenAIService {
     this.endpoint = process.env.AZURE_OPENAI_ENDPOINT;
     this.apiKey = process.env.AZURE_OPENAI_API_KEY;
     this.apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview";
-    this.defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
+    // quality first: every feature uses the top model unless a caller picks another deployment
+    this.defaultDeployment = TOP_MODEL;
     this.clients = {};
     // Dice for emoji / Tanglish at the owner's real rate (tests swap it for a fixed value)
     this.random = Math.random;
@@ -83,7 +85,7 @@ class AzureOpenAIService {
   /**
    * One chat completion on the platform Azure deployment. gpt-5.x / o-series deployments are
    * reasoning models: they spend part of the budget thinking, so they get a larger cap and no
-   * sampling params. Empty content (or a content-filter stop) falls back to gpt-4o once.
+   * sampling params. Empty content (or a content-filter stop) falls back to FALLBACK_MODEL (a second deployment of the top model) once.
    * Returns the reply text; throws when no usable text came back.
    */
   async completeWithFallback(selectedModel, messages, { maxTokens, temperature, extra = {} } = {}) {
@@ -94,13 +96,13 @@ class AzureOpenAIService {
     try {
       first = getCompletionText(await this.getClient(selectedModel).chat.completions.create(params(selectedModel)));
       if (first.ok) return first.text;
-      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" returned no usable text (finish_reason: ${first.finishReason || 'unknown'}). Falling back to "gpt-4o"...`);
+      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" returned no usable text (finish_reason: ${first.finishReason || 'unknown'}). Falling back to "${FALLBACK_MODEL}"...`);
     } catch (modelErr) {
       // A blocked prompt is blocked on every deployment: let the caller retry it masked
       if (isContentFilterError(modelErr)) throw modelErr;
-      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
+      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "${FALLBACK_MODEL}"...`);
     }
-    const second = getCompletionText(await this.getClient('gpt-4o').chat.completions.create(params('gpt-4o')));
+    const second = getCompletionText(await this.getClient(FALLBACK_MODEL).chat.completions.create(params(FALLBACK_MODEL)));
     if (second.ok) return second.text;
     const emptyErr = new Error(`AI returned an empty reply (finish_reason: ${second.finishReason || 'unknown'})`);
     if (second.finishReason === 'content_filter') emptyErr.code = 'content_filter';
@@ -109,15 +111,15 @@ class AzureOpenAIService {
 
   /**
    * JSON-mode call for the People tools: if the model fails or returns no usable JSON,
-   * the same request is retried once on gpt-4o (reasoning models get no temperature).
+   * the same request is retried once on FALLBACK_MODEL (reasoning models get no temperature).
    */
   async jsonWithFallback(selectedModel, messages) {
     try {
       return parseJsonCompletion(await this.getClient(selectedModel).chat.completions.create({ messages, response_format: { type: 'json_object' } }));
     } catch (modelErr) {
-      if (isContentFilterError(modelErr) || selectedModel === 'gpt-4o') throw modelErr;
-      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "gpt-4o"...`);
-      return parseJsonCompletion(await this.getClient('gpt-4o').chat.completions.create({ messages, temperature: 0.3, response_format: { type: 'json_object' } }));
+      if (isContentFilterError(modelErr) || selectedModel === FALLBACK_MODEL) throw modelErr;
+      console.warn(`⚠️ [Model Fallback]: Model "${selectedModel}" failed (${modelErr.message}). Falling back to "${FALLBACK_MODEL}"...`);
+      return parseJsonCompletion(await this.getClient(FALLBACK_MODEL).chat.completions.create({ messages, response_format: { type: 'json_object' } }));
     }
   }
 
@@ -525,7 +527,7 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         : await llmAdapter.completeForTenant(tenant, messages, { maxTokens: 220, temperature: 0.90 });
       const usedPlatformModel = reply === null;
       if (reply === null) {
-        // Empty content / errors fall back to gpt-4o; reasoning deployments get a 1200-token cap.
+        // Empty content / errors fall back to FALLBACK_MODEL; reasoning deployments get a 1200-token cap.
         // A prompt Azure's filter blocks (slurs friends use as banter) is retried masked.
         reply = await this.completeWithFilterRetry(selectedModel, messages, {
           maxTokens: 220,
@@ -755,7 +757,7 @@ ${HUMAN_CHAT_RULES}
 
     try {
       // gpt-5.1-chat reasons before answering: 150 tokens often left nothing for the reply
-      const client = this.getClient('gpt-5.1-chat');
+      const client = this.getClient(TOP_MODEL);
       const response = await client.chat.completions.create({
         messages,
         max_completion_tokens: REASONING_MIN_COMPLETION_TOKENS,
@@ -852,7 +854,7 @@ RETURN ONLY VALID JSON WITH EXACTLY THIS FORMAT:
     }
 
     try {
-      return await this.jsonWithFallback('gpt-5.6-luna', messages);
+      return await this.jsonWithFallback(TOP_MODEL, messages);
     } catch (err) {
       console.error('❌ Azure OpenAI interview error:', err.message);
       throw err;
@@ -898,7 +900,7 @@ Return a STRICT JSON object in this exact format:
 
     try {
       const messages = [{ role: 'system', content: personalize(systemPrompt, (await creatorIdentity(ownerId)).name) }];
-      return await this.jsonWithFallback('gpt-5.6-luna', messages);
+      return await this.jsonWithFallback(TOP_MODEL, messages);
     } catch (err) {
       console.error('❌ Azure OpenAI raw chat extraction error:', err.message);
       throw err;

@@ -20,6 +20,7 @@ const instagramService = require('./services/instagramService');
 const azureOpenAI = require('./services/azureOpenAI');
 const { creatorIdentity } = require('./services/creatorIdentity');
 const { aiTask } = require('./services/langfuse');
+const { completionParams } = require('./services/models');
 const celRuleEngine = require('./services/celRuleEngine');
 const analyticsService = require('./services/analyticsService');
 const memoryService = require('./services/memoryService');
@@ -1377,7 +1378,7 @@ app.get('/api/status', publicLimiter, (req, res, next) => {
       appId: process.env.META_APP_ID || '',
       totalUsers,
       totalMessages,
-      azureModel: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
+      azureModel: azureOpenAI.defaultDeployment,
     });
   } catch (err) {
     sendServerError(res, err, 'Status');
@@ -2986,8 +2987,8 @@ Return ONLY raw JSON.`;
         { role: 'system', content: 'You are an expert social intelligence analyzer. Output valid JSON only without markdown formatting.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3,
-      max_tokens: 800,
+      // the top model is a reasoning model: no temperature, and room to think before the JSON
+      ...completionParams(azureOpenAI.defaultDeployment, { maxTokens: 800, temperature: 0.3 }),
     }));
 
     const raw = completion.choices[0].message.content.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();

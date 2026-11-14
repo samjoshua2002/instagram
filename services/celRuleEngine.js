@@ -1,5 +1,7 @@
 const { evaluate } = require('@marcbachmann/cel-js');
 const { untrustedContactBlock } = require('./promptSafety');
+// every reply uses the top model (quality first); the routing rules stay so a cheaper model can be slotted back in
+const { TOP_MODEL: TOP } = require('./models');
 
 class CelRuleEngine {
   constructor() {
@@ -24,8 +26,8 @@ class CelRuleEngine {
 
     // Hardcoded model routing based on chat type
     this.MODEL_ROUTING_RULE = `
-      message.isCollabOrTech || message.isEmotional || message.isAskingAboutMemory || message.wordCount >= 16 ? 'gpt-5.6-luna' :
-      'gpt-5.1-chat'
+      message.isCollabOrTech || message.isEmotional || message.isAskingAboutMemory || message.wordCount >= 16 ? '${TOP}' :
+      '${TOP}'
     `;
 
     // ── Business rules (never evaluated for personal accounts) ──
@@ -52,8 +54,8 @@ class CelRuleEngine {
     `;
 
     this.BUSINESS_MODEL_ROUTING_RULE = `
-      message.isComplaint || message.mentionsRefund || message.wordCount >= 25 ? 'gpt-5.6-luna' :
-      'gpt-5.1-chat'
+      message.isComplaint || message.mentionsRefund || message.wordCount >= 25 ? '${TOP}' :
+      '${TOP}'
     `;
   }
 
@@ -186,7 +188,7 @@ class CelRuleEngine {
     let styleMode = 'casual_peer';
     let shouldInjectFacts = false;
     let lengthTier = 'one_liner';
-    let selectedModel = 'gpt-5.1-chat';
+    let selectedModel = TOP;
     let chatType = 'fast_casual_dm';
 
     try {
@@ -200,8 +202,8 @@ class CelRuleEngine {
       else if (context.user.gender === 'female') styleMode = 'sweet_playful';
       shouldInjectFacts = context.message.isAskingAboutMemory;
       selectedModel = (context.message.isCollabOrTech || context.message.isEmotional || context.message.isAskingAboutMemory || context.message.wordCount >= 16)
-        ? 'gpt-5.6-luna'
-        : 'gpt-5.1-chat';
+        ? TOP
+        : TOP;
     }
 
     if (context.message.isCollabOrTech) chatType = 'creative_collab_tech';
@@ -312,7 +314,7 @@ class CelRuleEngine {
     let shouldEscalate = false;
     let refundAction = 'none';
     let discountAction = 'none';
-    let selectedModel = 'gpt-5.1-chat';
+    let selectedModel = TOP;
 
     try {
       isWithinBusinessHours = evaluate(this.BUSINESS_HOURS_RULE, context);
@@ -326,7 +328,7 @@ class CelRuleEngine {
       shouldEscalate = message.isComplaint || message.asksForHuman;
       refundAction = !message.mentionsRefund ? 'none' : (policy.hasRefundPolicy ? 'quote_policy' : 'defer_to_human');
       discountAction = !message.asksForDiscount ? 'none' : (policy.allowDiscounts && policy.hasDiscountPolicy ? 'quote_policy' : 'decline_politely');
-      selectedModel = (message.isComplaint || message.mentionsRefund || message.wordCount >= 25) ? 'gpt-5.6-luna' : 'gpt-5.1-chat';
+      selectedModel = (message.isComplaint || message.mentionsRefund || message.wordCount >= 25) ? TOP : TOP;
     }
     if (refundAction === 'defer_to_human') shouldEscalate = true;
 
