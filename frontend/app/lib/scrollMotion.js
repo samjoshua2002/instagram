@@ -139,7 +139,9 @@ export function useHeroCollapse(rootRef, o, deps = []) {
       const { motion, phone } = ctx.conditions;
       const band = motion ? (phone ? 56 : 64) : 0;
       const cleanups = [];
-      gsap.set(root, { '--hero-band': `${band}px` });
+      // Set directly: gsap.set on a CSS variable reads getComputedStyle first, a ~100ms style recalc on big pages
+      root.style.setProperty('--hero-band', `${band}px`);
+      cleanups.push(() => root.style.removeProperty('--hero-band'));
 
       if (motion) {
         const media = hero.querySelector(o.media);

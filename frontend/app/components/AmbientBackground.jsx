@@ -242,15 +242,23 @@ export function extractPalette(pixels) {
 }
 
 /** Palette from one colour (hex, rgb() or hsl()), built the same way as a photo's palette. */
+// One CPU-backed 1x1 canvas, reused: a fresh GPU canvas + getImageData stalled page load by ~30ms
+let colorCtx = null;
+const colorPalettes = new Map();
 export function colorPalette(color) {
   if (typeof document === 'undefined' || !color) return null;
-  const ctx = document.createElement('canvas').getContext('2d');
+  if (colorPalettes.has(color)) return colorPalettes.get(color);
+  colorCtx ||= document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const ctx = colorCtx;
   if (!ctx) return null;
   ctx.fillStyle = '#000';
   ctx.fillStyle = color; // the browser parses any CSS colour; bad input stays black
   ctx.fillRect(0, 0, 1, 1);
   const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-  return extractPalette(new Uint8ClampedArray([r, g, b, 255])); // a grey colour gives the calm neutral palette
+  const palette = extractPalette(new Uint8ClampedArray([r, g, b, 255])); // a grey colour gives the calm neutral palette
+  if (colorPalettes.size > 50) colorPalettes.clear();
+  colorPalettes.set(color, palette);
+  return palette;
 }
 
 // Instagram CDN images have no CORS headers, so route them through the backend proxy
