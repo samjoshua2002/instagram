@@ -548,7 +548,11 @@ function SettingsPageContent() {
         desc="Teach the AI your voice, texting style and background so its replies sound like you."
       >
           <button
-            onClick={fetchPersona}
+            onClick={() => {
+              // Reset throws away edits: treat what is on screen as untouched so the reload replaces every field
+              shownRef.current = { ...formData };
+              fetchPersona();
+            }}
             type="button"
             className="spx-outline"
             title="Reload settings from server"

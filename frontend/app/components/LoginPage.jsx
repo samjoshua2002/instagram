@@ -321,6 +321,13 @@ export default function LoginPage({ onLoginSuccess }) {
 
   // Forgot Password Modal States
   const [showForgotModal, setShowForgotModal] = useState(false);
+  // Escape closes the password recovery popup
+  useEffect(() => {
+    if (!showForgotModal) return;
+    const onKey = (e) => { if (e.key === 'Escape') setShowForgotModal(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showForgotModal]);
   const [forgotMethod, setForgotMethod] = useState('oneauth'); // 'oneauth' | 'email'
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotTotpCode, setForgotTotpCode] = useState('');

@@ -1785,11 +1785,12 @@ router.put('/profile', requireAuth, async (req, res) => {
       user.address = { street: address.trim().slice(0, 300), city: '', state: '', country: '', postalCode: '' };
     } else if (address && typeof address === 'object') {
       user.address = {
-        street: address.street || user.address?.street || '',
-        city: address.city || user.address?.city || '',
-        state: address.state || user.address?.state || '',
-        country: address.country || user.address?.country || '',
-        postalCode: address.postalCode || user.address?.postalCode || '',
+        // A field that was sent (even empty) replaces the old value, so cleared fields stay cleared
+        street: str(address.street ?? user.address?.street).slice(0, 300),
+        city: str(address.city ?? user.address?.city).slice(0, 120),
+        state: str(address.state ?? user.address?.state).slice(0, 120),
+        country: str(address.country ?? user.address?.country).slice(0, 120),
+        postalCode: str(address.postalCode ?? user.address?.postalCode).slice(0, 20),
       };
     }
 
@@ -2236,21 +2237,8 @@ router.post('/admin/impersonate', requireAuth, async (req, res) => {
     res.json({
       success: true,
       token,
-      user: {
-        id: targetUser._id,
-        email: targetUser.email,
-        username: targetUser.username,
-        role: targetUser.role || 'user',
-        firstName: targetUser.firstName,
-        lastName: targetUser.lastName,
-        profilePicUrl: targetUser.profilePicUrl || '',
-        instagramUsername: targetUser.instagramUsername || '',
-        instagramId: targetUser.instagramId || '',
-        accountType: targetUser.accountType || 'personal',
-        isOnboarded: targetUser.isOnboarded ?? false,
-        businessProfile: targetUser.businessProfile || null,
-        hasPasskeys: (targetUser.passkeys || []).length > 0,
-      }
+      // Same fields as every sign-in, so a connected workspace never shows the Connect Instagram screen
+      user: { ...sessionUser(targetUser), accountType: targetUser.accountType || 'personal' },
     });
   } catch (err) {
     return serverError(res, 'Impersonation error', err, 'Failed to switch workspace.');
