@@ -1145,7 +1145,7 @@ export default function LoginPage({ onLoginSuccess }) {
               style={{
                 background: authMode === 'signin' ? 'var(--color-surface)' : 'transparent',
                 color: authMode === 'signin' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                border: authMode === 'signin' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                border: authMode === 'signin' ? '1px solid var(--color-border)' : '1px solid transparent',
                 borderRadius: '8px',
                 padding: '9px 12px',
                 fontSize: '0.84rem',
@@ -1173,7 +1173,7 @@ export default function LoginPage({ onLoginSuccess }) {
               style={{
                 background: authMode === 'register' ? 'var(--color-surface)' : 'transparent',
                 color: authMode === 'register' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                border: authMode === 'register' ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                border: authMode === 'register' ? '1px solid var(--color-border)' : '1px solid transparent',
                 borderRadius: '8px',
                 padding: '9px 12px',
                 fontSize: '0.84rem',

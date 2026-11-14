@@ -513,7 +513,7 @@ export default function StoryboardCanvas({ kind, nodeTypes, templates, templateC
                     const Icon = t.icon;
                     return (
                       <button key={t.key} type="button" role="menuitem" onClick={() => addNode(t.key, {}, addMenu)}>
-                        <Icon size={13} style={{ color: t.color }} /> {t.label}
+                        <Icon size={13} className="story-node-icon" style={{ '--node-color': t.color }} /> {t.label}
                       </button>
                     );
                   })}

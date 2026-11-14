@@ -189,7 +189,7 @@
 }
 
 /* Needs your attention: handoffs and Instagram sign-in, same rows as Follow up */
-.sh-attn-badge { background: #ffb547; }
+.sh-attn-badge { background: #ffb547; color: #111; }
 .sh-attn-icon {
   flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   background: color-mix(in srgb, #ffb547 22%, transparent); color: #ffb547;
@@ -321,6 +321,9 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
   --color-text-secondary: #d9a7aa;
   --color-text-muted: #a8777b;
   --ambient-dominant: #ff8f8f;
+  /* --accent and --field-ring were worked out at :root, so they are set again to pick up the coral */
+  --accent: #ff8f8f;
+  --field-ring: 0 0 0 3px color-mix(in srgb, #ff8f8f 35%, transparent), inset 0 0 0 1px #ff8f8f;
   --input-bg: rgba(255, 255, 255, 0.05);
   --input-border: rgba(255, 170, 170, 0.18);
   background: linear-gradient(180deg, #2a1217, #12080a);
@@ -365,6 +368,9 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
   background: transparent; color: inherit; font: inherit; font-size: 0.95rem; text-align: left; cursor: pointer;
 }
 .sh-menu-item:hover, .sh-menu-item:focus-visible { background: rgba(255, 255, 255, 0.1); outline: none; }
+:root[data-theme="light"] .sh-menu { background: var(--color-surface); color: var(--color-text-primary); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18); }
+:root[data-theme="light"] .sh-menu-head { border-bottom-color: var(--color-border); }
+:root[data-theme="light"] .sh-menu-item:hover, :root[data-theme="light"] .sh-menu-item:focus-visible { background: var(--glass-fill-standard); }
 @keyframes sh-menu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sh-menu { animation: none; } }
 

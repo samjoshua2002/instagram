@@ -251,7 +251,7 @@
   font-weight: 700;
 }
 
-.ctl-row.is-full_ai .ctl-seg button.is-on { background: #16a34a; color: #fff; }
+.ctl-row.is-full_ai .ctl-seg button.is-on { background: #15803d; color: #fff; } /* 5:1 for the small bold label */
 
 .ctl-empty {
   padding: 32px 12px;
