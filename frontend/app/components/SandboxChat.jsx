@@ -18,7 +18,16 @@ export default function SandboxChat({ senderId, senderName, placeholder = 'Type 
   // A reply still on its way must not land in another person's thread or a cleared one
   const senderRef = useRef(senderId);
   const clearCountRef = useRef(0);
-  const resetThread = () => { clearCountRef.current += 1; setMessages([]); setLoading(false); };
+  const resetThread = () => {
+    clearCountRef.current += 1; setMessages([]); setLoading(false);
+    // The server keeps the test history too: clear it so the bot starts fresh (best effort)
+    if (/^test_/.test(senderRef.current || '')) {
+      fetch(`${API_BASE}/api/simulator/chat?testSenderId=${encodeURIComponent(senderRef.current)}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }).catch(() => {});
+    }
+  };
 
   // New sender, fresh thread
   useEffect(() => { senderRef.current = senderId; resetThread(); }, [senderId]);

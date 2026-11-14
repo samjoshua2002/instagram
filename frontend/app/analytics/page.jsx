@@ -140,7 +140,8 @@ export default function AnalyticsPage() {
         },
         body: JSON.stringify({
           userId: targetUser.id,
-          instagramUsername: targetUser.instagramUsername || targetUser.username
+          // Never the app username: the server would save it as their Instagram handle
+          instagramUsername: targetUser.instagramUsername || ''
         })
       });
       const data = await res.json();
@@ -342,7 +343,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* MAIN USERS DIRECTORY CONTAINER */}
-          <div style={{
+          <div id="platform-directory" style={{ scrollMarginTop: '80px',
             background: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: '12px',
@@ -473,7 +474,7 @@ export default function AnalyticsPage() {
                     color: 'var(--color-text-primary)'
                   }}
                 >
-                  <RefreshCw size={14} className={adminLoading ? 'spin' : ''} />
+                  <RefreshCw size={14} className={adminLoading ? 'animate-spin' : ''} />
                 </button>
               </div>
             </div>
@@ -745,7 +746,7 @@ export default function AnalyticsPage() {
                                   </button>
                                 )}
 
-                                {!isSelf && (
+                                {!isSelf && !isSuper && (
                                   <button
                                     type="button"
                                     onClick={() => handleEnterWorkspace(acc)}

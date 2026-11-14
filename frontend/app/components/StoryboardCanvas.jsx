@@ -317,7 +317,9 @@ export default function StoryboardCanvas({ kind, nodeTypes, templates, templateC
       if (e.key === 'Escape') { setAddMenu(null); setWire(null); gestureRef.current = null; if (board?.nodes.length) setPicking(false); return; }
       const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
       if (typing) return;
-      if (selectedId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeNode(selectedId); return; }
+      // Only while the board itself has focus: Backspace after clicking a toolbar button must not delete a card
+      const onBoard = !document.activeElement || document.activeElement === document.body || scrollerRef.current?.contains(document.activeElement);
+      if (selectedId && onBoard && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeNode(selectedId); return; }
       if (e.shiftKey && (e.key === 'A' || e.key === 'a') && scrollerRef.current) {
         const last = lastPointRef.current;
         const r = scrollerRef.current.getBoundingClientRect();
