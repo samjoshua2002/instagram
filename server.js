@@ -426,7 +426,7 @@ if (!VERIFY_TOKEN) console.warn('⚠️ WEBHOOK_VERIFY_TOKEN is not set: Meta we
 
 // Cache for recent message IDs to prevent duplicate processing
 const processedMids = new Set();
-const recentProfileLookups = new Map(); // owner:sender -> time of the last profile lookup
+const recentProfileLookups = new Map(); // owner:sender -> { promise of the profile, expiresAt }
 const PROFILE_REFRESH_MS = 6 * 60 * 60 * 1000;
 
 // Anti-spam debounce queue: aggregates rapid-fire/spam messages and replies once
@@ -779,23 +779,22 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     }
   }
 
-  // 2. Fetch or create user memory. The profile lookup can take many seconds with retries, so it runs
-  // at most every 6 hours per contact: a burst of DMs then reaches the debounce queue on time and in order
-  let userProfile = null;
+  // 2. Fetch or create user memory. The profile lookup can take many seconds with retries, so one lookup
+  // per contact is shared for 6 hours (30 minutes after a failure). Messages arriving while it runs wait for
+  // that same lookup, in arrival order, so a burst still reaches the debounce queue in order; the cached
+  // profile also fills in a contact that was deleted and messages again.
   const profileKey = `${ownerUser?._id || ''}:${senderId}`;
-  const lastProfileAt = recentProfileLookups.get(profileKey);
-  if (!lastProfileAt || Date.now() - lastProfileAt > PROFILE_REFRESH_MS) {
+  let lookup = recentProfileLookups.get(profileKey);
+  if (!lookup || Date.now() > lookup.expiresAt) {
+    const promise = instagramService.getUserProfile(senderId, creatorAccessToken).catch(() => null);
+    lookup = { promise, expiresAt: Infinity };
     recentProfileLookups.delete(profileKey);
-    recentProfileLookups.set(profileKey, Date.now());
+    recentProfileLookups.set(profileKey, lookup);
     while (recentProfileLookups.size > 5000) recentProfileLookups.delete(recentProfileLookups.keys().next().value);
-    try {
-      userProfile = await instagramService.getUserProfile(senderId, creatorAccessToken);
-    } catch (e) {
-      // ignore
-    }
-    // A failed lookup is tried again after 30 minutes, not on every message
-    if (!userProfile) recentProfileLookups.set(profileKey, Date.now() - PROFILE_REFRESH_MS + 30 * 60 * 1000);
+    const entry = lookup;
+    promise.then(p => { entry.expiresAt = Date.now() + (p ? PROFILE_REFRESH_MS : 30 * 60 * 1000); });
   }
+  const userProfile = await lookup.promise;
   const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile, memOptsFor(ownerUser));
   if (ownerUser && !userMemory.ownerId) userMemory.ownerId = ownerUser._id;
 

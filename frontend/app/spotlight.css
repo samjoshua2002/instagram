@@ -351,9 +351,10 @@ button.sh-follow-btn { border: 0; cursor: pointer; font-family: inherit; }
 
 /* Long-press profile menu (Home cards) */
 .sh-pressable { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-.sh-menu-backdrop { position: fixed; inset: 0; z-index: 90; background: transparent; }
+/* Above the phone tab bar (100) and header (60), below popups and toasts (10000+) */
+.sh-menu-backdrop { position: fixed; inset: 0; z-index: 1090; background: transparent; }
 .sh-menu {
-  position: fixed; z-index: 91; min-width: 230px; padding: 6px; border-radius: 14px;
+  position: fixed; z-index: 1091; min-width: 230px; padding: 6px; border-radius: 14px;
   background: #282828; color: #fff; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   animation: sh-menu-in 0.14s ease-out;
 }
