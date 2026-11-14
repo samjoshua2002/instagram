@@ -535,7 +535,8 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
     };
   }, [onClose]);
   const p = menu.person;
-  return (
+  // Portaled to <body>: inside the Home page (isolation: isolate) the menu would sit under the phone tab bar
+  return createPortal(
     <>
       <div className="sh-menu-backdrop" onClick={onClose} onContextMenu={e => { e.preventDefault(); onClose(); }} />
       <div ref={ref} className="sh-menu" role="menu" aria-label={`Options for ${p.name}`} style={pos}>
@@ -552,7 +553,8 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
           <span>Open profile</span>
         </Link>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

@@ -232,7 +232,8 @@ export default function OnboardingWizard({ isOpen, onComplete, onClose }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 99999,
+      // Above the app, below toasts (10000) and confirm popups (10001+) so the wizard's own messages show
+      zIndex: 9000,
       padding: '16px',
       boxSizing: 'border-box'
     }}>

@@ -3531,6 +3531,8 @@ body {
   flex-shrink: 0;
   color: var(--node-color);
 }
+/* Bright yellows and cyans fade on white: darken them in light theme */
+:root[data-theme="light"] .story-node-icon { color: color-mix(in srgb, var(--node-color) 60%, #000); }
 
 .story-node-title {
   flex: 1;
@@ -4068,6 +4070,13 @@ body {
   --toast-bg: #121212;
   --toast-text: #ffffff;
 }
+/* The toast stays dark in light theme, so its icons and action use the bright (dark-theme) colours */
+:root[data-theme="light"] .toast {
+  --color-success: #1ed760;
+  --color-danger: #f3727f;
+  --color-warning: #ffa42b;
+  --color-info: #4cb3ff;
+}
 
 /* Faster taps on phones: no 300ms delay, no grey flash, visible press */
 button, a, [role="button"], input[type="checkbox"], input[type="radio"], label, select {
@@ -4202,7 +4211,9 @@ button[aria-busy="true"] { cursor: progress; }
 .dialog-btn:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 2px; }
 .dialog-btn-primary { background: var(--color-text-primary); color: var(--color-background); }
 .dialog-btn-primary:hover:not(:disabled) { transform: scale(1.04); }
-.dialog-btn-danger { background: var(--color-danger); color: #fff; }
+/* Dark theme's pale danger red needs dark text to stay readable; light theme's deep red keeps white */
+.dialog-btn-danger { background: var(--color-danger); color: var(--color-background); }
+:root[data-theme="light"] .dialog-btn-danger { color: #fff; }
 .dialog-btn-danger:hover:not(:disabled) { transform: scale(1.04); }
 .dialog-btn-ghost { background: transparent; color: var(--color-text-secondary); }
 .dialog-btn-ghost:hover:not(:disabled) { color: var(--color-text-primary); transform: scale(1.04); }

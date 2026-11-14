@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/DialogContext';
 import {
@@ -1227,7 +1228,8 @@ function RelationshipsPageContent() {
         </div>
 
         {/* ================= MODAL: AI RAW CHAT EXTRACTION & CLARIFICATION ================= */}
-        {isRawChatModalOpen && (
+        {/* Portaled to <body>: inside .person-page (isolation: isolate) it would sit under the nav bars */}
+        {isRawChatModalOpen && typeof document !== 'undefined' && createPortal(
           <div
             style={{
               position: 'fixed',
@@ -1406,7 +1408,8 @@ function RelationshipsPageContent() {
                 </div>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         <div className="person-grid">
