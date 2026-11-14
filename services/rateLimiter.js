@@ -141,14 +141,21 @@ function networkOf(ip) {
  * guessing by a stranger cannot lock the owner out at home. Success clears both.
  */
 class AccountLockout {
-  constructor({ perIp = 5, perAccount = 30, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now, knownForMs = 30 * 24 * 60 * MINUTE, maxKnown = 10 } = {}) {
+  constructor({ perIp = 5, perAccount = 30, windowMs = 15 * MINUTE, lockMs = 15 * MINUTE, now = Date.now, knownForMs = 30 * 24 * 60 * MINUTE, maxKnown = 10, known = new Map() } = {}) {
     this.now = now;
     this.ipLock = new FailureLockout({ maxFailures: perIp, windowMs, lockMs, now });
     // Account-wide locks double on each repeat, so spread-out guessing slows to a crawl
     this.accountLock = new FailureLockout({ maxFailures: perAccount, windowMs, lockMs, now, escalate: true });
     this.knownForMs = knownForMs;
     this.maxKnown = maxKnown;
-    this.known = new Map(); // key -> Map(network -> time of the last correct password/code from it)
+    // account -> Map(network -> time of the last correct password/code from it). Pass one Map to several
+    // lockouts so a network proven by password also counts as known for codes (and the other way round)
+    this.known = known;
+  }
+
+  // 'pw:<id>' and 'code:<id>' share the same known networks
+  static accountOf(key) {
+    return String(key).replace(/^[a-z]+:/i, '');
   }
 
   static ipKey(key, ip) {
@@ -159,7 +166,7 @@ class AccountLockout {
   isKnown(key, ip) {
     const net = networkOf(ip);
     if (net === 'unknown') return false;
-    const at = this.known.get(key)?.get(net);
+    const at = this.known.get(AccountLockout.accountOf(key))?.get(net);
     return at !== undefined && this.now() - at < this.knownForMs;
   }
 
@@ -182,11 +189,11 @@ class AccountLockout {
     this.accountLock.recordSuccess(key);
     const net = networkOf(ip);
     if (net === 'unknown') return;
-    const nets = this.known.get(key) || new Map();
+    const nets = this.known.get(AccountLockout.accountOf(key)) || new Map();
     nets.delete(net); // re-insert so the newest is last
     nets.set(net, this.now());
     while (nets.size > this.maxKnown) nets.delete(nets.keys().next().value);
-    this.known.set(key, nets);
+    this.known.set(AccountLockout.accountOf(key), nets);
   }
 
   prune() {
