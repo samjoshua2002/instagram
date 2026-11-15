@@ -210,7 +210,7 @@ async function ownerFingerprint(ownerId, asOf) {
  * Prompt block with the owner's real voice for a reply to `contactId`.
  * asOf (optional) only uses messages before that time (the voice test hides the real answer).
  */
-async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = null, incomingText = '' }) {
+async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = null, incomingText = '', level = null }) {
   try {
     const [{ fp, lines }, chat, allExchanges] = await Promise.all([
       ownerFingerprint(ownerId, asOf),
@@ -236,7 +236,12 @@ async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = n
         '\n<<<END REAL EXCHANGES>>>'
       );
     }
-    const similar = rankSimilar(allExchanges, incomingText, { exclude: contactId });
+    // Your answers in other chats can hold private things: contact details never travel between chats,
+    // and below friend level an answer to a personal question (family, number, college...) is not shown
+    const { hasContactDetails, PERSONAL_ASK_RE } = require('./closeness');
+    const shareable = allExchanges.filter(e => !e.me.some(hasContactDetails) &&
+      (level === 'friend' || level === 'close' || !level || !e.them.some(t => PERSONAL_ASK_RE.test(t))));
+    const similar = rankSimilar(shareable, incomingText, { exclude: contactId });
     if (similar.length) {
       parts.push(
         `\nHOW YOU REALLY ANSWERED MESSAGES LIKE THIS ONE (verbatim from your other chats; answer this one the same way: same length, same words, same attitude. Use only YOUR wording, never the facts or names from these chats):\n` +

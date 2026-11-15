@@ -68,7 +68,7 @@ function findContactNode(nodes, userMemory) {
  * Personal board context for one conversation.
  * Returns '' when the owner has no board.
  */
-async function getPersonalContext(ownerId, userMemory) {
+async function getPersonalContext(ownerId, userMemory, { level = null } = {}) {
   try {
     const board = await loadBoard(ownerId, 'personal');
     if (!board?.nodes?.length) return '';
@@ -81,7 +81,7 @@ async function getPersonalContext(ownerId, userMemory) {
 
     // People linked to the You card: how you named each link ("Mom", "Cousin") is how you know them.
     // Always included, so a question about your family or friends works in any chat, not only with that person.
-    if (you) {
+    if (you && (!level || level === 'friend' || level === 'close')) {
       const mine = edges
         .filter(e => e.from === you.id || e.to === you.id)
         .map(e => ({ edge: e, other: byId[e.from === you.id ? e.to : e.from] }))
@@ -120,6 +120,16 @@ ${lore.slice(0, 12).map(n => `- [${n.type}] ${clip(n.label, 80)}${n.notes ? `: $
   } catch (err) {
     console.warn('⚠️ [Storyboard] Personal context failed:', err.message);
     return '';
+  }
+}
+
+/** This contact's closeness circle on the personal Storyboard ('close', 'family', ...), or null. */
+async function getContactCircle(ownerId, userMemory) {
+  try {
+    const board = await loadBoard(ownerId, 'personal');
+    return findContactNode(board?.nodes || [], userMemory)?.circle || null;
+  } catch {
+    return null;
   }
 }
 
@@ -173,4 +183,4 @@ ${steps.join('\n')}`);
   }
 }
 
-module.exports = { getPersonalContext, getBusinessContext, clearCache, findContactNode, orderJourney, CIRCLE_LABELS };
+module.exports = { getPersonalContext, getContactCircle, getBusinessContext, clearCache, findContactNode, orderJourney, CIRCLE_LABELS };

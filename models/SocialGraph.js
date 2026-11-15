@@ -50,6 +50,12 @@ const SocialGraphSchema = new mongoose.Schema({
     type: String,
     default: 'friend', // 'bro', 'sister', 'close friend', 'lover', 'relative', 'homie'
   },
+  // How much of your personal life replies may share with them; '' = worked out automatically (services/closeness.js)
+  closenessOverride: {
+    type: String,
+    enum: ['', 'stranger', 'acquaintance', 'friend', 'close'],
+    default: '',
+  },
   category: {
     type: String,
     enum: ['close_friend', 'online_friend', 'offline_friend', 'family', 'professional', 'business', 'relative', 'homie', 'group_icon', 'other'],

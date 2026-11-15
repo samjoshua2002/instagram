@@ -269,6 +269,16 @@ class SocialGraphService {
    * Find relevant entities and social tree connections for an incoming message, from the
    * conversation owner's graph only. options: { ownerId } (null = legacy admin graph).
    */
+  /** This contact's People card (from the per-owner cache), or null. */
+  async getNode(ownerId, senderId) {
+    try {
+      const cache = await this._ownerCache(ownerId);
+      return cache.get(String(senderId)) || null;
+    } catch {
+      return null;
+    }
+  }
+
   async getContextForConversation(senderId, currentText = '', history = [], options = {}) {
     try {
       const cache = await this._ownerCache(options.ownerId);
@@ -300,9 +310,11 @@ class SocialGraphService {
 
       // 2b. Your family and partner are always known, even when nobody types their name
       // ("who's your mom?" never contains "Sangeetha")
+      // Only for friends and close people: strangers never learn who your family is
       const family = [];
       const familySeen = new Set();
-      for (const node of cache.values()) {
+      const shareFamily = !options.level || ['friend', 'close'].includes(options.level);
+      for (const node of shareFamily ? cache.values() : []) {
         const id = String(node._id || node.name);
         if (familySeen.has(id) || node === senderNode) continue;
         familySeen.add(id);

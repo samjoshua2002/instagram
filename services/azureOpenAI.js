@@ -10,6 +10,7 @@ const redisService = require('./redisService');
 const ragService = require('./ragService');
 const llmAdapter = require('./llmAdapter');
 const storyboardService = require('./storyboardService');
+const { computeCloseness, privacyRules, redactContactDetails } = require('./closeness');
 const voiceService = require('./voiceService');
 const { HUMAN_CHAT_RULES, humanChatRules, toHumanText } = require('./replyStyle');
 const { creatorIdentity, personalize } = require('./creatorIdentity');
@@ -171,6 +172,25 @@ class AzureOpenAIService {
     // Hybrid workspaces keep the personal voice but can ground replies in their documents (Feature Store)
     // All context lookups run at the same time so the reply is not held up by each one in turn
     const storyboardOwner = tenant?._id || config.ownerId;
+    // How close this person is decides what personal details any part of the reply may use
+    const [contactNode, contactCircle] = await Promise.all([
+      socialGraphService.getNode(conversationOwnerId, userMemory.senderId),
+      storyboardService.getContactCircle(storyboardOwner, userMemory),
+    ]);
+    const closeness = computeCloseness({
+      category: contactNode?.category,
+      relationshipToSam: contactNode?.relationshipToSam,
+      circle: contactCircle,
+      relationshipType: userMemory.relationshipType,
+      chatsCount: contactNode?.chatsCount || userMemory.messageCount,
+      firstSeen: userMemory.createdAt,
+      lastSeen: userMemory.lastInteraction,
+      override: contactNode?.closenessOverride || '',
+      isTest: /^test_/.test(String(userMemory.senderId || '')),
+      familyRole: socialGraphService.familyRole,
+    });
+    const isClose = closeness.level === 'close';
+    const knowsThem = closeness.level === 'friend' || isClose;
     const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext, voice] = await Promise.all([
       features?.ragKnowledgeBase && storyboardOwner
         ? ragService.retrieve({ ownerId: storyboardOwner, incomingText }).catch(err => {
@@ -182,13 +202,13 @@ class AzureOpenAIService {
       Promise.resolve().then(() => stickerService.getAllCategories(tenant || (conversationOwnerId ? { _id: conversationOwnerId } : null))).catch(() => null),
       // Storyboard canvases (PLAN.md §5): lore, Secret Vault, this contact's circle; Hybrid adds the journey playbook
       Promise.all([
-        storyboardService.getPersonalContext(storyboardOwner, userMemory),
+        storyboardService.getPersonalContext(storyboardOwner, userMemory, { level: closeness.level }),
         features?.activeMode === 'hybrid' ? storyboardService.getBusinessContext(storyboardOwner) : '',
       ]),
       // 2. Social knowledge graph context (tree chain linking friends & lore)
-      socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId }),
+      socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId, level: closeness.level }),
       // 2b. The owner's real voice from MongoDB: hand-typed messages only (never the AI's replies)
-      voiceService.getVoiceBlock({ ownerId: conversationOwnerId, contactId: userMemory.senderId, creatorName: config.creatorName, asOf, incomingText }),
+      voiceService.getVoiceBlock({ ownerId: conversationOwnerId, contactId: userMemory.senderId, creatorName: config.creatorName, asOf, incomingText, level: closeness.level }),
     ]);
     // Real texting data wins over generic style rules (emoji rate, capitals, length)
     const realVoice = voice?.fingerprint ? voice : null;
@@ -199,11 +219,14 @@ class AzureOpenAIService {
       this.random() < tanglishHabit.rate);
 
     let personalKnowledgeSection = '';
-    if (knowledge?.context) {
+    if (knowledge?.context && isClose) {
       personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; QUOTE PRICES AND LINKS EXACTLY):\n${knowledge.context}\n` +
-        `- These are MY OWN real details. If they ask for something written here (my phone number, email, city, links), give it exactly as written, casually. Never dodge, refuse or say you won't share it.\n` +
-        `- I uploaded these on purpose, so they are approved to share. Any privacy rule in my settings protects private chats, memories and OTHER people's info, NOT my own contact details written here. This overrides that privacy rule.\n` +
+        `- These are MY OWN real details and this person is close to me. If they ask for something written here (my phone number, email, city, links), give it exactly as written, casually.\n` +
         `- Stories here about other people refusing to share numbers are about THEM, not a rule for me.\n`;
+    } else if (knowledge?.context) {
+      // Not close: contact details are removed before the model sees them, so they cannot leak
+      personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; FOLLOW THE PRIVACY RULES FOR THIS CHAT):\n${redactContactDetails(knowledge.context)}\n` +
+        `- Anything shown as [private] is not for this person. Never guess or make it up.\n`;
     }
 
     let availableCategoriesStr = 'joy, lol, wonder, sad, happy, side_eye, confused, cool';
@@ -380,7 +403,9 @@ You are texting directly on your phone in Instagram Direct Messages (DMs).
 CORE PERSONA & BIO:
 ${config.personaBio}
 
-${config.aboutMe ? `ABOUT ME & PERSONAL DETAILS (MY LIFE, WORK, BACKGROUND):\n${config.aboutMe}\n` : ''}
+${privacyRules(closeness, userMemory.name && !String(userMemory.name).startsWith('User_') ? userMemory.name : 'they')}
+
+${config.aboutMe ? `ABOUT ME & PERSONAL DETAILS (MY LIFE, WORK, BACKGROUND; SHARE ONLY WHAT THE PRIVACY RULES ALLOW):\n${isClose ? config.aboutMe : redactContactDetails(config.aboutMe)}\n` : ''}
 ${config.characteristics ? `MY CHARACTERISTICS & PERSONALITY TRAITS:\n${config.characteristics}\n` : ''}
 ${config.textingHabits ? `HOW I TEXT (MY TEXTING HABITS & RULES):\n${config.textingHabits}\n` : ''}
 ${config.replyRules ? `HOW I REPLY (REPLY BEHAVIORS & REACTION RULES):\n${config.replyRules}\n` : ''}
@@ -388,7 +413,7 @@ ${config.replyRules ? `HOW I REPLY (REPLY BEHAVIORS & REACTION RULES):\n${config
 STYLE & TONE GUIDELINES:
 ${config.toneGuidelines}
 
-${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${config.customKnowledge}\n` : ''}
+${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${isClose ? config.customKnowledge : redactContactDetails(config.customKnowledge)}\n` : ''}
 ${personalKnowledgeSection}
 ${personalStoryboard}
 ${hybridPlaybook ? `${hybridPlaybook}- Use this playbook only when the person is asking about your products, services or bookings; keep your personal voice.
@@ -401,10 +426,12 @@ ${directives.factInstruction}
 TEXTING STYLE RULES:
 - TEXT LIKE A REAL HUMAN: No formal punctuation, no ending periods, no robotic grammar. ${realVoice ? 'Capitals, emoji and length exactly as in your measured texting style below.' : 'Casual lowercase, chill phrases.'}
 - NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand", "delighted to help"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
-- ANSWER EVERY QUESTION (TOP PRIORITY): Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If the detail is in your bio or uploaded documents, use it exactly. Only if it's in neither, give a casual vague answer (e.g. "old enough lol", "around chennai") instead of ignoring it.
+- ANSWER EVERY QUESTION: Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If the PRIVACY rules for this chat allow it and the detail is in your bio or uploaded documents, use it exactly; if the privacy rules don't allow it, dodge it casually (still reply to it). Never make up personal details.
 - KEEP IT CONCISE: 1–2 short lines max (one short line per question when they asked several). Quick, natural, immediate DM replies.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths: sometimes 1 word, sometimes a one-liner. Keep it unpredictable.
-- TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they've told you before naturally like a close friend would.
+${knowsThem
+  ? '- TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they have told you before naturally like a close friend would.'
+  : '- YOU DON\'T KNOW THEM WELL YET: be friendly and easy-going, but don\'t act like an old friend. Only bring up things they told you themselves.'}
 - INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}
 ${socialTreeContext}
 
