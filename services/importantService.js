@@ -8,7 +8,7 @@
 const mongoose = require('mongoose');
 const SharedItem = require('../models/SharedItem');
 const User = require('../models/User');
-const { extractLinks, looksImportant, kindOf } = require('./importantRules');
+const { extractLinks, kindOf, isTrivial, validDue } = require('./importantRules');
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const EMAIL_GAP_MS = 5 * 60 * 1000; // one alert email per person per 5 minutes
@@ -60,16 +60,21 @@ function openFile(fileId) {
 async function judge(text, name) {
   try {
     const azureOpenAI = require('./azureOpenAI');
-    const { TOP_MODEL } = require('./models');
-    const out = await azureOpenAI.jsonWithFallback(TOP_MODEL, [
-      { role: 'system', content: `You sort Instagram DMs for their owner. Decide if this message from ${name || 'a contact'} needs the owner personally: an invite or challenge (game, call, meet, party, trip), a plan with a time, a request for something only the owner can give or decide, money, or something urgent. Small talk, jokes, reactions and memes do not.
-Return JSON only: {"needsYou": true|false, "category": "invite"|"request"|"money"|"urgent"|"plan"|"info", "summary": "<one short line for the owner, e.g. 'Arun wants to play chess now (lichess link)'>"}` },
-      { role: 'user', content: String(text || '').slice(0, 1500) },
+    const model = process.env.FAST_MODEL || 'gpt-5.4-mini';
+    const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const out = await azureOpenAI.jsonWithFallback(model, [
+      { role: 'system', content: `You read Instagram DMs sent to the owner and catch what matters. Now: ${now} India time (+05:30).
+1) needsYou: true if the message needs the owner personally: an invite or challenge (game, call, meet, party, trip, "can we play chess now"), a plan with a time, a question or request only the owner can answer or decide, money, a deadline, something urgent or emotional (bad news, they need help). false for small talk, jokes, reactions, memes, greetings.
+2) reminder: if they ask to be reminded or pinged ("remind me at 5", "ping me tomorrow morning", "tell me in 20 mins"), or ask the owner to remember to do something at a time ("remind sam to send notes tonight"). Work out the exact date-time in India time. forWhom "them" when they want a reminder sent to them, "owner" when the owner must do it.
+Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urgent"|"plan"|"info", "summary": "<one short line for the owner, e.g. 'Fami wants to play chess now (chess.com link)'>", "reminder": null or {"dueAt": "<ISO 8601 with +05:30>", "what": "<what to remind, short>", "forWhom": "them"|"owner"}}` },
+      { role: 'user', content: `From ${name || 'a contact'}: ${String(text || '').slice(0, 1500)}` },
     ]);
+    const r = out?.reminder;
     return {
       needsYou: !!out?.needsYou,
       category: ['invite', 'request', 'money', 'urgent', 'plan', 'info'].includes(out?.category) ? out.category : 'info',
       summary: String(out?.summary || '').slice(0, 200),
+      reminder: r && r.dueAt && r.what ? { dueAt: r.dueAt, what: String(r.what).slice(0, 200), forWhom: r.forWhom === 'owner' ? 'owner' : 'them' } : null,
     };
   } catch (err) {
     console.warn('⚠️ [Shared] Importance check failed:', err.message);
@@ -132,13 +137,28 @@ async function capture({ ownerId = null, senderId, name = '', text = '', attachm
       ).catch(() => {});
     }
 
+    // Reels and posts (Instagram links) are their own kind, not "links"; the attachment above already
+    // saved a shared reel, so a reel URL in the same message is not saved twice
+    const attachedUrls = new Set((attachments || []).map(a => a.url));
     for (const url of extractLinks(clean)) {
-      const seen = await SharedItem.exists({ ownerId, senderId, kind: 'link', url });
-      if (!seen) await SharedItem.create({ ownerId, senderId, name, kind: 'link', url, text: clean.slice(0, 1000), mid });
+      if (attachedUrls.has(url)) continue;
+      const kind = /instagram\.com\/(reels?|p|tv)\//i.test(url) ? (/\/p\//i.test(url) ? 'post' : 'reel') : 'link';
+      const seen = await SharedItem.exists({ ownerId, senderId, kind, url });
+      if (!seen) await SharedItem.create({ ownerId, senderId, name, kind, url, text: clean.slice(0, 1000), mid });
     }
-    if (!clean || !looksImportant(clean, { hasAttachment: (attachments || []).length > 0 })) return null;
+    // Every real message is checked (a laugh or an emoji is not); links/files always are
+    const hasAttachment = (attachments || []).length > 0;
+    if (!clean || (isTrivial(clean) && !hasAttachment)) return null;
     const verdict = await judge(clean, name);
-    if (!verdict?.needsYou) return null;
+    if (verdict?.reminder) {
+      const dueAt = validDue(verdict.reminder.dueAt);
+      if (dueAt) {
+        const Reminder = require('../models/Reminder');
+        await Reminder.create({ ownerId, senderId, name, what: verdict.reminder.what, forWhom: verdict.reminder.forWhom, dueAt, sourceText: clean.slice(0, 500) });
+        console.log(`⏰ [Reminder] Set for ${name || senderId} at ${dueAt.toISOString()}: ${verdict.reminder.what}`);
+      }
+    }
+    if (!verdict?.needsYou) return verdict;
     const item = await SharedItem.create({
       ownerId, senderId, name, kind: 'message', category: verdict.category, needsYou: true,
       summary: verdict.summary || clean.slice(0, 120), text: clean.slice(0, 1000), mid,

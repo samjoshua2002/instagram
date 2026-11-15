@@ -3509,6 +3509,7 @@ app.listen(PORT, '0.0.0.0', () => {
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
   checkInService.startScheduler(20);
+  require('./services/scheduledReminders').startScheduler();
   // Older saved photos/videos get described in the background (a few at a time)
   setTimeout(() => importantService.backfillDescriptions(30).catch(() => {}), 60 * 1000);
 

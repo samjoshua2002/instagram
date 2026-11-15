@@ -2115,8 +2115,9 @@ body {
   padding: 6px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  /* solid on purpose: spotify.css makes --color-surface-elevated see-through */
-  background: #1e1e22;
+  /* solid on purpose (spotify.css makes --color-surface-elevated see-through); mixed from the page's own
+     text and background so the menu and its text always come from the same theme */
+  background: color-mix(in srgb, var(--color-text-primary) 6%, var(--color-background, #121212));
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;

@@ -47,3 +47,14 @@ test('their message asks for a commitment: invites, plans, money, game links', (
   assert.ok(!asksForCommitment('i played chess yesterday lol'));
   assert.ok(!asksForCommitment('hi sam'));
 });
+
+test('trivial messages skip the AI check; reminder times are sanity-checked', () => {
+  const { isTrivial, validDue } = require('../services/importantRules');
+  for (const t of ['lol', 'hahaha', '😂😂', 'ok', 'gn', '']) assert.ok(isTrivial(t), t);
+  for (const t of ['remind me at 5', 'can we play chess now', 'what time tmrw']) assert.ok(!isTrivial(t), t);
+  const now = Date.parse('2026-11-16T00:00:00Z');
+  assert.ok(validDue('2026-11-16T17:00:00+05:30', now));
+  assert.equal(validDue('2020-01-01T00:00:00Z', now), null);
+  assert.equal(validDue('2027-06-01T00:00:00Z', now), null);
+  assert.equal(validDue('not a date', now), null);
+});

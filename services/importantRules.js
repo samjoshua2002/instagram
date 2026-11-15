@@ -69,4 +69,20 @@ function asksForCommitment(text) {
   return extractLinks(t).some(u => /chess\.com|lichess|meet\.google|zoom\.us|discord\.gg|teams\.microsoft|skribbl|gartic|among|play/i.test(u));
 }
 
-module.exports = { extractLinks, cues, looksImportant, kindOf, commitsOwner, holdingReply, asksForCommitment };
+/** Not worth an AI check: a laugh, an emoji, "ok", a reaction. Everything else is checked. */
+function isTrivial(text) {
+  const t = String(text || '').replace(/\[[^\]]*\]/g, '').trim();
+  if (!t) return true;
+  if (!/[\p{L}\p{N}]/u.test(t)) return true; // emoji / punctuation only
+  return /^(ok+|okay|k+|lol+|lmao+|(?:ha|he)+h?|hm+|yes|no|ya+|yeah|nah|hi+|hey+|hello|gn|gm|ty|thx|thanks|bye|sure|cool|nice|wow|omg|bro|da|ah+|oh+)[\s!.?]*$/i.test(t);
+}
+
+/** A reminder date the AI gave back, if it is a real time in the next 60 days. */
+function validDue(iso, now = Date.now()) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return null;
+  if (t < now - 5 * 60 * 1000 || t > now + 60 * 86400000) return null;
+  return new Date(Math.max(t, now + 30 * 1000));
+}
+
+module.exports = { extractLinks, cues, looksImportant, kindOf, commitsOwner, holdingReply, asksForCommitment, isTrivial, validDue };

@@ -13,7 +13,8 @@ import { useApp } from '../context/AppContext';
 const TABS = [
   { id: 'needs', label: 'Needs you', match: i => i.needsYou && i.status !== 'done' },
   { id: 'media', label: 'Media', match: i => i.kind === 'photo' || i.kind === 'video' },
-  { id: 'links', label: 'Links', match: i => ['link', 'post', 'reel'].includes(i.kind) },
+  { id: 'reels', label: 'Reels', match: i => i.kind === 'reel' || i.kind === 'post' },
+  { id: 'links', label: 'Links', match: i => i.kind === 'link' },
   { id: 'docs', label: 'Docs', match: i => i.kind === 'file' },
   { id: 'voice', label: 'Voice', match: i => i.kind === 'voice' },
 ];
@@ -134,6 +135,20 @@ export default function PersonShared({ senderId }) {
         <div className="shared-grid">
           {current.items.map(it => <Tile key={it._id} API_BASE={API_BASE} item={it} onOpen={setOpen} />)}
         </div>
+      )}
+
+      {current?.id === 'reels' && (
+        <ul className="shared-list">
+          {current.items.map(it => (
+            <li key={it._id} className="shared-item">
+              <span className="shared-icon"><Play size={15} /></span>
+              <span className="shared-main">
+                <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.description || it.summary || (it.kind === 'post' ? 'Post' : 'Reel')}</a>
+                <small>{it.kind} · {when(it.createdAt)}{it.text ? ` · "${it.text.slice(0, 60)}"` : ''}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
 
       {current?.id === 'links' && (
