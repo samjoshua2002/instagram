@@ -1777,6 +1777,47 @@ app.post('/api/people/:senderId/memory/reindex', async (req, res) => {
   }
 });
 
+// Your answer to one of the AI's doubts, or dismiss it; the document is rewritten right after
+app.post('/api/people/:senderId/memory/doubts/:doubtId', async (req, res) => {
+  try {
+    const senderId = String(req.params.senderId);
+    const mem = await PersonMemory.findOne({ ownerId: req.user._id, senderId });
+    const d = mem?.doubts?.id(req.params.doubtId);
+    if (!d) return res.status(404).json({ error: 'Question not found.' });
+    const answer = String(req.body?.answer || '').trim().slice(0, 400);
+    if (answer) {
+      d.status = 'answered';
+      d.answer = answer;
+      mem.ownerFacts.push({ text: `${d.question} -> ${answer}` });
+    } else {
+      d.status = 'dismissed';
+    }
+    Object.assign(mem, { rebuildDoc: true, dirty: true, priority: Date.now() });
+    await mem.save();
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+// "Something's wrong? Tell the AI": a correction or fact from you, always true from now on
+app.post('/api/people/:senderId/memory/correct', async (req, res) => {
+  try {
+    const senderId = String(req.params.senderId);
+    const text = String(req.body?.text || '').trim().slice(0, 500);
+    if (!text) return res.status(400).json({ error: 'Write what the AI should know.' });
+    if (!(await UserMemory.exists(ownedMemoryQuery(req, senderId)))) return res.status(404).json({ error: 'User not found' });
+    await PersonMemory.updateOne(
+      { ownerId: req.user._id, senderId },
+      { $push: { ownerFacts: { text, at: new Date() } }, $set: { rebuildDoc: true, dirty: true, priority: Date.now() }, $setOnInsert: { ownerId: req.user._id, senderId } },
+      { upsert: true },
+    );
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // Indexing progress for everyone (AI Memory page): like Spotlight's "Indexing..." status
 app.get('/api/memory-index', async (req, res) => {
   try {

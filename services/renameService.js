@@ -35,7 +35,7 @@ async function renameEverywhere({ ownerId = null, senderId, oldName, newName }) 
   if (node) {
     node.lore = (node.lore || []).map(sw);
     if (node.personalNotes) node.personalNotes = sw(node.personalNotes);
-    (node.connections || []).forEach(c => { c.notes = sw(c.notes); });
+    (node.connections || []).forEach(c => { c.notes = sw(c.notes); c.targetName = sw(c.targetName); });
     await node.save();
     changed++;
   }
@@ -45,8 +45,26 @@ async function renameEverywhere({ ownerId = null, senderId, oldName, newName }) 
     pm.doc = sw(pm.doc);
     pm.notes = (pm.notes || []).map(sw);
     pm.bondReason = sw(pm.bondReason);
+    pm.rebuildDoc = true;
+    pm.priority = Date.now();
     pm.dirty = true;
     await pm.save();
+    changed++;
+  }
+  // Things they shared, alerts and reminders were saved with the name of the time
+  const SharedItem = require('../models/SharedItem');
+  const Reminder = require('../models/Reminder');
+  for (const item of await SharedItem.find({ ownerId, senderId })) {
+    item.name = newName;
+    item.summary = sw(item.summary);
+    item.description = sw(item.description);
+    await item.save().catch(() => {});
+    changed++;
+  }
+  for (const r of await Reminder.find({ ownerId, senderId })) {
+    r.name = newName;
+    r.what = sw(r.what);
+    await r.save().catch(() => {});
     changed++;
   }
   console.log(`✏️ [Rename] ${oldName} -> ${newName} for ${senderId} (${changed} records)`);

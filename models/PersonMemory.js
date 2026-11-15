@@ -27,6 +27,18 @@ const personMemorySchema = new mongoose.Schema({
   error: { type: String, default: '' },
   errorCount: { type: Number, default: 0 },
   dirty: { type: Boolean, default: true },
+  // Things the AI is not sure about: questions for you (answer or dismiss on the person's page)
+  doubts: [{
+    question: { type: String, required: true },
+    about: { type: String, default: '' },
+    status: { type: String, enum: ['open', 'answered', 'dismissed'], default: 'open' },
+    answer: { type: String, default: '' },
+    askedAt: { type: Date, default: Date.now },
+  }],
+  // What you told the AI about them (answers and corrections): always true, beats anything read from chats
+  ownerFacts: [{ text: { type: String, required: true }, at: { type: Date, default: Date.now } }],
+  // Rewrite the document from the notes (after your answer or correction) without re-reading chats
+  rebuildDoc: { type: Boolean, default: false },
   // Re-read asked for by you: goes first, and rebuilds from the whole history
   priority: { type: Number, default: 0 },
   forceRebuild: { type: Boolean, default: false },

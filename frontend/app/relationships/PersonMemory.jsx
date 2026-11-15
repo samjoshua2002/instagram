@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Brain, RefreshCw } from 'lucide-react';
+import { Brain, RefreshCw, HelpCircle, X, Send } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 /**
@@ -54,6 +54,32 @@ export default function PersonMemory({ senderId, name }) {
     setTimeout(load, 1500);
   };
 
+  // Your answers and corrections: saved as always-true, then the document is rewritten
+  const [answers, setAnswers] = useState({});
+  const [correction, setCorrection] = useState('');
+  const post = async (path, body, okText) => {
+    const res = await fetch(`${API_BASE}/api/people/${encodeURIComponent(senderId)}/memory/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }).catch(() => null);
+    if (!res?.ok) { showToast?.('Could not save that', 'error'); return false; }
+    showToast?.(okText);
+    load();
+    return true;
+  };
+  const answer = async (d, dismiss = false) => {
+    const text = dismiss ? '' : String(answers[d._id] || '').trim();
+    if (!dismiss && !text) return;
+    setMem(m => ({ ...m, doubts: (m.doubts || []).map(x => (x._id === d._id ? { ...x, status: dismiss ? 'dismissed' : 'answered' } : x)) }));
+    await post(`doubts/${d._id}`, { answer: text }, dismiss ? 'Dismissed' : 'Thanks, the AI will use that');
+  };
+  const sendCorrection = async e => {
+    e.preventDefault();
+    const text = correction.trim();
+    if (!text) return;
+    if (await post('correct', { text }, 'Got it, updating the memory')) setCorrection('');
+  };
+  const openDoubts = (mem?.doubts || []).filter(d => d.status === 'open');
+
   const score = mem?.brainScore || 0;
   const busy = mem && (mem.status === 'indexing' || mem.status === 'pending');
   const pct = mem?.totalMessages ? Math.round(100 * Math.min(mem.indexedMessages || 0, mem.totalMessages) / mem.totalMessages) : 0;
@@ -86,8 +112,28 @@ export default function PersonMemory({ senderId, name }) {
       </div>
       {mem?.status === 'indexing' && <div className="pm-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></div>}
       {mem?.bondReason && <p className="pm-bond">{mem.bondReason}</p>}
+      {openDoubts.length > 0 && (
+        <div className="pm-doubts">
+          <div className="pm-doubts-head"><HelpCircle size={15} /> The AI isn't sure about these</div>
+          {openDoubts.map(d => (
+            <form key={d._id} className="pm-doubt" onSubmit={e => { e.preventDefault(); answer(d); }}>
+              <span className="pm-doubt-q">{d.question}</span>
+              <div className="pm-doubt-row">
+                <input value={answers[d._id] || ''} onChange={e => setAnswers(a => ({ ...a, [d._id]: e.target.value }))} placeholder="Your answer" aria-label={`Answer: ${d.question}`} />
+                <button type="submit" className="person-light-btn" disabled={!String(answers[d._id] || '').trim()}><Send size={13} /></button>
+                <button type="button" className="pm-doubt-x" onClick={() => answer(d, true)} aria-label="Dismiss" title="Not important"><X size={14} /></button>
+              </div>
+            </form>
+          ))}
+        </div>
+      )}
       {mem?.doc ? <MemoryDoc text={mem.doc} /> : !busy && mem && <p className="person-empty">Nothing learned yet.</p>}
-      <p className="pm-note">Written by the AI from your real chats only. It updates itself; you can't edit or delete it.</p>
+      <form className="pm-correct" onSubmit={sendCorrection}>
+        <input value={correction} onChange={e => setCorrection(e.target.value)} maxLength={500}
+          placeholder={`Something wrong? Tell the AI, e.g. "Rajveer is ${name}'s friend, not dad"`} aria-label="Correct the AI's memory" />
+        <button type="submit" className="person-light-btn" disabled={!correction.trim()}>Fix</button>
+      </form>
+      <p className="pm-note">Written from your real chats and what you tell it. Your answers always win; the AI keeps asking when it's unsure.</p>
     </div>
   );
 }

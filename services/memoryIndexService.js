@@ -57,11 +57,13 @@ async function compressNotes(name, notes) {
   return String(text || '').trim();
 }
 
-async function writeDoc({ name, ownerName, notes, card, totalMessages }) {
+async function writeDoc({ name, ownerName, notes, card, totalMessages, ownerFacts = [], answered = [] }) {
   const azureOpenAI = await ai();
   const { TOP_MODEL } = require('./models');
   const out = await azureOpenAI.jsonWithFallback(TOP_MODEL, [
-    { role: 'system', content: `You keep ${ownerName}'s memory of one person, ${name}, written only from notes taken from their real chats (and ${ownerName}'s own card about them). Never invent anything.
+    { role: 'system', content: `You keep ${ownerName}'s memory of one person, ${name}, written ONLY from notes taken from their real chats, plus what ${ownerName} told you directly (which is always true and beats the notes). Never invent anything, never fill gaps with guesses.
+- ${ownerName} is the owner (me): never list ${ownerName} under "People in their life".
+- If something is unclear or the notes conflict (who someone is to them, a name, a date), do NOT write a guess: leave it out and add a short question for ${ownerName} to "doubts" instead (max 5, only real doubts, never one already answered below).
 Write "doc" in Markdown with exactly these sections (leave a section out if nothing is known):
 ## Who they are
 ## Our bond
@@ -75,8 +77,11 @@ Write "doc" in Markdown with exactly these sections (leave a section out if noth
 (plans, promises, things to ask about next time)
 Then rate how well each part is known: 0 nothing, 1 a little, 2 well, 3 very well, for: ${Object.keys(SLOTS).join(', ')}.
 And judge the bond from the chats: "stranger", "acquaintance", "friend", "close", "family" or "partner", with one short reason.
-Return JSON only: {"doc": "...", "slots": {...}, "bond": "...", "bondReason": "..."}` },
-    { role: 'user', content: `${ownerName}'s card about ${name}: ${card || 'none'}\nMessages in our chat: ${totalMessages}\n\nNOTES:\n${notes.join('\n\n')}` },
+Return JSON only: {"doc": "...", "slots": {...}, "bond": "...", "bondReason": "...", "doubts": [{"question": "...", "about": "<short topic>"}]}` },
+    { role: 'user', content: `${ownerName}'s own labels for ${name}: ${card || 'none'}
+Messages in our chat: ${totalMessages}
+${ownerFacts.length ? `\nWHAT ${ownerName.toUpperCase()} TOLD YOU (always true):\n${ownerFacts.map(f => `- ${f}`).join('\n')}\n` : ''}${answered.length ? `\nQUESTIONS ALREADY ANSWERED OR DISMISSED (never ask again):\n${answered.map(a => `- ${a}`).join('\n')}\n` : ''}
+NOTES FROM THE CHATS:\n${notes.join('\n\n')}` },
   ]);
   return out || null;
 }
@@ -127,11 +132,18 @@ async function indexOne(ownerId, senderId, { ownerName = 'me', force = false } =
     }
     mem.indexedMessages = totalMessages;
 
-    if (chunks.length || force || !mem.doc) {
-      const cardText = card ? [card.relationshipToSam && `relationship: ${card.relationshipToSam}`, card.category && `category: ${card.category}`,
-        card.personalNotes && `notes: ${String(card.personalNotes).slice(0, 600)}`,
-        (card.connections || []).length && `people: ${(card.connections || []).slice(0, 25).map(c => `${c.targetName} (${c.relationship})`).join(', ')}`].filter(Boolean).join('; ') : '';
-      const out = mem.notes.length ? await writeDoc({ name, ownerName, notes: mem.notes, card: cardText, totalMessages }) : null;
+    if (chunks.length || force || !mem.doc || mem.rebuildDoc) {
+      // Only your own labels from the card: its older learned "connections" and notes were guesses
+      const cardText = card ? [card.relationshipToSam && `relationship: ${card.relationshipToSam}`, card.category && `category: ${card.category}`].filter(Boolean).join('; ') : '';
+      const ownerFacts = (mem.ownerFacts || []).map(f => f.text);
+      const answered = (mem.doubts || []).filter(d => d.status !== 'open').map(d => `${d.question}${d.answer ? ` -> ${d.answer}` : ' (dismissed)'}`);
+      const out = mem.notes.length || ownerFacts.length ? await writeDoc({ name, ownerName, notes: mem.notes, card: cardText, totalMessages, ownerFacts, answered }) : null;
+      if (Array.isArray(out?.doubts)) {
+        const known = new Set((mem.doubts || []).map(d => d.question.toLowerCase()));
+        const fresh = out.doubts.filter(d => d && d.question && !known.has(String(d.question).toLowerCase())).slice(0, 5);
+        mem.doubts = [...(mem.doubts || []).filter(d => d.status !== 'open'), ...fresh.map(d => ({ question: String(d.question).slice(0, 200), about: String(d.about || '').slice(0, 60) }))].slice(-40);
+      }
+      mem.rebuildDoc = false;
       if (out?.doc) {
         mem.doc = String(out.doc).slice(0, 20000);
         // The model's own ratings, or (if it left them out) the ratings read from the document
