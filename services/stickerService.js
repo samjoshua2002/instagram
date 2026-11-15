@@ -8,6 +8,8 @@ const PersonaConfig = require('../models/PersonaConfig');
  * tenant's media. Ownership is the account id only: a username can be changed and then taken
  * by another account, which must not inherit the old owner's media or categories.
  */
+const shuffle = list => [...list].sort(() => Math.random() - 0.5);
+
 function vaultOwnerQuery(user) {
   if (!user || !user._id) return { ownerId: null };
   return { ownerId: user._id };
@@ -385,6 +387,27 @@ class StickerService {
     };
   }
 
+  /** First item whose media still loads (a deleted file shows "no content found" in Instagram). Cached 6 h. */
+  async firstLive(items) {
+    this.liveCache = this.liveCache || new Map();
+    for (const item of items) {
+      const url = item?.url;
+      if (!url) continue;
+      const hit = this.liveCache.get(url);
+      if (hit && Date.now() - hit.at < 6 * 3600 * 1000) { if (hit.ok) return item; continue; }
+      let ok = false;
+      try {
+        const res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000) });
+        const type = res.headers.get('content-type') || '';
+        ok = res.ok && /^(image|video)\//i.test(type);
+      } catch { ok = false; }
+      this.liveCache.set(url, { ok, at: Date.now() });
+      if (ok) return item;
+      console.warn(`🧹 [MediaVault] Skipped "${item.name || url}": the file no longer loads`);
+    }
+    return null;
+  }
+
   hasSticker(type) {
     if (!type) return false;
     const cleanType = type.toLowerCase().trim().replace(/[^a-z0-9_]/g, '');
@@ -429,6 +452,7 @@ class StickerService {
     try {
       const ownerQuery = vaultOwnerQuery(user);
       let allVaultItems = await MediaVault.find(ownerQuery);
+      const isStock = it => /(^|\.)(giphy|tenor)\.com\//i.test(String(it?.url || '').replace(/^https?:\/\//, ''));
       // Auto-seed predefined catalog if vault is empty for system
       if ((!allVaultItems || allVaultItems.length === 0) && !user) {
         console.log(`📦 [MediaVault Auto-Seed]: Vault is empty. Auto-seeding curated meme collection into DB...`);
@@ -453,6 +477,7 @@ class StickerService {
       const scoredItems = [];
 
       for (const item of allVaultItems) {
+        if (isStock(item)) continue;
         const itemCat = (item.category || '').toLowerCase();
         // Never evaluate sad items unless genuine sorrow
         if (itemCat === 'sad' && !/heartbroken|depressed|so sad rn|crying inside/.test(lowerContext)) {
@@ -493,74 +518,30 @@ class StickerService {
       if (scoredItems.length > 0 && scoredItems[0].score >= 12) {
         const topScore = scoredItems[0].score;
         // Take top items tied or within 5 points of top score for natural variety
-        const topCandidates = scoredItems.filter(s => s.score >= topScore - 5).slice(0, 3);
-        const picked = topCandidates[Math.floor(Math.random() * topCandidates.length)].item;
-        console.log(`🎯 [MediaVault Relevant Match]: Picked "${picked.name}" [${picked.category}] (score: ${topScore}) for context: "${contextText.slice(0, 40)}..."`);
-        return picked.url;
+        const topCandidates = scoredItems.filter(s => s.score >= topScore - 5).slice(0, 3).map(s => s.item);
+        const picked = await this.firstLive(shuffle(topCandidates));
+        if (picked) {
+          console.log(`🎯 [MediaVault Relevant Match]: Picked "${picked.name}" [${picked.category}] (score: ${topScore}) for context: "${contextText.slice(0, 40)}..."`);
+          return picked.url;
+        }
       }
 
       // If category items exist and no negative condition, pick the best category item
-      const categoryMatches = allVaultItems.filter(item => (item.category || '').toLowerCase() === cleanType);
+      const categoryMatches = allVaultItems.filter(item => !isStock(item) && (item.category || '').toLowerCase() === cleanType);
       if (categoryMatches.length > 0 && cleanType !== 'sad') {
-        const picked = categoryMatches[Math.floor(Math.random() * categoryMatches.length)];
-        console.log(`🎬 [MediaVault Category Match]: Picked "${picked.name}" [${picked.category}]`);
-        return picked.url;
+        const picked = await this.firstLive(shuffle(categoryMatches).slice(0, 4));
+        if (picked) {
+          console.log(`🎬 [MediaVault Category Match]: Picked "${picked.name}" [${picked.category}]`);
+          return picked.url;
+        }
       }
     } catch (e) {
       console.warn('⚠️ MediaVault DB check error:', e.message);
     }
 
-    // 2. SECOND PRIORITY: In-memory Predefined Curated GIFs (instant & relevant fallback)
-    const predefinedList = this.getPredefinedList();
-    const relevantPredefined = predefinedList.filter(item => {
-      if (item.category === 'sad' && !/heartbroken|depressed|so sad rn/.test(lowerContext)) return false;
-      return item.category === cleanType;
-    });
-    if (relevantPredefined.length > 0) {
-      const picked = relevantPredefined[Math.floor(Math.random() * relevantPredefined.length)];
-      console.log(`⚡ [Predefined Fallback Match]: Picked "${picked.name}" [${picked.category}]: ${picked.url}`);
-      return picked.url;
-    }
-
-    // 3. THIRD PRIORITY: Direct live GIPHY API search (only if not rate-limited)
-    if (!this.isGiphyRateLimited || Date.now() > this.rateLimitResetTime) {
-      try {
-        const liveGiphyUrl = await this.fetchFromGiphyApi(cleanType, contextText, user);
-        if (liveGiphyUrl) return liveGiphyUrl;
-      } catch (err) {
-        console.warn('⚠️ Live Giphy API search failed, falling back:', err.message);
-      }
-    }
-
-    // 3. THIRD PRIORITY: Built-in curated reaction GIF catalog fallback
-    let list = this.stickers[cleanType];
-
-    // Fuzzy matching for aliases
-    if (!list || list.length === 0) {
-      if (cleanType.includes('joy') || cleanType.includes('laugh') || cleanType.includes('haha') || cleanType.includes('lmao')) {
-        list = this.stickers.joy;
-      } else if (cleanType.includes('lol') || cleanType.includes('skull') || cleanType.includes('dead') || cleanType.includes('rofl')) {
-        list = this.stickers.lol;
-      } else if (cleanType.includes('wonder') || cleanType.includes('shock') || cleanType.includes('wow') || cleanType.includes('omg')) {
-        list = this.stickers.wonder;
-      } else if (cleanType.includes('sad') || cleanType.includes('cry') || cleanType.includes('tear')) {
-        list = this.stickers.sad;
-      } else if (cleanType.includes('happy') || cleanType.includes('hype') || cleanType.includes('fire')) {
-        list = this.stickers.happy;
-      } else if (cleanType.includes('side') || cleanType.includes('sus') || cleanType.includes('bombastic')) {
-        list = this.stickers.side_eye;
-      } else if (cleanType.includes('confus') || cleanType.includes('idk') || cleanType.includes('what')) {
-        list = this.stickers.confused;
-      } else if (cleanType.includes('cool') || cleanType.includes('cat') || cleanType.includes('chill')) {
-        list = this.stickers.cool;
-      } else {
-        list = this.stickers.joy.concat(this.stickers.cat);
-      }
-    }
-
-    if (!list || list.length === 0) return null;
-    const idx = Math.floor(Math.random() * list.length);
-    return list[idx];
+    // No stock GIFs: the built-in list, the seeded catalog and live GIPHY search sent the same common
+    // GIFs to everyone (and many had been deleted, showing "no content found"). Only your own media is sent.
+    return null;
   }
 
   /**

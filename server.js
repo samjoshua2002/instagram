@@ -17,6 +17,7 @@ const MediaVault = require('./models/MediaVault');
 
 // Services
 const instagramService = require('./services/instagramService');
+const transcribeService = require('./services/transcribeService');
 const azureOpenAI = require('./services/azureOpenAI');
 const { creatorIdentity } = require('./services/creatorIdentity');
 const { aiTask } = require('./services/langfuse');
@@ -497,6 +498,7 @@ function parseIncomingEventMessage(msg) {
     isNoteReply = true;
   }
 
+  let audioUrl = '';
   if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
     for (const att of msg.attachments) {
       const type = (att.type || '').toLowerCase();
@@ -530,6 +532,7 @@ function parseIncomingEventMessage(msg) {
       } else if (type === 'audio') {
         isMedia = true;
         mediaTitle = 'Voice message';
+        audioUrl = url;
       }
     }
   }
@@ -554,7 +557,7 @@ function parseIncomingEventMessage(msg) {
   // If there's neither text nor post/reel/story, skip
   if (!text) return null;
 
-  return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply };
+  return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply, audioUrl };
 }
 
 // Finds the one workspace that owns an Instagram account id. Fields are checked in order of trust
@@ -662,6 +665,7 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
         const parsed = parseIncomingEventMessage(event.message);
         if (parsed) {
           event.message.text = parsed.text;
+          event.message.audioUrl = parsed.audioUrl;
           event.isReelOrShare = parsed.isReelOrShare;
           event.reelTitle = parsed.reelTitle;
           handleIncomingInstagramMessage(event, entry.id).catch(err => {
@@ -684,6 +688,7 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
           const parsed = parseIncomingEventMessage(val.message);
           if (parsed) {
             val.message.text = parsed.text;
+            val.message.audioUrl = parsed.audioUrl;
             handleIncomingInstagramMessage({
               sender: val.sender,
               recipient: val.recipient,
@@ -708,6 +713,11 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
 async function handleIncomingInstagramMessage(event, accountId = null) {
   const senderId = event.sender.id;
   const recipientId = event.recipient.id;
+  // Voice notes: answer what they said (transcribed), not "[Sent a Voice message]"
+  if (event.message.audioUrl) {
+    const transcript = await transcribeService.transcribeUrl(event.message.audioUrl);
+    event.message.text = transcribeService.withTranscript(event.message.text, transcript);
+  }
   const messageText = event.message.text;
   const mid = event.message.mid;
   const isReelOrShare = event.isReelOrShare;
