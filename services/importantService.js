@@ -8,6 +8,7 @@
 const mongoose = require('mongoose');
 const SharedItem = require('../models/SharedItem');
 const User = require('../models/User');
+const UserMemory = require('../models/UserMemory');
 const { extractLinks, kindOf, isTrivial, validDue } = require('./importantRules');
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -84,12 +85,16 @@ async function judge(text, name) {
     const out = await azureOpenAI.jsonWithFallback(model, [
       { role: 'system', content: `You read Instagram DMs sent to the owner and catch what matters. Now: ${now} India time (+05:30).
 1) needsYou: true if the message needs the owner personally: an invite or challenge (game, call, meet, party, trip, "can we play chess now"), a plan with a time, a question or request only the owner can answer or decide, money, a deadline, something urgent or emotional (bad news, they need help). false for small talk, jokes, reactions, memes, greetings.
+3) away: if they say they are leaving or getting busy ("gtg", "going to study", "going out", "sleeping", "brb", "in class"), give the reason in 1-3 words and when they'll be back if they said (ISO, India time) else null. back: true if they say they're back / free now.
 2) reminder: if they ask to be reminded or pinged ("remind me at 5", "ping me tomorrow morning", "tell me in 20 mins"), or ask the owner to remember to do something at a time ("remind sam to send notes tonight"). Work out the exact date-time in India time. forWhom "them" when they want a reminder sent to them, "owner" when the owner must do it.
-Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urgent"|"plan"|"info", "summary": "<one short line for the owner, e.g. 'Fami wants to play chess now (chess.com link)'>", "reminder": null or {"dueAt": "<ISO 8601 with +05:30>", "what": "<what to remind, short>", "forWhom": "them"|"owner"}}` },
+Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urgent"|"plan"|"info", "summary": "<one short line for the owner, e.g. 'Fami wants to play chess now (chess.com link)'>", "reminder": null or {"dueAt": "<ISO 8601 with +05:30>", "what": "<what to remind, short>", "forWhom": "them"|"owner"}, "away": null or {"reason": "<1-3 words>", "until": "<ISO or null>"}, "back": bool}` },
       { role: 'user', content: `From ${name || 'a contact'}: ${String(text || '').slice(0, 1500)}` },
     ]);
     const r = out?.reminder;
+    const away = out?.away && out.away.reason ? { reason: String(out.away.reason).slice(0, 40), until: out.away.until || null } : null;
     return {
+      away,
+      back: !!out?.back,
       needsYou: !!out?.needsYou,
       category: ['invite', 'request', 'money', 'urgent', 'plan', 'info'].includes(out?.category) ? out.category : 'info',
       summary: String(out?.summary || '').slice(0, 200),
@@ -172,6 +177,13 @@ async function capture({ ownerId = null, senderId, name = '', text = '', attachm
     const hasAttachment = (attachments || []).length > 0;
     if (!clean || (isTrivial(clean) && !hasAttachment)) return null;
     const verdict = await judge(clean, name);
+    // Busy / back: check-ins wait while they're away; the reply knows they said they'd be busy
+    if (verdict?.away) {
+      const until = validDue(verdict.away.until) || null;
+      await UserMemory.updateOne({ ownerId, senderId }, { $set: { away: { reason: verdict.away.reason, since: new Date(), until, endedAt: null } } }).catch(() => {});
+    } else if (verdict?.back) {
+      await UserMemory.updateOne({ ownerId, senderId, 'away.since': { $ne: null }, 'away.endedAt': null }, { $set: { 'away.endedAt': new Date() } }).catch(() => {});
+    }
     if (verdict?.reminder) {
       const dueAt = validDue(verdict.reminder.dueAt);
       if (dueAt) {

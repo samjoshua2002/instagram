@@ -55,3 +55,19 @@ test('photo and video descriptions replace the placeholder', () => {
   assert.match(withDescription('[Sent a Photo]', 'photo', 'a snow leopard'), /Sent a photo: a snow leopard/);
   assert.match(withDescription('[Sent a Video]', 'video', null), /can't open right now/);
 });
+
+test('away: no check-ins while they are busy; afterwards ask how it went', () => {
+  const { awayState, checkInDecision } = require('../services/checkInRules');
+  const now = Date.parse('2026-11-16T12:00:00Z');
+  const h = n => new Date(now - n * 3600000);
+  assert.equal(awayState({ reason: 'studying', since: h(1) }, now).state, 'away');
+  assert.equal(awayState({ reason: 'studying', since: h(1), until: h(0.5) }, now).state, 'justBack');
+  assert.equal(awayState({ reason: 'studying', since: h(2), endedAt: h(1) }, now).state, 'justBack');
+  assert.equal(awayState({ reason: 'sleeping', since: h(7) }, now).state, 'away');
+  assert.equal(awayState({ reason: 'studying', since: h(12) }, now).state, 'none');
+  assert.equal(awayState(null, now).state, 'none');
+  const base = { level: 'close', lastTheirsAt: h(1), lastAnyAt: h(0.5), lastAnyRole: 'assistant', now };
+  assert.equal(checkInDecision({ ...base, away: 'away' }).ok, false);
+  assert.equal(checkInDecision({ ...base, away: 'justBack' }).ok, true);
+  assert.equal(checkInDecision({ ...base }).ok, false);
+});

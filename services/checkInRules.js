@@ -10,14 +10,16 @@ const MAX_PER_RUN = 3;
  * @returns {{ ok: boolean, reason: string }}
  */
 function checkInDecision({ enabled = true, level, minLevel = 'close', lastTheirsAt, lastAnyAt, lastAnyRole,
-  lastAnyWasCheckIn = false, lastCheckInAt = null, idleHours = 4, quiet = false, sentToday = 0, dailyLimit = 6, now = Date.now() }) {
+  lastAnyWasCheckIn = false, lastCheckInAt = null, idleHours = 4, quiet = false, sentToday = 0, dailyLimit = 6, away = 'none', now = Date.now() }) {
   if (!enabled) return { ok: false, reason: 'check-ins are off' };
+  // They said they're busy: don't disturb until they're back
+  if (away === 'away') return { ok: false, reason: 'they said they are busy' };
   if (!atLeast(level || 'stranger', minLevel)) return { ok: false, reason: `not ${minLevel} enough (${level})` };
   if (sentToday >= dailyLimit) return { ok: false, reason: 'daily limit reached' };
   if (!lastTheirsAt) return { ok: false, reason: 'they never messaged' };
   const sinceTheirs = now - new Date(lastTheirsAt).getTime();
   if (sinceTheirs > WINDOW_HOURS * HOUR) return { ok: false, reason: "outside Instagram's 24h window" };
-  if (now - new Date(lastAnyAt || lastTheirsAt).getTime() < idleHours * HOUR) return { ok: false, reason: 'chat still active' };
+  if (away !== 'justBack' && now - new Date(lastAnyAt || lastTheirsAt).getTime() < idleHours * HOUR) return { ok: false, reason: 'chat still active' };
   // Their message still waiting is the reply's job; our unanswered check-in means don't double-text
   if (lastAnyRole !== 'assistant') return { ok: false, reason: 'their message is unanswered' };
   if (lastAnyWasCheckIn) return { ok: false, reason: 'last check-in not answered yet' };
@@ -37,4 +39,21 @@ function nextQuestionTopic(mem) {
   return { topic: 'how they are', hint: 'how their day or week is really going' };
 }
 
-module.exports = { checkInDecision, nextQuestionTopic, WINDOW_HOURS, HOUR, MAX_PER_RUN };
+/**
+ * Where they are after saying they'd be busy:
+ *  'away'     still busy (until the time they gave, else 6 h, or 9 h for sleep)
+ *  'justBack' came back (said so, or their time passed) within the last 3 h: ask how it went
+ *  'none'     nothing going on
+ */
+function awayState(away, now = Date.now()) {
+  if (!away || !away.since) return { state: 'none' };
+  const since = new Date(away.since).getTime();
+  const defaultMs = (/sleep|bed|nap/i.test(away.reason || '') ? 9 : 6) * HOUR;
+  const until = away.until ? new Date(away.until).getTime() : since + defaultMs;
+  const ended = away.endedAt ? new Date(away.endedAt).getTime() : (now >= until ? until : null);
+  if (!ended) return { state: 'away', reason: away.reason, until };
+  if (now - ended <= 3 * HOUR) return { state: 'justBack', reason: away.reason, since: ended };
+  return { state: 'none' };
+}
+
+module.exports = { checkInDecision, nextQuestionTopic, awayState, WINDOW_HOURS, HOUR, MAX_PER_RUN };

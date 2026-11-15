@@ -147,6 +147,13 @@ const UserMemorySchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // They said they're busy ("going to study", "going out"): no check-ins until they're back
+  away: {
+    reason: { type: String, default: '' },
+    since: { type: Date, default: null },
+    until: { type: Date, default: null },
+    endedAt: { type: Date, default: null },
+  },
   // Last check-in the AI started itself, and the one question it asked (answer is learned into memory)
   lastCheckInAt: { type: Date, default: null },
   pendingQuestion: {

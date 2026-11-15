@@ -19,7 +19,7 @@ const { computeCloseness } = require('./closeness');
 const { splitIntoBubbles, bubbleGapMs } = require('./humanizeService');
 const { aiRepliesTo } = require('../frontend/app/lib/aiReplyRules');
 
-const { checkInDecision, nextQuestionTopic, WINDOW_HOURS, HOUR, MAX_PER_RUN } = require('./checkInRules');
+const { checkInDecision, nextQuestionTopic, awayState, WINDOW_HOURS, HOUR, MAX_PER_RUN } = require('./checkInRules');
 
 async function ownerAccountToken(ownerId) {
   try {
@@ -96,7 +96,9 @@ class CheckInService {
       firstSeen: mem.createdAt, lastSeen: mem.lastInteraction, override: node?.closenessOverride || '',
       familyRole: socialGraphService.familyRole,
     }, now);
+    const away = awayState(mem.away, now);
     const decision = checkInDecision({
+      away: away.state,
       enabled: config.checkInsEnabled !== false,
       level: closeness.level,
       minLevel: config.checkInMinLevel || 'close',
@@ -116,7 +118,10 @@ class CheckInService {
     if (!token) return false;
 
     const history = (await Message.find(convo).sort({ createdAt: -1 }).limit(12).lean()).reverse();
-    const ask = nextQuestionTopic(mem);
+    // Back from studying / going out: the natural check-in is how it went
+    const ask = away.state === 'justBack'
+      ? { topic: 'back from being busy', hint: `how their ${away.reason} went (they said earlier they were going for ${away.reason}); welcome them back` }
+      : nextQuestionTopic(mem);
     const memoryDoc = (await require('../models/PersonMemory').findOne({ ownerId: mem.ownerId || null, senderId: mem.senderId }, { doc: 1 }).lean().catch(() => null))?.doc || '';
     const out = await azureOpenAI.generateCheckIn({ userMemory: mem, messageHistory: history, config, closeness, ask, node, memoryDoc });
     if (!out?.message) return false;
