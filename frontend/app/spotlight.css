@@ -505,3 +505,179 @@ a.bn-card:hover { transform: translateY(-2px); }
   .bn-bar-ai, .bn-bar-you, .bn-rank-track span, .bn-mix-track span, .bn-skeleton { animation: none; }
   .bn-ring-arc, .bn-card { transition: none; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   Home v2: one photo, one palette.
+   The cover photo (PageCover) is the only image on Home; every colour below is mixed from the
+   colours read out of it (--ambient-dominant / --ambient-accent), so nothing clashes with it.
+   One card style everywhere: same surface, border, radius and shadow.
+   ═══════════════════════════════════════════════════════════════════ */
+.sh-home.sh-v2 {
+  --v2-tone: var(--ambient-dominant, #8a8a8a);
+  --sh-action: var(--ambient-accent, var(--v2-tone));
+  --sh-accent: color-mix(in srgb, var(--v2-tone) 75%, #fff);
+  --sh-text: #f5f5f7;
+  --sh-text-2: color-mix(in srgb, var(--v2-tone) 18%, #a1a1aa);
+  --sh-card: color-mix(in srgb, var(--v2-tone) 7%, #17171a);
+  --sh-card-hover: color-mix(in srgb, var(--v2-tone) 12%, #1d1d21);
+  --sh-border: color-mix(in srgb, var(--v2-tone) 16%, rgba(255, 255, 255, 0.06));
+  --v2-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -18px rgba(0, 0, 0, 0.6);
+  --v2-radius: 20px;
+  padding: 32px 40px 56px;
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-theme="light"] .sh-home.sh-v2 {
+  --sh-accent: color-mix(in srgb, var(--v2-tone) 80%, #000);
+  --sh-on-accent: var(--on-ambient-dominant-80, #fff);
+  --sh-text: #121216;
+  --sh-text-2: color-mix(in srgb, var(--v2-tone) 25%, #5c5c66);
+  --sh-card: #ffffff;
+  --sh-card-hover: color-mix(in srgb, var(--v2-tone) 5%, #ffffff);
+  --sh-border: color-mix(in srgb, var(--v2-tone) 14%, #e7e7ec);
+  --v2-shadow: 0 1px 2px rgba(16, 16, 24, 0.04), 0 14px 32px -20px color-mix(in srgb, var(--v2-tone) 45%, transparent);
+  background: transparent;
+}
+/* The main panel itself takes the photo's colour (flat, no second gradient on top) */
+.app-main-content:has(.sh-v2) {
+  background-color: color-mix(in srgb, var(--ambient-dominant, #888) 9%, #0c0c0e) !important;
+  background-image: none !important;
+}
+:root[data-theme="light"] .app-main-content:has(.sh-v2) {
+  background-color: color-mix(in srgb, var(--ambient-dominant, #888) 5%, #fafafb) !important;
+}
+
+/* Cover: full width of the panel behind the greeting, fading into the page */
+.sh-v2 > .page-cover { left: 0; right: 0; height: 440px; border-radius: 8px 8px 0 0; }
+.sh-v2 > .page-cover .ub-img { filter: saturate(1.05) brightness(0.8); }
+:root[data-theme="light"] .sh-v2 > .page-cover .ub-img { filter: saturate(1) brightness(1.04); }
+.sh-v2 > .page-cover .ub-shade { background: linear-gradient(180deg, rgba(10, 10, 12, 0.25) 0%, rgba(10, 10, 12, 0.55) 100%); }
+:root[data-theme="light"] .sh-v2 > .page-cover .ub-shade { background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.7) 100%); }
+.sh-v2 > .page-cover .ub-tint { display: none; }
+
+/* Header */
+.sh-v2 .sh-hello { font-size: clamp(2rem, 3.6vw, 2.9rem); font-weight: 800; letter-spacing: -0.03em; color: var(--sh-text); }
+.sh-v2 .sh-ai-pill, .sh-v2 .sh-icon-btn {
+  background: color-mix(in srgb, var(--sh-card) 70%, transparent); border: 1px solid var(--sh-border);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+
+/* Today: text straight on the photo, no card and no second photo */
+.sh-v2 .sh-banner {
+  min-height: 0; margin: 40px 0 8px; padding: 0; border-radius: 0; box-shadow: none !important;
+  background: none; color: var(--sh-text); text-shadow: none; align-items: flex-end;
+}
+.sh-v2 .sh-banner-eyebrow { color: var(--sh-text-2); letter-spacing: 0.12em; font-size: 0.72rem; opacity: 1; }
+.sh-v2 .sh-banner-title { font-size: clamp(1.8rem, 3.2vw, 2.6rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; }
+.sh-v2 .sh-banner-sub { color: var(--sh-text-2); font-size: 0.95rem; opacity: 1; }
+.sh-v2 .sh-banner-pills { margin-top: 10px; gap: 8px; }
+.sh-v2 .sh-pill {
+  background: color-mix(in srgb, var(--sh-card) 72%, transparent); border: 1px solid var(--sh-border);
+  color: var(--sh-text); padding: 6px 12px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.sh-v2 .sh-banner-btn {
+  background: var(--sh-action); color: var(--on-ambient-accent, #000) !important;
+  padding: 11px 14px 11px 20px; box-shadow: 0 10px 24px -10px var(--sh-action);
+}
+:root[data-theme="light"] .sh-v2 .sh-banner-btn { background: var(--sh-accent); color: var(--sh-on-accent) !important; }
+
+/* Section headings: one size and spacing everywhere */
+.sh-v2 .sh-row-head { margin: 44px 0 14px; }
+.sh-v2 .sh-row-head h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em; }
+.sh-v2 .sh-link, .sh-v2 .sh-row-note { font-weight: 600; font-size: 0.8rem; }
+
+/* One card style */
+.sh-v2 .bn-card,
+.sh-v2 .sh-stat,
+.sh-v2 .sh-follow-item,
+.sh-v2 .sh-fact,
+.sh-v2 .sh-spot,
+.sh-v2 .sh-empty {
+  background: var(--sh-card); border: 1px solid var(--sh-border); border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.sh-v2 a.bn-card:hover, .sh-v2 .sh-stat:hover, .sh-v2 .sh-follow-item:hover, .sh-v2 .sh-spot:hover { background: var(--sh-card-hover); }
+.sh-v2 .bn-grid { gap: 16px; }
+.sh-v2 .bn-card { padding: 22px 24px; }
+.sh-v2 .sh-stats { gap: 16px; }
+.sh-v2 .sh-stat { padding: 18px 20px; }
+.sh-v2 .sh-stat-num { font-size: 1.75rem; letter-spacing: -0.02em; }
+.sh-v2 .bn-dot.you, .sh-v2 .bn-bar-you { background: color-mix(in srgb, var(--sh-text) 22%, transparent); }
+.sh-v2 .sh-kpi-change.down { color: var(--sh-text-2); }
+
+/* Avatars without a photo: initials on the page colour (no random artwork) */
+.sh-v2 .sh-photo, .sh-menu .sh-photo { background: color-mix(in srgb, var(--ambient-dominant, #888) 32%, #2a2a2e); }
+:root[data-theme="light"] .sh-v2 .sh-photo, :root[data-theme="light"] .sh-menu .sh-photo { background: color-mix(in srgb, var(--ambient-dominant, #888) 22%, #f1f1f4); }
+:root[data-theme="light"] .sh-v2 .sh-photo-initials { color: color-mix(in srgb, var(--ambient-dominant, #888) 70%, #000); text-shadow: none; }
+
+/* Top chats: compact person cards, photo + name + count */
+.sh-v2 .sh-spot-row {
+  grid-auto-columns: minmax(250px, 1fr); gap: 16px; margin: 28px 0 0; padding: 0; overflow-x: auto;
+}
+.sh-v2 .sh-spot {
+  height: auto; padding: 16px; align-items: center; gap: 14px; transform: none;
+}
+.sh-v2 .sh-spot:hover { transform: translateY(-2px); }
+.sh-v2 .sh-spot-avatar { width: 52px; height: 52px; border: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-action) 35%, transparent); }
+.sh-v2 .sh-spot-text { color: var(--sh-text); flex: 1; text-shadow: none; }
+.sh-v2 .sh-spot-name { font-size: 1rem; font-weight: 700; }
+.sh-v2 .sh-spot-sub { color: var(--sh-text-2); opacity: 1; }
+.sh-v2 .sh-spot-count { flex: none; display: flex; flex-direction: column; align-items: flex-end; font-size: 0.7rem; color: var(--sh-text-2); }
+.sh-v2 .sh-spot-count b { font-size: 1.05rem; font-weight: 800; color: var(--sh-text); font-variant-numeric: tabular-nums; }
+
+/* Did you know: a plain card in the page colours */
+.sh-v2 .sh-fact { align-items: center; min-height: 0; margin-top: 16px; padding: 20px 22px; color: var(--sh-text); text-shadow: none; }
+.sh-v2 .sh-fact-icon { width: 44px; height: 44px; border: 0; background: color-mix(in srgb, var(--sh-action) 18%, transparent); color: var(--sh-action); }
+:root[data-theme="light"] .sh-v2 .sh-fact-icon { color: var(--sh-accent); }
+.sh-v2 .sh-fact-label { color: var(--sh-text-2); opacity: 1; letter-spacing: 0.1em; font-size: 0.7rem; }
+.sh-v2 .sh-fact-body { font-size: 1.02rem; font-weight: 600; }
+.sh-v2 .sh-fact-btn { align-self: center; background: var(--sh-card-hover); color: var(--sh-text); border: 1px solid var(--sh-border); }
+
+/* Chips and follow-ups follow the same palette */
+.sh-v2 .sh-chips { margin: 44px 0 0; }
+.sh-v2 .sh-chip { background: var(--sh-card); border-color: var(--sh-border); color: var(--sh-text-2); font-weight: 600; }
+.sh-v2 .sh-chip.active { background: var(--sh-text); border-color: var(--sh-text); color: var(--sh-card); }
+.sh-v2 .sh-follow { gap: 12px; }
+.sh-v2 .sh-follow-item { padding: 12px 12px 12px 14px; }
+.sh-v2 .sh-follow-badge { border-color: var(--sh-card); }
+
+/* Favourites: the person's photo, same radius as the cards */
+.sh-v2 .sh-fav-row { grid-auto-columns: 148px; gap: 18px; }
+.sh-v2 .sh-fav-photo { width: 148px; height: 148px; border-radius: var(--v2-radius); box-shadow: var(--v2-shadow); }
+.sh-v2 .sh-list { gap: 4px 20px; }
+.sh-v2 .sh-list-item:hover { background: var(--sh-card); }
+
+/* The sidebar already has these shortcuts on a desktop */
+@media (min-width: 769px) { .sh-v2 .sh-quicknav { display: none; } }
+
+@media (max-width: 1100px) { .sh-home.sh-v2 { padding: 28px 28px 48px; } }
+@media (max-width: 768px) {
+  .sh-home.sh-v2 { padding: 18px 16px 32px; }
+  .sh-v2 > .page-cover { height: 300px; border-radius: 0; }
+  .sh-v2 .sh-banner { margin-top: 24px; }
+  .sh-v2 .sh-row-head { margin: 30px 0 10px; }
+  .sh-v2 .sh-spot-row { grid-auto-columns: 78%; margin-top: 20px; }
+}
+
+/* ── Sidebar: same photo and colours as the page ─────────────────── */
+@media (min-width: 769px) {
+  .floating-sidebar {
+    isolation: isolate;
+    background: color-mix(in srgb, var(--ambient-dominant, #888) 8%, var(--sp-panel)) !important;
+    transition: background-color 0.6s ease;
+  }
+  /* The page photo, softly blurred, at the top of the sidebar */
+  .floating-sidebar::before {
+    content: ''; position: absolute; z-index: -1; inset: 0 0 auto 0; height: 260px; border-radius: 8px 8px 0 0;
+    background-image: var(--ambient-image, none); background-size: cover; background-position: center;
+    filter: blur(28px) saturate(1.1); opacity: 0.45; pointer-events: none;
+    -webkit-mask-image: linear-gradient(180deg, #000, transparent); mask-image: linear-gradient(180deg, #000, transparent);
+  }
+  :root[data-theme="light"] .floating-sidebar::before { opacity: 0.55; }
+  .floating-sidebar .sp-nav-link.active {
+    background: color-mix(in srgb, var(--ambient-dominant, #888) 16%, transparent) !important;
+    color: var(--color-text-primary) !important;
+  }
+  .floating-sidebar .sp-nav-link.active svg { color: color-mix(in srgb, var(--ambient-dominant, #888) 80%, var(--color-text-primary)); }
+}

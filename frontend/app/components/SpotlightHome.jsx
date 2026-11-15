@@ -10,7 +10,6 @@ import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
 import { savedPhotoUrl, unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 import { abstractArt, useFreshBanner } from '../lib/banners';
-import UnsplashBanner from './UnsplashBanner';
 import HomeBento from './HomeBento';
 import PageCover from './PageCover';
 
@@ -37,7 +36,7 @@ const personHref = p => `/relationships?person=${encodeURIComponent(p.id)}`;
 const handleOf = p => (p.handle || '').replace(/^@/, '').trim();
 const fmt = n => Number(n || 0).toLocaleString();
 
-/** Saved photo (a fresh link is fetched when it has expired) -> unavatar -> abstract artwork. */
+/** Saved photo (a fresh link is fetched when it has expired) -> unavatar -> initials on the page's own colour. */
 function Photo({ person, className = '' }) {
   const { requestFreshPhoto } = useApp();
   const [stage, setStage] = useState(0);
@@ -61,7 +60,7 @@ function Photo({ person, className = '' }) {
   };
   const initials = (person.name || '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
   return (
-    <div className={`sh-photo ${className}`} style={{ backgroundImage: abstractArt(person.name) }}>
+    <div className={`sh-photo ${className}`}>
       {src ? (
         <img key={src} src={src} alt="" referrerPolicy="no-referrer" onError={onError} />
       ) : (
@@ -470,16 +469,16 @@ function FactCard({ people }) {
   });
   const fact = index === null ? null : facts[index % facts.length];
   return (
-    <UnsplashBanner as="section" seed={`fact-${index ?? 0}`} topic="colorful" width={1200} credit={false} className="sh-fact">
-      <span className="sh-fact-icon" aria-hidden="true"><Sparkles size={22} /></span>
+    <section className="sh-fact" aria-label="Did you know?">
+      <span className="sh-fact-icon" aria-hidden="true"><Sparkles size={20} /></span>
       <span className="sh-fact-text">
         <span className="sh-fact-label">Did you know?</span>
         <span className="sh-fact-body" aria-live="polite">{fact || '\u00a0'}</span>
       </span>
       <button type="button" className="sh-fact-btn" onClick={next} aria-label="Show another fact">
-        <Shuffle size={18} />
+        <Shuffle size={16} />
       </button>
-    </UnsplashBanner>
+    </section>
   );
 }
 
@@ -715,13 +714,13 @@ export default function SpotlightHome() {
     paused.length > 0 && { id: 'paused', icon: PauseCircle, title: `${paused.length} with AI paused`, href: '/controls' },
   ].filter(Boolean);
 
-  // A new background and banner photo every time Home opens (page colours follow the background)
+  // One Unsplash photo per visit: it is the cover behind the greeting, and every colour on Home (and the
+  // sidebar) comes from it. No other photo is shown, so nothing on the page clashes with it.
   const coverPhoto = useFreshBanner('home-cover', 'abstract');
-  const bannerPhoto = useFreshBanner('home-banner', 'colorful');
   const firstName = (user?.firstName || user?.name || user?.username || '').split(' ')[0];
 
   return (
-    <div className={`sh-home${coverPhoto ? ' sh-tinted' : ''}`}>
+    <div className={`sh-home sh-v2${coverPhoto ? ' sh-tinted' : ''}`}>
       <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
         {/* Two parts so a narrow phone breaks only after the comma, never inside "Good afternoon" */}
@@ -751,7 +750,8 @@ export default function SpotlightHome() {
       {/* Phones: the bell sits in the app header; the header's mode chip is the AI switch */}
       {headerSlot && createPortal(<HomeBell alerts={alerts} inHeader />, headerSlot)}
 
-      <UnsplashBanner seed="home-banner" topic="colorful" photo={bannerPhoto} className="sh-banner">
+      {/* Today's line sits on the cover photo itself (no second photo, no card) */}
+      <section className="sh-banner" aria-label="Today">
         <div className="sh-banner-text">
           <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           <h2 className="sh-banner-title">{people.length > 0 ? story.title : 'Your circle today'}</h2>
@@ -771,7 +771,7 @@ export default function SpotlightHome() {
         <Link href={people.length > 0 ? story.href : '/relationships'} className="sh-banner-btn" aria-label={`Open ${people.length > 0 ? story.cta : 'People'}`}>
           <span>{people.length > 0 ? story.cta : 'People'}</span><ChevronRight size={18} />
         </Link>
-      </UnsplashBanner>
+      </section>
 
       <NeedsAttention summary={summary} people={people} onDone={doneHandoff} />
 
@@ -820,19 +820,19 @@ export default function SpotlightHome() {
         </div>
       ) : (
         <>
-          <section aria-label="Spotlight">
+          {/* Top chats: the person's own photo is the card (no artwork behind it) */}
+          <section aria-label="Top chats">
             <div className="sh-spot-row">
               {spotlight.map(p => (
                 <Link key={p.id} href={personHref(p)} className="sh-spot sh-pressable" {...pressProps(p)}>
-                  <UnsplashBanner as="span" seed={p.name} width={720} credit={false} matchImage={savedPhotoUrl(p)} className="sh-spot-art" />
-                  <span className="sh-spot-glow" aria-hidden="true" />
                   <Photo person={p} className="sh-spot-avatar" />
                   <span className="sh-spot-text">
                     <span className="sh-spot-name">{p.name}</span>
                     <span className="sh-spot-sub">
-                      {handleOf(p) ? `@${handleOf(p)}` : CATEGORY_LABEL[p.category || 'online_friend']} · {fmt(p.chatsCount)} DMs
+                      {handleOf(p) ? `@${handleOf(p)}` : CATEGORY_LABEL[p.category || 'online_friend']}
                     </span>
                   </span>
+                  <span className="sh-spot-count"><b>{fmt(p.chatsCount)}</b> DMs</span>
                 </Link>
               ))}
             </div>
