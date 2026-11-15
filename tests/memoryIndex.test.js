@@ -49,3 +49,12 @@ test('overall index score: share read and brain weighted by chat size', () => {
   assert.equal(o.brain, 72);
   assert.equal(o.ready, 1);
 });
+
+test('brain score can be read from the memory document when the model gives no ratings', () => {
+  const { slotsFromDoc, brainScore } = require('../services/memoryIndexRules');
+  const doc = '## Who they are\nA college student in Chennai who loves music.\n## Our bond\nClose friends for years.\n## People in their life\n- Mom\n- Brother\n- Best friend Asha\n## Timeline\n- 2026-03 exams\n- 2026-05 trip';
+  const s = slotsFromDoc(doc);
+  assert.ok(s.identity >= 1 && s.bond >= 1 && s.people >= 2 && s.timeline >= 1);
+  assert.ok(brainScore(s, 5000) > 20);
+  assert.equal(brainScore(slotsFromDoc(''), 5000), 0);
+});

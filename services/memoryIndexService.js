@@ -12,7 +12,7 @@ const UserMemory = require('../models/UserMemory');
 const SocialGraph = require('../models/SocialGraph');
 const PersonMemory = require('../models/PersonMemory');
 const MemoryChunk = require('../models/MemoryChunk');
-const { buildChunks, batchChunks, brainScore, searchTerms, wellFormed, SLOTS } = require('./memoryIndexRules');
+const { buildChunks, batchChunks, brainScore, searchTerms, slotsFromDoc, wellFormed, SLOTS } = require('./memoryIndexRules');
 
 const FAST = () => process.env.FAST_MODEL || 'gpt-5.4-mini';
 const MAX_NOTES = 60;
@@ -23,6 +23,17 @@ const convo = (ownerId, senderId) => ({ ownerId: ownerId || null, $or: [{ sender
 async function ai() { return require('./azureOpenAI'); }
 
 async function writeNotes(name, batch, ownerName) {
+  try {
+    return await writeNotesOnce(name, batch, ownerName);
+  } catch (err) {
+    // Swearing in real chats trips Azure's content filter: retry with the rude words masked
+    const { isContentFilterError, maskForFilter } = require('./promptSafety');
+    if (!isContentFilterError(err) && !/filter|content_filter/i.test(err.message)) throw err;
+    return writeNotesOnce(name, maskForFilter(batch, 2), ownerName);
+  }
+}
+
+async function writeNotesOnce(name, batch, ownerName) {
   const azureOpenAI = await ai();
   const text = await azureOpenAI.completeWithFallback(FAST(), [
     { role: 'system', content: `You read real Instagram chats between ${ownerName} ("me") and ${name} ("them"), with dates. Write short factual notes about ${name} and our friendship, ONLY from what is in the text (never guess):
@@ -33,7 +44,7 @@ async function writeNotes(name, batch, ownerName) {
 - open threads (plans, promises, things to follow up)
 Plain lines starting with "- ". Skip small talk.` },
     { role: 'user', content: batch },
-  ], { maxTokens: 900, temperature: 0.2 });
+  ], { maxTokens: 2500, temperature: 0.2 });
   return String(text || '').trim();
 }
 
@@ -123,7 +134,10 @@ async function indexOne(ownerId, senderId, { ownerName = 'me', force = false } =
       const out = mem.notes.length ? await writeDoc({ name, ownerName, notes: mem.notes, card: cardText, totalMessages }) : null;
       if (out?.doc) {
         mem.doc = String(out.doc).slice(0, 20000);
-        mem.slots = out.slots || {};
+        // The model's own ratings, or (if it left them out) the ratings read from the document
+        const docSlots = slotsFromDoc(mem.doc);
+        const given = out.slots && typeof out.slots === 'object' ? out.slots : {};
+        mem.slots = Object.fromEntries(Object.keys(SLOTS).map(k => [k, Math.max(Number(given[k]) || 0, docSlots[k] || 0)]));
         mem.brainScore = brainScore(mem.slots, totalMessages);
         mem.bond = ['stranger', 'acquaintance', 'friend', 'close', 'family', 'partner'].includes(out.bond) ? out.bond : '';
         mem.bondReason = String(out.bondReason || '').slice(0, 200);
@@ -175,15 +189,16 @@ async function tick() {
   try {
     const next = await PersonMemory.findOne({
       dirty: true,
-      $or: [{ lastIndexedAt: null }, { lastIndexedAt: { $lte: new Date(Date.now() - REINDEX_AFTER_MS) } }],
+      $or: [{ lastIndexedAt: null }, { lastIndexedAt: { $lte: new Date(Date.now() - REINDEX_AFTER_MS) } }, { priority: { $gt: 0 } }],
       status: { $ne: 'indexing' },
       // a person that keeps failing is retried at most every 15 min, and parked after 5 failures
       errorCount: { $not: { $gte: 5 } },
-    }).sort({ lastIndexedAt: 1, totalMessages: -1 });
+    }).sort({ priority: -1, lastIndexedAt: 1, totalMessages: 1 });
     if (!next) return;
     const User = require('../models/User');
     const owner = next.ownerId ? await User.findById(next.ownerId, { firstName: 1, name: 1 }).lean() : null;
-    await indexOne(next.ownerId, next.senderId, { ownerName: owner?.firstName || owner?.name || 'me' });
+    await indexOne(next.ownerId, next.senderId, { ownerName: owner?.firstName || owner?.name || 'me', force: !!next.forceRebuild });
+    await PersonMemory.updateOne({ _id: next._id }, { $set: { priority: 0, forceRebuild: false } }).catch(() => {});
   } catch (err) {
     console.warn('⚠️ [Memory] tick failed:', err.message);
   } finally {
@@ -217,4 +232,14 @@ async function contextFor(ownerId, senderId, incomingText) {
   return { mem, moments };
 }
 
-module.exports = { indexOne, markDirty, ensureEntries, tick, startScheduler, contextFor };
+/** Where this person is in the indexer's queue (0 = next or reading now). */
+async function queuePosition(ownerId, senderId) {
+  const me = await PersonMemory.findOne({ ownerId: ownerId || null, senderId }, { priority: 1, lastIndexedAt: 1, totalMessages: 1, dirty: 1, status: 1 }).lean();
+  if (!me || !me.dirty || me.status === 'indexing') return 0;
+  const waiting = await PersonMemory.find({ dirty: true, status: { $ne: 'indexing' }, errorCount: { $not: { $gte: 5 } } },
+    { priority: 1, lastIndexedAt: 1, totalMessages: 1 }).sort({ priority: -1, lastIndexedAt: 1, totalMessages: 1 }).lean();
+  const i = waiting.findIndex(w => String(w._id) === String(me._id));
+  return i < 0 ? 0 : i;
+}
+
+module.exports = { indexOne, markDirty, ensureEntries, tick, startScheduler, contextFor, queuePosition };

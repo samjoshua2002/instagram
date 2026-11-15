@@ -1751,9 +1751,10 @@ async function accountIdsForToken(token) {
 // The AI's memory of one person (read only): document, brain score, bond, indexing progress
 app.get('/api/people/:senderId/memory', async (req, res) => {
   try {
-    const mem = await PersonMemory.findOne({ ownerId: req.user._id, senderId: String(req.params.senderId) },
-      { notes: 0 }).lean();
-    res.json({ memory: mem || null });
+    const senderId = String(req.params.senderId);
+    const mem = await PersonMemory.findOne({ ownerId: req.user._id, senderId }, { notes: 0 }).lean();
+    const position = mem ? await memoryIndexService.queuePosition(req.user._id, senderId) : 0;
+    res.json({ memory: mem ? { ...mem, queuePosition: position } : null });
   } catch (err) {
     sendServerError(res, err);
   }
@@ -1764,8 +1765,12 @@ app.post('/api/people/:senderId/memory/reindex', async (req, res) => {
   try {
     const senderId = String(req.params.senderId);
     if (!(await UserMemory.exists(ownedMemoryQuery(req, senderId)))) return res.status(404).json({ error: 'User not found' });
-    await PersonMemory.updateOne({ ownerId: req.user._id, senderId }, { $set: { status: 'indexing' } });
-    memoryIndexService.indexOne(req.user._id, senderId, { ownerName: req.user.firstName || req.user.name || 'me', force: true }).catch(() => {});
+    // Handed to the background indexer (front of the queue): it finishes even if you close the page
+    await PersonMemory.updateOne(
+      { ownerId: req.user._id, senderId },
+      { $set: { dirty: true, priority: Date.now(), forceRebuild: true, errorCount: 0, status: 'pending' }, $setOnInsert: { ownerId: req.user._id, senderId } },
+      { upsert: true },
+    );
     res.json({ success: true });
   } catch (err) {
     sendServerError(res, err);

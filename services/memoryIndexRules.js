@@ -107,4 +107,41 @@ function overallScore(people = []) {
   return { indexedPct: total ? Math.round((100 * read) / total) : 0, brain: Math.round(brain), people: people.length, ready: people.filter(p => p.status === 'ready').length };
 }
 
-module.exports = { buildChunks, batchChunks, brainScore, searchTerms, overallScore, wellFormed, SLOTS, isPlaceholder };
+/**
+ * How well each part is known, read from the memory document itself (used when the model did not
+ * rate it): each section's length and number of points -> 0..3.
+ */
+function slotsFromDoc(doc) {
+  const sections = {};
+  let cur = null;
+  for (const line of String(doc || '').split('\n')) {
+    const h = line.match(/^##\s+(.+)/);
+    if (h) { cur = h[1].toLowerCase(); sections[cur] = ''; continue; }
+    if (cur) sections[cur] += `${line}\n`;
+  }
+  const rate = text => {
+    const t = String(text || '').trim();
+    if (!t) return 0;
+    const points = (t.match(/^[-*] /gm) || []).length;
+    return t.length > 500 || points >= 6 ? 3 : t.length > 180 || points >= 3 ? 2 : 1;
+  };
+  const find = re => Object.entries(sections).filter(([k]) => re.test(k)).map(([, v]) => v).join('\n');
+  const all = Object.values(sections).join('\n');
+  const has = re => (re.test(all) ? 1 : 0);
+  return {
+    identity: rate(find(/who they are/)),
+    bond: rate(find(/bond/)),
+    howWeTalk: rate(find(/how we talk/)),
+    interests: rate(find(/interest/)),
+    workStudy: Math.max(has(/\b(college|school|exam|study|studies|class|job|work|office|course)\b/i) * 2, 0),
+    people: rate(find(/people/)),
+    places: has(/\b(city|lives? in|from [A-Z]|chennai|bangalore|tamil nadu|kerala|india|hostel|home town)\b/i) * 2,
+    timeline: rate(find(/timeline/)),
+    routines: has(/\b(every day|daily|usually|always|morning|night|routine|gym|sleeps?)\b/i) * 2,
+    insideJokes: rate(find(/inside jokes?/)),
+    preferences: Math.max(rate(find(/likes/)), has(/\b(loves?|likes?|hates?|favou?rite)\b/i)),
+    openThreads: rate(find(/open threads?/)),
+  };
+}
+
+module.exports = { buildChunks, batchChunks, brainScore, searchTerms, overallScore, slotsFromDoc, wellFormed, SLOTS, isPlaceholder };

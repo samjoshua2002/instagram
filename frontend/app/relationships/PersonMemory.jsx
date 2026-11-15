@@ -43,7 +43,7 @@ export default function PersonMemory({ senderId, name }) {
   // While it is being read, check again every few seconds
   useEffect(() => {
     if (!mem || (mem.status !== 'indexing' && mem.status !== 'pending')) return undefined;
-    const t = setInterval(load, 4000);
+    const t = setInterval(load, mem.status === 'indexing' ? 3000 : 10000);
     return () => clearInterval(t);
   }, [mem, load]);
 
@@ -75,15 +75,16 @@ export default function PersonMemory({ senderId, name }) {
           <div className="person-card-sub">
             {mem === undefined ? 'Loading…'
               : !mem ? 'Not read yet. It starts on its own in the background.'
-                : busy ? `Reading your chats… ${pct ? `${pct}%` : ''}`
+                : mem.status === 'indexing' ? `Reading your chats… ${pct ? `${pct}%` : ''}`
+                  : mem.status === 'pending' ? (mem.queuePosition > 0 ? `Waiting to be read · ${mem.queuePosition} ahead in line (runs on the server, you can close this page)` : 'Starting…')
                   : `Brain score ${score}/100${mem.bond ? ` · ${BOND[mem.bond] || mem.bond}` : ''} · from ${(mem.totalMessages || 0).toLocaleString()} messages${mem.lastIndexedAt ? ` · updated ${new Date(mem.lastIndexedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}`}
           </div>
         </div>
         <button type="button" className="person-light-btn pm-reindex" onClick={reindex} disabled={busy} title="Read the whole chat again">
-          <RefreshCw size={14} className={busy ? 'pm-spin' : ''} /> {busy ? 'Reading' : 'Re-read'}
+          <RefreshCw size={14} className={mem?.status === 'indexing' ? 'pm-spin' : ''} /> {mem?.status === 'indexing' ? 'Reading' : mem?.status === 'pending' ? 'Queued' : 'Re-read'}
         </button>
       </div>
-      {busy && <div className="pm-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></div>}
+      {mem?.status === 'indexing' && <div className="pm-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></div>}
       {mem?.bondReason && <p className="pm-bond">{mem.bondReason}</p>}
       {mem?.doc ? <MemoryDoc text={mem.doc} /> : !busy && mem && <p className="person-empty">Nothing learned yet.</p>}
       <p className="pm-note">Written by the AI from your real chats only. It updates itself; you can't edit or delete it.</p>

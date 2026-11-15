@@ -27,6 +27,9 @@ const personMemorySchema = new mongoose.Schema({
   error: { type: String, default: '' },
   errorCount: { type: Number, default: 0 },
   dirty: { type: Boolean, default: true },
+  // Re-read asked for by you: goes first, and rebuilds from the whole history
+  priority: { type: Number, default: 0 },
+  forceRebuild: { type: Boolean, default: false },
 }, { timestamps: true, versionKey: false });
 
 personMemorySchema.index({ ownerId: 1, senderId: 1 }, { unique: true });
