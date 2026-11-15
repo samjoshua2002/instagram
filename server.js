@@ -339,6 +339,7 @@ app.use('/api/reminders', requireAuth);
 app.use('/api/quiz', requireAuth);
 app.use('/api/shared', requireAuth);
 app.use('/api/checkins', requireAuth);
+app.use('/api/priorities', requireAuth);
 app.use('/api/giphy', requireAuth);
 app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
@@ -847,6 +848,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     ownerId: userMemory.ownerId || null, senderId, name: userMemory.name || userMemory.username || '',
     text: messageText, attachments: event.message.attachmentList || [], mid,
   }).catch(() => {});
+
+  // If the AI asked them something it wasn't sure about, their answer closes that question
+  require('./services/chatDoubts').checkAnswer(userMemory.ownerId || null, senderId, userMemory.name || userMemory.username || '', messageText).catch(() => {});
 
   // 3. Save incoming user message in DB
   await Message.create({
@@ -1878,6 +1882,29 @@ app.get('/api/memory-index', async (req, res) => {
   }
 });
 
+// Your people ranked by priority (asked after the quiz): top / normal / not important, ordered
+app.get('/api/priorities', async (req, res) => {
+  try {
+    const nodes = await SocialGraph.find(inGraph(req, { senderId: { $exists: true, $nin: [null, ''] } }),
+      { senderId: 1, name: 1, instagramHandle: 1, profilePic: 1, category: 1, relationshipToSam: 1, chatsCount: 1, priority: 1, priorityRank: 1, closenessOverride: 1 }).lean();
+    const people = nodes.filter(n => !/^test_/.test(String(n.senderId)));
+    const tierOrder = { top: 0, normal: 1, low: 2, '': 1 };
+    people.sort((a, b) => (tierOrder[a.priority || ''] - tierOrder[b.priority || ''])
+      || ((a.priorityRank ?? 1e9) - (b.priorityRank ?? 1e9)) || ((b.chatsCount || 0) - (a.chatsCount || 0)));
+    res.json({ people, ranked: people.some(p => p.priority) });
+  } catch (err) { sendServerError(res, err); }
+});
+app.put('/api/priorities', async (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.people) ? req.body.people.slice(0, 2000) : [];
+    const ops = list.filter(p => p && p.senderId && ['', 'top', 'normal', 'low'].includes(p.priority || '')).map((p, i) => ({
+      updateOne: { filter: inGraph(req, { senderId: String(p.senderId) }), update: { $set: { priority: p.priority || '', priorityRank: Number.isFinite(p.rank) ? p.rank : i + 1 } } },
+    }));
+    if (ops.length) await SocialGraph.bulkWrite(ops, { ordered: false });
+    res.json({ ok: true, saved: ops.length });
+  } catch (err) { sendServerError(res, err); }
+});
+
 // Reminders this person asked for (People page > Shared > Reminders); cancel one
 app.get('/api/people/:senderId/reminders', async (req, res) => {
   try {
@@ -1953,7 +1980,7 @@ const quizView = s => ({ id: s._id, status: s.status, answered: s.answers.length
 app.post('/api/quiz/start', async (req, res) => {
   try {
     const { session, next, total } = await quizService.start(req.user._id);
-    res.json({ session: quizView(session), next, total });
+    res.json({ session: quizView(session), next, total, items: require('./services/quizBank').allItems() });
   } catch (err) { sendServerError(res, err); }
 });
 app.post('/api/quiz/:id/answer', async (req, res) => {
@@ -1982,7 +2009,7 @@ app.post('/api/quiz/restart', async (req, res) => {
   try {
     await QuizSession.updateMany({ ownerId: req.user._id, status: 'active' }, { $set: { status: 'done' } });
     const { session, next, total } = await quizService.start(req.user._id);
-    res.json({ session: quizView(session), next, total });
+    res.json({ session: quizView(session), next, total, items: require('./services/quizBank').allItems() });
   } catch (err) { sendServerError(res, err); }
 });
 

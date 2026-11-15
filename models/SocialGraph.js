@@ -56,6 +56,10 @@ const SocialGraphSchema = new mongoose.Schema({
     enum: ['', 'stranger', 'acquaintance', 'friend', 'close'],
     default: '',
   },
+  // Your ranking after the quiz: 'top' people get alerts at once and check-ins; 'low' get no
+  // alert emails and no check-ins. priorityRank orders people inside a tier (1 = most important).
+  priority: { type: String, enum: ['', 'top', 'normal', 'low'], default: '' },
+  priorityRank: { type: Number, default: null },
   category: {
     type: String,
     enum: ['close_friend', 'online_friend', 'offline_friend', 'family', 'professional', 'business', 'relative', 'homie', 'group_icon', 'other'],

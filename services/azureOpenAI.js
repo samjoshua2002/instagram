@@ -216,6 +216,9 @@ class AzureOpenAIService {
       // The AI's memory of this person (from all your real chats) and old chat moments matching this message
       require('./memoryIndexService').contextFor(conversationOwnerId, userMemory.senderId, incomingText).catch(() => ({})),
     ]);
+    // One thing the AI isn't sure about them, to ask them casually if it fits (services/chatDoubts.js)
+    const chatDoubts = require('./chatDoubts');
+    const doubtAsk = await chatDoubts.pick(conversationOwnerId, userMemory.senderId).catch(() => null);
     // Reminders already set for them, so the reply can confirm them ("ok will ping u at 5 and 8")
     const pendingReminders = await require('../models/Reminder').find({ ownerId: conversationOwnerId || null, senderId: userMemory.senderId, status: 'pending' })
       .sort({ dueAt: 1 }).limit(10).lean().catch(() => []);
@@ -470,7 +473,7 @@ ${(() => {
   * If they say they're busy or leaving, just wish them well ("all the best da", "ok go go"), no more questions.
 - INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}${userMemory.pendingQuestion?.text && userMemory.pendingQuestion.askedAt && Date.now() - new Date(userMemory.pendingQuestion.askedAt).getTime() < 48 * 3600 * 1000
   ? `\n- YOU ASKED THEM EARLIER: "${c(userMemory.pendingQuestion.text, 160)}". If this message answers it, react to the answer like a friend who cares (don't ask it again). If it doesn't, don't push.`
-  : ''}
+  : ''}${doubtAsk ? `\n- SOMETHING YOU'RE NOT SURE ABOUT THEM: "${c(doubtAsk.question, 200)}". Only if the chat is relaxed and it fits right now (not when they're busy, upset, leaving, or asked you something you must answer), ask them about it casually in your own words, like a friend catching up ("btw did u ever fix ur phone"), never like a form. If you ask it, put [[ASKED]] at the very end of your reply. If it doesn't fit, ignore this.` : ''}
 ${socialTreeContext}
 ${memDoc ? `\nMY MEMORY OF ${String(personMemory.mem.name || 'THEM').toUpperCase()} (written from all our real chats; brain score ${brain}/100. Use it like a friend who remembers: bring up people in their life, events and open threads naturally. Never make up anything that is not here):\n${memDoc}\n` : ''}
 ${memMoments ? `\nOLD CHAT MOMENTS THAT MATCH WHAT THEY JUST SAID (real, with dates; "me" is you):\n${memMoments}\n` : ''}
@@ -646,6 +649,12 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       if (attachmentMatch) {
         attachmentTag = ' ' + attachmentMatch[1];
         reply = reply.replace(/\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]/gi, '').trim();
+      }
+
+      // It asked them one of its doubts: remember that, so their answer can close it
+      if (/\[\[ASKED\]\]/i.test(reply)) {
+        if (doubtAsk) chatDoubts.markAsked(conversationOwnerId, userMemory.senderId, doubtAsk.id).catch(() => {});
+        reply = reply.replace(/\s*\[\[ASKED\]\]\s*/gi, ' ').trim();
       }
 
       // Remove ending periods for casual authentic human DM texting

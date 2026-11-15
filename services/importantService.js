@@ -110,7 +110,11 @@ Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urg
 
 async function emailOwner(ownerId, senderId, name, item) {
   if (!ownerId) return;
-  const recent = await SharedItem.exists({ ownerId, senderId, emailedAt: { $gte: new Date(Date.now() - EMAIL_GAP_MS) } });
+  // Your ranking: no emails for people you marked not important; top people skip the 5-minute gap
+  const SocialGraph = require('../models/SocialGraph');
+  const node = await SocialGraph.findOne({ ownerId, senderId: String(senderId) }, { priority: 1 }).lean().catch(() => null);
+  if (node?.priority === 'low') return;
+  const recent = node?.priority !== 'top' && await SharedItem.exists({ ownerId, senderId, emailedAt: { $gte: new Date(Date.now() - EMAIL_GAP_MS) } });
   if (recent) return;
   const owner = await User.findById(ownerId, { email: 1, firstName: 1 }).lean();
   if (!owner?.email) return;

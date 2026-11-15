@@ -96,6 +96,9 @@ class CheckInService {
       firstSeen: mem.createdAt, lastSeen: mem.lastInteraction, override: node?.closenessOverride || '',
       familyRole: socialGraphService.familyRole,
     }, now);
+    // Your ranking: never start chats with people you marked not important; top people always qualify
+    if (node?.priority === 'low') return false;
+    if (node?.priority === 'top') closeness.level = config.checkInMinLevel || 'close';
     const away = awayState(mem.away, now);
     const decision = checkInDecision({
       away: away.state,

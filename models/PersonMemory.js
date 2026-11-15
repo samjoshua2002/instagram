@@ -34,6 +34,10 @@ const personMemorySchema = new mongoose.Schema({
     status: { type: String, enum: ['open', 'answered', 'dismissed'], default: 'open' },
     answer: { type: String, default: '' },
     askedAt: { type: Date, default: Date.now },
+    // Asked to the person themselves in a DM (services/chatDoubts.js)
+    askedInChatAt: { type: Date, default: null },
+    chatTries: { type: Number, default: 0 },
+    askableInChat: { type: Boolean, default: true },
   }],
   // What you told the AI about them (answers and corrections): always true, beats anything read from chats
   ownerFacts: [{ text: { type: String, required: true }, at: { type: Date, default: Date.now } }],
