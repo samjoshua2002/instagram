@@ -3360,8 +3360,10 @@ app.post('/api/social-graph/node/:identifier/preferences', async (req, res) => {
       const otherKeys = people.flatMap(n => [String(n._id), n.instagramHandle ? n.instagramHandle.replace(/^@/, '').toLowerCase() : '', n.name ? n.name.toLowerCase().replace(/[^a-z0-9]/g, '_') : '']);
       const change = routingAfterMode(config, { senderIds, otherKeys }, modePrefs.aiEnabled);
       if (change && config) {
+        // Only the changed lists are written (no whole-document save): two quick toggles, or a mode
+        // change at the same moment, used to collide on the document version and fail with a 500
         Object.assign(config, change);
-        await config.save();
+        await PersonaConfig.updateOne({ _id: config._id }, { $set: change });
         await redisService.invalidatePersonaConfig();
       }
       if (config) routing = { chatMode: config.chatMode, includedContactIds: config.includedContactIds || [], excludedContactIds: config.excludedContactIds || [], globalBotActive: config.globalBotActive !== false };
