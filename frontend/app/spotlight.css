@@ -947,3 +947,7 @@ a.bn-card:hover { transform: translateY(-2px); }
 }
 .pm-doubt-x { width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--color-text-secondary); cursor: pointer; display: grid; place-items: center; }
 .pm-doubt-x:hover { background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
+.bn-agent { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--sh-border); font-size: 0.76rem; color: var(--sh-text-2); }
+.bn-agent-head { font-weight: 700; color: var(--sh-text); }
+.bn-agent-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bn-agent-row b { color: var(--sh-text); font-weight: 600; }

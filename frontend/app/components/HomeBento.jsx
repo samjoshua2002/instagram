@@ -211,6 +211,10 @@ function Coverage({ people, routingConfig, summary, loading }) {
 function MemoryStatus() {
   const { API_BASE } = useApp();
   const [d, setD] = useState(null);
+  const [agent, setAgent] = useState(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/memory-index/agent`).then(r => (r.ok ? r.json() : null)).then(setAgent).catch(() => {});
+  }, [API_BASE]);
   useEffect(() => {
     let t = null;
     const load = () => fetch(`${API_BASE}/api/memory-index`).then(r => (r.ok ? r.json() : null)).then(x => {
@@ -242,6 +246,16 @@ function MemoryStatus() {
           </div>
           <div className="bn-mem-bar" aria-hidden="true"><span style={{ width: `${Math.max(3, o.indexedPct)}%` }} /></div>
           {top.length > 0 && <p className="bn-mem-top">Knows best: {top.map(p => `${p.name} ${p.brainScore}`).join(' · ')}</p>}
+          {agent && (
+            <div className="bn-agent">
+              <span className="bn-agent-head">Memory agent · checked {agent.reviewedToday} {agent.reviewedToday === 1 ? 'person' : 'people'} today</span>
+              {(agent.items || []).slice(0, 3).map(a => (
+                <span key={a._id} className="bn-agent-row" title={(a.details || []).join('\n')}>
+                  {a.name ? <b>{a.name}</b> : null}{a.name ? ': ' : ''}{a.summary}
+                </span>
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>

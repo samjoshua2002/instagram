@@ -1818,6 +1818,20 @@ app.post('/api/people/:senderId/memory/correct', async (req, res) => {
   }
 });
 
+// What the memory agent fixed lately (Home > AI memory)
+app.get('/api/memory-index/agent', async (req, res) => {
+  try {
+    const AgentAction = require('./models/AgentAction');
+    const [items, reviewed] = await Promise.all([
+      AgentAction.find({ $or: [{ ownerId: req.user._id }, { kind: 'cleanup' }] }).sort({ at: -1 }).limit(20).lean(),
+      PersonMemory.countDocuments({ ownerId: req.user._id, lastReviewedAt: { $gte: new Date(Date.now() - 24 * 3600 * 1000) } }),
+    ]);
+    res.json({ items, reviewedToday: reviewed });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // Indexing progress for everyone (AI Memory page): like Spotlight's "Indexing..." status
 app.get('/api/memory-index', async (req, res) => {
   try {
@@ -3630,6 +3644,7 @@ app.listen(PORT, '0.0.0.0', () => {
   reminderService.startScheduler(15);
   checkInService.startScheduler(20);
   memoryIndexService.startScheduler();
+  require('./services/memoryAgent').startScheduler();
   require('./services/scheduledReminders').startScheduler();
   // Older saved photos/videos get described in the background (a few at a time)
   setTimeout(() => importantService.backfillDescriptions(30).catch(() => {}), 60 * 1000);

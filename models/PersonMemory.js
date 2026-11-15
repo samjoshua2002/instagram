@@ -39,6 +39,7 @@ const personMemorySchema = new mongoose.Schema({
   ownerFacts: [{ text: { type: String, required: true }, at: { type: Date, default: Date.now } }],
   // Rewrite the document from the notes (after your answer or correction) without re-reading chats
   rebuildDoc: { type: Boolean, default: false },
+  lastReviewedAt: { type: Date, default: null },
   // Re-read asked for by you: goes first, and rebuilds from the whole history
   priority: { type: Number, default: 0 },
   forceRebuild: { type: Boolean, default: false },
