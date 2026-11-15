@@ -77,7 +77,8 @@ Write "doc" in Markdown with exactly these sections (leave a section out if noth
 (plans, promises, things to ask about next time)
 Then rate how well each part is known: 0 nothing, 1 a little, 2 well, 3 very well, for: ${Object.keys(SLOTS).join(', ')}.
 And judge the bond from the chats: "stranger", "acquaintance", "friend", "close", "family" or "partner", with one short reason.
-Return JSON only: {"doc": "...", "slots": {...}, "bond": "...", "bondReason": "...", "doubts": [{"question": "...", "about": "<short topic>"}]}` },
+Also give their gender only if the chats make it clear (how they talk about themselves, how others address them): "female", "male", or "unknown".
+Return JSON only: {"doc": "...", "slots": {...}, "bond": "...", "bondReason": "...", "gender": "female"|"male"|"unknown", "doubts": [{"question": "...", "about": "<short topic>"}]}` },
     { role: 'user', content: `${ownerName}'s own labels for ${name}: ${card || 'none'}
 Messages in our chat: ${totalMessages}
 ${ownerFacts.length ? `\nWHAT ${ownerName.toUpperCase()} TOLD YOU (always true):\n${ownerFacts.map(f => `- ${f}`).join('\n')}\n` : ''}${answered.length ? `\nQUESTIONS ALREADY ANSWERED OR DISMISSED (never ask again):\n${answered.map(a => `- ${a}`).join('\n')}\n` : ''}
@@ -144,6 +145,16 @@ async function indexOne(ownerId, senderId, { ownerName = 'me', force = false } =
         mem.doubts = [...(mem.doubts || []).filter(d => d.status !== 'open'), ...fresh.map(d => ({ question: String(d.question).slice(0, 200), about: String(d.about || '').slice(0, 60) }))].slice(-40);
       }
       mem.rebuildDoc = false;
+      // Gender read from the chats updates their card (and the AI's record), logged so you can see it
+      if (['female', 'male'].includes(out?.gender) && !(mem.ownerFacts || []).some(f => /\b(he|she|him|her|boy|girl|male|female|gender)\b/i.test(f.text))) {
+        const node = await SocialGraph.findOne({ ownerId: ownerId || null, senderId }, { gender: 1 });
+        if (node && node.gender !== out.gender) {
+          const before = node.gender || 'unknown';
+          await SocialGraph.updateOne({ _id: node._id }, { $set: { gender: out.gender } });
+          await UserMemory.updateOne({ ownerId: ownerId || null, senderId }, { $set: { gender: out.gender } });
+          await require('../models/AgentAction').create({ ownerId: ownerId || null, senderId, name, kind: 'review', summary: `Gender set to ${out.gender} from the chats (was ${before})` }).catch(() => {});
+        }
+      }
       if (out?.doc) {
         mem.doc = String(out.doc).slice(0, 20000);
         // The model's own ratings, or (if it left them out) the ratings read from the document

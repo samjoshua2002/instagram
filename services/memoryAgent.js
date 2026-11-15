@@ -111,6 +111,31 @@ async function healthCheck() {
     }
   }
 
+  // 1b. "People in their life" must be THEIR people: drop you (the owner) and your own people ("Sam's sister")
+  const owners = new Map();
+  for (const card of await SocialGraph.find({ 'connections.0': { $exists: true } }, { ownerId: 1, senderId: 1, name: 1, connections: 1 })) {
+    const key = String(card.ownerId || '');
+    if (!owners.has(key)) {
+      const User = require('../models/User');
+      const PersonaConfig = require('../models/PersonaConfig');
+      const [u, pc] = await Promise.all([
+        card.ownerId ? User.findById(card.ownerId, { firstName: 1, lastName: 1, name: 1, username: 1 }).lean() : null,
+        PersonaConfig.findOne({ ownerId: card.ownerId || null }, { creatorName: 1 }).lean(),
+      ]);
+      owners.set(key, [u?.firstName, u?.name, u?.username, pc?.creatorName, [u?.firstName, u?.lastName].filter(Boolean).join(' ')].filter(Boolean).map(x => String(x).toLowerCase()));
+    }
+    const ownerNames = owners.get(key);
+    const first = ownerNames.map(n => n.split(/\s+/)[0]).filter(n => n.length >= 3);
+    const isOwner = c => ownerNames.includes(String(c.targetName || '').toLowerCase().trim());
+    const isOwnersPerson = c => first.some(f => new RegExp(`^${f}'s\\b|\\b${f}'s (crush|sister|brother|mom|dad|mother|father|friend|colleague|wife|gf|girlfriend|boyfriend)`, 'i').test(`${c.targetName} ${c.relationship}`));
+    const bad = (card.connections || []).filter(c => isOwner(c) || isOwnersPerson(c));
+    if (bad.length) {
+      card.connections = card.connections.filter(c => !bad.includes(c));
+      await card.save();
+      await log(card.ownerId, card.senderId, card.name, `Removed ${bad.length} wrong "people in their life" (you or your own people): ${bad.map(c => c.targetName).join(', ')}`);
+    }
+  }
+
   // 2. Alerts and reminders saved under another name
   for (const card of cards) {
     if (!card.name) continue;
