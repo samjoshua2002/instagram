@@ -23,7 +23,7 @@ export default function PriorityRanker({ onSaved }) {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/priorities`).then(r => (r.ok ? r.json() : { people: [] }))
-      .then(d => setPeople((d.people || []).map(p => ({ ...p, priority: p.priority || 'normal' }))))
+      .then(d => { setPeople((d.people || []).map(p => ({ ...p, priority: p.priority || 'normal' }))); if (!d.ranked) setDirty(true); })
       .catch(() => setPeople([]));
   }, [API_BASE]);
 

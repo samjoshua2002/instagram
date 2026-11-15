@@ -43,6 +43,12 @@ export default function QuizPage() {
     setSession(d.session); setNext(d.next); setTotal(d.total || 60);
     if (d.items) setItems(d.items);
     setSel(d.next?.id || null);
+    // Step 1 is ranking your people: the quiz messages then come from them
+    if (d.ranked === false) setView('rank');
+  };
+  const afterRanking = async () => {
+    const d = await call('start').catch(() => null);
+    if (d) { load(d); setView('quiz'); setLast(null); showToast?.('Now your top people send the quiz messages'); }
   };
   useEffect(() => {
     call('start').then(load).catch(e => showToast?.(e.message, 'error'));
@@ -164,7 +170,7 @@ export default function QuizPage() {
                       return (
                         <button key={it.id} type="button" onClick={() => go(it.id)}
                           className={`qz2-num ${state}${sel === it.id && view === 'quiz' ? ' on' : ''}`}
-                          title={h ? (h.skipped ? 'Skipped' : `${h.score}% match`) : `${FROM[it.from]}: ${it.text}`}
+                          title={h ? (h.skipped ? 'Skipped' : `${h.score}% match`) : `${it.person?.name || FROM[it.from]}: ${it.text}`}
                           aria-label={`Question ${it.n}${h ? (h.skipped ? ', skipped' : `, ${h.score}% match`) : ''}`}>
                           {it.n}
                         </button>
@@ -194,7 +200,17 @@ export default function QuizPage() {
         </aside>
 
         <main className="split-main">
-          {view === 'rank' && <PriorityRanker />}
+          {view === 'rank' && (
+            <>
+              {session && !history.length && (
+                <section className="split-card qz2-card qz2-step">
+                  <span className="qz2-eyebrow">Step 1 of 2</span>
+                  <p className="qz2-summary">Rank your people first. Then the quiz messages come from them: your top people as close friends, the rest as friends, so the AI learns how you text each of them.</p>
+                </section>
+              )}
+              <PriorityRanker onSaved={afterRanking} />
+            </>
+          )}
 
           {view === 'draft' && draft && (
             <section className="split-card qz2-card">
@@ -236,9 +252,14 @@ export default function QuizPage() {
                 <section className="split-card qz2-card">
                   <div className="qz2-q-head">
                     <span className="qz2-eyebrow">Question {numberOf(current.id) || '–'} of {total} · {current.roundTitle}</span>
-                    <span className="qz2-pill soft"><User size={12} /> {FROM[current.from]}</span>
+                    <span className="qz2-pill soft"><User size={12} /> {current.person ? `${current.person.name} · ${FROM[current.from].replace('Your ', '').toLowerCase()}` : FROM[current.from]}</span>
                   </div>
-                  <div className="qz2-dm"><span className="qz2-dm-av">{FROM[current.from][0]}</span><div className="qz2-in">{current.text}</div></div>
+                  <div className="qz2-dm">
+                    {current.person?.profilePic
+                      ? <img className="qz2-dm-av" src={current.person.profilePic} alt="" referrerPolicy="no-referrer" />
+                      : <span className="qz2-dm-av">{(current.person?.name || FROM[current.from])[0]}</span>}
+                    <div><div className="qz2-dm-name">{current.person?.name || FROM[current.from]}</div><div className="qz2-in">{current.text}</div></div>
+                  </div>
                   {current.measures && <p className="qz2-measures">Tests: {current.measures}</p>}
 
                   {done ? (

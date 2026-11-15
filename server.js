@@ -1993,11 +1993,12 @@ app.get('/api/shared/:id/file', async (req, res) => {
 const quizService = require('./services/quizService');
 const QuizSession = require('./models/QuizSession');
 const quizView = s => ({ id: s._id, status: s.status, answered: s.answers.length, appliedAt: s.appliedAt,
-  history: s.answers.map(a => ({ itemId: a.itemId, from: a.from, text: a.text, answer: a.answer, skipped: a.skipped, aiGuess: a.aiGuess, score: a.score, style: a.style, meaning: a.meaning, note: a.note })) });
+  history: s.answers.map(a => ({ itemId: a.itemId, from: a.from, text: a.text, personName: a.personName, answer: a.answer, skipped: a.skipped, aiGuess: a.aiGuess, score: a.score, style: a.style, meaning: a.meaning, note: a.note })) });
 app.post('/api/quiz/start', async (req, res) => {
   try {
-    const { session, next, total } = await quizService.start(req.user._id);
-    res.json({ session: quizView(session), next, total, items: require('./services/quizBank').allItems() });
+    const { session, next, total, cast, ranked } = await quizService.start(req.user._id);
+    res.json({ session: quizView(session), next: next && { ...next, person: cast[next.id] || null }, total, ranked,
+      items: require('./services/quizBank').allItems().map(i => ({ ...i, person: cast[i.id] || null })) });
   } catch (err) { sendServerError(res, err); }
 });
 app.post('/api/quiz/:id/answer', async (req, res) => {
@@ -2025,8 +2026,9 @@ app.post('/api/quiz/:id/apply', async (req, res) => {
 app.post('/api/quiz/restart', async (req, res) => {
   try {
     await QuizSession.updateMany({ ownerId: req.user._id, status: 'active' }, { $set: { status: 'done' } });
-    const { session, next, total } = await quizService.start(req.user._id);
-    res.json({ session: quizView(session), next, total, items: require('./services/quizBank').allItems() });
+    const { session, next, total, cast, ranked } = await quizService.start(req.user._id);
+    res.json({ session: quizView(session), next: next && { ...next, person: cast[next.id] || null }, total, ranked,
+      items: require('./services/quizBank').allItems().map(i => ({ ...i, person: cast[i.id] || null })) });
   } catch (err) { sendServerError(res, err); }
 });
 

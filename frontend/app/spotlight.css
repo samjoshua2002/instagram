@@ -1223,3 +1223,6 @@ a.bn-card:hover { transform: translateY(-2px); }
 .fx-compose button:disabled { opacity: .45; cursor: default; }
 @media (max-width: 760px) { .fx-fab { right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); } .fx-fab span { display: none; } .fx-fab { width: 50px; padding: 0; justify-content: center; }
   .fx-panel { right: 8px; left: 8px; bottom: 8px; width: auto; height: min(78vh, calc(100vh - 16px)); } }
+.qz2-dm-name { margin: 0 0 4px 4px; font-size: .74rem; font-weight: 600; color: var(--color-text-secondary); }
+img.qz2-dm-av { object-fit: cover; }
+.qz2-step { gap: 6px; border-color: color-mix(in srgb, var(--qz-acc) 45%, var(--glass-border)); }
