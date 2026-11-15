@@ -30,6 +30,7 @@ const reminderService = require('./services/reminderService');
 const checkInService = require('./services/checkInService');
 const importantService = require('./services/importantService');
 const memoryIndexService = require('./services/memoryIndexService');
+const { overallScore } = require('./services/memoryIndexRules');
 const PersonMemory = require('./models/PersonMemory');
 const { commitsOwner, holdingReply, asksForCommitment } = require('./services/importantRules');
 const SharedItem = require('./models/SharedItem');
@@ -1773,11 +1774,11 @@ app.post('/api/people/:senderId/memory/reindex', async (req, res) => {
 app.get('/api/memory-index', async (req, res) => {
   try {
     const people = await PersonMemory.find({ ownerId: req.user._id },
-      { senderId: 1, name: 1, brainScore: 1, bond: 1, status: 1, totalMessages: 1, indexedMessages: 1, chunkCount: 1, lastIndexedAt: 1, dirty: 1 })
+      { senderId: 1, name: 1, brainScore: 1, bond: 1, status: 1, totalMessages: 1, indexedMessages: 1, chunkCount: 1, lastIndexedAt: 1, dirty: 1, error: 1 })
       .sort({ totalMessages: -1 }).lean();
     const total = people.reduce((n, p) => n + (p.totalMessages || 0), 0);
     const done = people.reduce((n, p) => n + Math.min(p.indexedMessages || 0, p.totalMessages || 0), 0);
-    res.json({ people, total, done, ready: people.filter(p => p.status === 'ready').length });
+    res.json({ people, total, done, overall: overallScore(people), ready: people.filter(p => p.status === 'ready').length });
   } catch (err) {
     sendServerError(res, err);
   }

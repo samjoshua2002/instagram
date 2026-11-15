@@ -12,7 +12,7 @@ const UserMemory = require('../models/UserMemory');
 const SocialGraph = require('../models/SocialGraph');
 const PersonMemory = require('../models/PersonMemory');
 const MemoryChunk = require('../models/MemoryChunk');
-const { buildChunks, batchChunks, brainScore, searchTerms, SLOTS } = require('./memoryIndexRules');
+const { buildChunks, batchChunks, brainScore, searchTerms, wellFormed, SLOTS } = require('./memoryIndexRules');
 
 const FAST = () => process.env.FAST_MODEL || 'gpt-5.4-mini';
 const MAX_NOTES = 60;
@@ -101,7 +101,11 @@ async function indexOne(ownerId, senderId, { ownerName = 'me', force = false } =
     if (chunks.length) {
       await MemoryChunk.insertMany(chunks.map(c => ({ ...c, ownerId: ownerId || null, senderId })), { ordered: false });
       for (const batch of batchChunks(chunks)) {
-        const note = await writeNotes(name, batch, ownerName);
+        // One bad batch (blocked by the content filter, a timeout) never stops the rest
+        const note = await writeNotes(name, wellFormed(batch), ownerName).catch(err => {
+          console.warn(`⚠️ [Memory] ${name}: skipped one batch (${err.message.slice(0, 80)})`);
+          return '';
+        });
         if (note) mem.notes.push(note);
         mem.indexedMessages += Math.round(messages.length / Math.max(1, batchChunks(chunks).length));
         await PersonMemory.updateOne({ _id: mem._id }, { $set: { notes: mem.notes, indexedMessages: Math.min(mem.indexedMessages, totalMessages) } });
@@ -127,12 +131,14 @@ async function indexOne(ownerId, senderId, { ownerName = 'me', force = false } =
     }
     mem.status = 'ready';
     mem.dirty = false;
+    mem.errorCount = 0;
     mem.lastIndexedAt = new Date();
     await mem.save();
     console.log(`🧠 [Memory] ${name}: ${totalMessages} messages, ${mem.chunkCount} moments, brain ${mem.brainScore}, bond ${mem.bond || '-'}`);
     return mem;
   } catch (err) {
-    await PersonMemory.updateOne({ _id: mem._id }, { $set: { status: 'error', error: err.message.slice(0, 300) } });
+    // Back off this person (lastIndexedAt = now) so the indexer moves on to everyone else
+    await PersonMemory.updateOne({ _id: mem._id }, { $set: { status: 'error', error: err.message.slice(0, 300), lastIndexedAt: new Date() }, $inc: { errorCount: 1 } });
     console.warn(`⚠️ [Memory] ${name}: ${err.message}`);
     return null;
   }
@@ -171,6 +177,8 @@ async function tick() {
       dirty: true,
       $or: [{ lastIndexedAt: null }, { lastIndexedAt: { $lte: new Date(Date.now() - REINDEX_AFTER_MS) } }],
       status: { $ne: 'indexing' },
+      // a person that keeps failing is retried at most every 15 min, and parked after 5 failures
+      errorCount: { $not: { $gte: 5 } },
     }).sort({ lastIndexedAt: 1, totalMessages: -1 });
     if (!next) return;
     const User = require('../models/User');
@@ -187,7 +195,8 @@ function startScheduler() {
   // A server restart in the middle of indexing leaves "indexing": pick those up again
   PersonMemory.updateMany({ status: 'indexing' }, { $set: { status: 'pending', dirty: true } }).catch(() => {});
   setTimeout(() => ensureEntries().catch(() => {}), 30 * 1000);
-  const t = setInterval(tick, 20 * 1000);
+  // Keeps going: one person after another; any error is logged and the next tick carries on
+  const t = setInterval(() => { tick().catch(err => console.warn('⚠️ [Memory] tick error:', err.message)); }, 10 * 1000);
   if (t.unref) t.unref();
   console.log('🧠 [Memory] Indexer running');
 }

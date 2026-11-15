@@ -34,3 +34,18 @@ test('brain score grows with what is known and is capped by little history', () 
 test('search terms skip filler words', () => {
   assert.deepEqual(searchTerms('what is your mom name bro'), ['mom', 'name']);
 });
+
+test('a cut emoji is removed so the text is valid JSON', () => {
+  const { wellFormed } = require('../services/memoryIndexRules');
+  const cut = '😂😂'.slice(0, 3);
+  assert.equal(wellFormed(cut), '😂');
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify(wellFormed(`hi ${cut}`))));
+});
+
+test('overall index score: share read and brain weighted by chat size', () => {
+  const { overallScore } = require('../services/memoryIndexRules');
+  const o = overallScore([{ totalMessages: 900, indexedMessages: 900, brainScore: 80, status: 'ready' }, { totalMessages: 100, indexedMessages: 0, brainScore: 0, status: 'pending' }]);
+  assert.equal(o.indexedPct, 90);
+  assert.equal(o.brain, 72);
+  assert.equal(o.ready, 1);
+});

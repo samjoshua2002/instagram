@@ -25,6 +25,7 @@ const personMemorySchema = new mongoose.Schema({
   lastIndexedAt: { type: Date, default: null },
   status: { type: String, enum: ['pending', 'indexing', 'ready', 'error'], default: 'pending' },
   error: { type: String, default: '' },
+  errorCount: { type: Number, default: 0 },
   dirty: { type: Boolean, default: true },
 }, { timestamps: true, versionKey: false });
 

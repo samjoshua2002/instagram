@@ -4,6 +4,14 @@
 
 const isPlaceholder = t => /^\s*\[(Sent a|Shared an|Reacted)[^\]]*\]\s*$/i.test(String(t || ''));
 
+/** Text that is safe to send as JSON: a cut emoji (lone surrogate) is dropped. */
+function wellFormed(text) {
+  const s = String(text || '');
+  return typeof s.toWellFormed === 'function'
+    ? s.toWellFormed().replace(/\uFFFD/g, '')
+    : s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+}
+
 /**
  * Real messages (oldest first) -> chat "moments": consecutive messages until a 30-minute gap or
  * `max` messages. The AI's own replies are left out, so memory only learns from real people.
@@ -17,7 +25,7 @@ function buildChunks(messages, { gapMinutes = 30, max = 8, maxChars = 1200 } = {
     if (!m || !m.text || m.sentByAI) continue;
     const at = new Date(m.timestamp || m.createdAt || 0);
     const who = m.role === 'assistant' ? 'me' : 'them';
-    const text = String(m.text).replace(/\s+/g, ' ').trim().slice(0, 400);
+    const text = wellFormed(String(m.text).replace(/\s+/g, ' ').trim().slice(0, 400));
     if (!text) continue;
     const gap = cur ? (at - cur.endAt) / 60000 : Infinity;
     if (!cur || gap > gapMinutes || cur.lines.length >= max || cur.chars + text.length > maxChars) {
@@ -90,4 +98,13 @@ function searchTerms(text, max = 8) {
   return [...seen];
 }
 
-module.exports = { buildChunks, batchChunks, brainScore, searchTerms, SLOTS, isPlaceholder };
+/** Overall index score for the account: how much is read, and how well the AI knows people (weighted by chat size). */
+function overallScore(people = []) {
+  const total = people.reduce((n, p) => n + (p.totalMessages || 0), 0);
+  const read = people.reduce((n, p) => n + Math.min(p.indexedMessages || 0, p.totalMessages || 0), 0);
+  const weight = people.reduce((n, p) => n + Math.max(1, p.totalMessages || 0), 0);
+  const brain = weight ? people.reduce((n, p) => n + (p.brainScore || 0) * Math.max(1, p.totalMessages || 0), 0) / weight : 0;
+  return { indexedPct: total ? Math.round((100 * read) / total) : 0, brain: Math.round(brain), people: people.length, ready: people.filter(p => p.status === 'ready').length };
+}
+
+module.exports = { buildChunks, batchChunks, brainScore, searchTerms, overallScore, wellFormed, SLOTS, isPlaceholder };
