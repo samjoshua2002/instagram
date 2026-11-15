@@ -970,3 +970,25 @@ a.bn-card:hover { transform: translateY(-2px); }
 .friend-badge small { font-weight: 600; font-size: 0.66rem; color: var(--color-text-secondary); }
 .friend-badge span { color: color-mix(in srgb, var(--ambient-dominant, #e0457b) 70%, #e0457b); }
 .friend-badge.lvl-stranger span, .friend-badge.lvl-acquaintance span { color: var(--color-text-secondary); }
+
+/* AI memory: compact card + popup */
+.pm-compact { margin-bottom: 14px; gap: 10px; }
+.pm-compact .pm-doc { max-height: none; }
+.pm-icon-btn {
+  position: relative; flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--color-border); background: transparent; color: var(--color-text-primary);
+}
+.pm-icon-btn:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+.pm-icon-btn:disabled { opacity: 0.6; cursor: progress; }
+.pm-icon-dot {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  display: grid; place-items: center; font-size: 0.66rem; font-weight: 800; background: #e5484d; color: #fff;
+}
+.pm-modal { position: fixed; inset: 0; z-index: 11000; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: sh-menu-in 0.16s ease-out; }
+.pm-modal-box { display: flex; flex-direction: column; width: min(720px, 100%); max-height: min(86vh, 900px); border-radius: 22px; background: var(--color-surface, #18181b); color: var(--color-text-primary); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); overflow: hidden; }
+.pm-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 12px; border-bottom: 1px solid var(--color-border); }
+.pm-modal-head h2 { margin: 0; font-size: 1.15rem; }
+.pm-modal-head p { margin: 4px 0 0; font-size: 0.8rem; color: var(--color-text-secondary); }
+.pm-modal-body { flex: 1; overflow: auto; padding: 16px 22px; display: flex; flex-direction: column; gap: 12px; }
+.pm-modal-box .pm-correct { padding: 12px 22px 18px; border-top: 1px solid var(--color-border); }
+@media (max-width: 640px) { .pm-modal { padding: 0; place-items: end center; } .pm-modal-box { border-radius: 22px 22px 0 0; max-height: 92vh; } }
