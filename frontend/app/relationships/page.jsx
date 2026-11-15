@@ -1322,52 +1322,66 @@ function RelationshipsPageContent() {
           document.body
         )}
 
-        <div className="person-grid">
-          {/* ================= HOW THE AI TALKS ================= */}
-          <section className="person-glass-card">
-            {/* Learned from your real chats (read only); the AI uses this instead of manual tone settings */}
-            {selectedPerson.senderId
-              ? <PersonMemory senderId={selectedPerson.senderId} name={personName} />
-              : <h2 className="person-card-title">What the AI learned</h2>}
-
-            <div className="person-field-label person-sub-label">Never calls {pron}</div>
-            <div className="person-chip-row">
-              {(formData.avoidWords || []).map(w => (
-                <button
-                  key={w}
-                  type="button"
-                  className="person-chip avoid"
-                  title={`Remove "${w}"`}
-                  aria-label={`Remove ${w}`}
-                  onClick={() => editProfile({ avoidWords: formData.avoidWords.filter(x => x !== w) }, 0)}
-                >
-                  <span>{w}</span>
-                  <X size={12} />
-                </button>
-              ))}
-              {isAddingAvoid ? (
-                <form className="person-chip-form" onSubmit={handleAddAvoidWord}>
-                  <input
-                    autoFocus
-                    type="text"
-                    maxLength={40}
-                    placeholder="e.g. bro"
-                    aria-label="Word the AI should never use"
-                    value={newAvoidWord}
-                    onChange={e => setNewAvoidWord(e.target.value)}
-                    onBlur={() => { if (!newAvoidWord.trim()) setIsAddingAvoid(false); }}
-                    onKeyDown={e => { if (e.key === 'Escape') { setNewAvoidWord(''); setIsAddingAvoid(false); } }}
-                  />
+        {/* ================= DETAILS ================= */}
+        <h2 className="person-details-title">Details</h2>
+        <div className="person-details">
+          {detailRows.map(row => (
+            <div key={row.key} className={`person-detail${editingField === row.key ? ' is-editing' : ''}`}>
+              {editingField === row.key ? (
+                <form className="person-detail-form" onSubmit={saveDetail} onKeyDown={e => { if (e.key === 'Escape') setEditingField(null); }}>
+                  <label className="person-detail-label" htmlFor={`detail-${row.key}`}>{row.label}</label>
+                  {row.key === 'gender' ? (
+                    <select id={`detail-${row.key}`} autoFocus value={editDraft.value} onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}>
+                      {Object.entries(GENDER_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  ) : row.key === 'category' ? (
+                    <select id={`detail-${row.key}`} autoFocus value={editDraft.value} onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}>
+                      {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  ) : row.key === 'dob' ? (
+                    <div className="person-dob-edit">
+                      <select id={`detail-${row.key}`} autoFocus aria-label="Month" value={editDraft.month} onChange={e => setEditDraft({ ...editDraft, month: e.target.value })}>
+                        <option value="">Month</option>
+                        {MONTH_NAMES.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      <select aria-label="Day" value={editDraft.day} onChange={e => setEditDraft({ ...editDraft, day: e.target.value })}>
+                        <option value="">Day</option>
+                        {Array.from({ length: 31 }, (_, i) => String(i + 1)).map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input type="text" inputMode="numeric" maxLength={4} placeholder="Year" aria-label="Year (optional)" value={editDraft.year} onChange={e => setEditDraft({ ...editDraft, year: e.target.value.replace(/\D/g, '') })} />
+                    </div>
+                  ) : (
+                    <input
+                      id={`detail-${row.key}`}
+                      autoFocus
+                      type="text"
+                      maxLength={row.key === 'relationship' ? 80 : 60}
+                      placeholder={row.key === 'handle' ? '@username' : row.key === 'relationship' ? 'e.g. Very close friend' : ''}
+                      value={editDraft.value}
+                      onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}
+                    />
+                  )}
+                  <div className="person-detail-actions">
+                    {row.key === 'dob' && formData.dob && (
+                      <button type="button" className="person-link-btn" onClick={() => { editProfile({ dob: '' }, 0); setEditingField(null); }}>Clear</button>
+                    )}
+                    <button type="button" className="person-soft-btn" onClick={() => setEditingField(null)}>Cancel</button>
+                    <button type="submit" className="person-light-btn">Save</button>
+                  </div>
                 </form>
               ) : (
-                <button type="button" className="person-chip dashed" onClick={() => setIsAddingAvoid(true)}>+ Add</button>
+                <>
+                  <div className="person-detail-text">
+                    <div className="person-detail-label">{row.label}</div>
+                    <div className={`person-detail-value${row.value === 'Not set' ? ' muted' : ''}`}>{row.value}</div>
+                  </div>
+                  <button type="button" className="person-soft-btn" onClick={() => startEditDetail(row.key)} aria-label={`Edit ${row.label}`}>
+                    {row.value === 'Not set' ? 'Add' : 'Edit'}
+                  </button>
+                </>
               )}
             </div>
-          </section>
-
-          {/* ================= WHAT THE AI KNOWS ================= */}
-          <PersonFacts key={selectedPerson.id} person={selectedPerson} personName={personName} onAdd={handleAddFact} onRemove={handleRemoveFact} />
-          {selectedPerson.senderId && <PersonShared key={`shared-${selectedPerson.id}`} senderId={selectedPerson.senderId} />}
+          ))}
         </div>
 
         {/* ================= PEOPLE IN THEIR LIFE ================= */}
@@ -1480,67 +1494,57 @@ function RelationshipsPageContent() {
           </div>
         </section>
 
-        {/* ================= DETAILS ================= */}
-        <h2 className="person-details-title">Details</h2>
-        <div className="person-details">
-          {detailRows.map(row => (
-            <div key={row.key} className={`person-detail${editingField === row.key ? ' is-editing' : ''}`}>
-              {editingField === row.key ? (
-                <form className="person-detail-form" onSubmit={saveDetail} onKeyDown={e => { if (e.key === 'Escape') setEditingField(null); }}>
-                  <label className="person-detail-label" htmlFor={`detail-${row.key}`}>{row.label}</label>
-                  {row.key === 'gender' ? (
-                    <select id={`detail-${row.key}`} autoFocus value={editDraft.value} onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}>
-                      {Object.entries(GENDER_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                  ) : row.key === 'category' ? (
-                    <select id={`detail-${row.key}`} autoFocus value={editDraft.value} onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}>
-                      {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                  ) : row.key === 'dob' ? (
-                    <div className="person-dob-edit">
-                      <select id={`detail-${row.key}`} autoFocus aria-label="Month" value={editDraft.month} onChange={e => setEditDraft({ ...editDraft, month: e.target.value })}>
-                        <option value="">Month</option>
-                        {MONTH_NAMES.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                      <select aria-label="Day" value={editDraft.day} onChange={e => setEditDraft({ ...editDraft, day: e.target.value })}>
-                        <option value="">Day</option>
-                        {Array.from({ length: 31 }, (_, i) => String(i + 1)).map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                      <input type="text" inputMode="numeric" maxLength={4} placeholder="Year" aria-label="Year (optional)" value={editDraft.year} onChange={e => setEditDraft({ ...editDraft, year: e.target.value.replace(/\D/g, '') })} />
-                    </div>
-                  ) : (
-                    <input
-                      id={`detail-${row.key}`}
-                      autoFocus
-                      type="text"
-                      maxLength={row.key === 'relationship' ? 80 : 60}
-                      placeholder={row.key === 'handle' ? '@username' : row.key === 'relationship' ? 'e.g. Very close friend' : ''}
-                      value={editDraft.value}
-                      onChange={e => setEditDraft({ ...editDraft, value: e.target.value })}
-                    />
-                  )}
-                  <div className="person-detail-actions">
-                    {row.key === 'dob' && formData.dob && (
-                      <button type="button" className="person-link-btn" onClick={() => { editProfile({ dob: '' }, 0); setEditingField(null); }}>Clear</button>
-                    )}
-                    <button type="button" className="person-soft-btn" onClick={() => setEditingField(null)}>Cancel</button>
-                    <button type="submit" className="person-light-btn">Save</button>
-                  </div>
+        <div className="person-grid">
+          <div className="person-col">
+          {/* ================= HOW THE AI TALKS ================= */}
+          <section className="person-glass-card">
+            {/* Learned from your real chats (read only); the AI uses this instead of manual tone settings */}
+            {selectedPerson.senderId
+              ? <PersonMemory senderId={selectedPerson.senderId} name={personName} />
+              : <h2 className="person-card-title">What the AI learned</h2>}
+
+            <div className="person-field-label person-sub-label">Never calls {pron}</div>
+            <div className="person-chip-row">
+              {(formData.avoidWords || []).map(w => (
+                <button
+                  key={w}
+                  type="button"
+                  className="person-chip avoid"
+                  title={`Remove "${w}"`}
+                  aria-label={`Remove ${w}`}
+                  onClick={() => editProfile({ avoidWords: formData.avoidWords.filter(x => x !== w) }, 0)}
+                >
+                  <span>{w}</span>
+                  <X size={12} />
+                </button>
+              ))}
+              {isAddingAvoid ? (
+                <form className="person-chip-form" onSubmit={handleAddAvoidWord}>
+                  <input
+                    autoFocus
+                    type="text"
+                    maxLength={40}
+                    placeholder="e.g. bro"
+                    aria-label="Word the AI should never use"
+                    value={newAvoidWord}
+                    onChange={e => setNewAvoidWord(e.target.value)}
+                    onBlur={() => { if (!newAvoidWord.trim()) setIsAddingAvoid(false); }}
+                    onKeyDown={e => { if (e.key === 'Escape') { setNewAvoidWord(''); setIsAddingAvoid(false); } }}
+                  />
                 </form>
               ) : (
-                <>
-                  <div className="person-detail-text">
-                    <div className="person-detail-label">{row.label}</div>
-                    <div className={`person-detail-value${row.value === 'Not set' ? ' muted' : ''}`}>{row.value}</div>
-                  </div>
-                  <button type="button" className="person-soft-btn" onClick={() => startEditDetail(row.key)} aria-label={`Edit ${row.label}`}>
-                    {row.value === 'Not set' ? 'Add' : 'Edit'}
-                  </button>
-                </>
+                <button type="button" className="person-chip dashed" onClick={() => setIsAddingAvoid(true)}>+ Add</button>
               )}
             </div>
-          ))}
+          </section>
+
+          {selectedPerson.senderId && <PersonShared key={`shared-${selectedPerson.id}`} senderId={selectedPerson.senderId} />}
+          </div>
+
+          {/* ================= WHAT THE AI KNOWS ================= */}
+          <PersonFacts key={selectedPerson.id} person={selectedPerson} personName={personName} onAdd={handleAddFact} onRemove={handleRemoveFact} />
         </div>
+
       </div>
     );
   }

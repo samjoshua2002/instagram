@@ -1000,3 +1000,9 @@ a.bn-card:hover { transform: translateY(-2px); }
 .bn-review-a button { border: 0; border-radius: 999px; padding: 0 12px; font: 600 0.78rem var(--font-sans); cursor: pointer; background: var(--sh-card-hover); color: var(--sh-text); }
 .bn-review-a button[type="submit"] { background: var(--sh-action); color: var(--on-ambient-accent, #000); }
 .bn-review-a button:disabled { opacity: 0.5; cursor: default; }
+
+/* Person page: left column stacks AI memory + Shared, so there is no gap beside a tall facts list */
+.person-grid { align-items: start; }
+.person-col { display: flex; flex-direction: column; gap: inherit; min-width: 0; }
+.person-col > * { margin: 0; }
+.person-details-title { margin-top: 8px; }
