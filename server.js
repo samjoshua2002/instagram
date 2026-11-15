@@ -1818,6 +1818,19 @@ app.post('/api/people/:senderId/memory/correct', async (req, res) => {
   }
 });
 
+// Every open question the AI has for you, across everyone (Home review list and bell)
+app.get('/api/memory-index/questions', async (req, res) => {
+  try {
+    const people = await PersonMemory.find({ ownerId: req.user._id, 'doubts.status': 'open' }, { senderId: 1, name: 1, doubts: 1 }).lean();
+    const items = people.flatMap(p => (p.doubts || []).filter(d => d.status === 'open')
+      .map(d => ({ _id: d._id, senderId: p.senderId, name: p.name, question: d.question, about: d.about, askedAt: d.askedAt })))
+      .sort((a, b) => new Date(b.askedAt) - new Date(a.askedAt));
+    res.json({ items, total: items.length, people: people.length });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // What the memory agent fixed lately (Home > AI memory)
 app.get('/api/memory-index/agent', async (req, res) => {
   try {

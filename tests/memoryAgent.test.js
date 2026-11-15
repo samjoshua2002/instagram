@@ -50,9 +50,11 @@ test("people in their life never includes the owner or the owner's own people", 
     { targetName: 'Sam Joshua', relationship: 'friend' }, { targetName: 'Sam', relationship: 'friend' },
     { targetName: "Sam's mom", relationship: 'mother' }, { targetName: 'Wife', relationship: "Sam's wife" },
     { targetName: 'Annie', relationship: "Sam's sister" }, { targetName: "Sam's office colleague", relationship: 'Akka' },
+    { targetName: "Sam Joshua's brother", relationship: 'brother' },
   ]) assert.ok(isOwnerOrOwnersPerson(c, owner), JSON.stringify(c));
   for (const c of [
     { targetName: 'Mom', relationship: 'mother' }, { targetName: 'Jennifer', relationship: 'neighbor' },
     { targetName: 'Fami', relationship: 'friend' }, { targetName: 'Samantha', relationship: 'cousin' },
+    { targetName: 'Sam Altman', relationship: 'public figure' },
   ]) assert.ok(!isOwnerOrOwnersPerson(c, owner), JSON.stringify(c));
 });

@@ -992,3 +992,11 @@ a.bn-card:hover { transform: translateY(-2px); }
 .pm-modal-body { flex: 1; overflow: auto; padding: 16px 22px; display: flex; flex-direction: column; gap: 12px; }
 .pm-modal-box .pm-correct { padding: 12px 22px 18px; border-top: 1px solid var(--color-border); }
 @media (max-width: 640px) { .pm-modal { padding: 0; place-items: end center; } .pm-modal-box { border-radius: 22px 22px 0 0; max-height: 92vh; } }
+.bn-review { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--sh-action) 10%, transparent); }
+.bn-review-row { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; }
+.bn-review-q b { font-weight: 700; }
+.bn-review-a { display: flex; gap: 6px; }
+.bn-review-a input { flex: 1; min-width: 0; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--sh-border); background: var(--sh-card); color: var(--sh-text); font: inherit; font-size: 0.8rem; }
+.bn-review-a button { border: 0; border-radius: 999px; padding: 0 12px; font: 600 0.78rem var(--font-sans); cursor: pointer; background: var(--sh-card-hover); color: var(--sh-text); }
+.bn-review-a button[type="submit"] { background: var(--sh-action); color: var(--on-ambient-accent, #000); }
+.bn-review-a button:disabled { opacity: 0.5; cursor: default; }

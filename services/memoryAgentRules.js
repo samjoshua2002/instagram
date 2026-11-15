@@ -71,7 +71,10 @@ function isOwnerOrOwnersPerson(conn, ownerNames = []) {
   if (names.includes(target)) return true;
   const firsts = [...new Set(names.map(n => n.split(/\s+/)[0]).filter(n => n.length >= 3))];
   const text = `${conn?.targetName || ''} ${conn?.relationship || ''} ${conn?.notes || ''}`.toLowerCase();
-  return firsts.some(f => new RegExp(`(^|[^a-z])${f}'s\\s`, 'i').test(`${conn?.targetName || ''} ${conn?.relationship || ''}`.toLowerCase())
+  const esc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // "Sam's mom", and the full-name form "Sam Joshua's brother"
+  const owners = [...new Set([...firsts, ...names.filter(n => n.includes(' '))])];
+  return owners.some(f => new RegExp(`(^|[^a-z])${esc(f)}'s\\s`, 'i').test(`${conn?.targetName || ''} ${conn?.relationship || ''}`.toLowerCase())
     || target === f || text.startsWith(`${f}'s `));
 }
 

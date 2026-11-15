@@ -134,7 +134,8 @@ async function healthCheck() {
 
   // 2. Alerts and reminders saved under another name
   for (const card of cards) {
-    if (!card.name) continue;
+    // "User_1187" is a placeholder until their real name is known: never copied anywhere
+    if (!card.name || /^User_/.test(card.name)) continue;
     const q = { ownerId: card.ownerId || null, senderId: card.senderId, name: { $nin: [card.name, ''] } };
     const n = (await SharedItem.updateMany(q, { $set: { name: card.name } })).modifiedCount + (await Reminder.updateMany(q, { $set: { name: card.name } })).modifiedCount;
     if (n) await log(card.ownerId, card.senderId, card.name, `${n} alert(s)/reminder(s) now use the name "${card.name}"`);

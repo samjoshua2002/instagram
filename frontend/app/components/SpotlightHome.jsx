@@ -728,6 +728,10 @@ export default function SpotlightHome() {
 
   // Messages that need you (invites, requests, money, urgent): newest first in the bell
   const [needsYou, setNeedsYou] = useState([]);
+  const [aiQuestions, setAiQuestions] = useState(0);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/memory-index/questions`).then(r => (r.ok ? r.json() : null)).then(d => setAiQuestions(d?.total || 0)).catch(() => {});
+  }, [API_BASE]);
   useEffect(() => {
     const load = () => fetch(`${API_BASE}/api/shared/needs-you`).then(r => (r.ok ? r.json() : { items: [] }))
       .then(d => setNeedsYou(d.items || [])).catch(() => {});
@@ -738,6 +742,7 @@ export default function SpotlightHome() {
 
   const paused = people.filter(p => p.aiEnabled === false);
   const alerts = [
+    aiQuestions > 0 && { id: 'ai-questions', icon: Sparkles, title: `The AI has ${aiQuestions} question${aiQuestions === 1 ? '' : 's'} about your people`, href: '/' },
     ...needsYou.slice(0, 8).map(it => ({
       id: `need-${it._id}`, icon: Bell, title: it.summary || `${it.name || 'Someone'} needs you`,
       href: `/relationships?person=${encodeURIComponent(people.find(p => String(p.senderId) === String(it.senderId))?.id || '')}`,

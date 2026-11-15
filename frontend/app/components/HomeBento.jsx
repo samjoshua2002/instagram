@@ -212,9 +212,21 @@ function MemoryStatus() {
   const { API_BASE } = useApp();
   const [d, setD] = useState(null);
   const [agent, setAgent] = useState(null);
+  const [questions, setQuestions] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const loadQuestions = () => fetch(`${API_BASE}/api/memory-index/questions`).then(r => (r.ok ? r.json() : null)).then(setQuestions).catch(() => {});
   useEffect(() => {
     fetch(`${API_BASE}/api/memory-index/agent`).then(r => (r.ok ? r.json() : null)).then(setAgent).catch(() => {});
-  }, [API_BASE]);
+    loadQuestions();
+  }, [API_BASE]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reply = async (q, dismiss = false) => {
+    const answer = dismiss ? '' : String(answers[q._id] || '').trim();
+    if (!dismiss && !answer) return;
+    setQuestions(x => x && ({ ...x, items: x.items.filter(i => i._id !== q._id), total: x.total - 1 }));
+    await fetch(`${API_BASE}/api/people/${encodeURIComponent(q.senderId)}/memory/doubts/${q._id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer }),
+    }).catch(() => {});
+  };
   useEffect(() => {
     let t = null;
     const load = () => fetch(`${API_BASE}/api/memory-index`).then(r => (r.ok ? r.json() : null)).then(x => {
@@ -246,6 +258,22 @@ function MemoryStatus() {
           </div>
           <div className="bn-mem-bar" aria-hidden="true"><span style={{ width: `${Math.max(3, o.indexedPct)}%` }} /></div>
           {top.length > 0 && <p className="bn-mem-top">Knows best: {top.map(p => `${p.name} ${p.brainScore}`).join(' · ')}</p>}
+          {questions?.total > 0 && (
+            <div className="bn-review">
+              <span className="bn-agent-head">Needs your review · {questions.total} question{questions.total === 1 ? '' : 's'} from the AI</span>
+              {questions.items.slice(0, 4).map(q => (
+                <form key={q._id} className="bn-review-row" onSubmit={e => { e.preventDefault(); reply(q); }}>
+                  <span className="bn-review-q"><b>{q.name}</b>: {q.question}</span>
+                  <span className="bn-review-a">
+                    <input value={answers[q._id] || ''} onChange={e => setAnswers(a => ({ ...a, [q._id]: e.target.value }))} placeholder="Answer" aria-label={`Answer: ${q.question}`} />
+                    <button type="submit" disabled={!String(answers[q._id] || '').trim()}>Send</button>
+                    <button type="button" onClick={() => reply(q, true)} aria-label="Dismiss" title="Not important">✕</button>
+                  </span>
+                </form>
+              ))}
+              {questions.total > 4 && <span className="bn-agent-row">+ {questions.total - 4} more on people's pages</span>}
+            </div>
+          )}
           {agent && (
             <div className="bn-agent">
               <span className="bn-agent-head">Memory agent · checked {agent.reviewedToday} {agent.reviewedToday === 1 ? 'person' : 'people'} today</span>
