@@ -26,8 +26,10 @@ export const metadata = {
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    apple: '/apple-touch-icon.png',
   },
+  // Installed on a phone home screen: opens full screen with its own name
+  appleWebApp: { capable: true, title: 'Chatter OS', statusBarStyle: 'black-translucent' },
 };
 
 // viewport-fit=cover exposes env(safe-area-inset-*) for the sticky mobile bars

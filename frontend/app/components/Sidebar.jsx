@@ -40,6 +40,7 @@ import MobileFeatureSheet from './MobileFeatureSheet';
 import { useTheme } from '../lib/theme';
 import { DUR, EASE_OUT, STAGGER } from '../lib/motion';
 import { IconSwap } from './ui/motion';
+import InstallApp from './InstallApp';
 
 // Framer Motion Variants for Staggered Fade-in Animation
 const navContainerVariants = {
@@ -356,36 +357,18 @@ export default function Sidebar() {
               </div>
             </Link>
 
-            {/* Live Bot Pulse Dot */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: routingConfig.globalBotActive ? 'color-mix(in srgb, #22c55e 12%, transparent)' : 'var(--color-surface-hover)',
-                border: routingConfig.globalBotActive ? '1px solid color-mix(in srgb, #22c55e 35%, transparent)' : '1px solid var(--color-border)',
-                borderRadius: '999px',
-                padding: '3px 8px',
-                cursor: 'pointer'
-              }}
+            {/* AI on / paused: a quiet switch in the page colour (no green badge) */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!routingConfig.globalBotActive}
+              className={`sb-ai-switch${routingConfig.globalBotActive ? ' on' : ''}`}
               onClick={toggleGlobalBot}
-              title={routingConfig.globalBotActive ? 'Bot is Active. Click to pause.' : 'Bot is Paused. Click to resume.'}
+              title={routingConfig.globalBotActive ? 'AI is replying. Click to pause.' : 'AI is paused. Click to resume.'}
             >
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: routingConfig.globalBotActive ? '#16a34a' : 'var(--color-text-muted)'
-              }} />
-              <span style={{
-                fontSize: '0.62rem',
-                fontWeight: '700',
-                fontFamily: "var(--font-label)",
-                color: routingConfig.globalBotActive ? 'var(--color-success)' : 'var(--color-text-secondary)'
-              }}>
-                {routingConfig.globalBotActive ? 'LIVE' : 'OFF'}
-              </span>
-            </div>
+              <span className="sb-ai-track" aria-hidden="true"><span className="sb-ai-knob" /></span>
+              <span className="sb-ai-text">{routingConfig.globalBotActive ? 'AI on' : 'Paused'}</span>
+            </button>
           </motion.div>
 
           {!isPureSuperadmin && (
@@ -525,6 +508,8 @@ export default function Sidebar() {
               <span>Add Person</span>
             </motion.button>
           )}
+
+          <InstallApp className="sb-install" />
 
           {/* Bot State Switcher Button (Only for creator account or impersonating workspace) */}
           {!isPureSuperadmin && (

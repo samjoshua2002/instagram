@@ -19,6 +19,7 @@ import { useTheme } from '../lib/theme';
 import WorkspaceModeSwitch from './WorkspaceModeSwitch';
 import { SegIndicator, IconSwap, useSegId } from './ui/motion';
 import { EASE_IN, EASE_OUT, STAGGER, backdropMotion, exitOf, listItem } from '../lib/motion';
+import InstallApp from './InstallApp';
 
 const SHEET_IN = 0.32;
 const tilesContainer = { hidden: {}, show: { transition: { delayChildren: 0.12, staggerChildren: STAGGER } } };
@@ -136,6 +137,8 @@ export default function MobileFeatureSheet({ open, onClose, items }) {
                 </button>
               </div>
             </div>
+
+            <InstallApp className="sheet-install" label="Install as an app" />
 
             {/* Every platform route */}
             <div className="sheet-section">
