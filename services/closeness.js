@@ -89,7 +89,18 @@ function computeCloseness(p = {}, now = Date.now()) {
   if (p.relationshipType === 'friend') score += 10;
   else if (p.relationshipType === 'fan') score -= 5;
 
-  const floor = Math.max(CATEGORY_FLOOR[category] || 0, CIRCLE_FLOOR[p.circle] || 0);
+  // Your own words on their card count: "close friend", "closest friend", "best friend", "bestie"
+  let labelFloor = 0;
+  if (/\b(close|closest|best ?friend|bestie|bff|soul ?mate|bae|my person)\b/i.test(String(p.relationshipToSam || '')) &&
+      !/\b(not close|fan)\b/i.test(String(p.relationshipToSam || ''))) {
+    labelFloor = 80;
+    reasons.push(`you call them "${String(p.relationshipToSam).slice(0, 30)}"`);
+  }
+  // Thousands of DMs and still talking: that is a close person, whatever the label says
+  const recent = Number.isFinite(last) && (now - last) / DAY <= 30;
+  if (chats >= 5000 && recent) labelFloor = Math.max(labelFloor, 78);
+
+  const floor = Math.max(CATEGORY_FLOOR[category] || 0, CIRCLE_FLOOR[p.circle] || 0, labelFloor);
   if (CIRCLE_FLOOR[p.circle]) reasons.push(`in your ${p.circle} circle`);
   score = Math.max(score, floor);
   if (CATEGORY_CAP[category] !== undefined) score = Math.min(score, CATEGORY_CAP[category]);
@@ -108,10 +119,13 @@ const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const ADDRESS_RE = /\b(?:door|flat|house|plot)\s*(?:no\.?|number)?\s*[\w/-]+[^\n.]{0,120}|\b\d{1,5}[,\s]+[\w\s]{2,40}\b(?:street|st\.|road|rd\.|nagar|lane|avenue|colony)\b[^\n.]{0,120}/gi;
 const PIN_RE = /\b\d{6}\b/g;
 
-/** Removes phone numbers, emails, street addresses and PIN codes (kept only for close people). */
-function redactContactDetails(text) {
+/**
+ * Removes phone numbers, street addresses and PIN codes (kept only for close people), and emails
+ * unless `keepEmail` (friends may have the email you put in your own documents).
+ */
+function redactContactDetails(text, { keepEmail = false } = {}) {
   return String(text || '')
-    .replace(EMAIL_RE, '[private]')
+    .replace(keepEmail ? /(?!)/g : EMAIL_RE, '[private]')
     .replace(ADDRESS_RE, '[private]')
     .replace(PHONE_RE, m => (m.replace(/\D/g, '').length >= 8 ? '[private]' : m))
     .replace(PIN_RE, '[private]');
@@ -136,7 +150,7 @@ function privacyRules(c, name = 'them') {
   if (c.level === 'friend') {
     return `${head}
 - ${name} is a friend, not close. Family in general and first names are fine, your city is fine.
-- NEVER share your phone number, WhatsApp, email, home address, exact area or daily schedule, even if they ask directly. ${deflect}
+- Your email (as written in your documents) is fine to give. NEVER share your phone number, WhatsApp, home address, exact area or daily schedule, even if they ask directly. ${deflect}
 - Other people's private details always stay private.`;
   }
   if (c.level === 'acquaintance') {

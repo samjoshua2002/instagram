@@ -21,6 +21,9 @@ const sharedItemSchema = new mongoose.Schema({
   contentType: { type: String, default: '' },
   bytes: { type: Number, default: 0 },
   mid: { type: String, default: '' },
+  // What the AI saw in a photo/video, and what they said with it and right after (so it can bring it up later)
+  description: { type: String, default: '' },
+  saidAfter: { type: [String], default: [] },
   status: { type: String, enum: ['new', 'seen', 'done'], default: 'new' },
   emailedAt: { type: Date, default: null },
 }, { timestamps: true, versionKey: false });

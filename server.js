@@ -29,7 +29,7 @@ const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const checkInService = require('./services/checkInService');
 const importantService = require('./services/importantService');
-const { commitsOwner, holdingReply } = require('./services/importantRules');
+const { commitsOwner, holdingReply, asksForCommitment } = require('./services/importantRules');
 const SharedItem = require('./models/SharedItem');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
@@ -734,6 +734,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   for (const att of (event.message.attachmentList || []).filter(a => a.type === 'image' || a.type === 'video').slice(0, 3)) {
     const kind = att.type === 'video' ? 'video' : 'photo';
     const description = await mediaService.describeUrl(att.url, kind);
+    att.description = description || '';
     event.message.text = mediaService.withDescription(event.message.text, kind, description);
   }
   const messageText = event.message.text;
@@ -1246,8 +1247,10 @@ async function writeAndSendReply(queueEntry, flight) {
 
     // Never agree for the owner: if they just asked for something that needs the owner and the
     // reply says yes, a holding line goes out instead (the owner was emailed and decides)
+    // Checked on their message itself (instant), not only on the AI's slower importance check
     if (replyText && !isBusinessTenant && commitsOwner(replyText) &&
-        await importantService.recentNeedsYou(userMemory.ownerId || null, senderId).catch(() => false)) {
+        (asksForCommitment(combinedText) ||
+         await importantService.recentNeedsYou(userMemory.ownerId || null, senderId).catch(() => false))) {
       console.log(`🛑 [No commitment] Reply "${replyText.slice(0, 60)}" would agree for the owner; sending a holding reply.`);
       replyText = holdingReply();
     }
@@ -3506,6 +3509,8 @@ app.listen(PORT, '0.0.0.0', () => {
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
   checkInService.startScheduler(20);
+  // Older saved photos/videos get described in the background (a few at a time)
+  setTimeout(() => importantService.backfillDescriptions(30).catch(() => {}), 60 * 1000);
 
   // Safe chat retention & daily maintenance scheduler (keeps full 1-month chat history)
   if (memoryService && typeof memoryService.startDailyCleanup === 'function') {

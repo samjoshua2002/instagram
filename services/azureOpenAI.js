@@ -191,7 +191,7 @@ class AzureOpenAIService {
     });
     const isClose = closeness.level === 'close';
     const knowsThem = closeness.level === 'friend' || isClose;
-    const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext, voice] = await Promise.all([
+    const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext, voice, sharedByThem] = await Promise.all([
       features?.ragKnowledgeBase && storyboardOwner
         ? ragService.retrieve({ ownerId: storyboardOwner, incomingText }).catch(err => {
             console.warn('⚠️ [RAG] Personal retrieval failed:', err.message);
@@ -209,6 +209,8 @@ class AzureOpenAIService {
       socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId, level: closeness.level }),
       // 2b. The owner's real voice from MongoDB: hand-typed messages only (never the AI's replies)
       voiceService.getVoiceBlock({ ownerId: conversationOwnerId, contactId: userMemory.senderId, creatorName: config.creatorName, asOf, incomingText, level: closeness.level }),
+      // Photos, videos and links they sent before, with what they said about them
+      require('./importantService').recentSharedForPrompt(conversationOwnerId, userMemory.senderId).catch(() => ''),
     ]);
     // Real texting data wins over generic style rules (emoji rate, capitals, length)
     const realVoice = voice?.fingerprint ? voice : null;
@@ -225,7 +227,7 @@ class AzureOpenAIService {
         `- Stories here about other people refusing to share numbers are about THEM, not a rule for me.\n`;
     } else if (knowledge?.context) {
       // Not close: contact details are removed before the model sees them, so they cannot leak
-      personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; FOLLOW THE PRIVACY RULES FOR THIS CHAT):\n${redactContactDetails(knowledge.context)}\n` +
+      personalKnowledgeSection = `FACTS FROM MY UPLOADED DOCUMENTS (USE ONLY IF THEY ASK ABOUT THIS; FOLLOW THE PRIVACY RULES FOR THIS CHAT):\n${redactContactDetails(knowledge.context, { keepEmail: knowsThem })}\n` +
         `- Anything shown as [private] is not for this person. Never guess or make it up.\n`;
     }
 
@@ -405,7 +407,7 @@ ${config.personaBio}
 
 ${privacyRules(closeness, userMemory.name && !String(userMemory.name).startsWith('User_') ? userMemory.name : 'they')}
 
-${config.aboutMe ? `ABOUT ME & PERSONAL DETAILS (MY LIFE, WORK, BACKGROUND; SHARE ONLY WHAT THE PRIVACY RULES ALLOW):\n${isClose ? config.aboutMe : redactContactDetails(config.aboutMe)}\n` : ''}
+${config.aboutMe ? `ABOUT ME & PERSONAL DETAILS (MY LIFE, WORK, BACKGROUND; SHARE ONLY WHAT THE PRIVACY RULES ALLOW):\n${isClose ? config.aboutMe : redactContactDetails(config.aboutMe, { keepEmail: knowsThem })}\n` : ''}
 ${config.characteristics ? `MY CHARACTERISTICS & PERSONALITY TRAITS:\n${config.characteristics}\n` : ''}
 ${config.textingHabits ? `HOW I TEXT (MY TEXTING HABITS & RULES):\n${config.textingHabits}\n` : ''}
 ${config.replyRules ? `HOW I REPLY (REPLY BEHAVIORS & REACTION RULES):\n${config.replyRules}\n` : ''}
@@ -413,7 +415,7 @@ ${config.replyRules ? `HOW I REPLY (REPLY BEHAVIORS & REACTION RULES):\n${config
 STYLE & TONE GUIDELINES:
 ${config.toneGuidelines}
 
-${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${isClose ? config.customKnowledge : redactContactDetails(config.customKnowledge)}\n` : ''}
+${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${isClose ? config.customKnowledge : redactContactDetails(config.customKnowledge, { keepEmail: knowsThem })}\n` : ''}
 ${personalKnowledgeSection}
 ${personalStoryboard}
 ${hybridPlaybook ? `${hybridPlaybook}- Use this playbook only when the person is asking about your products, services or bookings; keep your personal voice.
@@ -440,7 +442,7 @@ ${knowsThem
   ? `\n- YOU ASKED THEM EARLIER: "${c(userMemory.pendingQuestion.text, 160)}". If this message answers it, react to the answer like a friend who cares (don't ask it again). If it doesn't, don't push.`
   : ''}
 ${socialTreeContext}
-
+${sharedByThem ? `\n${sharedByThem}\n` : ''}
 REEL & SHARED MEDIA REACTIONS:
 - When user shares a Reel/Post/Photo: React instantly like a human friend — not an essay. Express genuine emotion matching the content (funny, epic, aesthetic, emotional). Keep it short and real.
 

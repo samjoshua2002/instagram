@@ -37,3 +37,13 @@ test('a reply that says yes for the owner is caught; normal replies are not', ()
   }
   assert.ok(!commitsOwner(holdingReply(0.1)));
 });
+
+test('their message asks for a commitment: invites, plans, money, game links', () => {
+  const { asksForCommitment } = require('../services/importantRules');
+  assert.ok(asksForCommitment('can we play chess now?'));
+  assert.ok(asksForCommitment('https://link.chess.com/play/wJ23ZU'));
+  assert.ok(asksForCommitment('lets go movie tomorrow'));
+  assert.ok(asksForCommitment('send 200 on gpay'));
+  assert.ok(!asksForCommitment('i played chess yesterday lol'));
+  assert.ok(!asksForCommitment('hi sam'));
+});

@@ -52,3 +52,14 @@ test('privacy rules: strangers get nothing personal, close people can have your 
   assert.ok(PERSONAL_ASK_RE.test('who is your mom'));
   assert.ok(!PERSONAL_ASK_RE.test('did you watch the match'));
 });
+
+test('your own words count: "close friend" / "closest friend" are close; thousands of recent DMs too', () => {
+  const NOW2 = Date.parse('2026-11-16T00:00:00Z');
+  const ago = d => new Date(NOW2 - d * 86400000);
+  assert.equal(computeCloseness({ category: 'online_friend', relationshipToSam: 'close friend', chatsCount: 50 }, NOW2).level, 'close');
+  assert.equal(computeCloseness({ category: 'online_friend', relationshipToSam: 'Closest friend' }, NOW2).level, 'close');
+  assert.equal(computeCloseness({ category: 'online_friend', relationshipToSam: 'Fan', chatsCount: 2009, firstSeen: ago(200), lastSeen: ago(1) }, NOW2).level, 'friend');
+  assert.equal(computeCloseness({ category: 'online_friend', chatsCount: 13012, firstSeen: ago(300), lastSeen: ago(1) }, NOW2).level, 'close');
+  assert.ok(!redactContactDetails('mail me at sam@example.com', { keepEmail: true }).includes('[private]'));
+  assert.ok(redactContactDetails('call 9876543210', { keepEmail: true }).includes('[private]'));
+});

@@ -83,4 +83,18 @@ function withDescription(text, kind, description) {
   return t.includes(placeholder) ? t.replace(placeholder, said) : `${t} ${said}`.trim();
 }
 
-module.exports = { describeUrl, withDescription, videoFrames };
+/** Same as describeUrl, from a file we already have (catch-up for older saved photos/videos). */
+async function describeBuffer(buf, contentType = 'image/jpeg', kind = 'photo') {
+  try {
+    if (kind === 'video') {
+      const frames = await videoFrames(buf);
+      return frames.length ? await describeImages(frames.map(f => ({ buf: f, type: 'image/jpeg' })), 'video (frames from it)') : null;
+    }
+    return await describeImages([{ buf, type: /^image\//.test(contentType) ? contentType : 'image/jpeg' }], kind);
+  } catch (err) {
+    console.warn(`⚠️ [Media] Could not look at a saved ${kind}:`, err.message);
+    return null;
+  }
+}
+
+module.exports = { describeUrl, describeBuffer, withDescription, videoFrames };

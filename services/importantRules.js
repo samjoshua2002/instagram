@@ -57,4 +57,16 @@ function holdingReply(seed = Math.random()) {
   return HOLDING[Math.floor(seed * HOLDING.length) % HOLDING.length];
 }
 
-module.exports = { extractLinks, cues, looksImportant, kindOf, commitsOwner, holdingReply };
+/**
+ * Their message asks the owner to commit to something: an invite or challenge, a plan, money,
+ * or a game/meeting link. Used to stop an instant "sure" before it is sent.
+ */
+function asksForCommitment(text) {
+  const t = String(text || '');
+  const c = cues(t);
+  if (c.includes('money')) return true;
+  if (c.includes('invite') && (/\?/.test(t) || c.includes('plan') || /\b(now|rn|today|tonight|tomorrow)\b/i.test(t))) return true;
+  return extractLinks(t).some(u => /chess\.com|lichess|meet\.google|zoom\.us|discord\.gg|teams\.microsoft|skribbl|gartic|among|play/i.test(u));
+}
+
+module.exports = { extractLinks, cues, looksImportant, kindOf, commitsOwner, holdingReply, asksForCommitment };
