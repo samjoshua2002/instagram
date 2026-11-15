@@ -28,4 +28,35 @@ function applyReview(facts, review, { maxDropShare = 1 / 3 } = {}) {
   return { facts: out, changes: reasons, skipped: false };
 }
 
-module.exports = { applyReview };
+/**
+ * The name most facts are about, when it is not the person's current name: a sign they were
+ * renamed (or merged) and the facts still use the old name. Needs at least 3 facts and over 40%
+ * of them starting with that name. Returns the old name or null.
+ */
+function detectNameDrift(facts, currentName, { minFacts = 3, share = 0.4 } = {}) {
+  const list = (facts || []).map(f => String(f?.fact || f || '')).filter(Boolean);
+  if (list.length < minFacts) return null;
+  const counts = new Map();
+  for (const t of list) {
+    // "Laptop upgrade: Rajveer's laptop ..." or "Rajveer is studying ..." -> the subject name
+    const body = t.includes(':') ? t.slice(t.indexOf(':') + 1).trim() : t;
+    const m = body.match(/^([A-Z][\p{L}]{2,20})(?:'s|\s)/u);
+    if (m) counts.set(m[1], (counts.get(m[1]) || 0) + 1);
+  }
+  // The card name in plain letters ("✩𝑆𝒶𝓊𝓂𝓎𝒶✩" -> "saumya"), so a fancy font is not a different name
+  const cur = plainName(currentName);
+  const skip = new Set(['she', 'he', 'they', 'the', 'their', 'his', 'her', 'shared', 'wanted', 'mentioned', 'said', 'sent', 'likes', 'loves', 'has', 'is', 'was',
+    'user', 'users', 'contact', 'person', 'friend', 'sender', 'someone', 'owner', 'sam', 'samjoshua']);
+  const [name, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  if (!name || skip.has(name.toLowerCase())) return null;
+  const plain = plainName(name);
+  if (!cur || plain === cur || cur.includes(plain) || plain.includes(cur)) return null;
+  return n >= minFacts && n / list.length > share ? name : null;
+}
+
+/** Letters only, lower case, fancy fonts folded to plain ("𝑆𝒶𝓊𝓂𝓎𝒶" -> "saumya", "ليو" stays). */
+function plainName(name) {
+  return String(name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}]/gu, '');
+}
+
+module.exports = { applyReview, detectNameDrift, plainName };

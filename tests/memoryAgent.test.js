@@ -25,3 +25,20 @@ test('agent review: a review that would remove too much is not applied', () => {
   assert.equal(r.skipped, true);
   assert.equal(r.facts.length, facts.length);
 });
+
+test('name drift: most facts about another name means they were renamed', () => {
+  const { detectNameDrift } = require('../services/memoryAgentRules');
+  const facts = ["Laptop: Rajveer's laptop is lagging", 'Commerce: Rajveer is studying commerce', 'Roblox: Rajveer quit Roblox', 'Leg pain: mentioned leg pain', 'Likes surfing reels'];
+  assert.equal(detectNameDrift(facts, 'mochi'), 'Rajveer');
+  assert.equal(detectNameDrift(facts, 'Rajveer'), null);
+  assert.equal(detectNameDrift(['She likes cats', 'She is in college', 'She quit gym'], 'Asha'), null);
+  assert.equal(detectNameDrift(['Fami likes cats', 'Moksha visited', 'Arun called'], 'Sam'), null);
+});
+
+test('name drift ignores "User", fancy fonts of the same name, and the owner', () => {
+  const { detectNameDrift, plainName } = require('../services/memoryAgentRules');
+  assert.equal(detectNameDrift(['User likes cats', 'User is in college', 'User quit gym'], 'Asra'), null);
+  assert.equal(detectNameDrift(['Saumya likes cats', 'Saumya is in college', 'Saumya quit gym'], '✩⃛ 𝑆𝒶𝓊𝓂𝓎𝒶✩⃛'), null);
+  assert.equal(detectNameDrift(['Ankith likes cats', 'Ankith is in college', 'Ankith quit gym'], 'Ankush'), 'Ankith');
+  assert.equal(plainName('✩⃛ 𝑆𝒶𝓊𝓂𝓎𝒶✩⃛'), 'saumya');
+});

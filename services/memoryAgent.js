@@ -11,7 +11,7 @@ const UserMemory = require('../models/UserMemory');
 const PersonMemory = require('../models/PersonMemory');
 const MemoryChunk = require('../models/MemoryChunk');
 const AgentAction = require('../models/AgentAction');
-const { applyReview } = require('./memoryAgentRules');
+const { applyReview, detectNameDrift } = require('./memoryAgentRules');
 
 const REVIEW_EVERY_MS = 24 * 3600 * 1000;
 
@@ -73,6 +73,78 @@ async function cleanup() {
   }
 }
 
+/**
+ * Health checks across every contact (no AI calls): finds and fixes broken or stale data the
+ * owner may never notice. Each fix is logged.
+ */
+async function healthCheck() {
+  const SocialGraph = require('../models/SocialGraph');
+  const SharedItem = require('../models/SharedItem');
+  const Reminder = require('../models/Reminder');
+  const { slotsFromDoc, brainScore, SLOTS } = require('./memoryIndexRules');
+  const fixes = [];
+  const log = async (ownerId, senderId, name, summary, details = []) => {
+    fixes.push(summary);
+    await AgentAction.create({ ownerId: ownerId || null, senderId: senderId || '', name: name || '', kind: 'cleanup', summary, details }).catch(() => {});
+  };
+
+  // 1. Names: your card name is the truth; the AI's records and facts follow it
+  const cards = await SocialGraph.find({ senderId: { $nin: [null, ''] } }, { ownerId: 1, senderId: 1, name: 1 }).lean();
+  for (const card of cards) {
+    if (!card.name || /^User_/.test(card.name)) continue;
+    const mem = await UserMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { name: 1, facts: 1 }).lean();
+    if (!mem) continue;
+    // The AI's record uses your card name (facts are left as they are: a full name is still them)
+    if (mem.name !== card.name) {
+      await UserMemory.updateOne({ _id: mem._id }, { $set: { name: card.name } });
+      await log(card.ownerId, card.senderId, card.name, `Name in the AI's records set to "${card.name}" (was "${mem.name || 'empty'}")`);
+    }
+    // Facts mostly about another name: never rewritten on a guess; you are asked instead
+    const drift = detectNameDrift(mem.facts, card.name);
+    if (drift) {
+      const question = `Most of what the AI learned about ${card.name} calls them "${drift}". Is "${drift}" the same person (an old or real name)? If not, who is ${drift}?`;
+      const pm = await PersonMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { doubts: 1 });
+      if (pm && !(pm.doubts || []).some(d => d.question === question)) {
+        await PersonMemory.updateOne({ _id: pm._id }, { $push: { doubts: { question, about: 'name' } } });
+        await log(card.ownerId, card.senderId, card.name, `Asked you whether "${drift}" is ${card.name}`);
+      }
+    }
+  }
+
+  // 2. Alerts and reminders saved under another name
+  for (const card of cards) {
+    if (!card.name) continue;
+    const q = { ownerId: card.ownerId || null, senderId: card.senderId, name: { $nin: [card.name, ''] } };
+    const n = (await SharedItem.updateMany(q, { $set: { name: card.name } })).modifiedCount + (await Reminder.updateMany(q, { $set: { name: card.name } })).modifiedCount;
+    if (n) await log(card.ownerId, card.senderId, card.name, `${n} alert(s)/reminder(s) now use the name "${card.name}"`);
+  }
+
+  // 3. Memory stuck after a crash or restart, and people parked after errors (retry once a day)
+  const stuck = await PersonMemory.updateMany({ status: 'indexing', updatedAt: { $lte: new Date(Date.now() - 30 * 60 * 1000) } }, { $set: { status: 'pending', dirty: true } });
+  if (stuck.modifiedCount) await log(null, '', '', `${stuck.modifiedCount} memory job(s) stuck after a restart were queued again`);
+  const parked = await PersonMemory.updateMany({ errorCount: { $gte: 5 }, lastIndexedAt: { $lte: new Date(Date.now() - 24 * 3600 * 1000) } }, { $set: { errorCount: 0, dirty: true, status: 'pending' } });
+  if (parked.modifiedCount) await log(null, '', '', `${parked.modifiedCount} person(s) that kept failing are being tried again`);
+
+  // 4. A memory document but no brain score: score it from the document
+  for (const pm of await PersonMemory.find({ status: 'ready', doc: { $ne: '' }, brainScore: { $lte: 0 } })) {
+    const ds = slotsFromDoc(pm.doc);
+    const given = pm.slots || {};
+    pm.slots = Object.fromEntries(Object.keys(SLOTS).map(k => [k, Math.max(Number(given[k]) || 0, ds[k] || 0)]));
+    pm.brainScore = brainScore(pm.slots, pm.totalMessages);
+    if (pm.brainScore > 0) { await pm.save(); await log(pm.ownerId, pm.senderId, pm.name, `Brain score fixed: 0 -> ${pm.brainScore}`); }
+  }
+
+  // 5. Reminders cut off in the middle of sending (server restarted): send them again
+  const cut = await Reminder.updateMany({ status: 'failed', note: 'sending', updatedAt: { $lte: new Date(Date.now() - 10 * 60 * 1000) } }, { $set: { status: 'pending', note: '' } });
+  if (cut.modifiedCount) await log(null, '', '', `${cut.modifiedCount} reminder(s) interrupted by a restart will be sent again`);
+
+  // 6. Memory entries missing for contacts that have messages
+  await require('./memoryIndexService').ensureEntries().catch(() => {});
+
+  if (fixes.length) console.log(`🩺 [Memory agent] Health check: ${fixes.length} fix(es)`);
+  return fixes;
+}
+
 let running = false;
 async function tick() {
   if (running) return;
@@ -96,7 +168,11 @@ function startScheduler() {
   const c = setInterval(() => { cleanup().catch(() => {}); }, 6 * 3600 * 1000);
   if (c.unref) c.unref();
   setTimeout(() => { cleanup().catch(() => {}); }, 5 * 60 * 1000);
+  // Health checks: 2 minutes after start (catches anything a crash left behind), then every 30 min
+  setTimeout(() => { healthCheck().catch(err => console.warn('⚠️ [Memory agent] health', err.message)); }, 2 * 60 * 1000);
+  const h = setInterval(() => { healthCheck().catch(err => console.warn('⚠️ [Memory agent] health', err.message)); }, 30 * 60 * 1000);
+  if (h.unref) h.unref();
   console.log('🧹 [Memory agent] Reviewing one person every 3 min');
 }
 
-module.exports = { reviewPerson, cleanup, tick, startScheduler };
+module.exports = { reviewPerson, cleanup, healthCheck, tick, startScheduler };
