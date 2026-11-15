@@ -1,5 +1,6 @@
 'use client';
 
+import { isAiOnFor } from '../lib/aiReply';
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import PageSkeleton from '../components/Skeletons';
 import { useApp } from '../context/AppContext';
@@ -100,37 +101,11 @@ function ControlsPageContent() {
     ].filter(Boolean);
   }, []);
 
-  const isExcluded = useCallback((contact) => {
-    const configToUse = currentConfigRef.current || routingConfig;
-    const excluded = (configToUse.excludedContactIds || []).filter(Boolean);
-    const targetKeys = getTargetKeys(contact);
-    return targetKeys.some(k => excluded.includes(k)) || contact.aiEnabled === false;
-  }, [routingConfig, getTargetKeys]);
-
-  const isIncluded = useCallback((contact) => {
-    const configToUse = currentConfigRef.current || routingConfig;
-    const included = (configToUse.includedContactIds || []).filter(Boolean);
-    const targetKeys = getTargetKeys(contact);
-    return targetKeys.some(k => included.includes(k)) && contact.aiEnabled !== false;
-  }, [routingConfig, getTargetKeys]);
-
-  // Determine current AI state of contact
+  // Determine current AI state of contact: the same shared rule the server replies by
   const getContactMode = useCallback((contact) => {
-    const chatMode = routingConfig.chatMode;
-    if (chatMode === 'only_selected') {
-      const included = isIncluded(contact);
-      if (!included || contact.aiEnabled === false || contact.replyToMessages === false) return 'manual';
-      return 'full_ai';
-    } else if (chatMode === 'everyone_except') {
-      const excluded = isExcluded(contact);
-      if (excluded || contact.aiEnabled === false || contact.replyToMessages === false) return 'manual';
-      return 'full_ai';
-    } else {
-      // everyone
-      if (contact.aiEnabled === false || contact.replyToMessages === false) return 'manual';
-      return 'full_ai';
-    }
-  }, [routingConfig.chatMode, isIncluded, isExcluded]);
+    const configToUse = currentConfigRef.current || routingConfig;
+    return isAiOnFor(contact, configToUse) ? 'full_ai' : 'manual';
+  }, [routingConfig]);
 
   // Direct Button Switcher: Full AI, Stop AI (Instant Two-Way Sync)
   const handleSetMode = useCallback((contact, mode) => {

@@ -18,13 +18,13 @@
   object-fit: cover;
   opacity: 0;
   transition: opacity 0.5s ease;
-  /* Same look for every photo: no colour of its own (the tint adds one), softer detail,
-     lower contrast, so busy photos calm down and text on top stays readable */
-  filter: grayscale(1) contrast(0.8) brightness(0.85) blur(1.5px);
+  /* Each photo keeps its own colours (they used to be greyed out and repainted one colour, so every banner looked
+     the same); slightly calmer so text on top stays readable */
+  filter: saturate(1.05) contrast(0.92) brightness(0.88);
   transform: scale(1.04); /* hides the blurred edge */
 }
 .ub-img.in { opacity: 1; }
-:root[data-theme="light"] .ub-img { filter: grayscale(1) contrast(0.75) brightness(1.12) blur(1.5px); }
+:root[data-theme="light"] .ub-img { filter: saturate(0.95) contrast(0.9) brightness(1.06); }
 /* Theme switch: the circle reveal already blends the change; a photo fade inside it reads as a flicker */
 html.theme-vt .ub-img,
 html.theme-vt .ub-tint { transition: none !important; }
@@ -39,7 +39,8 @@ html.theme-vt .ub-tint { transition: none !important; }
   transition: opacity 0.5s ease;
 }
 /* a light wash only: photos keep their own colours (a full tint made every banner look the same) */
-.ub-tint.in { opacity: 0.22; }
+.ub-tint.in { opacity: 0.18; }
+:root[data-theme="light"] .ub-tint.in { opacity: 0.1; }
 .ub-shade {
   position: absolute;
   inset: 0;
@@ -224,3 +225,6 @@ html.theme-vt .ub-tint { transition: none !important; }
   .sh-banner-btn span { display: none; } /* phone: just the arrow */
   .person-cover { left: -16px; right: -16px; top: -16px; height: 300px; }
 }
+
+/* Light theme: no dark drop shadow under the page's cover square (it showed as a grey smudge on the light page) */
+:root[data-theme="light"] .spx-cover { box-shadow: 0 10px 30px -12px rgba(60, 40, 20, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.04); }

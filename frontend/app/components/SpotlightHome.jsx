@@ -378,26 +378,38 @@ function Sparkline({ values }) {
 }
 
 /** Week-on-week change: percent for counts, points for a share. */
-function weekChange(now, before, unit = '%') {
-  if (now === null || before === null || now === undefined || before === undefined) return { text: 'No data last week', dir: 0 };
+function weekChange(now, before, unit = '%', than = 'last week') {
+  if (now === null || before === null || now === undefined || before === undefined) return { text: `No data ${than}`, dir: 0 };
   if (unit === 'pts') {
     const d = now - before;
-    return { text: d === 0 ? 'Same as last week' : `${d > 0 ? '+' : '−'}${Math.abs(d)} pts vs last week`, dir: Math.sign(d) };
+    return { text: d === 0 ? `Same as ${than}` : `${d > 0 ? '+' : '−'}${Math.abs(d)} pts vs ${than}`, dir: Math.sign(d) };
   }
-  if (before === 0) return now === 0 ? { text: 'Same as last week', dir: 0 } : { text: 'New this week', dir: 1 };
+  if (before === 0) return now === 0 ? { text: `Same as ${than}`, dir: 0 } : { text: `Up from none ${than}`, dir: 1 };
   const pct = Math.round(((now - before) / before) * 100);
-  return { text: pct === 0 ? 'Same as last week' : `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% vs last week`, dir: Math.sign(pct) };
+  return { text: pct === 0 ? `Same as ${than}` : `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% vs ${than}`, dir: Math.sign(pct) };
 }
 
 /** This week's headline numbers, each with its change from last week and a 7-day sparkline. */
 function KpiRow({ summary }) {
+  // The AI-share ring beside the chart already shows this week's AI / your replies and the share, so these tiles
+  // show what nothing else on Home does: today, the daily pace, the busiest day and who you talked to.
   const r = summary?.replies;
+  const days = summary?.days || [];
+  const totals = r ? r.ai.map((a, i) => a + (r.human[i] || 0)) : null;
   const lastSeven = arr => (arr ? arr.slice(-7) : null);
-  const aiShareDaily = r ? r.ai.slice(-7).map((a, i) => { const t = a + r.human.slice(-7)[i]; return t ? (a / t) * 100 : 0; }) : null;
+  const today = totals ? totals[totals.length - 1] : null;
+  const yesterday = totals && totals.length > 1 ? totals[totals.length - 2] : null;
+  const avg = arr => (arr && arr.length ? Math.round(arr.reduce((x, y) => x + y, 0) / arr.length) : null);
+  const thisAvg = totals ? avg(totals.slice(-7)) : null;
+  const lastAvg = totals && totals.length >= 14 ? avg(totals.slice(-14, -7)) : null;
+  const best = totals ? totals.reduce((bi, v, i) => (v > totals[bi] ? i : bi), 0) : -1;
+  const bestDay = best >= 0 && days[best] && totals[best] > 0
+    ? new Date(`${days[best]}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+    : null;
   const tiles = [
-    { label: 'AI replies', value: r?.thisWeek.ai, change: r && weekChange(r.thisWeek.ai, r.lastWeek.ai), spark: lastSeven(r?.ai), href: '/analytics' },
-    { label: 'Your replies', value: r?.thisWeek.human, change: r && weekChange(r.thisWeek.human, r.lastWeek.human), spark: lastSeven(r?.human), href: '/analytics' },
-    { label: 'AI share', value: summary?.aiShare.thisWeek, suffix: '%', change: summary && weekChange(summary.aiShare.thisWeek, summary.aiShare.lastWeek, 'pts'), spark: aiShareDaily, href: '/controls' },
+    { label: 'Replies today', value: today, change: yesterday !== null && weekChange(today, yesterday, '%', 'yesterday'), spark: lastSeven(totals), href: '/analytics' },
+    { label: 'Daily average', value: thisAvg, change: lastAvg !== null && weekChange(thisAvg, lastAvg), spark: lastSeven(totals), href: '/analytics' },
+    { label: 'Busiest day', value: best >= 0 ? totals[best] : null, change: bestDay && { dir: 0, text: bestDay }, spark: totals ? totals.slice(-14) : null, href: '/analytics' },
     { label: 'People messaged', value: summary?.people.thisWeek, change: summary && weekChange(summary.people.thisWeek, summary.people.lastWeek), spark: lastSeven(summary?.people.daily), href: '/relationships' },
   ];
   return (

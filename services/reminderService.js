@@ -1,3 +1,4 @@
+const { aiRepliesTo } = require('../frontend/app/lib/aiReplyRules');
 const UserMemory = require('../models/UserMemory');
 const Message = require('../models/Message');
 const PersonaConfig = require('../models/PersonaConfig');
@@ -81,10 +82,9 @@ class ReminderService {
 
     // Same switches as live replies: paused bot, chat mode lists, reminders off, business workspaces
     const { config, activeMode } = await this.loadOwner(user.ownerId, ownerCache);
-    if (!config || !config.globalBotActive || config.chatMode === 'paused') return;
-    if (config.followUpReminderEnabled === false || activeMode === 'business') return;
-    if (config.chatMode === 'everyone_except' && (config.excludedContactIds || []).includes(user.senderId)) return;
-    if (config.chatMode === 'only_selected' && !(config.includedContactIds || []).includes(user.senderId)) return;
+    if (!config || config.followUpReminderEnabled === false || activeMode === 'business') return;
+    // the same "does the AI reply to them?" rule as live replies and every page
+    if (!aiRepliesTo({ senderId: user.senderId, handle: user.username, name: user.name, aiEnabled: user.aiEnabled, replyToMessages: user.replyToMessages }, config, { includeGlobal: true })) return;
 
     if (!isWithinReminderWindow(user.lastInteraction, now, reminderDelayHours(config))) return;
 

@@ -95,6 +95,8 @@ const UserMemorySchema = new mongoose.Schema({
   facts: [{
     fact: { type: String, required: true },
     addedAt: { type: Date, default: Date.now },
+    // "you": typed in by the owner (never condensed or dropped by the tidy-up); "learned": from the chat
+    source: { type: String, enum: ['you', 'learned'], default: 'learned' },
   }],
   rollingSummary: {
     type: String,

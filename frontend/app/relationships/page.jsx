@@ -12,7 +12,10 @@ import {
   ChevronLeft, MoreHorizontal
 } from 'lucide-react';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
-import { isAiOnFor } from '../lib/aiReply';
+import { isAiOnFor, contactKeys } from '../lib/aiReply';
+import aiRules from '../lib/aiReplyRules';
+
+const { listsAfterSwitch } = aiRules;
 import ContactAvatar from '../components/ContactAvatar';
 import CountUp from '../components/CountUp';
 import { useAmbientImage, prefetchAmbientImages } from '../components/AmbientBackground';
@@ -26,109 +29,12 @@ import PageSkeleton, { Sk } from '../components/Skeletons';
 // Before paint on the client (no flash of the directory when deep-linking to a person)
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-// Next birthday from a stored DOB ("2002-05-14", "14 May", "May 14, 2002")
-function getNextBirthday(dob) {
-  if (!dob) return null;
-  const hasYear = /\b(19|20)\d{2}\b/.test(dob);
-  // "2002-05-14" alone is read as UTC midnight (a day early west of UTC), so ISO dates are built locally
-  const iso = String(dob).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  const parsed = iso ? new Date(+iso[1], +iso[2] - 1, +iso[3]) : new Date(hasYear ? dob : `${dob} 2000`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let next = new Date(today.getFullYear(), parsed.getMonth(), parsed.getDate());
-  if (next < today) next = new Date(today.getFullYear() + 1, parsed.getMonth(), parsed.getDate());
-  return {
-    days: Math.round((next - today) / 86400000),
-    label: next.toLocaleDateString(undefined, { day: 'numeric', month: 'long' }),
-    turning: hasYear ? next.getFullYear() - parsed.getFullYear() : null,
-  };
-}
-
-function formatLastContact(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return '—';
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-}
 import { motion, AnimatePresence } from 'framer-motion';
 import { enterMotion, swapMotion } from '../lib/motion';
 import { SegIndicator } from '../components/ui/motion';
 import { useHeroCollapse, useRevealOnce } from '../lib/scrollMotion';
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
-// Person page: built-in greeting chips, labels for the Details grid, and the People-in-their-life groups
-const DEFAULT_GREETINGS = ['hey', 'heyy', 'oyy', 'hii', 'yo'];
-const CATEGORY_LABELS = {
-  close_friend: 'Close friend',
-  online_friend: 'Online friend',
-  offline_friend: 'Offline friend',
-  family: 'Family',
-  professional: 'Professional / creator',
-  business: 'Business / client',
-};
-const GENDER_LABELS = { female: 'Female', male: 'Male', neutral: 'Neutral', unknown: 'Not set' };
-const PEOPLE_GROUPS = [
-  { id: 'friends', label: 'Friends', rel: 'friend' },
-  { id: 'family', label: 'Family', rel: 'family' },
-  { id: 'mentioned', label: 'Mentioned', rel: 'mentioned' },
-];
-const FAMILY_REL = /\b(sis|sister|brother|mom|mum|mother|amma|dad|father|appa|parent|cousin|aunt|aunty|uncle|grand\w*|niece|nephew|family|relative|wife|husband|son|daughter|in-law)\b/i;
-function connectionGroup(c) {
-  const rel = String(c?.rel || c?.relationship || '').trim();
-  if (!rel || /^(connected|mentioned|unknown)$/i.test(rel)) return 'mentioned';
-  return FAMILY_REL.test(rel) ? 'family' : 'friends';
-}
-function connectionLabel(c) {
-  const rel = String(c?.rel || c?.relationship || '').trim();
-  if (!rel || /^(connected|unknown)$/i.test(rel)) return 'Mentioned';
-  return rel.charAt(0).toUpperCase() + rel.slice(1);
-}
-
-// Drop broken years (e.g. "0002" from a half-typed date picker) so only day + month show
-function cleanDob(dob) {
-  if (!dob) return "";
-  return String(dob).replace(/^0\d{3}-/, "").replace(/,?\s*0\d{3}\b/, "").trim();
-}
-
-// Robust timezone-agnostic helper to parse date strings into YYYY-MM-DD
-function formatDobForInput(dob) {
-  if (!dob) return '';
-  const isoMatch = dob.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (isoMatch) {
-    const [, y, m, d] = isoMatch;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  for (let i = 0; i < MONTH_NAMES.length; i++) {
-    const mName = MONTH_NAMES[i];
-    if (dob.toLowerCase().includes(mName.toLowerCase()) || dob.toLowerCase().includes(mName.slice(0, 3).toLowerCase())) {
-      const yearMatch = dob.match(/\b(19|20)\d{2}\b/);
-      const dayMatch = dob.match(/\b([1-9]|[12]\d|3[01])\b/);
-      if (yearMatch && dayMatch) {
-        const y = yearMatch[0];
-        const m = String(i + 1).padStart(2, '0');
-        const d = String(dayMatch[0]).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-      }
-    }
-  }
-  const d = new Date(dob);
-  if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return '';
-}
+import { getNextBirthday, formatLastContact, MONTH_NAMES, DEFAULT_GREETINGS, CATEGORY_LABELS, GENDER_LABELS, PEOPLE_GROUPS, connectionGroup, connectionLabel, cleanDob, formatDobForInput } from './personHelpers';
+import PersonFacts from './PersonFacts';
 
 function RelationshipsPageContent() {
 
@@ -149,7 +55,8 @@ function RelationshipsPageContent() {
     isSyncingInitial,
     user,
     isImpersonating,
-    routingConfig
+    routingConfig,
+    setRoutingConfig
   } = useApp();
   const confirm = useConfirm();
   const confirmDelete = (name, extra = 'Their contact and saved profile will be removed.') =>
@@ -207,7 +114,6 @@ function RelationshipsPageContent() {
   const [saveState, setSaveState] = useState('saved'); // saved | pending | saving | error
   const [saveTick, setSaveTick] = useState(0);
   const autosaveTimer = useRef(null);
-  const [factSearch, setFactSearch] = useState('');
   const [peopleSearch, setPeopleSearch] = useState('');
   const [peopleTab, setPeopleTab] = useState('friends');
   const [showAllPeople, setShowAllPeople] = useState(false);
@@ -221,7 +127,6 @@ function RelationshipsPageContent() {
 
   const [isAutofilling, setIsAutofilling] = useState(false);
   const [isLearning, setIsLearning] = useState(false);
-  const [newFactInput, setNewFactInput] = useState('');
   const [newConnTarget, setNewConnTarget] = useState('');
   const [newConnRel, setNewConnRel] = useState('');
 
@@ -299,7 +204,6 @@ function RelationshipsPageContent() {
       // Open on the first group that has anyone in it
       const groups = (selectedPerson.connections || []).map(connectionGroup);
       setPeopleTab(PEOPLE_GROUPS.find(g => groups.includes(g.id))?.id || 'friends');
-      setFactSearch('');
       setPeopleSearch('');
       setShowAllPeople(false);
       setIsAddingPerson(false);
@@ -578,12 +482,20 @@ function RelationshipsPageContent() {
       replyToMessages: isFullAi,
       replyToReelsAndPosts: false
     }));
+    // the chat-rule list changes with the switch: show it now (the server sends back its own copy to confirm)
+    const prevRouting = routingConfig;
+    const listChange = listsAfterSwitch(routingConfig, {
+      senderIds: [prev.senderId],
+      otherKeys: contactKeys(prev),
+    }, isFullAi);
+    if (listChange) setRoutingConfig(r => ({ ...r, ...listChange }));
 
     try {
       // silent: errors are thrown back here so the switch can be put back
       await updateContactPreferences(targetKey, { aiMode: mode }, { silent: true });
       showToast(isPaused ? `Stopped AI for ${prev.name}. Manual chat active!` : `Full AI auto-reply enabled for ${prev.name}!`);
     } catch (e) {
+      if (listChange) setRoutingConfig(r => ({ ...r, includedContactIds: prevRouting.includedContactIds, excludedContactIds: prevRouting.excludedContactIds }));
       setSelectedPerson(p => (p && p.id === prev.id ? { ...p, aiEnabled: prev.aiEnabled, replyToMessages: prev.replyToMessages, replyToReelsAndPosts: prev.replyToReelsAndPosts } : p));
       showToast(`Could not update ${prev.name}: ${e.message}`, 'error');
     }
@@ -901,10 +813,9 @@ function RelationshipsPageContent() {
   };
 
   // Add custom fact to memory and synchronize with personalNotes
-  const handleAddFact = (e) => {
-    e?.preventDefault();
-    if (!newFactInput.trim() || !selectedPerson) return;
-    const factText = newFactInput.trim();
+  const handleAddFact = (text) => {
+    const factText = String(text || '').trim();
+    if (!factText || !selectedPerson) return;
     addFact(selectedPerson.name, factText);
 
     // Link: also append to personalNotes (autosave turns note lines into lore, so it is kept)
@@ -912,7 +823,6 @@ function RelationshipsPageContent() {
       personalNotes: formData.personalNotes ? `${formData.personalNotes}\n• ${factText}` : `• ${factText}`
     });
 
-    setNewFactInput('');
     showToast('Fact added & linked to personal lore');
   };
 
@@ -1096,21 +1006,6 @@ function RelationshipsPageContent() {
       : toneName === 'Playful'
         ? `${sampleOpen} relax relax, I'm here now`
         : `${sampleOpen} sorry sorry, I'm here now`;
-    // newest first: what the AI learned last is what you want to see first
-    const allFacts = [...(selectedPerson.facts || selectedPerson.lore || [])].reverse();
-    const factQuery = factSearch.trim().toLowerCase();
-    const shownFacts = factQuery ? allFacts.filter(f => String(f).toLowerCase().includes(factQuery)) : allFacts;
-    // the latest things learned from the chat, with when (fresh ones are marked New)
-    const learned = (selectedPerson.learned || []).filter(l => l && l.fact);
-    const ago = (at) => {
-      const s = Math.max(0, (Date.now() - new Date(at).getTime()) / 1000);
-      if (!Number.isFinite(s)) return '';
-      if (s < 90) return 'just now';
-      if (s < 3600) return `${Math.round(s / 60)} min ago`;
-      if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-      return `${Math.round(s / 86400)} d ago`;
-    };
-    const isFresh = (at) => Date.now() - new Date(at).getTime() < 6 * 3600 * 1000;
     const connections = selectedPerson.connections || [];
     const groupCounts = connections.reduce((acc, c) => { acc[connectionGroup(c)] += 1; return acc; }, { friends: 0, family: 0, mentioned: 0 });
     const peopleQuery = peopleSearch.trim().toLowerCase();
@@ -1518,66 +1413,7 @@ function RelationshipsPageContent() {
           </section>
 
           {/* ================= WHAT THE AI KNOWS ================= */}
-          <section className="person-glass-card">
-            <h2 className="person-card-title">What the AI knows</h2>
-            <div className="person-card-sub person-live">
-              <span className="person-live-dot" aria-hidden="true" />
-              {allFacts.length.toLocaleString()} fact{allFacts.length === 1 ? '' : 's'} · newest first · updates live
-            </div>
-
-            {(learned.length > 0 || selectedPerson.chatSummary) && !factQuery && (
-              <div className="person-learned" aria-live="polite">
-                <div className="person-learned-head">
-                  <span>Just learned from your chat</span>
-                  {learned[0]?.at && <span className="person-learned-when">{ago(learned[0].at)}</span>}
-                </div>
-                {selectedPerson.chatSummary && <p className="person-learned-summary">{selectedPerson.chatSummary}</p>}
-                {learned.slice(0, 5).map(l => (
-                  <div key={`${l.at}-${l.fact}`} className={`person-learned-row${isFresh(l.at) ? ' is-fresh' : ''}`}>
-                    <span className="person-learned-fact">{l.fact}</span>
-                    {isFresh(l.at) ? <span className="person-learned-new">New</span> : <span className="person-learned-when">{ago(l.at)}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <input
-              type="search"
-              className="person-search"
-              placeholder={`Search ${allFacts.length.toLocaleString()} facts`}
-              aria-label="Search facts"
-              value={factSearch}
-              onChange={e => setFactSearch(e.target.value)}
-            />
-
-            <div className="person-facts">
-              {allFacts.length === 0 ? (
-                <div className="person-empty">No facts yet. The AI learns them from your DMs, or add one below.</div>
-              ) : shownFacts.length === 0 ? (
-                <div className="person-empty">No facts match “{factSearch.trim()}”.</div>
-              ) : (
-                shownFacts.map((fact, i) => (
-                  <div key={`${i}-${fact}`} className="person-fact">
-                    <span>{fact}</span>
-                    <button type="button" className="person-x" onClick={() => handleRemoveFact(fact)} aria-label="Remove this fact" title="Remove this fact">
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <form className="person-inline-form" onSubmit={handleAddFact}>
-              <input
-                type="text"
-                placeholder={`Tell the AI something new about ${personName}`}
-                aria-label="New fact"
-                value={newFactInput}
-                onChange={e => setNewFactInput(e.target.value)}
-              />
-              <button type="submit" className="person-light-btn" disabled={!newFactInput.trim()}>Add</button>
-            </form>
-          </section>
+          <PersonFacts key={selectedPerson.id} person={selectedPerson} personName={personName} onAdd={handleAddFact} onRemove={handleRemoveFact} />
         </div>
 
         {/* ================= PEOPLE IN THEIR LIFE ================= */}

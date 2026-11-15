@@ -98,9 +98,7 @@ const MEMORY_LEARN_QUIET_MS = 45 * 1000;
 // ...but a chat that never pauses still gets learned at least this often
 const MEMORY_LEARN_MAX_WAIT_MS = 5 * 60 * 1000;
 
-// When a person has more facts than this, the older ones are condensed (the newest FACTS_KEPT_FRESH stay as they are)
-const FACTS_BEFORE_TIDY = 60;
-const FACTS_KEPT_FRESH = 20;
+const { tidyCandidates, applyTidy } = require('../lib/factTidy');
 
 class MemoryService {
   constructor() {
@@ -556,19 +554,18 @@ Only extract genuine details explicitly stated or strongly implied by the chat. 
       }
       memory.facts = dedupeFacts(memory.facts || [], f => f.fact, nameWords);
 
-      // Tidy up: once the list is long, the older facts are merged into a few lasting ones and the passing
-      // details (a meal, a mood, an event that's over) are dropped. The newest facts stay word for word.
-      const retiredFacts = new Set();
-      if (memory.facts.length > FACTS_BEFORE_TIDY) {
+      // Tidy up: once the list is long, the older learned facts are merged into a few lasting ones and the passing
+      // details are dropped. The newest facts and the ones you typed in yourself always stay (lib/factTidy.js).
+      let retiredFacts = new Set();
+      const candidates = tidyCandidates(memory.facts);
+      if (candidates.length) {
         try {
-          const old = memory.facts.slice(0, memory.facts.length - FACTS_KEPT_FRESH);
-          const lasting = await this._condenseFacts(old.map(f => f.fact), memory.name || memory.username || 'this person');
-          if (lasting.length && lasting.length < old.length) {
-            const keep = new Set(lasting.map(l => l.toLowerCase()));
-            old.forEach(f => { if (!keep.has(f.fact.toLowerCase())) retiredFacts.add(f.fact); });
-            const oldestAt = old[0]?.addedAt || new Date();
-            memory.facts = [...lasting.map(fact => ({ fact, addedAt: oldestAt })), ...memory.facts.slice(-FACTS_KEPT_FRESH)];
-            console.log(`🧹 [MemoryService] ${senderId}: ${old.length} older facts condensed to ${lasting.length}`);
+          const lasting = await this._condenseFacts(candidates.map(f => f.fact), memory.name || memory.username || 'this person');
+          const tidy = applyTidy(memory.facts, lasting);
+          if (tidy.retired.length) {
+            memory.facts = tidy.facts;
+            retiredFacts = new Set(tidy.retired);
+            console.log(`🧹 [MemoryService] ${senderId}: ${candidates.length} older facts condensed to ${lasting.length}`);
           }
         } catch (tidyErr) {
           console.warn(`⚠️ [MemoryService] Couldn't tidy facts for ${senderId}: ${tidyErr.message}`);

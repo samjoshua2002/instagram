@@ -29,6 +29,8 @@ const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
 const { shouldSendAiTextReply, preferencesForMode, routingAfterMode } = require('./lib/replyPolicy');
+// the one "does the AI reply to this person?" rule, shared with the frontend pages
+const { aiRepliesTo, whyQuiet } = require('./frontend/app/lib/aiReplyRules');
 const workspaceFeatureService = require('./services/workspaceFeatureService');
 const SocialGraph = require('./models/SocialGraph');
 const redisService = require('./services/redisService');
@@ -891,28 +893,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // ─────────────────────────────────────────────────────────────────────────
   memoryService.scheduleMemoryUpdate(senderId, memOptsFor(ownerUser));
 
-  // 4. Check if Bot is enabled globally or paused
-  if (!config.globalBotActive || config.chatMode === 'paused') {
-    console.log(`⏸️ Global Bot is paused. Message learned, skipping auto-reply.`);
-    return;
-  }
-
-  // Check chat routing mode
-  if (config.chatMode === 'everyone_except') {
-    if ((config.excludedContactIds || []).includes(senderId) || userMemory.aiEnabled === false) {
-      console.log(`⏸️ ${userMemory.username} is excluded. Message learned, skipping auto-reply.`);
-      return;
-    }
-  } else if (config.chatMode === 'only_selected') {
-    if (!(config.includedContactIds || []).includes(senderId)) {
-      console.log(`⏸️ ${userMemory.username} not in whitelist. Message learned, skipping auto-reply.`);
-      return;
-    }
-  }
-
-  // Check if AI is enabled for this specific user
-  if (!userMemory.aiEnabled) {
-    console.log(`⏸️ AI paused for ${userMemory.username}. Message learned, skipping auto-reply.`);
+  // 4. Global pause, chat mode lists and their own switch: the same rule every page shows
+  const replyContact = { senderId, handle: userMemory.username, name: userMemory.name, aiEnabled: userMemory.aiEnabled, replyToMessages: userMemory.replyToMessages };
+  if (!aiRepliesTo(replyContact, config, { includeGlobal: true })) {
+    console.log(`⏸️ No auto-reply to ${userMemory.username || senderId}: ${whyQuiet(replyContact, config)}. Message learned.`);
     return;
   }
 
@@ -1211,13 +1195,15 @@ async function writeAndSendReply(queueEntry, flight) {
     // Same switches as at the start (global pause, chat mode lists, per-person toggles): any of them may
     // have been flipped while the reply was being written
     const [latestMemory, latestConfig] = await Promise.all([
-      UserMemory.findById(userMemory._id, { aiEnabled: 1, replyToMessages: 1 }).lean(),
+      UserMemory.findById(userMemory._id, { aiEnabled: 1, replyToMessages: 1, username: 1, name: 1 }).lean(),
       config?._id ? PersonaConfig.findById(config._id, { globalBotActive: 1, chatMode: 1, excludedContactIds: 1, includedContactIds: 1 }).lean() : null,
     ]);
-    const switchedOff = (latestMemory && (latestMemory.aiEnabled === false || latestMemory.replyToMessages === false)) ||
-      (latestConfig && (latestConfig.globalBotActive === false || latestConfig.chatMode === 'paused' ||
-        (latestConfig.chatMode === 'everyone_except' && (latestConfig.excludedContactIds || []).includes(senderId)) ||
-        (latestConfig.chatMode === 'only_selected' && !(latestConfig.includedContactIds || []).includes(senderId))));
+    const latest = latestMemory || userMemory;
+    const switchedOff = !aiRepliesTo(
+      { senderId, handle: latest.username, name: latest.name, aiEnabled: latest.aiEnabled, replyToMessages: latest.replyToMessages },
+      latestConfig || config,
+      { includeGlobal: true },
+    );
     if (switchedOff) {
       console.log(`⏸️ AI was switched off for ${senderId} while typing; not sending.`);
       await afterTurn('');
@@ -1550,7 +1536,13 @@ app.put('/api/conversations/:senderId/memory', async (req, res) => {
     if (relationshipType) memory.relationshipType = relationshipType;
     if (rollingSummary) memory.rollingSummary = rollingSummary;
     if (Array.isArray(facts)) {
-      memory.facts = facts.map(f => typeof f === 'string' ? { fact: f } : f);
+      // a fact that was already there keeps its date and where it came from; a new one in this list is yours
+      const before = new Map((memory.facts || []).map(f => [f.fact, f]));
+      memory.facts = facts.map(f => {
+        const text = typeof f === 'string' ? f : f?.fact;
+        const known = before.get(text);
+        return known ? { fact: known.fact, addedAt: known.addedAt, source: known.source } : { fact: text, source: 'you' };
+      }).filter(f => f.fact);
     }
 
     await memory.save();
@@ -1615,7 +1607,7 @@ app.post('/api/conversations/:senderId/fact', async (req, res) => {
     const memory = await UserMemory.findOne(ownedMemoryQuery(req, senderId));
     if (!memory) return res.status(404).json({ error: 'User not found' });
 
-    memory.facts.push({ fact: String(fact).trim() });
+    memory.facts.push({ fact: String(fact).trim(), source: 'you' });
     await memory.save();
     res.json({ success: true, memory });
   } catch (err) {
@@ -3357,6 +3349,19 @@ app.listen(PORT, '0.0.0.0', () => {
   socialGraphService.seedInitialGraph().then(() => {
     return socialGraphService.trainGraphFromDB(UserMemory, Message);
   }).catch(e => console.error('❌ SocialGraph init error:', e.message));
+
+  // Banner photos ready before anyone asks: each art style's list (dark and light) is fetched one at a time,
+  // 20 s apart, after startup. Lists already saved in the database are reused without calling Unsplash,
+  // so this spends at most one call per style per week. First visits get real photos, not the fallback art.
+  if (process.env.NODE_ENV !== 'test') {
+    const warm = Object.keys(UNSPLASH_TOPICS).filter(t => !t.startsWith('tone-'));
+    warm.forEach((topic, i) => {
+      setTimeout(() => {
+        if (unsplashCache.isBlocked()) return;
+        unsplashCache.getPhotos(topic).then(p => p.length && console.log(`🖼️ Banners ready: ${topic} (${p.length})`)).catch(() => {});
+      }, 15_000 + i * 20_000).unref?.();
+    });
+  }
 
   // Seed predefined meme collection in MediaVault so DB always has relevant GIFs ready
   stickerService.seedPredefinedIntoVault().catch(e => console.warn('MediaVault seed warning:', e.message));
