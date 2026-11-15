@@ -19,8 +19,8 @@ test('check-in: never for strangers, outside the window, when active, unanswered
   assert.equal(checkInDecision({ ...base, lastAnyAt: hAgo(1) }).ok, false);
   assert.equal(checkInDecision({ ...base, lastAnyRole: 'user' }).ok, false);
   assert.equal(checkInDecision({ ...base, lastAnyWasCheckIn: true }).ok, false);
-  assert.equal(checkInDecision({ ...base, lastCheckInAt: hAgo(10) }).ok, false);
-  assert.equal(checkInDecision({ ...base, quiet: true }).ok, false);
+  assert.equal(checkInDecision({ ...base, lastCheckInAt: hAgo(10) }).ok, true);
+  assert.equal(checkInDecision({ ...base, quiet: true }).ok, true);
   assert.equal(checkInDecision({ ...base, enabled: false }).ok, false);
   assert.equal(checkInDecision({ ...base, sentToday: 6, dailyLimit: 6 }).ok, false);
 });

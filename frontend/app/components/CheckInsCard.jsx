@@ -73,7 +73,7 @@ export default function CheckInsCard() {
               {[2, 4, 6, 10, 15].map(n => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
-          <p className="ci-note">Instagram only lets the AI message someone within 24 hours of their last message, so check-ins happen inside that window. Never between 10pm and 8am.</p>
+          <p className="ci-note">Instagram only lets the AI message someone within 24 hours of their last message, so check-ins happen inside that window. It never sends another until they've answered the last one.</p>
         </div>
       )}
     </section>

@@ -5,8 +5,8 @@
  * Their answer is learned into memory like any reply, so the People page updates by itself.
  *
  * Limits: only friend/close contacts (your setting), only within Instagram's 24-hour window after
- * THEIR last message (Instagram blocks messages after that), never in quiet hours, never two in a
- * row without an answer, at most one a day per person and a daily cap per account.
+ * THEIR last message (Instagram blocks messages after that), never two in a row without an answer,
+ * and a daily cap per account (your setting). Any hour of the day.
  */
 const UserMemory = require('../models/UserMemory');
 const PersonaConfig = require('../models/PersonaConfig');
@@ -16,7 +16,6 @@ const azureOpenAI = require('./azureOpenAI');
 const socialGraphService = require('./socialGraphService');
 const storyboardService = require('./storyboardService');
 const { computeCloseness } = require('./closeness');
-const { isQuietHours, DEFAULT_TIMEZONE } = require('./reminderSchedule');
 const { splitIntoBubbles, bubbleGapMs } = require('./humanizeService');
 const { aiRepliesTo } = require('../frontend/app/lib/aiReplyRules');
 
@@ -107,7 +106,6 @@ class CheckInService {
       lastAnyWasCheckIn: !!lastAny?.isCheckIn,
       lastCheckInAt: mem.lastCheckInAt,
       idleHours: config.checkInIdleHours || 4,
-      quiet: isQuietHours(new Date(now), config.businessPolicy?.timezone || DEFAULT_TIMEZONE),
       sentToday,
       dailyLimit: config.checkInDailyLimit || 6,
       now,

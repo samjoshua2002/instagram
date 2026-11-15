@@ -13,7 +13,6 @@ function checkInDecision({ enabled = true, level, minLevel = 'close', lastTheirs
   lastAnyWasCheckIn = false, lastCheckInAt = null, idleHours = 4, quiet = false, sentToday = 0, dailyLimit = 6, now = Date.now() }) {
   if (!enabled) return { ok: false, reason: 'check-ins are off' };
   if (!atLeast(level || 'stranger', minLevel)) return { ok: false, reason: `not ${minLevel} enough (${level})` };
-  if (quiet) return { ok: false, reason: 'quiet hours' };
   if (sentToday >= dailyLimit) return { ok: false, reason: 'daily limit reached' };
   if (!lastTheirsAt) return { ok: false, reason: 'they never messaged' };
   const sinceTheirs = now - new Date(lastTheirsAt).getTime();
@@ -22,7 +21,6 @@ function checkInDecision({ enabled = true, level, minLevel = 'close', lastTheirs
   // Their message still waiting is the reply's job; our unanswered check-in means don't double-text
   if (lastAnyRole !== 'assistant') return { ok: false, reason: 'their message is unanswered' };
   if (lastAnyWasCheckIn) return { ok: false, reason: 'last check-in not answered yet' };
-  if (lastCheckInAt && now - new Date(lastCheckInAt).getTime() < 24 * HOUR) return { ok: false, reason: 'already checked in today' };
   return { ok: true, reason: 'quiet chat with someone close' };
 }
 
