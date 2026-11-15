@@ -1840,6 +1840,24 @@ app.get('/api/memory-index', async (req, res) => {
       .sort({ totalMessages: -1 }).lean();
     const total = people.reduce((n, p) => n + (p.totalMessages || 0), 0);
     const done = people.reduce((n, p) => n + Math.min(p.indexedMessages || 0, p.totalMessages || 0), 0);
+    // Friendship score per person: the same closeness the replies use (labels, chats, the bond read from chats)
+    const { computeCloseness } = require('./services/closeness');
+    const [cards, mems] = await Promise.all([
+      SocialGraph.find(inGraph(req, { senderId: { $in: people.map(p => p.senderId) } }), { senderId: 1, category: 1, relationshipToSam: 1, chatsCount: 1, closenessOverride: 1 }).lean(),
+      UserMemory.find(inMemories(req, { senderId: { $in: people.map(p => p.senderId) } }), { senderId: 1, relationshipType: 1, messageCount: 1, createdAt: 1, lastInteraction: 1 }).lean(),
+    ]);
+    const cardBy = new Map(cards.map(c => [String(c.senderId), c]));
+    const memBy = new Map(mems.map(m => [String(m.senderId), m]));
+    for (const p of people) {
+      const c = cardBy.get(String(p.senderId)) || {};
+      const m = memBy.get(String(p.senderId)) || {};
+      const f = computeCloseness({
+        category: c.category, relationshipToSam: c.relationshipToSam, relationshipType: m.relationshipType,
+        chatsCount: c.chatsCount || m.messageCount, firstSeen: m.createdAt, lastSeen: m.lastInteraction,
+        override: c.closenessOverride || '', memoryBond: p.bond || '', familyRole: socialGraphService.familyRole,
+      });
+      p.friendship = { score: f.score, level: f.level, reasons: f.reasons.slice(0, 3) };
+    }
     res.json({ people, total, done, overall: overallScore(people), ready: people.filter(p => p.status === 'ready').length });
   } catch (err) {
     sendServerError(res, err);

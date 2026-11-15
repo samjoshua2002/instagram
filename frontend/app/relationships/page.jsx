@@ -37,6 +37,7 @@ import { getNextBirthday, formatLastContact, MONTH_NAMES, DEFAULT_GREETINGS, CAT
 import PersonFacts from './PersonFacts';
 import PersonShared from './PersonShared';
 import PersonMemory from './PersonMemory';
+import BrainBadge, { FriendshipBadge } from '../components/BrainBadge';
 
 function RelationshipsPageContent() {
 
@@ -1894,8 +1895,12 @@ function RelationshipsPageContent() {
                         </div>
                       </div>
                     </div>
-                    <span style={{ fontSize: '11px', background: 'var(--color-surface-hover)', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', fontFamily: "var(--font-label)", border: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {relDisplay}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '11px', background: 'var(--color-surface-hover)', padding: '4px 8px', borderRadius: '6px', fontWeight: '600', fontFamily: "var(--font-label)", border: 'none', whiteSpace: 'nowrap' }}>
+                        {relDisplay}
+                      </span>
+                      <FriendshipBadge senderId={person.senderId} />
+                      <BrainBadge senderId={person.senderId} />
                     </span>
                   </div>
 

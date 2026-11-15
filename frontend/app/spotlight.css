@@ -951,3 +951,22 @@ a.bn-card:hover { transform: translateY(-2px); }
 .bn-agent-head { font-weight: 700; color: var(--sh-text); }
 .bn-agent-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bn-agent-row b { color: var(--sh-text); font-weight: 600; }
+
+/* Brain score badge on each person (People directory) */
+.brain-badge { position: relative; display: inline-grid; place-items: center; flex: none; }
+.brain-badge svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.brain-badge .bb-track { fill: none; stroke: color-mix(in srgb, var(--color-text-primary) 10%, transparent); stroke-width: 3; }
+.brain-badge .bb-arc { fill: none; stroke: var(--ambient-dominant, #888); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+.brain-badge b { position: relative; font-size: 0.66rem; font-weight: 800; color: var(--color-text-primary); }
+.brain-badge.reading svg { animation: bb-pulse 1.6s ease-in-out infinite; }
+.brain-badge.queued b { color: var(--color-text-secondary); }
+@keyframes bb-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .brain-badge.reading svg { animation: none; } }
+.friend-badge {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 8px; border-radius: 999px; white-space: nowrap;
+  font: 700 0.72rem var(--font-sans); color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--ambient-dominant, #888) 14%, transparent);
+}
+.friend-badge small { font-weight: 600; font-size: 0.66rem; color: var(--color-text-secondary); }
+.friend-badge span { color: color-mix(in srgb, var(--ambient-dominant, #e0457b) 70%, #e0457b); }
+.friend-badge.lvl-stranger span, .friend-badge.lvl-acquaintance span { color: var(--color-text-secondary); }
