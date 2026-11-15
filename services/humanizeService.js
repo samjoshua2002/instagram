@@ -96,10 +96,19 @@ function splitIntoBubbles(text, { maxBubbles = 3, minLength = 60 } = {}) {
     const isNum = w => /^\d{1,3}$/.test(w);
     const WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
     const isWordNum = w => WORDS.includes(w.toLowerCase().replace(/[.!]$/, ''));
-    if (items.length >= 3 && items.length <= 10 && (items.every(isNum) || items.every(isWordNum))) parts = items;
+    if (items.length >= 3 && (items.every(isNum) || items.every(isWordNum))) parts = items;
   }
 
-  // Short items (a count, a list, "wait" / "what" / "no way") each go out on their own, up to 10
+  // A count goes out one number per message, like tapping them out ("53", "54", ...). Up to 20;
+  // a longer count is sent in messages of 10 numbers each so the chat is not flooded.
+  if (parts.length >= 3 && parts.every(p => /^\d{1,4}$/.test(p))) {
+    if (parts.length <= 20) return parts;
+    const groups = [];
+    for (let i = 0; i < parts.length && groups.length < 10; i += 10) groups.push(parts.slice(i, i + 10).join(' '));
+    return groups;
+  }
+
+  // Other short items (a list, "wait" / "what" / "no way") each go out on their own, up to 10
   const allShort = parts.length > maxBubbles && parts.every(p => p.split(/\s+/).length <= 4);
   if (allShort) return parts.slice(0, 10);
 
