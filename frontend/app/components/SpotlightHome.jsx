@@ -726,8 +726,22 @@ export default function SpotlightHome() {
       .sort((a, b) => (a.chatsCount || 0) - (b.chatsCount || 0)).slice(0, 10);
   }, [filtered, followAll]);
 
+  // Messages that need you (invites, requests, money, urgent): newest first in the bell
+  const [needsYou, setNeedsYou] = useState([]);
+  useEffect(() => {
+    const load = () => fetch(`${API_BASE}/api/shared/needs-you`).then(r => (r.ok ? r.json() : { items: [] }))
+      .then(d => setNeedsYou(d.items || [])).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, [API_BASE]);
+
   const paused = people.filter(p => p.aiEnabled === false);
   const alerts = [
+    ...needsYou.slice(0, 8).map(it => ({
+      id: `need-${it._id}`, icon: Bell, title: it.summary || `${it.name || 'Someone'} needs you`,
+      href: `/relationships?person=${encodeURIComponent(people.find(p => String(p.senderId) === String(it.senderId))?.id || '')}`,
+    })),
     routingConfig && routingConfig.globalBotActive === false && { id: 'bot', icon: BotOff, title: 'Automation is paused', href: '/controls' },
     ...birthdays.slice(0, 5).map(({ p, days }) => ({
       id: `bd-${p.id}`, icon: Cake, href: personHref(p),
