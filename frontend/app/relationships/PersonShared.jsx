@@ -152,17 +152,30 @@ export default function PersonShared({ senderId }) {
       )}
 
       {current?.id === 'links' && (
-        <ul className="shared-list">
-          {current.items.map(it => (
-            <li key={it._id} className="shared-item">
-              <span className="shared-icon"><Link2 size={15} /></span>
-              <span className="shared-main">
-                <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.summary || hostOf(it.url)}</a>
-                <small>{hostOf(it.url)} · {when(it.createdAt)}</small>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="shared-link-groups">
+          {/* One group per site, the site with the most links first */}
+          {Object.entries(current.items.reduce((g, it) => ((g[hostOf(it.url)] = g[hostOf(it.url)] || []).push(it), g), {}))
+            .sort((a, b) => b[1].length - a[1].length)
+            .map(([host, list]) => (
+              <div key={host} className="shared-link-group">
+                <div className="shared-link-host">
+                  <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} alt="" width="16" height="16" />
+                  <span>{host}</span><small>{list.length}</small>
+                </div>
+                <ul className="shared-list">
+                  {list.map(it => (
+                    <li key={it._id} className="shared-item">
+                      <span className="shared-icon"><Link2 size={15} /></span>
+                      <span className="shared-main">
+                        <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.summary || it.url.replace(/^https?:\/\/(www\.)?/, '')}</a>
+                        <small>{when(it.createdAt)}{it.text && it.text !== it.url ? ` · "${it.text.slice(0, 60)}"` : ''}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+        </div>
       )}
 
       {(current?.id === 'docs' || current?.id === 'voice') && (

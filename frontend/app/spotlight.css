@@ -895,3 +895,8 @@ a.bn-card:hover { transform: translateY(-2px); }
 .shared-viewer-desc { margin: 0; }
 .shared-viewer-said { margin: 0; color: var(--color-text-secondary); }
 .shared-viewer-info small { color: var(--color-text-secondary); }
+.shared-link-groups { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.shared-link-host { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; color: var(--color-text-secondary); }
+.shared-link-host img { border-radius: 4px; }
+.shared-link-host small { font-weight: 600; opacity: 0.7; }
+.shared-link-group .shared-list { margin-top: 6px; }

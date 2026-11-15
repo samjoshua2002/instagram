@@ -52,6 +52,25 @@ async function storeFile(url, filename, meta) {
   }
 }
 
+/** The page title of a link (og:title, then <title>), or ''. Small and quick: 5 s, first 300 KB. */
+async function linkTitle(url) {
+  try {
+    const res = await fetch(/^https?:/i.test(url) ? url : `https://${url}`, {
+      redirect: 'follow', signal: AbortSignal.timeout(5000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (link preview)', Accept: 'text/html' },
+    });
+    if (!res.ok || !/text\/html/i.test(res.headers.get('content-type') || '')) return '';
+    const html = (await res.text()).slice(0, 300000);
+    const pick = re => (html.match(re) || [])[1] || '';
+    const raw = pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i)
+      || pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)
+      || pick(/<title[^>]*>([^<]+)<\/title>/i);
+    return raw.replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim().slice(0, 160);
+  } catch {
+    return '';
+  }
+}
+
 /** Streams a stored file (only to its owner). */
 function openFile(fileId) {
   return bucket().openDownloadStream(new mongoose.Types.ObjectId(String(fileId)));
@@ -144,7 +163,10 @@ async function capture({ ownerId = null, senderId, name = '', text = '', attachm
       if (attachedUrls.has(url)) continue;
       const kind = /instagram\.com\/(reels?|p|tv)\//i.test(url) ? (/\/p\//i.test(url) ? 'post' : 'reel') : 'link';
       const seen = await SharedItem.exists({ ownerId, senderId, kind, url });
-      if (!seen) await SharedItem.create({ ownerId, senderId, name, kind, url, text: clean.slice(0, 1000), mid });
+      if (!seen) {
+        const summary = kind === 'link' ? await linkTitle(url) : '';
+        await SharedItem.create({ ownerId, senderId, name, kind, url, summary, text: clean.slice(0, 1000), mid });
+      }
     }
     // Every real message is checked (a laugh or an emoji is not); links/files always are
     const hasAttachment = (attachments || []).length > 0;
@@ -213,7 +235,13 @@ async function backfillDescriptions(limit = 20) {
       console.warn('⚠️ [Shared] Catch-up description failed:', err.message);
     }
   }
-  if (done) console.log(`🖼️ [Shared] Described ${done} saved photo(s)/video(s)`);
+  // Links saved before titles were fetched
+  const links = await SharedItem.find({ kind: 'link', summary: { $in: ['', null] } }).sort({ createdAt: -1 }).limit(limit);
+  for (const l of links) {
+    const title = await linkTitle(l.url);
+    if (title) { l.summary = title; await l.save().catch(() => {}); done++; }
+  }
+  if (done) console.log(`🖼️ [Shared] Described ${done} saved item(s)`);
   return done;
 }
 
