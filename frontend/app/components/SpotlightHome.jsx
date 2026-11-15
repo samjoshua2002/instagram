@@ -410,11 +410,13 @@ function KpiRow({ summary }) {
     { label: 'Daily average', value: thisAvg, change: lastAvg !== null && weekChange(thisAvg, lastAvg), spark: lastSeven(totals), href: '/analytics' },
     { label: 'Busiest day', value: best >= 0 ? totals[best] : null, change: bestDay && { dir: 0, text: bestDay }, spark: totals ? totals.slice(-14) : null, href: '/analytics' },
     { label: 'People messaged', value: summary?.people.thisWeek, change: summary && weekChange(summary.people.thisWeek, summary.people.lastWeek), spark: lastSeven(summary?.people.daily), href: '/relationships' },
+    // Phones only: the AI-share ring is hidden there, so its number joins this row
+    { label: 'AI share', value: Number.isFinite(summary?.aiShare?.thisWeek) ? Math.round(summary.aiShare.thisWeek) : null, suffix: '%', change: summary && Number.isFinite(summary.aiShare?.lastWeek) && weekChange(Math.round(summary.aiShare.thisWeek), Math.round(summary.aiShare.lastWeek), 'pts'), href: '/controls', phone: true },
   ];
   return (
     <div className="sh-stats sh-kpis">
       {tiles.map(t => (
-        <Link key={t.label} href={t.href} className="sh-stat">
+        <Link key={t.label} href={t.href} className={`sh-stat${t.phone ? ' sh-stat-phone' : ''}`}>
           <span className="sh-stat-label">{t.label}</span>
           <span className="sh-stat-num">{t.value === null || t.value === undefined ? '-' : `${fmt(t.value)}${t.suffix || ''}`}</span>
           <Sparkline values={t.spark} />

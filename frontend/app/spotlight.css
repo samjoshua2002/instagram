@@ -681,3 +681,86 @@ a.bn-card:hover { transform: translateY(-2px); }
   }
   .floating-sidebar .sp-nav-link.active svg { color: color-mix(in srgb, var(--ambient-dominant, #888) 80%, var(--color-text-primary)); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Home v2 on phones: its own layout, not the desktop grid stacked up.
+   Numbers first (a swipeable row), then a short chart, then people. The AI-share ring and the
+   circle mix are left out (the share is a tile in the number row); everything else is smaller.
+   ═══════════════════════════════════════════════════════════════════ */
+.sh-v2 .sh-stat-phone { display: none; }
+@media (max-width: 768px) {
+  .sh-home.sh-v2 { --v2-radius: 16px; padding: 14px 16px 28px; }
+  .sh-v2 > .page-cover { height: 260px; }
+
+  /* Header + today line, compact */
+  .sh-v2 .sh-hello { font-size: 1.55rem; }
+  .sh-v2 .sh-banner { margin: 14px 0 0; gap: 12px; align-items: flex-end; }
+  .sh-v2 .sh-banner-eyebrow { font-size: 0.66rem; }
+  .sh-v2 .sh-banner-title { font-size: 1.35rem; }
+  .sh-v2 .sh-banner-sub { font-size: 0.84rem; }
+  .sh-v2 .sh-banner-pills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
+  .sh-v2 .sh-banner-pills::-webkit-scrollbar { display: none; }
+  .sh-v2 .sh-banner-btn { padding: 10px; }
+
+  .sh-v2 .sh-row-head { margin: 26px 0 10px; }
+  .sh-v2 .sh-row-head h2 { font-size: 1.02rem; }
+
+  /* Dashboard: numbers row first, then the chart, then top people and AI coverage */
+  .sh-v2 .bn-grid { display: flex; flex-direction: column; gap: 10px; }
+  .sh-v2 .bn-kpis { order: 1; margin: 0 -16px; }
+  .sh-v2 .bn-chart { order: 2; }
+  .sh-v2 .bn-top { order: 3; }
+  .sh-v2 .bn-cover { order: 4; }
+  .sh-v2 .bn-ring, .sh-v2 .bn-mix { display: none; }
+
+  /* Swipeable number tiles */
+  .sh-v2 .sh-stat-phone { display: flex; }
+  .sh-v2 .sh-kpis {
+    display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 40%;
+    gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+    padding: 2px 16px 6px; scroll-padding-inline: 16px;
+  }
+  .sh-v2 .sh-kpis::-webkit-scrollbar { display: none; }
+  .sh-v2 .sh-kpis .sh-stat { scroll-snap-align: start; padding: 12px 14px; gap: 2px; }
+  .sh-v2 .sh-kpis .sh-stat-num { font-size: 1.4rem; }
+  .sh-v2 .sh-kpis .sh-spark { height: 18px; }
+  .sh-v2 .sh-kpi-change { font-size: 0.68rem; }
+
+  /* Short chart: about a third of the screen, not all of it */
+  .sh-v2 .bn-card { padding: 14px 16px; }
+  .sh-v2 .bn-chart { min-height: 0; }
+  .sh-v2 .bn-head { margin-bottom: 10px; }
+  .sh-v2 .bn-bars { min-height: 0; height: 110px; gap: 4px; flex: none; }
+  .sh-v2 .bn-bar-track { border-radius: 6px; }
+  .sh-v2 .bn-bar-label { font-size: 0.6rem; }
+  .sh-v2 .bn-legend { gap: 10px; font-size: 0.72rem; }
+
+  /* Top 3 people only, AI coverage as one row of four */
+  .sh-v2 .bn-rank li:nth-child(n + 4) { display: none; }
+  .sh-v2 .bn-cover-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .sh-v2 .bn-mini { padding: 8px; }
+  .sh-v2 .bn-mini b { font-size: 1.05rem; }
+  .sh-v2 .bn-mini small { display: none; }
+
+  /* Favourites as round story bubbles */
+  .sh-v2 .sh-fav-row { grid-auto-columns: 72px; gap: 14px; margin: 0 -16px; padding: 2px 16px 4px; }
+  .sh-v2 .sh-fav { align-items: center; text-align: center; }
+  .sh-v2 .sh-fav-photo {
+    width: 64px; height: 64px; border-radius: 50%; margin-bottom: 6px; font-size: 1.1rem; box-shadow: none;
+    outline: 2px solid var(--sh-action); outline-offset: 3px;
+  }
+  .sh-v2 .sh-fav-name { font-size: 0.74rem; font-weight: 600; max-width: 72px; }
+  .sh-v2 .sh-fav-sub { display: none; }
+
+  /* Top chats: swipe, one and a bit cards on screen */
+  .sh-v2 .sh-spot-row { grid-auto-columns: 74%; gap: 10px; margin: 16px -16px 0; padding: 0 16px 4px; scroll-padding-inline: 16px; scroll-snap-type: x mandatory; }
+  .sh-v2 .sh-spot { padding: 12px; gap: 10px; scroll-snap-align: start; }
+  .sh-v2 .sh-spot-avatar { width: 44px; height: 44px; }
+
+  .sh-v2 .sh-chips { margin: 26px -16px 0; padding: 0 16px; }
+  .sh-v2 .sh-fact { padding: 14px; gap: 12px; margin-top: 12px; }
+  .sh-v2 .sh-fact-icon { width: 36px; height: 36px; }
+  .sh-v2 .sh-fact-body { font-size: 0.9rem; }
+  .sh-v2 .sh-follow-item { padding: 10px; }
+  .sh-v2 .sh-list li:nth-child(n + 6) { display: none; }
+}
