@@ -59,4 +59,20 @@ function plainName(name) {
   return String(name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}]/gu, '');
 }
 
-module.exports = { applyReview, detectNameDrift, plainName };
+/**
+ * Is this "person in their life" really the owner, or one of the owner's own people ("Sam's sister",
+ * "Wife (Sam's wife)")? Those belong to the owner, never to the contact. ownerNames: full names,
+ * first names, username, persona name (any case).
+ */
+function isOwnerOrOwnersPerson(conn, ownerNames = []) {
+  const names = ownerNames.map(n => String(n || '').toLowerCase().trim()).filter(Boolean);
+  const target = String(conn?.targetName || '').toLowerCase().trim();
+  if (!target) return false;
+  if (names.includes(target)) return true;
+  const firsts = [...new Set(names.map(n => n.split(/\s+/)[0]).filter(n => n.length >= 3))];
+  const text = `${conn?.targetName || ''} ${conn?.relationship || ''} ${conn?.notes || ''}`.toLowerCase();
+  return firsts.some(f => new RegExp(`(^|[^a-z])${f}'s\\s`, 'i').test(`${conn?.targetName || ''} ${conn?.relationship || ''}`.toLowerCase())
+    || target === f || text.startsWith(`${f}'s `));
+}
+
+module.exports = { applyReview, detectNameDrift, plainName, isOwnerOrOwnersPerson };

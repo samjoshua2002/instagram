@@ -394,9 +394,10 @@ Return a valid JSON object matching EXACTLY this structure:
     { "userMessage": "what user texted", "myReply": "how ${owner.label} replied" }
   ],
   "mentionedPeople": [
-    { "name": "Person name", "relationship": "friend/sister/bro", "notes": "context" }
+    { "name": "Person name", "relationship": "what they are TO THIS PERSON: friend/sister/bro", "notes": "context" }
   ]
 }
+"mentionedPeople" is only people in THIS PERSON's life (their family, friends, partner). Never ${owner.label} themself, and never ${owner.label}'s own people (${owner.label}'s mom, sister, colleague, crush): those are not in this person's life.
 Only extract genuine details explicitly stated or strongly implied by the chat. Do not invent information. If an array has no items, return empty array.
 "newFacts" must contain ONLY facts not already in Existing Facts (no rewording of a known fact). Do not put name, age or birthday in newFacts; use "name", "age" and "dob".`;
 

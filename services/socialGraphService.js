@@ -240,6 +240,8 @@ class SocialGraphService {
       const owner = ownerFilter(options.ownerId);
       const targetName = sanitizeLearnedText(personBName, 60).replace(/\n/g, ' ');
       if (!targetName) return;
+      // Never file the owner, or the owner's own people ("Sam's sister"), as someone in THEIR life
+      if (isOwnerOrOwnersPerson({ targetName, relationship, notes }, await ownerNamesFor(options.ownerId))) return;
       const nodeA = (options.senderId && await SocialGraph.findOne({ ...owner, senderId: options.senderId }))
         || (personAName && await SocialGraph.findOne({ ...owner, name: new RegExp(`^${escapeRegex(personAName)}$`, 'i') }));
       if (!nodeA) return;
@@ -435,7 +437,27 @@ function familyRole(label) {
   return hit ? hit[0] : (/\bfamily\b/.test(t) ? 'family' : null);
 }
 
+const { isOwnerOrOwnersPerson } = require('./memoryAgentRules');
+const ownerNameCache = new Map();
+/** The owner's names (full, first, username, persona name), cached for 10 minutes. */
+async function ownerNamesFor(ownerId) {
+  const key = String(ownerId || '');
+  const hit = ownerNameCache.get(key);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.names;
+  const User = require('../models/User');
+  const PersonaConfig = require('../models/PersonaConfig');
+  const [u, pc] = await Promise.all([
+    ownerId ? User.findById(ownerId, { firstName: 1, lastName: 1, name: 1, username: 1 }).lean().catch(() => null) : null,
+    PersonaConfig.findOne({ ownerId: ownerId || null }, { creatorName: 1, instagramHandle: 1 }).lean().catch(() => null),
+  ]);
+  const names = [u?.firstName, u?.name, u?.username, pc?.creatorName, String(pc?.instagramHandle || '').replace(/^@/, ''),
+    [u?.firstName, u?.lastName].filter(Boolean).join(' ')].filter(Boolean);
+  ownerNameCache.set(key, { at: Date.now(), names });
+  return names;
+}
+
 const service = new SocialGraphService();
+service.ownerNamesFor = ownerNamesFor;
 service.familyRole = familyRole;
 service.ownerFilter = ownerFilter;
 service.escapeRegex = escapeRegex;

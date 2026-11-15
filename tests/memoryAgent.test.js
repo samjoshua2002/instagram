@@ -42,3 +42,17 @@ test('name drift ignores "User", fancy fonts of the same name, and the owner', (
   assert.equal(detectNameDrift(['Ankith likes cats', 'Ankith is in college', 'Ankith quit gym'], 'Ankush'), 'Ankith');
   assert.equal(plainName('✩⃛ 𝑆𝒶𝓊𝓂𝓎𝒶✩⃛'), 'saumya');
 });
+
+test("people in their life never includes the owner or the owner's own people", () => {
+  const { isOwnerOrOwnersPerson } = require('../services/memoryAgentRules');
+  const owner = ['Sam Joshua', 'Sam', 'catovidz'];
+  for (const c of [
+    { targetName: 'Sam Joshua', relationship: 'friend' }, { targetName: 'Sam', relationship: 'friend' },
+    { targetName: "Sam's mom", relationship: 'mother' }, { targetName: 'Wife', relationship: "Sam's wife" },
+    { targetName: 'Annie', relationship: "Sam's sister" }, { targetName: "Sam's office colleague", relationship: 'Akka' },
+  ]) assert.ok(isOwnerOrOwnersPerson(c, owner), JSON.stringify(c));
+  for (const c of [
+    { targetName: 'Mom', relationship: 'mother' }, { targetName: 'Jennifer', relationship: 'neighbor' },
+    { targetName: 'Fami', relationship: 'friend' }, { targetName: 'Samantha', relationship: 'cousin' },
+  ]) assert.ok(!isOwnerOrOwnersPerson(c, owner), JSON.stringify(c));
+});

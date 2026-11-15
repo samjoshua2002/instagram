@@ -11,7 +11,7 @@ const UserMemory = require('../models/UserMemory');
 const PersonMemory = require('../models/PersonMemory');
 const MemoryChunk = require('../models/MemoryChunk');
 const AgentAction = require('../models/AgentAction');
-const { applyReview, detectNameDrift } = require('./memoryAgentRules');
+const { applyReview, detectNameDrift, isOwnerOrOwnersPerson } = require('./memoryAgentRules');
 
 const REVIEW_EVERY_MS = 24 * 3600 * 1000;
 
@@ -124,11 +124,7 @@ async function healthCheck() {
       ]);
       owners.set(key, [u?.firstName, u?.name, u?.username, pc?.creatorName, [u?.firstName, u?.lastName].filter(Boolean).join(' ')].filter(Boolean).map(x => String(x).toLowerCase()));
     }
-    const ownerNames = owners.get(key);
-    const first = ownerNames.map(n => n.split(/\s+/)[0]).filter(n => n.length >= 3);
-    const isOwner = c => ownerNames.includes(String(c.targetName || '').toLowerCase().trim());
-    const isOwnersPerson = c => first.some(f => new RegExp(`^${f}'s\\b|\\b${f}'s (crush|sister|brother|mom|dad|mother|father|friend|colleague|wife|gf|girlfriend|boyfriend)`, 'i').test(`${c.targetName} ${c.relationship}`));
-    const bad = (card.connections || []).filter(c => isOwner(c) || isOwnersPerson(c));
+    const bad = (card.connections || []).filter(c => isOwnerOrOwnersPerson(c, owners.get(key)));
     if (bad.length) {
       card.connections = card.connections.filter(c => !bad.includes(c));
       await card.save();
