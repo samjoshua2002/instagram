@@ -30,16 +30,12 @@ test('check-in asks about the biggest gap first', () => {
   assert.equal(nextQuestionTopic({}).topic, 'what they are up to');
 });
 
-test('counting goes out one number per message', () => {
-  assert.deepEqual(splitIntoBubbles('1 2 3 4 5'), ['1', '2', '3', '4', '5']);
+test('every line the AI writes is its own message (the AI decides how to send)', () => {
   assert.deepEqual(splitIntoBubbles('1\n2\n3\n4\n5'), ['1', '2', '3', '4', '5']);
-  assert.deepEqual(splitIntoBubbles('one, two, three, four, five'), ['one', 'two', 'three', 'four', 'five']);
-  assert.deepEqual(splitIntoBubbles('ok wait'), ['ok wait']);
-  const c = splitIntoBubbles('53 54 55 56 57 58 59 60 61 62 63 64 65 66 67');
+  const c = splitIntoBubbles(Array.from({ length: 15 }, (_, i) => i + 53).join('\n'));
   assert.equal(c.length, 15);
-  assert.equal(c[0], '53');
-  assert.equal(c[14], '67');
-  const long = splitIntoBubbles(Array.from({ length: 35 }, (_, i) => i + 1).join(' '));
-  assert.deepEqual(long.map(x => x.split(' ').length), [10, 10, 10, 5]);
+  assert.deepEqual(splitIntoBubbles('53 54 55 56 57'), ['53 54 55 56 57']);
+  assert.deepEqual(splitIntoBubbles('ok wait'), ['ok wait']);
   assert.deepEqual(splitIntoBubbles('I have 2 cats'), ['I have 2 cats']);
+  assert.equal(splitIntoBubbles(Array.from({ length: 40 }, (_, i) => `${i}`).join('\n')).length, 25);
 });

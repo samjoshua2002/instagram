@@ -83,44 +83,24 @@ function humanizeReply(text, { isBusiness = false } = {}) {
  * Split a reply holding two or more distinct thoughts into 2-3 short bubbles.
  * Explicit line breaks win; otherwise split on sentence boundaries when long enough.
  */
-function splitIntoBubbles(text, { maxBubbles = 3, minLength = 60 } = {}) {
+function splitIntoBubbles(text, { maxBubbles = 25, minLength = 60 } = {}) {
   const clean = (text || '').trim();
   if (!clean) return [];
 
+  // The AI decides how the reply is sent: every line it writes goes out as its own message,
+  // exactly like a person tapping send (a count, a burst of short reactions, one long line...)
   let parts = clean.split(/\n+/).map(s => s.trim()).filter(Boolean);
 
-  // Counting or a quick list on one line ("1 2 3 4 5", "one, two, three"): one item per message,
-  // the way a person answers "count from one to five"
-  if (parts.length === 1) {
-    const items = clean.split(/\s*(?:,|\s)\s*/).filter(Boolean);
-    const isNum = w => /^\d{1,3}$/.test(w);
-    const WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-    const isWordNum = w => WORDS.includes(w.toLowerCase().replace(/[.!]$/, ''));
-    if (items.length >= 3 && (items.every(isNum) || items.every(isWordNum))) parts = items;
-  }
-
-  // A count goes out one number per message, like tapping them out ("53", "54", ...). Up to 20;
-  // a longer count is sent in messages of 10 numbers each so the chat is not flooded.
-  if (parts.length >= 3 && parts.every(p => /^\d{1,4}$/.test(p))) {
-    if (parts.length <= 20) return parts;
-    const groups = [];
-    for (let i = 0; i < parts.length && groups.length < 10; i += 10) groups.push(parts.slice(i, i + 10).join(' '));
-    return groups;
-  }
-
-  // Other short items (a list, "wait" / "what" / "no way") each go out on their own, up to 10
-  const allShort = parts.length > maxBubbles && parts.every(p => p.split(/\s+/).length <= 4);
-  if (allShort) return parts.slice(0, 10);
-
+  // One long line with two clear sentences reads like two texts
   if (parts.length === 1 && clean.length >= minLength) {
     const sentences = (clean.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [clean])
       .map(s => s.trim())
       .filter(Boolean);
-    if (sentences.length >= 2) parts = sentences.map(dropTerminalPeriod);
+    if (sentences.length >= 2 && sentences.length <= 3) parts = sentences.map(dropTerminalPeriod);
   }
 
+  // Safety only: never more than maxBubbles messages in one go (the rest join the last one)
   if (parts.length <= maxBubbles) return parts;
-  // Merge the overflow into the last bubble
   return [...parts.slice(0, maxBubbles - 1), parts.slice(maxBubbles - 1).join(' ')];
 }
 

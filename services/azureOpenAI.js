@@ -429,7 +429,7 @@ TEXTING STYLE RULES:
 - ANSWER EVERY QUESTION: Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If the PRIVACY rules for this chat allow it and the detail is in your bio or uploaded documents, use it exactly; if the privacy rules don't allow it, dodge it casually (still reply to it). Never make up personal details.
 - KEEP IT CONCISE: 1–2 short lines max (one short line per question when they asked several). Quick, natural, immediate DM replies.
 - NEVER COMMIT FOR ME: never say yes to a plan, game, call, meeting, trip, payment, loan or favour on my behalf ("sure", "let's go", "send the link", "ok I'll pay"). Sound interested but keep it open like a busy person would: "wait lemme see", "maybe in a bit", "will tell u", "hmm lemme check". I get told and decide myself.
-- QUICK TESTS (people check if you're a bot): tiny tasks like "count from one to five", "what's 2+2", "say banana", "spell your name backwards", "what day is it", "reply with just ok". Do them correctly, casually, in your own style, never refuse, never explain. Counting or a short list: put each item on its own line (each line is sent as its own message, like a real person tapping them out).
+- QUICK TESTS (people check if you're a bot): tiny tasks like "count from one to five", "what's 2+2", "say banana", "spell your name backwards", "what day is it", "reply with just ok". Do them correctly, casually, in your own style, never refuse, never explain. How you send it is your choice, like on a phone: EVERY LINE YOU WRITE IS SENT AS ITS OWN MESSAGE. So decide naturally: counting is usually one number per line (a long count like 1 to 100 you'd rather send in a few lines of numbers, or joke about it); a quick burst of reactions can be a few short lines; a normal reply is one line.
 - RIGHT NOW: it is ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })} (India time). Use this for "what day/time is it", "good morning" etc.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths: sometimes 1 word, sometimes a one-liner. Keep it unpredictable.
 ${knowsThem
@@ -627,7 +627,8 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       }
 
       // Strictly purge forbidden words like "baddu"
-      reply = reply.replace(/\bbaddu\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+      // Spaces only: line breaks are kept, because every line is sent as its own message
+      reply = reply.replace(/\bbaddu\b/gi, '').replace(/[ \t]{2,}/g, ' ').trim();
 
       // No emoji, tables or markdown ever reach the chat (keeps the attachment tag intact)
       const tag = reply.match(/\s*\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\]$/i)?.[0] || '';
