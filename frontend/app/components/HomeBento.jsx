@@ -94,7 +94,7 @@ function ShareRing({ summary, botOn }) {
 }
 
 /** The five people you talk to most, with their share of the top one. */
-function TopPeople({ people, personHref, Photo }) {
+function TopPeople({ people, personHref, Photo, loading }) {
   const top = [...people].filter(p => (p.chatsCount || 0) > 0).sort((a, b) => (b.chatsCount || 0) - (a.chatsCount || 0)).slice(0, 5);
   const max = Math.max(1, top[0]?.chatsCount || 1);
   return (
@@ -106,7 +106,9 @@ function TopPeople({ people, personHref, Photo }) {
         </div>
         <Link href="/relationships" className="bn-more">All <ChevronRight size={14} /></Link>
       </div>
-      {top.length === 0 ? (
+      {loading ? (
+        <div className="bn-skeleton" aria-hidden="true" />
+      ) : top.length === 0 ? (
         <p className="bn-empty">Your top chats appear here once DMs sync.</p>
       ) : (
         <ol className="bn-rank">
@@ -130,7 +132,7 @@ function TopPeople({ people, personHref, Photo }) {
 }
 
 /** Who is in the circle, by kind. */
-function CircleMix({ people, labels }) {
+function CircleMix({ people, labels, loading }) {
   const counts = new Map();
   for (const p of people) {
     const k = p.category || 'online_friend';
@@ -143,10 +145,12 @@ function CircleMix({ people, labels }) {
       <div className="bn-head">
         <div>
           <h3 className="bn-title">Your circle</h3>
-          <p className="bn-sub">{fmt(people.length)} {people.length === 1 ? 'person' : 'people'}</p>
+          <p className="bn-sub">{loading ? 'Loading' : `${fmt(people.length)} ${people.length === 1 ? 'person' : 'people'}`}</p>
         </div>
       </div>
-      {rows.length === 0 ? (
+      {loading ? (
+        <div className="bn-skeleton" aria-hidden="true" />
+      ) : rows.length === 0 ? (
         <p className="bn-empty">Nobody here yet.</p>
       ) : (
         <ul className="bn-mix-list">
@@ -164,7 +168,7 @@ function CircleMix({ people, labels }) {
 }
 
 /** How many people the AI answers for, and how much it knows. */
-function Coverage({ people, routingConfig, summary }) {
+function Coverage({ people, routingConfig, summary, loading }) {
   const on = people.filter(p => isAiOnFor(p, routingConfig)).length;
   const facts = sum(people.map(p => p.factsCount || (p.facts || p.lore || []).length || 0));
   const waiting = summary?.handoffs?.total || 0;
@@ -182,6 +186,7 @@ function Coverage({ people, routingConfig, summary }) {
           <p className="bn-sub">Right now</p>
         </div>
       </div>
+      {loading ? <div className="bn-skeleton" aria-hidden="true" /> : (
       <div className="bn-cover-grid">
         {tiles.map(t => (
           <Link key={t.label} href={t.href} className={`bn-mini${t.warn ? ' warn' : ''}`}>
@@ -191,19 +196,20 @@ function Coverage({ people, routingConfig, summary }) {
           </Link>
         ))}
       </div>
+      )}
     </section>
   );
 }
 
-export default function HomeBento({ summary, people, routingConfig, botOn, personHref, Photo, labels, kpis }) {
+export default function HomeBento({ summary, people, routingConfig, botOn, personHref, Photo, labels, kpis, loading = false }) {
   return (
     <div className="bn-grid">
       <ReplyChart summary={summary} />
       <ShareRing summary={summary} botOn={botOn} />
       <div className="bn-kpis">{kpis}</div>
-      <TopPeople people={people} personHref={personHref} Photo={Photo} />
-      <CircleMix people={people} labels={labels} />
-      <Coverage people={people} routingConfig={routingConfig} summary={summary} />
+      <TopPeople people={people} personHref={personHref} Photo={Photo} loading={loading} />
+      <CircleMix people={people} labels={labels} loading={loading} />
+      <Coverage people={people} routingConfig={routingConfig} summary={summary} loading={loading} />
     </div>
   );
 }

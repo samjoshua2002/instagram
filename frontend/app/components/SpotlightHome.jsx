@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock, Pause, Play, Check, KeyRound } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
-import PageSkeleton from './Skeletons';
 import { prefetchAmbientImages } from './AmbientBackground';
 import { savedPhotoUrl, unavatarUrl, noteUnavatarFailed } from '../lib/utils';
 import { abstractArt, useFreshBanner } from '../lib/banners';
@@ -572,6 +571,27 @@ function ProfileMenu({ menu, isFavourite, onToggle, onClose }) {
   );
 }
 
+/** Loading placeholder in the same shapes as Home's people sections (top chats, fact, favourites, list). */
+function HomeSkeleton() {
+  return (
+    <div className="sh-skel" role="status" aria-label="Loading your people">
+      <div className="sh-spot-row">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="sh-spot sh-skel-card">
+            <span className="sh-skel-dot" />
+            <span className="sh-skel-lines"><i style={{ width: '70%' }} /><i style={{ width: '45%' }} /></span>
+          </div>
+        ))}
+      </div>
+      <div className="sh-fact sh-skel-card"><span className="sh-skel-dot" /><span className="sh-skel-lines"><i style={{ width: '25%' }} /><i style={{ width: '80%' }} /></span></div>
+      <div className="sh-row-head"><i className="sh-skel-bar" style={{ width: 160 }} /></div>
+      <div className="sh-fav-row">
+        {[0, 1, 2, 3, 4, 5].map(i => <span key={i} className="sh-fav"><span className="sh-fav-photo sh-skel-block" /><i className="sh-skel-bar" style={{ width: '70%' }} /></span>)}
+      </div>
+    </div>
+  );
+}
+
 /** Notifications bell + list. Rendered in Home's header (desktop) and in the app header (phones). */
 function HomeBell({ alerts, inHeader = false }) {
   const [open, setOpen] = useState(false);
@@ -790,6 +810,7 @@ export default function SpotlightHome() {
         Photo={Photo}
         labels={CATEGORY_LABEL}
         kpis={<KpiRow summary={summary} />}
+        loading={people.length === 0 && isSyncingInitial}
       />
 
       {people.length > 0 && <FollowUps items={followOpen.slice(0, 4)} later={later} pressProps={pressProps} />}
@@ -813,7 +834,7 @@ export default function SpotlightHome() {
       )}
 
       {people.length === 0 && isSyncingInitial ? (
-        <PageSkeleton variant="home" header={false} bare label="Loading your people" />
+        <HomeSkeleton />
       ) : people.length === 0 ? (
         <div className="sh-empty">
           <div className="sh-empty-title">Your circle is empty</div>

@@ -840,3 +840,21 @@ a.bn-card:hover { transform: translateY(-2px); }
 .shared-dl { display: inline-flex; align-items: center; gap: 5px; }
 .shared-missing { color: var(--color-text-secondary); font-size: 0.78rem; }
 .shared-loading { display: block; width: 120px; height: 14px; border-radius: 6px; background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
+
+/* Home loading placeholder: same shapes as the real sections, one soft shimmer in the page colour */
+.sh-skel .sh-skel-card { pointer-events: none; }
+.sh-skel-dot, .sh-skel-block, .sh-skel-lines i, .sh-skel-bar {
+  display: block; border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--sh-text, #888) 7%, transparent) 0%,
+    color-mix(in srgb, var(--sh-text, #888) 13%, transparent) 50%,
+    color-mix(in srgb, var(--sh-text, #888) 7%, transparent) 100%);
+  background-size: 200% 100%; animation: bn-shimmer 1.4s linear infinite;
+}
+.sh-skel-dot { flex: none; width: 52px; height: 52px; border-radius: 50%; }
+.sh-skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.sh-skel-lines i { height: 10px; }
+.sh-skel-bar { height: 12px; margin-top: 8px; }
+.sh-skel .sh-fav-photo.sh-skel-block { border-radius: var(--v2-radius, 20px); box-shadow: none; }
+@media (max-width: 768px) { .sh-skel .sh-fav-photo.sh-skel-block { border-radius: 50%; } .sh-skel-dot { width: 44px; height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .sh-skel-dot, .sh-skel-block, .sh-skel-lines i, .sh-skel-bar { animation: none; } }
