@@ -117,7 +117,8 @@ class CheckInService {
 
     const history = (await Message.find(convo).sort({ createdAt: -1 }).limit(12).lean()).reverse();
     const ask = nextQuestionTopic(mem);
-    const out = await azureOpenAI.generateCheckIn({ userMemory: mem, messageHistory: history, config, closeness, ask, node });
+    const memoryDoc = (await require('../models/PersonMemory').findOne({ ownerId: mem.ownerId || null, senderId: mem.senderId }, { doc: 1 }).lean().catch(() => null))?.doc || '';
+    const out = await azureOpenAI.generateCheckIn({ userMemory: mem, messageHistory: history, config, closeness, ask, node, memoryDoc });
     if (!out?.message) return false;
 
     // Claim first so two servers never both write to the same person

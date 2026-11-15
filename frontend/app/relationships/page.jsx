@@ -36,6 +36,7 @@ import { useHeroCollapse, useRevealOnce } from '../lib/scrollMotion';
 import { getNextBirthday, formatLastContact, MONTH_NAMES, DEFAULT_GREETINGS, CATEGORY_LABELS, GENDER_LABELS, PEOPLE_GROUPS, connectionGroup, connectionLabel, cleanDob, formatDobForInput } from './personHelpers';
 import PersonFacts from './PersonFacts';
 import PersonShared from './PersonShared';
+import PersonMemory from './PersonMemory';
 
 function RelationshipsPageContent() {
 
@@ -1323,60 +1324,10 @@ function RelationshipsPageContent() {
         <div className="person-grid">
           {/* ================= HOW THE AI TALKS ================= */}
           <section className="person-glass-card">
-            <h2 className="person-card-title">How the AI talks to {pron}</h2>
-
-            <label className="person-field-label person-tone-label" htmlFor="roastiness">
-              <span>Tone</span>
-              <span className="person-range-value">{toneName} · {toneValue}%</span>
-            </label>
-            <input
-              id="roastiness"
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={toneValue}
-              onChange={e => editProfile({ roastiness: Number(e.target.value) })}
-              className="person-range"
-              style={{ '--range-fill': `${toneValue}%` }}
-            />
-            <div className="person-range-scale">
-              <span>Sweet</span>
-              <span>Playful</span>
-              <span>Savage</span>
-            </div>
-
-            <div className="person-tone-preview" aria-label="Example of how the AI replies">
-              <div className="person-bubble in">oyy please reply</div>
-              <div className="person-bubble out">{sampleReply}</div>
-            </div>
-
-            <div className="person-field-label person-sub-label">Greets {pron} with</div>
-            <div className="person-chip-row" role="radiogroup" aria-label="Greeting">
-              {greetingChoices.map(g => (
-                <button
-                  key={g}
-                  type="button"
-                  role="radio"
-                  aria-checked={activeGreeting === g}
-                  className={`person-chip${activeGreeting === g ? ' active' : ''}`}
-                  onClick={() => editProfile({ greetingStyle: activeGreeting === g ? '' : g }, 0)}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-            <form className="person-inline-form" onSubmit={handleAddGreeting}>
-              <input
-                type="text"
-                maxLength={40}
-                placeholder="Add your own, e.g. macha"
-                aria-label="Add your own greeting"
-                value={newGreeting}
-                onChange={e => setNewGreeting(e.target.value)}
-              />
-              <button type="submit" className="person-soft-btn" disabled={!newGreeting.trim()}>Add</button>
-            </form>
+            {/* Learned from your real chats (read only); the AI uses this instead of manual tone settings */}
+            {selectedPerson.senderId
+              ? <PersonMemory senderId={selectedPerson.senderId} name={personName} />
+              : <h2 className="person-card-title">What the AI learned</h2>}
 
             <div className="person-field-label person-sub-label">Never calls {pron}</div>
             <div className="person-chip-row">

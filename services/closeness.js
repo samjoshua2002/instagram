@@ -96,6 +96,12 @@ function computeCloseness(p = {}, now = Date.now()) {
     labelFloor = 80;
     reasons.push(`you call them "${String(p.relationshipToSam).slice(0, 30)}"`);
   }
+  // The bond the AI read from your whole chat history (memory index)
+  const MEMORY_FLOOR = { family: 85, partner: 85, close: 78, friend: 55, acquaintance: 25 };
+  if (MEMORY_FLOOR[p.memoryBond]) {
+    labelFloor = Math.max(labelFloor, MEMORY_FLOOR[p.memoryBond]);
+    if (p.memoryBond !== 'acquaintance') reasons.push(`chats read as ${p.memoryBond}`);
+  }
   // Thousands of DMs and still talking: that is a close person, whatever the label says
   const recent = Number.isFinite(last) && (now - last) / DAY <= 30;
   if (chats >= 5000 && recent) labelFloor = Math.max(labelFloor, 78);

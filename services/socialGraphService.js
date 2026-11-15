@@ -355,7 +355,8 @@ class SocialGraphService {
       // The owner's own choices on this person's page (tone slider, greeting, words to avoid). These are settings,
       // not learned text: they get their own section and beat the general tone rules.
       const style = [];
-      if (senderNode) {
+      // Tone and greeting come from what the AI learned from your chats (memory index) unless asked
+      if (senderNode && !options.autoStyle) {
         if (Number.isFinite(senderNode.roastiness)) {
           const r = senderNode.roastiness;
           const tone =
@@ -368,9 +369,10 @@ class SocialGraphService {
         if (senderNode.greetingStyle) {
           style.push(`- When you greet them or open a chat, use: "${clean(senderNode.greetingStyle, 80)}" (only as a greeting, not in every message).`);
         }
-        if (Array.isArray(senderNode.avoidWords) && senderNode.avoidWords.length > 0) {
-          style.push(`- NEVER call them or say to them: ${senderNode.avoidWords.slice(0, 30).map(w => `"${clean(w, 40)}"`).join(', ')}.`);
-        }
+      }
+      // Words you never use with them always apply
+      if (senderNode && Array.isArray(senderNode.avoidWords) && senderNode.avoidWords.length > 0) {
+        style.push(`- NEVER call them or say to them: ${senderNode.avoidWords.slice(0, 30).map(w => `"${clean(w, 40)}"`).join(', ')}.`);
       }
       if (style.length) {
         lines.push('', `=== HOW YOU CHOSE TO TALK TO ${String(senderNode.name || 'THIS PERSON').toUpperCase()} (YOUR OWN SETTINGS: FOLLOW THEM; THEY OVERRIDE THE GENERAL TONE, BANTER AND GENDER RULES) ===`, ...style);

@@ -51,4 +51,10 @@ const MessageSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// One person's chat in time order (replies, memory index, voice): both directions, by owner
+MessageSchema.index({ ownerId: 1, senderId: 1, timestamp: -1 });
+MessageSchema.index({ ownerId: 1, recipientId: 1, timestamp: -1 });
+// The owner's own hand-typed messages (voice fingerprint)
+MessageSchema.index({ ownerId: 1, role: 1, sentByAI: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Message', MessageSchema);

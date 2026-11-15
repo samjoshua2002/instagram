@@ -173,9 +173,10 @@ class AzureOpenAIService {
     // All context lookups run at the same time so the reply is not held up by each one in turn
     const storyboardOwner = tenant?._id || config.ownerId;
     // How close this person is decides what personal details any part of the reply may use
-    const [contactNode, contactCircle] = await Promise.all([
+    const [contactNode, contactCircle, memoryBond] = await Promise.all([
       socialGraphService.getNode(conversationOwnerId, userMemory.senderId),
       storyboardService.getContactCircle(storyboardOwner, userMemory),
+      require('../models/PersonMemory').findOne({ ownerId: conversationOwnerId || null, senderId: userMemory.senderId }, { bond: 1 }).lean().catch(() => null),
     ]);
     const closeness = computeCloseness({
       category: contactNode?.category,
@@ -186,12 +187,13 @@ class AzureOpenAIService {
       firstSeen: userMemory.createdAt,
       lastSeen: userMemory.lastInteraction,
       override: contactNode?.closenessOverride || '',
+      memoryBond: memoryBond?.bond || '',
       isTest: /^test_/.test(String(userMemory.senderId || '')),
       familyRole: socialGraphService.familyRole,
     });
     const isClose = closeness.level === 'close';
     const knowsThem = closeness.level === 'friend' || isClose;
-    const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext, voice, sharedByThem] = await Promise.all([
+    const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext, voice, sharedByThem, personMemory] = await Promise.all([
       features?.ragKnowledgeBase && storyboardOwner
         ? ragService.retrieve({ ownerId: storyboardOwner, incomingText }).catch(err => {
             console.warn('⚠️ [RAG] Personal retrieval failed:', err.message);
@@ -206,12 +208,18 @@ class AzureOpenAIService {
         features?.activeMode === 'hybrid' ? storyboardService.getBusinessContext(storyboardOwner) : '',
       ]),
       // 2. Social knowledge graph context (tree chain linking friends & lore)
-      socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId, level: closeness.level }),
+      socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId, level: closeness.level, autoStyle: true }),
       // 2b. The owner's real voice from MongoDB: hand-typed messages only (never the AI's replies)
       voiceService.getVoiceBlock({ ownerId: conversationOwnerId, contactId: userMemory.senderId, creatorName: config.creatorName, asOf, incomingText, level: closeness.level }),
       // Photos, videos and links they sent before, with what they said about them
       require('./importantService').recentSharedForPrompt(conversationOwnerId, userMemory.senderId).catch(() => ''),
+      // The AI's memory of this person (from all your real chats) and old chat moments matching this message
+      require('./memoryIndexService').contextFor(conversationOwnerId, userMemory.senderId, incomingText).catch(() => ({})),
     ]);
+    const memDoc = personMemory?.mem?.doc ? String(personMemory.mem.doc).slice(0, 4000) : '';
+    const memMoments = (personMemory?.moments || []).map(m =>
+      `[${new Date(m.startAt).toISOString().slice(0, 10)}]\n${String(m.text).slice(0, 600)}`).join('\n\n');
+    const brain = personMemory?.mem?.brainScore || 0;
     // Real texting data wins over generic style rules (emoji rate, capitals, length)
     const realVoice = voice?.fingerprint ? voice : null;
     const allowEmoji = !!(realVoice && realVoice.fingerprint.emojiShare >= 3);
@@ -443,6 +451,9 @@ ${knowsThem
   ? `\n- YOU ASKED THEM EARLIER: "${c(userMemory.pendingQuestion.text, 160)}". If this message answers it, react to the answer like a friend who cares (don't ask it again). If it doesn't, don't push.`
   : ''}
 ${socialTreeContext}
+${memDoc ? `\nMY MEMORY OF ${String(personMemory.mem.name || 'THEM').toUpperCase()} (written from all our real chats; brain score ${brain}/100. Use it like a friend who remembers: bring up people in their life, events and open threads naturally. Never make up anything that is not here):\n${memDoc}\n` : ''}
+${memMoments ? `\nOLD CHAT MOMENTS THAT MATCH WHAT THEY JUST SAID (real, with dates; "me" is you):\n${memMoments}\n` : ''}
+${brain < 20 ? '- You barely know this person yet: keep it light, ask one easy question about them, do not act like an old friend.\n' : ''}
 ${sharedByThem ? `\n${sharedByThem}\n` : ''}
 REEL & SHARED MEDIA REACTIONS:
 - When user shares a Reel/Post/Photo: React instantly like a human friend — not an essay. Express genuine emotion matching the content (funny, epic, aesthetic, emotional). Keep it short and real.
@@ -761,7 +772,7 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
    * own voice, with ONE question it wants answered (`ask` = the biggest gap in what it knows).
    * Returns { message, question } or null.
    */
-  async generateCheckIn({ userMemory, messageHistory, config: passedConfig = null, closeness, ask, node = null }) {
+  async generateCheckIn({ userMemory, messageHistory, config: passedConfig = null, closeness, ask, node = null, memoryDoc = '' }) {
     const config = passedConfig || await this.loadPersonaConfig(userMemory?.ownerId || null);
     const c = (v, n = 200) => sanitizeLearnedText(v, n).replace(/\n/g, ' ');
     const facts = (userMemory.facts || []).slice(-15).map(f => `- ${c(f.fact)}`).join('\n');
@@ -772,6 +783,7 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     const systemPrompt = `You are ${config.creatorName}. You are texting ${name} first, on Instagram DM, because your chat went quiet and you care about them.
 They are ${closeness?.level === 'close' ? 'one of your closest people' : 'a good friend'}. Be like a caring friend or sibling: warm, a little playful, genuinely interested. Never needy, never guilt-trippy, never "why didn't you reply".
 
+${memoryDoc ? `YOUR MEMORY OF THEM (from all your real chats: people in their life, timeline, open threads; pick something real from here):\n${String(memoryDoc).slice(0, 3500)}\n` : ''}
 WHAT YOU KNOW ABOUT THEM:
 ${facts || '- not much yet'}
 ${events ? `WHAT'S GOING ON IN THEIR LIFE:\n${events}` : ''}

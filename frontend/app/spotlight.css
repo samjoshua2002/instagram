@@ -900,3 +900,27 @@ a.bn-card:hover { transform: translateY(-2px); }
 .shared-link-host img { border-radius: 4px; }
 .shared-link-host small { font-weight: 600; opacity: 0.7; }
 .shared-link-group .shared-list { margin-top: 6px; }
+
+/* People > AI memory (read-only memory document and brain score) */
+.pm { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+.pm-head { display: flex; align-items: center; gap: 14px; }
+.pm-ring { position: relative; flex: none; width: 52px; height: 52px; display: grid; place-items: center; }
+.pm-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.pm-ring-track { fill: none; stroke: color-mix(in srgb, var(--color-text-primary) 10%, transparent); stroke-width: 5; }
+.pm-ring-arc { fill: none; stroke: var(--ambient-dominant, #888); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+.pm-ring b { position: relative; font-size: 0.95rem; font-weight: 800; }
+.pm-title { flex: 1; min-width: 0; }
+.pm-title .person-card-title { display: flex; align-items: center; gap: 8px; margin: 0; }
+.pm-reindex { flex: none; }
+.pm-spin { animation: pm-spin 1s linear infinite; }
+@keyframes pm-spin { to { transform: rotate(360deg); } }
+.pm-bar { height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); overflow: hidden; }
+.pm-bar span { display: block; height: 100%; background: var(--ambient-dominant, #888); transition: width 0.6s ease; }
+.pm-bond { margin: 0; font-size: 0.84rem; color: var(--color-text-secondary); font-style: italic; }
+.pm-doc { max-height: 520px; overflow: auto; padding-right: 6px; font-size: 0.88rem; line-height: 1.5; }
+.pm-h { margin: 14px 0 6px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-secondary); }
+.pm-h:first-child { margin-top: 0; }
+.pm-p { margin: 0 0 6px; }
+.pm-ul { margin: 0 0 6px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.pm-note { margin: 0; font-size: 0.72rem; color: var(--color-text-secondary); }
+@media (prefers-reduced-motion: reduce) { .pm-spin { animation: none; } }

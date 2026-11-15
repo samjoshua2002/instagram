@@ -29,6 +29,8 @@ const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const checkInService = require('./services/checkInService');
 const importantService = require('./services/importantService');
+const memoryIndexService = require('./services/memoryIndexService');
+const PersonMemory = require('./models/PersonMemory');
 const { commitsOwner, holdingReply, asksForCommitment } = require('./services/importantRules');
 const SharedItem = require('./models/SharedItem');
 const stickerService = require('./services/stickerService');
@@ -330,6 +332,7 @@ app.use('/api/simulator', requireAuth);
 app.use('/api/memory', requireAuth);
 app.use('/api/contacts', requireAuth);
 app.use('/api/people', requireAuth);
+app.use('/api/memory-index', requireAuth);
 app.use('/api/shared', requireAuth);
 app.use('/api/checkins', requireAuth);
 app.use('/api/giphy', requireAuth);
@@ -831,6 +834,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const userProfile = await lookup.promise;
   const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile, memOptsFor(ownerUser));
   if (ownerUser && !userMemory.ownerId) userMemory.ownerId = ownerUser._id;
+
+  // Their memory needs an update (the indexer picks it up in the background)
+  memoryIndexService.markDirty(userMemory.ownerId || null, senderId);
 
   // Keep links / files / photos they sent, and email the owner when the message needs them
   importantService.capture({
@@ -1739,6 +1745,44 @@ async function accountIdsForToken(token) {
 }
 
 // Update Persona Configuration
+// The AI's memory of one person (read only): document, brain score, bond, indexing progress
+app.get('/api/people/:senderId/memory', async (req, res) => {
+  try {
+    const mem = await PersonMemory.findOne({ ownerId: req.user._id, senderId: String(req.params.senderId) },
+      { notes: 0 }).lean();
+    res.json({ memory: mem || null });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+// Re-read one person's whole chat now (rebuilds their moments and memory document)
+app.post('/api/people/:senderId/memory/reindex', async (req, res) => {
+  try {
+    const senderId = String(req.params.senderId);
+    if (!(await UserMemory.exists(ownedMemoryQuery(req, senderId)))) return res.status(404).json({ error: 'User not found' });
+    await PersonMemory.updateOne({ ownerId: req.user._id, senderId }, { $set: { status: 'indexing' } });
+    memoryIndexService.indexOne(req.user._id, senderId, { ownerName: req.user.firstName || req.user.name || 'me', force: true }).catch(() => {});
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+// Indexing progress for everyone (AI Memory page): like Spotlight's "Indexing..." status
+app.get('/api/memory-index', async (req, res) => {
+  try {
+    const people = await PersonMemory.find({ ownerId: req.user._id },
+      { senderId: 1, name: 1, brainScore: 1, bond: 1, status: 1, totalMessages: 1, indexedMessages: 1, chunkCount: 1, lastIndexedAt: 1, dirty: 1 })
+      .sort({ totalMessages: -1 }).lean();
+    const total = people.reduce((n, p) => n + (p.totalMessages || 0), 0);
+    const done = people.reduce((n, p) => n + Math.min(p.indexedMessages || 0, p.totalMessages || 0), 0);
+    res.json({ people, total, done, ready: people.filter(p => p.status === 'ready').length });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // Things a contact shared (People page > Shared) and messages that need the owner
 app.get('/api/people/:senderId/shared', async (req, res) => {
   try {
@@ -3509,6 +3553,7 @@ app.listen(PORT, '0.0.0.0', () => {
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
   checkInService.startScheduler(20);
+  memoryIndexService.startScheduler();
   require('./services/scheduledReminders').startScheduler();
   // Older saved photos/videos get described in the background (a few at a time)
   setTimeout(() => importantService.backfillDescriptions(30).catch(() => {}), 60 * 1000);
