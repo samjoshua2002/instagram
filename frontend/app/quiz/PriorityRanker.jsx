@@ -75,7 +75,7 @@ export default function PriorityRanker({ onSaved }) {
               <li key={p.senderId}>
                 <span className="qz2-rank-n">{i + 1}</span>
                 {p.profilePic ? <img src={p.profilePic} alt="" className="qz2-rank-av" referrerPolicy="no-referrer" /> : <span className="qz2-rank-av">{(p.name || '?')[0]}</span>}
-                <span className="qz2-rank-name"><b>{p.name}</b><small>{p.instagramHandle ? `@${p.instagramHandle} · ` : ''}{(p.chatsCount || 0).toLocaleString()} chats</small></span>
+                <span className="qz2-rank-name"><b>{p.name}</b><small>{p.instagramHandle ? `@${String(p.instagramHandle).replace(/^@+/, '')} · ` : ''}{(p.chatsCount || 0).toLocaleString()} chats</small></span>
                 <span className="qz2-seg" role="group" aria-label={`Tier for ${p.name}`}>
                   {TIERS.map(x => (
                     <button key={x.id} type="button" className={p.priority === x.id ? 'on' : ''} onClick={() => setTier(p.senderId, x.id)} title={x.label}>{x.id === 'top' ? 'Top' : x.id === 'low' ? 'Low' : 'Normal'}</button>

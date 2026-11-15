@@ -1902,7 +1902,9 @@ app.get('/api/priorities', async (req, res) => {
   try {
     const nodes = await SocialGraph.find(inGraph(req, { senderId: { $exists: true, $nin: [null, ''] } }),
       { senderId: 1, name: 1, instagramHandle: 1, profilePic: 1, category: 1, relationshipToSam: 1, chatsCount: 1, priority: 1, priorityRank: 1, closenessOverride: 1 }).lean();
-    const people = nodes.filter(n => !/^test_/.test(String(n.senderId)));
+    // Not you: your own account shows up as a contact when you message yourself
+    const me = new Set([req.user.username, req.user.instagramUsername].filter(Boolean).map(h => String(h).replace(/^@+/, '').toLowerCase()));
+    const people = nodes.filter(n => !/^test_/.test(String(n.senderId)) && !me.has(String(n.instagramHandle || '').replace(/^@+/, '').toLowerCase()));
     const tierOrder = { top: 0, normal: 1, low: 2, '': 1 };
     people.sort((a, b) => (tierOrder[a.priority || ''] - tierOrder[b.priority || ''])
       || ((a.priorityRank ?? 1e9) - (b.priorityRank ?? 1e9)) || ((b.chatsCount || 0) - (a.chatsCount || 0)));
