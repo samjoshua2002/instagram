@@ -122,6 +122,66 @@ function describeFingerprint(fp, name = 'You') {
 
 const cache = new Map(); // ownerId -> { at, fp, lines }
 
+// ── Your real replies to messages like this one ─────────────────
+// The closest thing to training on your DMs without fine-tuning: every reply is shown how YOU
+// actually answered similar messages from anyone, picked fresh each time from your real history.
+const EXCHANGE_SAMPLE = 8000;      // latest messages (all chats) scanned for exchanges
+const SIMILAR_PAIRS = 8;
+const STOP = new Set('a an the i you u me my your ur is are was were be been am do does did to of in on at for and or but so it its this that what wat how who why when where with just like ok okay oh ya ye yes no not have has had will would can could pls please da hey hi hello'.split(' '));
+const tokens = t => new Set(String(t || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 1 && !STOP.has(w)));
+const exchangeCache = new Map(); // ownerId -> { at, list: [{ them, me, contact, keys }] }
+
+async function ownerExchanges(ownerId) {
+  const key = `${ownerId || 'legacy'}`;
+  const hit = exchangeCache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.list;
+  const docs = await Message.find({ ownerId: ownerId || null })
+    .sort({ createdAt: -1 }).limit(EXCHANGE_SAMPLE)
+    .select('role text sentByAI senderId recipientId').lean();
+  // Group by the other person, oldest first, then pull out real (them -> you) exchanges
+  const byContact = new Map();
+  for (const m of docs.reverse()) {
+    const contact = m.role === 'assistant' ? m.recipientId : m.senderId;
+    if (!contact || /^test_/.test(String(contact))) continue; // test chats are not your real voice
+    if (!byContact.has(contact)) byContact.set(contact, []);
+    byContact.get(contact).push(m);
+  }
+  const list = [];
+  for (const [contact, chat] of byContact) {
+    for (const e of extractExchanges(chat, Infinity)) {
+      const keys = tokens(e.them.join(' '));
+      if (keys.size) list.push({ ...e, contact, keys });
+    }
+  }
+  exchangeCache.set(key, { at: Date.now(), list });
+  return list;
+}
+
+/** Real exchanges whose incoming message shares the most words with `text` (pure, so it is unit tested). */
+function rankSimilar(list, text, { exclude = null, max = SIMILAR_PAIRS } = {}) {
+  const want = tokens(text);
+  if (!want.size) return [];
+  const scored = [];
+  for (const e of list) {
+    if (exclude && e.contact === exclude) continue;
+    let common = 0;
+    for (const w of want) if (e.keys.has(w)) common++;
+    if (!common) continue;
+    scored.push({ e, score: common / Math.sqrt(want.size * e.keys.size) });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const out = [];
+  const seen = new Set();
+  for (const { e } of scored) {
+    const sig = e.me.join(' ').toLowerCase();
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    out.push(e);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 async function ownerFingerprint(ownerId, asOf) {
   const key = `${ownerId || 'legacy'}`;
   const hit = !asOf && cache.get(key);
@@ -150,15 +210,17 @@ async function ownerFingerprint(ownerId, asOf) {
  * Prompt block with the owner's real voice for a reply to `contactId`.
  * asOf (optional) only uses messages before that time (the voice test hides the real answer).
  */
-async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = null }) {
+async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = null, incomingText = '' }) {
   try {
-    const [{ fp, lines }, chat] = await Promise.all([
+    const [{ fp, lines }, chat, allExchanges] = await Promise.all([
       ownerFingerprint(ownerId, asOf),
       Message.find({
         ownerId: ownerId || null,
         $or: [{ senderId: contactId }, { recipientId: contactId }],
         ...(asOf ? { createdAt: { $lt: asOf } } : {}),
       }).sort({ createdAt: -1 }).limit(CONTACT_WINDOW).select('role text sentByAI').lean(),
+      // The voice test (asOf) must not see later messages, so it skips the cross-chat search
+      incomingText && !asOf ? ownerExchanges(ownerId).catch(() => []) : [],
     ]);
     if (!fp) return { block: '', fingerprint: null, exchanges: 0, tanglish: null };
     chat.reverse();
@@ -174,6 +236,15 @@ async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = n
         '\n<<<END REAL EXCHANGES>>>'
       );
     }
+    const similar = rankSimilar(allExchanges, incomingText, { exclude: contactId });
+    if (similar.length) {
+      parts.push(
+        `\nHOW YOU REALLY ANSWERED MESSAGES LIKE THIS ONE (verbatim from your other chats; answer this one the same way: same length, same words, same attitude. Use only YOUR wording, never the facts or names from these chats):\n` +
+        '<<<SIMILAR REAL EXCHANGES>>>\n' +
+        similar.map(e => `them: ${e.them.join(' / ')}\nyou: ${e.me.join('\n     ')}`).join('\n\n') +
+        '\n<<<END SIMILAR REAL EXCHANGES>>>'
+      );
+    }
     if (exchanges.length < 10) {
       const others = lines.filter(l => l.contact !== contactId).map(l => `- ${l.t}`);
       if (others.length) {
@@ -187,4 +258,4 @@ async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = n
   }
 }
 
-module.exports = { getVoiceBlock, fingerprint, extractExchanges, describeFingerprint, tanglishHabit, isTanglish, _cache: cache };
+module.exports = { getVoiceBlock, fingerprint, extractExchanges, describeFingerprint, tanglishHabit, isTanglish, rankSimilar, tokens, _cache: cache, _exchangeCache: exchangeCache };

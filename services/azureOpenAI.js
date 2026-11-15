@@ -188,7 +188,7 @@ class AzureOpenAIService {
       // 2. Social knowledge graph context (tree chain linking friends & lore)
       socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId }),
       // 2b. The owner's real voice from MongoDB: hand-typed messages only (never the AI's replies)
-      voiceService.getVoiceBlock({ ownerId: conversationOwnerId, contactId: userMemory.senderId, creatorName: config.creatorName, asOf }),
+      voiceService.getVoiceBlock({ ownerId: conversationOwnerId, contactId: userMemory.senderId, creatorName: config.creatorName, asOf, incomingText }),
     ]);
     // Real texting data wins over generic style rules (emoji rate, capitals, length)
     const realVoice = voice?.fingerprint ? voice : null;

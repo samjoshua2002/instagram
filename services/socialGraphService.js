@@ -298,8 +298,20 @@ class SocialGraphService {
         mentionedNodes.delete(senderNode.name);
       }
 
+      // 2b. Your family and partner are always known, even when nobody types their name
+      // ("who's your mom?" never contains "Sangeetha")
+      const family = [];
+      const familySeen = new Set();
+      for (const node of cache.values()) {
+        const id = String(node._id || node.name);
+        if (familySeen.has(id) || node === senderNode) continue;
+        familySeen.add(id);
+        const rel = familyRole(node.relationshipToSam);
+        if (rel) family.push({ node, rel });
+      }
+
       // 3. Format Social Graph Context Prompt Block
-      if (!senderNode && mentionedNodes.size === 0) {
+      if (!senderNode && mentionedNodes.size === 0 && family.length === 0) {
         return '';
       }
 
@@ -352,6 +364,13 @@ class SocialGraphService {
         lines.push('', `=== HOW YOU CHOSE TO TALK TO ${String(senderNode.name || 'THIS PERSON').toUpperCase()} (YOUR OWN SETTINGS: FOLLOW THEM; THEY OVERRIDE THE GENERAL TONE, BANTER AND GENDER RULES) ===`, ...style);
       }
 
+      if (family.length > 0) {
+        lines.push(`• MY FAMILY AND PARTNER (you know them; answer naturally if someone asks about your family, but keep private details private. Write their names in plain English letters, e.g. "Sангёётна" is "Sangeetha"):`);
+        for (const { node, rel } of family.slice(0, 12)) {
+          lines.push(`  - ${clean(node.name, 60)}${node.instagramHandle ? ` (@${clean(String(node.instagramHandle).replace(/^@/, ''), 40)})` : ''}: my ${rel}${node.relationshipToSam && node.relationshipToSam.toLowerCase() !== rel ? ` (${clean(node.relationshipToSam, 60)})` : ''}`);
+        }
+      }
+
       if (mentionedNodes.size > 0) {
         lines.push(`• FRIENDS MENTIONED IN THIS CONVERSATION (TREE CHAIN):`);
         for (const [name, node] of mentionedNodes.entries()) {
@@ -380,7 +399,30 @@ class SocialGraphService {
   }
 }
 
+/**
+ * The family role in a "relationship to me" label, or null: "Mother" -> "mother", "Amma" -> "mother",
+ * "elder bro" -> "brother". Friends ("college friend", "online sister" style nicknames) are not family.
+ */
+function familyRole(label) {
+  const t = String(label || '').toLowerCase();
+  if (!t || /\b(online|insta|like a|figure|vibe|bestie|friend|homie|buddy|mate|dude)\b/.test(t)) return null;
+  const roles = [
+    ['mother', /\b(mother|mom|mum|mommy|amma|ammi|mummy)\b/],
+    ['father', /\b(father|dad|daddy|appa|abba|papa)\b/],
+    ['sister', /\b(sister|sis|akka|thangachi|didi)\b/],
+    ['brother', /\b(brother|bro|anna|thambi|bhaiya)\b/],
+    ['grandparent', /\b(grand ?(ma|pa|mother|father)|paati|thatha|patti)\b/],
+    ['cousin', /\bcousin\b/],
+    ['uncle', /\b(uncle|mama|chithappa|periyappa)\b/],
+    ['aunt', /\b(aunt|aunty|chithi|periyamma|athai)\b/],
+    ['partner', /\b(wife|husband|girlfriend|boyfriend|gf|bf|fiance|fiancee|partner)\b/],
+  ];
+  const hit = roles.find(([, re]) => re.test(t));
+  return hit ? hit[0] : (/\bfamily\b/.test(t) ? 'family' : null);
+}
+
 const service = new SocialGraphService();
+service.familyRole = familyRole;
 service.ownerFilter = ownerFilter;
 service.escapeRegex = escapeRegex;
 module.exports = service;

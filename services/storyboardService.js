@@ -79,6 +79,19 @@ async function getPersonalContext(ownerId, userMemory) {
     const you = nodes.find(n => n.type === 'you');
     if (you?.notes) parts.push(`MORE ABOUT ME (FROM MY STORYBOARD):\n${clip(you.notes, 500)}`);
 
+    // People linked to the You card: how you named each link ("Mom", "Cousin") is how you know them.
+    // Always included, so a question about your family or friends works in any chat, not only with that person.
+    if (you) {
+      const mine = edges
+        .filter(e => e.from === you.id || e.to === you.id)
+        .map(e => ({ edge: e, other: byId[e.from === you.id ? e.to : e.from] }))
+        .filter(l => l.other && l.other.type === 'person' && l.other.label);
+      if (mine.length) {
+        parts.push(`MY PEOPLE (FROM MY STORYBOARD; I know them, but keep their private details private):
+${mine.slice(0, 15).map(({ edge, other }) => `- ${clip(other.label, 60)}${edge.label ? `: my ${clip(edge.label, 40)}` : ''}${other.notes ? ` (${clip(other.notes, 120)})` : ''}`).join('\n')}`);
+      }
+    }
+
     const lore = nodes.filter(n => ['lore', 'place', 'event'].includes(n.type) && (n.label || n.notes));
     if (lore.length) {
       parts.push(`MY LORE, PLACES & EVENTS (bring up only when it fits naturally):
