@@ -134,7 +134,7 @@ export default function QuizPage() {
         icon={<Sparkles size={96} strokeWidth={2} />}
         eyebrow="Persona"
         title="Train your clone"
-        desc="Real DMs from someone new, a friend or a close friend. Reply the way you really would. The AI guesses first, then you see how close it got."
+        desc="Real messages your people sent you, section by section. Reply the way you would today. The AI guesses first, then you see how close it got, and what you said back then."
         meta={meta}
       >
         <Link href="/settings" className="split-badge"><ArrowLeft size={14} /> Back to persona</Link>
@@ -258,9 +258,14 @@ export default function QuizPage() {
                     {current.person?.profilePic
                       ? <img className="qz2-dm-av" src={current.person.profilePic} alt="" referrerPolicy="no-referrer" />
                       : <span className="qz2-dm-av">{(current.person?.name || FROM[current.from])[0]}</span>}
-                    <div><div className="qz2-dm-name">{current.person?.name || FROM[current.from]}</div><div className="qz2-in">{current.text}</div></div>
+                    <div className="qz2-dm-col">
+                      <div className="qz2-dm-name">{current.person?.name || FROM[current.from]}{current.at ? ` · ${new Date(current.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</div>
+                      {(current.before || []).map((b, k) => <div key={k} className={`qz2-before ${b.who}`}>{b.text}</div>)}
+                      <div className="qz2-in">{current.text}</div>
+                    </div>
                   </div>
                   {current.measures && <p className="qz2-measures">Tests: {current.measures}</p>}
+                  {current.realReply && !done && <p className="qz2-measures">A real message {current.person?.name || 'they'} sent you. Reply like you would today; you'll see what you said back then.</p>}
 
                   {done ? (
                     done.skipped ? <p className="qz2-measures">You skipped this one.</p> : (
@@ -308,6 +313,7 @@ function Compare({ h }) {
     <div className="qz2-compare">
       <div className="qz2-col"><span className="qz2-label">You</span><div className="qz2-out">{h.answer}</div></div>
       <div className="qz2-col"><span className="qz2-label"><Sparkles size={12} /> AI would say</span><div className="qz2-ai">{h.aiGuess}</div></div>
+      {h.realReply && <div className="qz2-col qz2-then"><span className="qz2-label">Back then you said</span><div className="qz2-real">{h.realReply}</div></div>}
       {h.note && <p className="qz2-note">{h.note}</p>}
     </div>
   );

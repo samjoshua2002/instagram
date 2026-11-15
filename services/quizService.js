@@ -9,9 +9,12 @@ const { styleScore, matchScore } = require('./quizRules');
 
 const FAST = () => process.env.FAST_MODEL || 'gpt-5.4-mini';
 
+// The session's own questions (real messages), or the old built-in list for older sessions
+const itemsOf = session => (session.items?.length ? session.items : allItems());
+
 function nextItem(session) {
   const done = new Set(session.answers.map(a => a.itemId));
-  return allItems().find(i => !done.has(i.id)) || null;
+  return itemsOf(session).find(i => !done.has(i.id)) || null;
 }
 
 /**
@@ -64,7 +67,7 @@ async function guessReply(ownerId, item, earlier, person = null) {
   const text = await azureOpenAI.completeWithFallback(TOP_MODEL, [
     { role: 'system', content: `You are ${cfg.creatorName || 'the owner'}. Reply to this Instagram DM exactly the way you really would: your length, words, casing, emoji, tone. One reply, no quotes.
 ${cfg.aboutMe ? `ABOUT YOU: ${String(cfg.aboutMe).slice(0, 800)}\n` : ''}${cfg.characteristics ? `YOUR PERSONALITY: ${String(cfg.characteristics).slice(0, 800)}\n` : ''}${cfg.textingHabits ? `HOW YOU TEXT: ${String(cfg.textingHabits).slice(0, 600)}\n` : ''}${voice?.block ? `${voice.block}\n` : ''}${pm?.doc ? `WHAT YOU KNOW ABOUT ${String(person.name).toUpperCase()}:\n${String(pm.doc).slice(0, 1500)}\n` : ''}${sameSender.length ? `HOW YOU ANSWERED ${FROM_LABEL[item.from].toUpperCase()} BEFORE:\n${ex(sameSender)}\n` : ''}${others.length ? `OTHER ANSWERS (different people):\n${ex(others)}\n` : ''}` },
-    { role: 'user', content: `${who} sends: ${item.text}` },
+    { role: 'user', content: `${(item.before || []).map(b => `${b.who === 'you' ? 'You' : who}: ${b.text}`).join('\n')}${item.before?.length ? '\n' : ''}${who} sends: ${item.text}` },
   ], { maxTokens: 120, temperature: 0.7 });
   return toHumanText(text, { keepEmoji: true }).trim();
 }
@@ -83,20 +86,44 @@ async function judgeMeaning(item, real, guess) {
   }
 }
 
+/** Your ranked people (top, normal, low) for building real-message questions. */
+async function rankedPeople(ownerId) {
+  const SocialGraph = require('../models/SocialGraph');
+  const User = require('../models/User');
+  const owner = await User.findById(ownerId, { username: 1, instagramUsername: 1 }).lean();
+  const me = new Set([owner?.username, owner?.instagramUsername].filter(Boolean).map(h => String(h).replace(/^@+/, '').toLowerCase()));
+  return (await SocialGraph.find({ ownerId, senderId: { $nin: [null, ''] }, priority: { $in: ['top', 'normal', 'low'] } },
+    { senderId: 1, name: 1, profilePic: 1, instagramHandle: 1, priority: 1, priorityRank: 1 }).lean())
+    .filter(n => !/^test_/.test(String(n.senderId)) && !me.has(String(n.instagramHandle || '').replace(/^@+/, '').toLowerCase()))
+    .sort((a, b) => (a.priorityRank ?? 1e9) - (b.priorityRank ?? 1e9))
+    .map(n => ({ ...n, senderId: String(n.senderId) }));
+}
+
+async function newSession(ownerId) {
+  const { buildItems } = require('./quizRealItems');
+  // Never ask a message again that an earlier quiz already asked
+  const past = await QuizSession.find({ ownerId }, { 'answers.text': 1 }).lean();
+  const used = new Set(past.flatMap(p => (p.answers || []).map(a => String(a.text || '').trim().toLowerCase())));
+  const items = await buildItems(ownerId, await rankedPeople(ownerId), used).catch(err => { console.warn('⚠️ [Quiz] real items:', err.message); return []; });
+  return QuizSession.create({ ownerId, items: items.length >= 12 ? items : [] });
+}
+
 async function start(ownerId) {
-  const open = await QuizSession.findOne({ ownerId, status: 'active' }).sort({ createdAt: -1 });
-  const session = open || await QuizSession.create({ ownerId });
+  let open = await QuizSession.findOne({ ownerId, status: 'active' }).sort({ createdAt: -1 });
+  // An untouched quiz from the old built-in list is swapped for one from your real chats
+  if (open && !open.items?.length && !open.answers.length) { open.status = 'done'; await open.save(); open = null; }
+  const session = open || await newSession(ownerId);
   const cast = await castFor(ownerId).catch(() => ({}));
-  return { session, next: nextItem(session), total: allItems().length, cast, ranked: await ranked(ownerId) };
+  return { session, next: nextItem(session), total: itemsOf(session).length, items: itemsOf(session), cast, ranked: await ranked(ownerId) };
 }
 
 async function answer(ownerId, sessionId, { itemId, text, skip = false }) {
   const session = await QuizSession.findOne({ _id: sessionId, ownerId });
   if (!session) throw new Error('Quiz not found');
-  const item = allItems().find(i => i.id === itemId);
+  const item = itemsOf(session).find(i => i.id === itemId);
   if (!item || session.answers.some(a => a.itemId === itemId)) throw new Error('Unknown or already answered question');
-  const person = (await castFor(ownerId).catch(() => ({})))[itemId] || null;
-  const who = person ? { personId: person.senderId, personName: person.name } : {};
+  const person = item.personId ? { senderId: item.personId, name: item.personName } : ((await castFor(ownerId).catch(() => ({})))[itemId] || null);
+  const who = person ? { personId: person.senderId, personName: person.name, realReply: item.realReply || '' } : {};
   if (skip) {
     session.answers.push({ itemId, from: item.from, text: item.text, skipped: true, ...who });
     await session.save();
@@ -170,4 +197,4 @@ async function apply(ownerId, sessionId) {
   return { applied: true };
 }
 
-module.exports = { start, answer, finish, apply, nextItem };
+module.exports = { start, answer, finish, apply, nextItem, newSession, itemsOf };

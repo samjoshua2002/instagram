@@ -2007,12 +2007,24 @@ app.get('/api/shared/:id/file', async (req, res) => {
 const quizService = require('./services/quizService');
 const QuizSession = require('./models/QuizSession');
 const quizView = s => ({ id: s._id, status: s.status, answered: s.answers.length, appliedAt: s.appliedAt,
-  history: s.answers.map(a => ({ itemId: a.itemId, from: a.from, text: a.text, personName: a.personName, answer: a.answer, skipped: a.skipped, aiGuess: a.aiGuess, score: a.score, style: a.style, meaning: a.meaning, note: a.note })) });
+  history: s.answers.map(a => ({ itemId: a.itemId, from: a.from, text: a.text, personName: a.personName, realReply: a.realReply, answer: a.answer, skipped: a.skipped, aiGuess: a.aiGuess, score: a.score, style: a.style, meaning: a.meaning, note: a.note })) });
+// For the Home nudge: how many quiz messages are waiting and how close the AI is (never creates a quiz)
+app.get('/api/quiz/status', async (req, res) => {
+  try {
+    const s = await QuizSession.findOne({ ownerId: req.user._id, status: 'active' }).sort({ createdAt: -1 }).lean();
+    const all = await QuizSession.find({ ownerId: req.user._id }, { 'answers.score': 1, 'answers.at': 1 }).sort({ createdAt: -1 }).limit(5).lean();
+    const scores = all.flatMap(x => (x.answers || []).map(a => a.score)).filter(Number.isFinite);
+    const total = s ? (s.items?.length || 60) : 0;
+    const answered = s ? (s.answers || []).length : 0;
+    const lastAt = all.flatMap(x => (x.answers || []).map(a => a.at)).filter(Boolean).sort().pop() || null;
+    res.json({ waiting: s ? Math.max(0, total - answered) : null, answered, total, match: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null, lastAt });
+  } catch (err) { sendServerError(res, err); }
+});
 app.post('/api/quiz/start', async (req, res) => {
   try {
-    const { session, next, total, cast, ranked } = await quizService.start(req.user._id);
-    res.json({ session: quizView(session), next: next && { ...next, person: cast[next.id] || null }, total, ranked,
-      items: require('./services/quizBank').allItems().map(i => ({ ...i, person: cast[i.id] || null })) });
+    const { session, next, total, cast, ranked, items } = await quizService.start(req.user._id);
+    const withPerson = i => i && ({ ...i, person: i.personId ? { senderId: i.personId, name: i.personName, profilePic: i.profilePic || '' } : (cast[i.id] || null) });
+    res.json({ session: quizView(session), next: withPerson(next), total, ranked, items: items.map(withPerson) });
   } catch (err) { sendServerError(res, err); }
 });
 app.post('/api/quiz/:id/answer', async (req, res) => {
@@ -2040,9 +2052,9 @@ app.post('/api/quiz/:id/apply', async (req, res) => {
 app.post('/api/quiz/restart', async (req, res) => {
   try {
     await QuizSession.updateMany({ ownerId: req.user._id, status: 'active' }, { $set: { status: 'done' } });
-    const { session, next, total, cast, ranked } = await quizService.start(req.user._id);
-    res.json({ session: quizView(session), next: next && { ...next, person: cast[next.id] || null }, total, ranked,
-      items: require('./services/quizBank').allItems().map(i => ({ ...i, person: cast[i.id] || null })) });
+    const { session, next, total, cast, ranked, items } = await quizService.start(req.user._id);
+    const withPerson = i => i && ({ ...i, person: i.personId ? { senderId: i.personId, name: i.personName, profilePic: i.profilePic || '' } : (cast[i.id] || null) });
+    res.json({ session: quizView(session), next: withPerson(next), total, ranked, items: items.map(withPerson) });
   } catch (err) { sendServerError(res, err); }
 });
 

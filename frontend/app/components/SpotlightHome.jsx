@@ -740,8 +740,18 @@ export default function SpotlightHome() {
     return () => clearInterval(t);
   }, [API_BASE]);
 
+  // Quiz nudge, always shown: answering real messages keeps the AI's replies sounding like you
+  const [quiz, setQuiz] = useState(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/quiz/status`).then(r => (r.ok ? r.json() : null)).then(setQuiz).catch(() => {});
+  }, [API_BASE]);
+  const quizTitle = !quiz ? 'Train your clone with real messages'
+    : quiz.waiting === null || quiz.waiting === 0 ? `New real messages to answer${quiz.match != null ? ` · AI ${quiz.match}% like you` : ''}`
+      : `${quiz.waiting} real message${quiz.waiting === 1 ? '' : 's'} waiting${quiz.match != null ? ` · AI ${quiz.match}% like you` : ''}`;
+
   const paused = people.filter(p => p.aiEnabled === false);
   const alerts = [
+    { id: 'quiz', icon: Sparkles, title: `Train your clone: ${quizTitle}`, href: '/quiz' },
     aiQuestions > 0 && { id: 'ai-questions', icon: Sparkles, title: `The AI has ${aiQuestions} question${aiQuestions === 1 ? '' : 's'} about your people`, href: '/' },
     ...needsYou.slice(0, 8).map(it => ({
       id: `need-${it._id}`, icon: Bell, title: it.summary || `${it.name || 'Someone'} needs you`,
@@ -785,6 +795,11 @@ export default function SpotlightHome() {
             {botOn ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
           </button>
         )}
+        <a href="/quiz" className="sh-quiz-pill" title="Answer real messages so the AI replies more like you">
+          <Sparkles size={14} aria-hidden="true" />
+          <span>{quiz?.waiting ? `Quiz · ${quiz.waiting} waiting` : 'Train your clone'}</span>
+          {quiz?.match != null && <b>{quiz.match}%</b>}
+        </a>
         <HomeBell alerts={alerts} />
         </div>
       </header>
