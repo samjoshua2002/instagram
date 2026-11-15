@@ -37,6 +37,7 @@ import { getNextBirthday, formatLastContact, MONTH_NAMES, DEFAULT_GREETINGS, CAT
 import PersonFacts from './PersonFacts';
 import PersonShared from './PersonShared';
 import PersonMemory from './PersonMemory';
+import FixWithAI from './FixWithAI';
 import BrainBadge, { FriendshipBadge } from '../components/BrainBadge';
 
 function RelationshipsPageContent() {
@@ -1539,6 +1540,7 @@ function RelationshipsPageContent() {
           </section>
 
           {selectedPerson.senderId && <PersonShared key={`shared-${selectedPerson.id}`} senderId={selectedPerson.senderId} />}
+          {selectedPerson.senderId && <FixWithAI senderId={selectedPerson.senderId} name={personName} />}
           </div>
 
           {/* ================= WHAT THE AI KNOWS ================= */}

@@ -1823,6 +1823,21 @@ app.post('/api/people/:senderId/memory/correct', async (req, res) => {
   }
 });
 
+// "Fix with AI" on a person's page: chat about them; the assistant updates their records
+app.post('/api/people/:senderId/fix-chat', async (req, res) => {
+  try {
+    const senderId = String(req.params.senderId);
+    const out = await require('./services/fixChatService').chat({
+      ownerId: req.user._id, senderId, mq: ownedMemoryQuery(req, senderId), gq: inGraph(req, { senderId }),
+      messages: req.body?.messages,
+    });
+    res.json(out);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    sendServerError(res, err);
+  }
+});
+
 // Every open question the AI has for you, across everyone (Home review list and bell)
 app.get('/api/memory-index/questions', async (req, res) => {
   try {

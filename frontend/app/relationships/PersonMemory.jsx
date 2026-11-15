@@ -41,6 +41,12 @@ export default function PersonMemory({ senderId, name }) {
       .then(r => (r.ok ? r.json() : { memory: null })).then(d => setMem(d.memory || null)).catch(() => setMem(null));
   }, [API_BASE, senderId]);
   useEffect(() => { load(); }, [load]);
+  // "Fix with AI" changed something: show the new state
+  useEffect(() => {
+    const on = e => { if (e.detail?.senderId === senderId) setTimeout(load, 800); };
+    window.addEventListener('person-updated', on);
+    return () => window.removeEventListener('person-updated', on);
+  }, [load, senderId]);
   // While it is being read, check again every few seconds
   useEffect(() => {
     if (!mem || (mem.status !== 'indexing' && mem.status !== 'pending')) return undefined;
