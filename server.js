@@ -27,6 +27,9 @@ const analyticsService = require('./services/analyticsService');
 const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
 const checkInService = require('./services/checkInService');
+const importantService = require('./services/importantService');
+const { commitsOwner, holdingReply } = require('./services/importantRules');
+const SharedItem = require('./models/SharedItem');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
@@ -500,11 +503,13 @@ function parseIncomingEventMessage(msg) {
   }
 
   let audioUrl = '';
+  const attachmentList = [];
   if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
     for (const att of msg.attachments) {
       const type = (att.type || '').toLowerCase();
       const url = att.payload?.url || '';
       const title = att.payload?.title || att.payload?.caption || att.payload?.name || '';
+      if (url) attachmentList.push({ type, url, title });
 
       if (type === 'ig_reel' || type === 'reel' || url.includes('/reel/') || url.includes('/reels/')) {
         isReelOrShare = true;
@@ -558,7 +563,7 @@ function parseIncomingEventMessage(msg) {
   // If there's neither text nor post/reel/story, skip
   if (!text) return null;
 
-  return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply, audioUrl };
+  return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply, audioUrl, attachments: attachmentList };
 }
 
 // Finds the one workspace that owns an Instagram account id. Fields are checked in order of trust
@@ -667,6 +672,7 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
         if (parsed) {
           event.message.text = parsed.text;
           event.message.audioUrl = parsed.audioUrl;
+          event.message.attachmentList = parsed.attachments;
           event.isReelOrShare = parsed.isReelOrShare;
           event.reelTitle = parsed.reelTitle;
           handleIncomingInstagramMessage(event, entry.id).catch(err => {
@@ -690,6 +696,7 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
           if (parsed) {
             val.message.text = parsed.text;
             val.message.audioUrl = parsed.audioUrl;
+            val.message.attachmentList = parsed.attachments;
             handleIncomingInstagramMessage({
               sender: val.sender,
               recipient: val.recipient,
@@ -813,6 +820,12 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   const userProfile = await lookup.promise;
   const userMemory = await memoryService.getOrCreateUserMemory(senderId, userProfile, memOptsFor(ownerUser));
   if (ownerUser && !userMemory.ownerId) userMemory.ownerId = ownerUser._id;
+
+  // Keep links / files / photos they sent, and email the owner when the message needs them
+  importantService.capture({
+    ownerId: userMemory.ownerId || null, senderId, name: userMemory.name || userMemory.username || '',
+    text: messageText, attachments: event.message.attachmentList || [], mid,
+  }).catch(() => {});
 
   // 3. Save incoming user message in DB
   await Message.create({
@@ -1219,6 +1232,14 @@ async function writeAndSendReply(queueEntry, flight) {
       console.log(`⏸️ AI was switched off for ${senderId} while typing; not sending.`);
       await afterTurn('');
       return;
+    }
+
+    // Never agree for the owner: if they just asked for something that needs the owner and the
+    // reply says yes, a holding line goes out instead (the owner was emailed and decides)
+    if (replyText && !isBusinessTenant && commitsOwner(replyText) &&
+        await importantService.recentNeedsYou(userMemory.ownerId || null, senderId).catch(() => false)) {
+      console.log(`🛑 [No commitment] Reply "${replyText.slice(0, 60)}" would agree for the owner; sending a holding reply.`);
+      replyText = holdingReply();
     }
 
     const hasText = !!(replyText && replyText.trim().length > 0);
@@ -1705,6 +1726,52 @@ async function accountIdsForToken(token) {
 }
 
 // Update Persona Configuration
+// Things a contact shared (People page > Shared) and messages that need the owner
+app.get('/api/people/:senderId/shared', async (req, res) => {
+  try {
+    const items = await SharedItem.find({ ownerId: req.user._id, senderId: String(req.params.senderId) })
+      .sort({ createdAt: -1 }).limit(200).lean();
+    res.json({ items });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+app.get('/api/shared/needs-you', async (req, res) => {
+  try {
+    const items = await SharedItem.find({ ownerId: req.user._id, needsYou: true, status: { $ne: 'done' } })
+      .sort({ createdAt: -1 }).limit(50).lean();
+    res.json({ items });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+app.patch('/api/shared/:id', async (req, res) => {
+  try {
+    const status = req.body?.status;
+    if (!['new', 'seen', 'done'].includes(status)) return res.status(400).json({ error: 'status must be new, seen or done.' });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+    await SharedItem.updateOne({ _id: req.params.id, ownerId: req.user._id }, { $set: { status } });
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+app.get('/api/shared/:id/file', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+    const item = await SharedItem.findOne({ _id: req.params.id, ownerId: req.user._id }).lean();
+    if (!item?.fileId) return res.status(404).json({ error: 'File not found.' });
+    res.setHeader('Content-Type', item.contentType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    importantService.openFile(item.fileId).on('error', () => res.status(404).end()).pipe(res);
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // Check-ins the AI starts itself (Chat Rules page): on/off, who (friend or close), quiet time before one
 app.get('/api/checkins', async (req, res) => {
   try {

@@ -826,3 +826,17 @@ a.bn-card:hover { transform: translateY(-2px); }
 .ci-seg button { border: 0; background: transparent; color: var(--color-text-secondary); padding: 5px 12px; border-radius: 999px; font: 600 0.78rem var(--font-sans); cursor: pointer; }
 .ci-seg button.on { background: color-mix(in srgb, var(--ambient-dominant, #888) 22%, transparent); color: var(--color-text-primary); }
 .ci-note { margin: 4px 0 0; font-size: 0.74rem; color: var(--color-text-muted, var(--color-text-secondary)); line-height: 1.4; }
+
+/* People > Shared */
+.shared-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.shared-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--color-text-primary) 4%, transparent); min-width: 0; }
+.shared-needs { background: color-mix(in srgb, var(--ambient-dominant, #888) 14%, transparent); }
+.shared-icon { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--ambient-dominant, #888) 20%, transparent); color: var(--color-text-primary); }
+.shared-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 0.86rem; }
+.shared-main a { color: var(--color-text-primary); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.shared-main small { color: var(--color-text-secondary); font-size: 0.72rem; text-transform: capitalize; }
+.shared-thumb { max-width: 220px; max-height: 160px; border-radius: 10px; object-fit: cover; display: block; }
+.shared-audio { width: min(260px, 100%); height: 34px; }
+.shared-dl { display: inline-flex; align-items: center; gap: 5px; }
+.shared-missing { color: var(--color-text-secondary); font-size: 0.78rem; }
+.shared-loading { display: block; width: 120px; height: 14px; border-radius: 6px; background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }

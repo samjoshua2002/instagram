@@ -35,6 +35,7 @@ import { SegIndicator } from '../components/ui/motion';
 import { useHeroCollapse, useRevealOnce } from '../lib/scrollMotion';
 import { getNextBirthday, formatLastContact, MONTH_NAMES, DEFAULT_GREETINGS, CATEGORY_LABELS, GENDER_LABELS, PEOPLE_GROUPS, connectionGroup, connectionLabel, cleanDob, formatDobForInput } from './personHelpers';
 import PersonFacts from './PersonFacts';
+import PersonShared from './PersonShared';
 
 function RelationshipsPageContent() {
 
@@ -1414,6 +1415,7 @@ function RelationshipsPageContent() {
 
           {/* ================= WHAT THE AI KNOWS ================= */}
           <PersonFacts key={selectedPerson.id} person={selectedPerson} personName={personName} onAdd={handleAddFact} onRemove={handleRemoveFact} />
+          {selectedPerson.senderId && <PersonShared key={`shared-${selectedPerson.id}`} senderId={selectedPerson.senderId} />}
         </div>
 
         {/* ================= PEOPLE IN THEIR LIFE ================= */}

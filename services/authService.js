@@ -303,6 +303,11 @@ class AuthService {
     const text = `Your ${purpose} verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\nIf you did not request this, you can safely ignore this email.`;
     const subject = `${otpCode} is your Chatter verification code`;
 
+    return this.deliverEmail(cleanTo, subject, text, html);
+  }
+
+  /** Brevo, then Resend, then SMTP. Used by every email the app sends. */
+  async deliverEmail(cleanTo, subject, text, html) {
     // 1. Primary: Send via Brevo HTTPS REST API (Port 443 — sends from guidetalk.app@gmail.com directly to any requester)
     const brevoKey = process.env.BREVO_API_KEY;
     if (brevoKey) {
