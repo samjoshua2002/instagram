@@ -336,6 +336,7 @@ app.use('/api/contacts', requireAuth);
 app.use('/api/people', requireAuth);
 app.use('/api/memory-index', requireAuth);
 app.use('/api/reminders', requireAuth);
+app.use('/api/quiz', requireAuth);
 app.use('/api/shared', requireAuth);
 app.use('/api/checkins', requireAuth);
 app.use('/api/giphy', requireAuth);
@@ -1942,6 +1943,47 @@ app.get('/api/shared/:id/file', async (req, res) => {
   } catch (err) {
     sendServerError(res, err);
   }
+});
+
+// Texting-style quiz (Persona & AI Studio > Take the quiz)
+const quizService = require('./services/quizService');
+const QuizSession = require('./models/QuizSession');
+const quizView = s => ({ id: s._id, status: s.status, answered: s.answers.length, appliedAt: s.appliedAt,
+  history: s.answers.map(a => ({ itemId: a.itemId, from: a.from, text: a.text, answer: a.answer, skipped: a.skipped, aiGuess: a.aiGuess, score: a.score, style: a.style, meaning: a.meaning, note: a.note })) });
+app.post('/api/quiz/start', async (req, res) => {
+  try {
+    const { session, next, total } = await quizService.start(req.user._id);
+    res.json({ session: quizView(session), next, total });
+  } catch (err) { sendServerError(res, err); }
+});
+app.post('/api/quiz/:id/answer', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+    const { itemId, text, skip } = req.body || {};
+    if (!skip && !String(text || '').trim()) return res.status(400).json({ error: 'Type your reply, or skip.' });
+    const out = await quizService.answer(req.user._id, req.params.id, { itemId: String(itemId || ''), text, skip: !!skip });
+    res.json({ result: out.result, next: out.next, session: quizView(out.session) });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/quiz/:id/finish', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+    const out = await quizService.finish(req.user._id, req.params.id);
+    res.json({ draft: out.draft, average: out.average, session: quizView(out.session) });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/quiz/:id/apply', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+    res.json(await quizService.apply(req.user._id, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/quiz/restart', async (req, res) => {
+  try {
+    await QuizSession.updateMany({ ownerId: req.user._id, status: 'active' }, { $set: { status: 'done' } });
+    const { session, next, total } = await quizService.start(req.user._id);
+    res.json({ session: quizView(session), next, total });
+  } catch (err) { sendServerError(res, err); }
 });
 
 // Check-ins the AI starts itself (Chat Rules page): on/off, who (friend or close), quiet time before one

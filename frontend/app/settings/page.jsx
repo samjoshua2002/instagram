@@ -10,6 +10,7 @@ import {
   Copy, Check, BarChart3, ArrowUpRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import AiProviderCard from '../components/AiProviderCard';
 import { motion } from 'framer-motion';
@@ -583,6 +584,10 @@ function SettingsPageContent() {
               </>
             )}
           </button>
+          {/* Quiz: fills these fields from how you really reply */}
+          <Link href="/quiz" className="quiz-cta" title="Answer realistic DMs; the AI learns your style and fills your persona">
+            <Sparkles size={16} /> <span>Take the quiz</span>
+          </Link>
       </PageHero>
 
       {/* Error alert if any */}
