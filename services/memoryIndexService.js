@@ -15,6 +15,8 @@ const MemoryChunk = require('../models/MemoryChunk');
 const { buildChunks, batchChunks, brainScore, searchTerms, slotsFromDoc, wellFormed, SLOTS } = require('./memoryIndexRules');
 
 const FAST = () => process.env.FAST_MODEL || 'gpt-5.4-mini';
+// Bump when the memory-writing rules change: older memories are rebuilt automatically
+const RULES_VERSION = 2;
 const MAX_NOTES = 60;
 const REINDEX_AFTER_MS = 15 * 60 * 1000;
 
@@ -168,6 +170,7 @@ async function indexOne(ownerId, senderId, { ownerName = 'me', force = false } =
     }
     mem.status = 'ready';
     mem.dirty = false;
+    if (mem.doc) mem.rulesVersion = RULES_VERSION;
     mem.errorCount = 0;
     mem.lastIndexedAt = new Date();
     await mem.save();
@@ -265,4 +268,4 @@ async function queuePosition(ownerId, senderId) {
   return i < 0 ? 0 : i;
 }
 
-module.exports = { indexOne, markDirty, ensureEntries, tick, startScheduler, contextFor, queuePosition };
+module.exports = { RULES_VERSION, indexOne, markDirty, ensureEntries, tick, startScheduler, contextFor, queuePosition };

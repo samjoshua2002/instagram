@@ -40,6 +40,8 @@ const personMemorySchema = new mongoose.Schema({
   // Rewrite the document from the notes (after your answer or correction) without re-reading chats
   rebuildDoc: { type: Boolean, default: false },
   lastReviewedAt: { type: Date, default: null },
+  // Which version of the memory-writing rules built `doc` (older ones are rebuilt automatically)
+  rulesVersion: { type: Number, default: 1 },
   // Re-read asked for by you: goes first, and rebuilds from the whole history
   priority: { type: Number, default: 0 },
   forceRebuild: { type: Boolean, default: false },

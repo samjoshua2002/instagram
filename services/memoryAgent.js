@@ -77,6 +77,16 @@ async function cleanup() {
  * Health checks across every contact (no AI calls): finds and fixes broken or stale data the
  * owner may never notice. Each fix is logged.
  */
+/** Runs one health-check step; a failing step is logged and the others still run. */
+async function step(name, fn, fixes) {
+  try {
+    await fn();
+  } catch (err) {
+    console.warn(`⚠️ [Memory agent] health step "${name}" failed: ${err.message}`);
+    fixes.push(`(step "${name}" failed: ${err.message.slice(0, 80)})`);
+  }
+}
+
 async function healthCheck() {
   const SocialGraph = require('../models/SocialGraph');
   const SharedItem = require('../models/SharedItem');
@@ -89,79 +99,178 @@ async function healthCheck() {
   };
 
   // 1. Names: your card name is the truth; the AI's records and facts follow it
-  const cards = await SocialGraph.find({ senderId: { $nin: [null, ''] } }, { ownerId: 1, senderId: 1, name: 1 }).lean();
-  for (const card of cards) {
-    if (!card.name || /^User_/.test(card.name)) continue;
-    const mem = await UserMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { name: 1, facts: 1 }).lean();
-    if (!mem) continue;
-    // The AI's record uses your card name (facts are left as they are: a full name is still them)
-    if (mem.name !== card.name) {
-      await UserMemory.updateOne({ _id: mem._id }, { $set: { name: card.name } });
-      await log(card.ownerId, card.senderId, card.name, `Name in the AI's records set to "${card.name}" (was "${mem.name || 'empty'}")`);
-    }
-    // Facts mostly about another name: never rewritten on a guess; you are asked instead
-    const drift = detectNameDrift(mem.facts, card.name);
-    if (drift) {
-      const question = `Most of what the AI learned about ${card.name} calls them "${drift}". Is "${drift}" the same person (an old or real name)? If not, who is ${drift}?`;
-      const pm = await PersonMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { doubts: 1 });
-      if (pm && !(pm.doubts || []).some(d => d.question === question)) {
-        await PersonMemory.updateOne({ _id: pm._id }, { $push: { doubts: { question, about: 'name' } } });
-        await log(card.ownerId, card.senderId, card.name, `Asked you whether "${drift}" is ${card.name}`);
+  await step('names', async () => {
+    const cards = await SocialGraph.find({ senderId: { $nin: [null, ''] } }, { ownerId: 1, senderId: 1, name: 1 }).lean();
+    for (const card of cards) {
+      if (!card.name || /^User_/.test(card.name)) continue;
+      const mem = await UserMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { name: 1, facts: 1 }).lean();
+      if (!mem) continue;
+      // The AI's record uses your card name (facts are left as they are: a full name is still them)
+      if (mem.name !== card.name) {
+        await UserMemory.updateOne({ _id: mem._id }, { $set: { name: card.name } });
+        await log(card.ownerId, card.senderId, card.name, `Name in the AI's records set to "${card.name}" (was "${mem.name || 'empty'}")`);
+      }
+      // Facts mostly about another name: never rewritten on a guess; you are asked instead
+      const drift = detectNameDrift(mem.facts, card.name);
+      if (drift) {
+        const question = `Most of what the AI learned about ${card.name} calls them "${drift}". Is "${drift}" the same person (an old or real name)? If not, who is ${drift}?`;
+        const pm = await PersonMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { doubts: 1 });
+        if (pm && !(pm.doubts || []).some(d => d.question === question)) {
+          await PersonMemory.updateOne({ _id: pm._id }, { $push: { doubts: { question, about: 'name' } } });
+          await log(card.ownerId, card.senderId, card.name, `Asked you whether "${drift}" is ${card.name}`);
+        }
       }
     }
-  }
+
+  
+  }, fixes);
 
   // 1b. "People in their life" must be THEIR people: drop you (the owner) and your own people ("Sam's sister")
-  const owners = new Map();
-  for (const card of await SocialGraph.find({ 'connections.0': { $exists: true } }, { ownerId: 1, senderId: 1, name: 1, connections: 1 })) {
-    const key = String(card.ownerId || '');
-    if (!owners.has(key)) {
-      const User = require('../models/User');
-      const PersonaConfig = require('../models/PersonaConfig');
-      const [u, pc] = await Promise.all([
-        card.ownerId ? User.findById(card.ownerId, { firstName: 1, lastName: 1, name: 1, username: 1 }).lean() : null,
-        PersonaConfig.findOne({ ownerId: card.ownerId || null }, { creatorName: 1 }).lean(),
-      ]);
-      owners.set(key, [u?.firstName, u?.name, u?.username, pc?.creatorName, [u?.firstName, u?.lastName].filter(Boolean).join(' ')].filter(Boolean).map(x => String(x).toLowerCase()));
+  await step('owner people', async () => {
+    const owners = new Map();
+    for (const card of await SocialGraph.find({ 'connections.0': { $exists: true } }, { ownerId: 1, senderId: 1, name: 1, connections: 1 })) {
+      const key = String(card.ownerId || '');
+      if (!owners.has(key)) {
+        const User = require('../models/User');
+        const PersonaConfig = require('../models/PersonaConfig');
+        const [u, pc] = await Promise.all([
+          card.ownerId ? User.findById(card.ownerId, { firstName: 1, lastName: 1, name: 1, username: 1 }).lean() : null,
+          PersonaConfig.findOne({ ownerId: card.ownerId || null }, { creatorName: 1 }).lean(),
+        ]);
+        owners.set(key, [u?.firstName, u?.name, u?.username, pc?.creatorName, [u?.firstName, u?.lastName].filter(Boolean).join(' ')].filter(Boolean).map(x => String(x).toLowerCase()));
+      }
+      const bad = (card.connections || []).filter(c => isOwnerOrOwnersPerson(c, owners.get(key)));
+      if (bad.length) {
+        card.connections = card.connections.filter(c => !bad.includes(c));
+        await card.save();
+        await log(card.ownerId, card.senderId, card.name, `Removed ${bad.length} wrong "people in their life" (you or your own people): ${bad.map(c => c.targetName).join(', ')}`);
+      }
     }
-    const bad = (card.connections || []).filter(c => isOwnerOrOwnersPerson(c, owners.get(key)));
-    if (bad.length) {
-      card.connections = card.connections.filter(c => !bad.includes(c));
-      await card.save();
-      await log(card.ownerId, card.senderId, card.name, `Removed ${bad.length} wrong "people in their life" (you or your own people): ${bad.map(c => c.targetName).join(', ')}`);
-    }
-  }
+
+  
+  }, fixes);
 
   // 2. Alerts and reminders saved under another name
-  for (const card of cards) {
-    // "User_1187" is a placeholder until their real name is known: never copied anywhere
-    if (!card.name || /^User_/.test(card.name)) continue;
-    const q = { ownerId: card.ownerId || null, senderId: card.senderId, name: { $nin: [card.name, ''] } };
-    const n = (await SharedItem.updateMany(q, { $set: { name: card.name } })).modifiedCount + (await Reminder.updateMany(q, { $set: { name: card.name } })).modifiedCount;
-    if (n) await log(card.ownerId, card.senderId, card.name, `${n} alert(s)/reminder(s) now use the name "${card.name}"`);
-  }
+  await step('alert names', async () => {
+    for (const card of cards) {
+      // "User_1187" is a placeholder until their real name is known: never copied anywhere
+      if (!card.name || /^User_/.test(card.name)) continue;
+      const q = { ownerId: card.ownerId || null, senderId: card.senderId, name: { $nin: [card.name, ''] } };
+      const n = (await SharedItem.updateMany(q, { $set: { name: card.name } })).modifiedCount + (await Reminder.updateMany(q, { $set: { name: card.name } })).modifiedCount;
+      if (n) await log(card.ownerId, card.senderId, card.name, `${n} alert(s)/reminder(s) now use the name "${card.name}"`);
+    }
+
+  
+  }, fixes);
 
   // 3. Memory stuck after a crash or restart, and people parked after errors (retry once a day)
-  const stuck = await PersonMemory.updateMany({ status: 'indexing', updatedAt: { $lte: new Date(Date.now() - 30 * 60 * 1000) } }, { $set: { status: 'pending', dirty: true } });
-  if (stuck.modifiedCount) await log(null, '', '', `${stuck.modifiedCount} memory job(s) stuck after a restart were queued again`);
-  const parked = await PersonMemory.updateMany({ errorCount: { $gte: 5 }, lastIndexedAt: { $lte: new Date(Date.now() - 24 * 3600 * 1000) } }, { $set: { errorCount: 0, dirty: true, status: 'pending' } });
-  if (parked.modifiedCount) await log(null, '', '', `${parked.modifiedCount} person(s) that kept failing are being tried again`);
+  await step('stuck jobs', async () => {
+    const stuck = await PersonMemory.updateMany({ status: 'indexing', updatedAt: { $lte: new Date(Date.now() - 30 * 60 * 1000) } }, { $set: { status: 'pending', dirty: true } });
+    if (stuck.modifiedCount) await log(null, '', '', `${stuck.modifiedCount} memory job(s) stuck after a restart were queued again`);
+    const parked = await PersonMemory.updateMany({ errorCount: { $gte: 5 }, lastIndexedAt: { $lte: new Date(Date.now() - 24 * 3600 * 1000) } }, { $set: { errorCount: 0, dirty: true, status: 'pending' } });
+    if (parked.modifiedCount) await log(null, '', '', `${parked.modifiedCount} person(s) that kept failing are being tried again`);
+
+  
+  }, fixes);
 
   // 4. A memory document but no brain score: score it from the document
-  for (const pm of await PersonMemory.find({ status: 'ready', doc: { $ne: '' }, brainScore: { $lte: 0 } })) {
-    const ds = slotsFromDoc(pm.doc);
-    const given = pm.slots || {};
-    pm.slots = Object.fromEntries(Object.keys(SLOTS).map(k => [k, Math.max(Number(given[k]) || 0, ds[k] || 0)]));
-    pm.brainScore = brainScore(pm.slots, pm.totalMessages);
-    if (pm.brainScore > 0) { await pm.save(); await log(pm.ownerId, pm.senderId, pm.name, `Brain score fixed: 0 -> ${pm.brainScore}`); }
-  }
+  await step('brain scores', async () => {
+    for (const pm of await PersonMemory.find({ status: 'ready', doc: { $ne: '' }, brainScore: { $lte: 0 } })) {
+      const ds = slotsFromDoc(pm.doc);
+      const given = pm.slots || {};
+      pm.slots = Object.fromEntries(Object.keys(SLOTS).map(k => [k, Math.max(Number(given[k]) || 0, ds[k] || 0)]));
+      pm.brainScore = brainScore(pm.slots, pm.totalMessages);
+      if (pm.brainScore > 0) { await pm.save(); await log(pm.ownerId, pm.senderId, pm.name, `Brain score fixed: 0 -> ${pm.brainScore}`); }
+    }
+
+  
+  }, fixes);
 
   // 5. Reminders cut off in the middle of sending (server restarted): send them again
-  const cut = await Reminder.updateMany({ status: 'failed', note: 'sending', updatedAt: { $lte: new Date(Date.now() - 10 * 60 * 1000) } }, { $set: { status: 'pending', note: '' } });
-  if (cut.modifiedCount) await log(null, '', '', `${cut.modifiedCount} reminder(s) interrupted by a restart will be sent again`);
+  await step('reminders', async () => {
+    const cut = await Reminder.updateMany({ status: 'failed', note: 'sending', updatedAt: { $lte: new Date(Date.now() - 10 * 60 * 1000) } }, { $set: { status: 'pending', note: '' } });
+    if (cut.modifiedCount) await log(null, '', '', `${cut.modifiedCount} reminder(s) interrupted by a restart will be sent again`);
+
+  
+  }, fixes);
 
   // 6. Memory entries missing for contacts that have messages
-  await require('./memoryIndexService').ensureEntries().catch(() => {});
+  await step('missing memories', async () => {
+    await require('./memoryIndexService').ensureEntries().catch(() => {});
+
+  
+  }, fixes);
+
+  // 7. Duplicate "people in their life" (same name several times) merged into one
+  await step('duplicate connections', async () => {
+    for (const card of await SocialGraph.find({ 'connections.1': { $exists: true } }, { name: 1, ownerId: 1, senderId: 1, connections: 1 })) {
+      const seen = new Set();
+      const kept = card.connections.filter(c => {
+        const k = String(c.targetName || '').toLowerCase().trim();
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      if (kept.length < card.connections.length) {
+        const n = card.connections.length - kept.length;
+        card.connections = kept;
+        await card.save();
+        await log(card.ownerId, card.senderId, card.name, `Merged ${n} duplicate "people in their life" entries`);
+      }
+    }
+  }, fixes);
+
+  // 8. Exact duplicate facts merged (your own facts are kept)
+  await step('duplicate facts', async () => {
+    for (const mem of await UserMemory.find({ 'facts.1': { $exists: true } }, { name: 1, ownerId: 1, senderId: 1, facts: 1 })) {
+      const seen = new Set();
+      const kept = mem.facts.filter(f => {
+        const k = String(f.fact || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        if (!k) return false;
+        if (seen.has(k) && f.source !== 'you') return false;
+        seen.add(k);
+        return true;
+      });
+      if (kept.length < mem.facts.length) {
+        const n = mem.facts.length - kept.length;
+        mem.facts = kept;
+        await mem.save();
+        await log(mem.ownerId, mem.senderId, mem.name, `Merged ${n} duplicate fact(s)`);
+      }
+    }
+  }, fixes);
+
+  // 9. Cards with no name: use their Instagram handle
+  await step('empty names', async () => {
+    for (const card of await SocialGraph.find({ $or: [{ name: '' }, { name: null }], instagramHandle: { $nin: ['', null] } }, { instagramHandle: 1, ownerId: 1, senderId: 1 })) {
+      const name = String(card.instagramHandle).replace(/^@/, '');
+      await SocialGraph.updateOne({ _id: card._id }, { $set: { name } });
+      await log(card.ownerId, card.senderId, name, `Card had no name: set to @${name}`);
+    }
+  }, fixes);
+
+  // 10. Contacts the AI talks to but with no linked card: link the ONE card with their name (never create)
+  await step('missing cards', async () => {
+    const withCard = new Set((await SocialGraph.find({ senderId: { $nin: [null, ''] } }, { senderId: 1, ownerId: 1 }).lean()).map(c => `${c.ownerId}|${c.senderId}`));
+    for (const mem of await UserMemory.find({ senderId: { $not: /^test_/ }, messageCount: { $gt: 0 } }, { ownerId: 1, senderId: 1, name: 1, username: 1, gender: 1 }).lean()) {
+      if (withCard.has(`${mem.ownerId}|${mem.senderId}`)) continue;
+      const name = mem.name || mem.username;
+      if (!name || /^User_/.test(name)) continue;
+      const sameName = await SocialGraph.find({ ownerId: mem.ownerId || null, senderId: { $in: [null, ''] }, name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, { _id: 1 }).lean();
+      if (sameName.length === 1) {
+        await SocialGraph.updateOne({ _id: sameName[0]._id }, { $set: { senderId: mem.senderId, ...(mem.username ? { instagramHandle: mem.username } : {}) } });
+        await log(mem.ownerId, mem.senderId, name, `Linked their card to their Instagram chat`);
+      }
+      // No card, or several with that name: never create or guess (duplicates in People); left for you
+    }
+  }, fixes);
+
+  // 11. Memories written under older rules are rebuilt (old records upgrade themselves)
+  await step('old memory rules', async () => {
+    const { RULES_VERSION } = require('./memoryIndexService');
+    const r = await PersonMemory.updateMany({ doc: { $ne: '' }, rulesVersion: { $lt: RULES_VERSION }, status: { $ne: 'indexing' } }, { $set: { rebuildDoc: true, dirty: true } });
+    if (r.modifiedCount) await log(null, '', '', `${r.modifiedCount} memory document(s) from older rules will be rewritten`);
+  }, fixes);
 
   if (fixes.length) console.log(`🩺 [Memory agent] Health check: ${fixes.length} fix(es)`);
   return fixes;
