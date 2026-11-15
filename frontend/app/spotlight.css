@@ -1226,3 +1226,8 @@ a.bn-card:hover { transform: translateY(-2px); }
 .qz2-dm-name { margin: 0 0 4px 4px; font-size: .74rem; font-weight: 600; color: var(--color-text-secondary); }
 img.qz2-dm-av { object-fit: cover; }
 .qz2-step { gap: 6px; border-color: color-mix(in srgb, var(--qz-acc) 45%, var(--glass-border)); }
+.qz2-src { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: 99px; font-style: normal; font-size: .68rem;
+  background: color-mix(in srgb, var(--qz-acc) 14%, transparent); color: var(--color-text-secondary); }
+.qz2-src.you { background: var(--qz-acc); color: #fff; }
+.qz2-reset { align-self: flex-start; height: 32px; font-size: .78rem; }
+.qz2-rank-name small { display: flex; align-items: center; flex-wrap: wrap; }

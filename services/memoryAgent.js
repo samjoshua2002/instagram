@@ -314,6 +314,15 @@ async function healthCheck() {
     if (r.modifiedCount) await log(null, '', '', `${r.modifiedCount} memory document(s) from older rules will be rewritten`);
   }, fixes);
 
+  // 12. Priority ranking from memory (people you ranked yourself are left alone)
+  await step('priority ranking', async () => {
+    const owners = [...new Set(cards.filter(c => c.ownerId).map(c => String(c.ownerId)))];
+    const { refresh } = require('./autoPriority');
+    let changed = 0;
+    for (const o of owners) changed += await refresh(o).catch(() => 0);
+    if (changed) console.log(`🩺 [Memory agent] Priority ranking: ${changed} change(s)`);
+  }, fixes);
+
   if (fixes.length) console.log(`🩺 [Memory agent] Health check: ${fixes.length} fix(es)`);
   return fixes;
 }

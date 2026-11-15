@@ -1900,8 +1900,12 @@ app.get('/api/memory-index', async (req, res) => {
 // Your people ranked by priority (asked after the quiz): top / normal / not important, ordered
 app.get('/api/priorities', async (req, res) => {
   try {
+    // Anyone not ranked yet (new contacts, or never ranked): rank from the AI's memory right away
+    if (await SocialGraph.exists(inGraph(req, { senderId: { $nin: [null, ''] }, prioritySource: { $nin: ['auto', 'you'] } }))) {
+      await require('./services/autoPriority').refresh(req.user._id).catch(err => console.warn('⚠️ [Priority]', err.message));
+    }
     const nodes = await SocialGraph.find(inGraph(req, { senderId: { $exists: true, $nin: [null, ''] } }),
-      { senderId: 1, name: 1, instagramHandle: 1, profilePic: 1, category: 1, relationshipToSam: 1, chatsCount: 1, priority: 1, priorityRank: 1, closenessOverride: 1 }).lean();
+      { senderId: 1, name: 1, instagramHandle: 1, profilePic: 1, category: 1, relationshipToSam: 1, chatsCount: 1, priority: 1, priorityRank: 1, prioritySource: 1, priorityReason: 1, closenessOverride: 1 }).lean();
     // Not you: your own account shows up as a contact when you message yourself
     const me = new Set([req.user.username, req.user.instagramUsername].filter(Boolean).map(h => String(h).replace(/^@+/, '').toLowerCase()));
     const people = nodes.filter(n => !/^test_/.test(String(n.senderId)) && !me.has(String(n.instagramHandle || '').replace(/^@+/, '').toLowerCase()));
@@ -1915,10 +1919,20 @@ app.put('/api/priorities', async (req, res) => {
   try {
     const list = Array.isArray(req.body?.people) ? req.body.people.slice(0, 2000) : [];
     const ops = list.filter(p => p && p.senderId && ['', 'top', 'normal', 'low'].includes(p.priority || '')).map((p, i) => ({
-      updateOne: { filter: inGraph(req, { senderId: String(p.senderId) }), update: { $set: { priority: p.priority || '', priorityRank: Number.isFinite(p.rank) ? p.rank : i + 1 } } },
+      // Only people you moved become yours (kept forever); the rest stay automatic
+      updateOne: { filter: inGraph(req, { senderId: String(p.senderId) }), update: { $set: { priority: p.priority || '', priorityRank: Number.isFinite(p.rank) ? p.rank : i + 1, ...(p.mine ? { prioritySource: 'you', priorityReason: 'you ranked them' } : {}) } } },
     }));
     if (ops.length) await SocialGraph.bulkWrite(ops, { ordered: false });
     res.json({ ok: true, saved: ops.length });
+  } catch (err) { sendServerError(res, err); }
+});
+
+// Back to automatic: forget your manual ranking and rank everyone from memory again
+app.post('/api/priorities/auto', async (req, res) => {
+  try {
+    await SocialGraph.updateMany(inGraph(req, { prioritySource: 'you' }), { $set: { prioritySource: 'auto' } });
+    const changed = await require('./services/autoPriority').refresh(req.user._id);
+    res.json({ ok: true, changed });
   } catch (err) { sendServerError(res, err); }
 });
 
