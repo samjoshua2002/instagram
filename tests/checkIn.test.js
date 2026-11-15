@@ -37,5 +37,21 @@ test('every line the AI writes is its own message (the AI decides how to send)',
   assert.deepEqual(splitIntoBubbles('53 54 55 56 57'), ['53 54 55 56 57']);
   assert.deepEqual(splitIntoBubbles('ok wait'), ['ok wait']);
   assert.deepEqual(splitIntoBubbles('I have 2 cats'), ['I have 2 cats']);
-  assert.equal(splitIntoBubbles(Array.from({ length: 40 }, (_, i) => `${i}`).join('\n')).length, 25);
+  assert.equal(splitIntoBubbles(Array.from({ length: 400 }, (_, i) => `${i}`).join('\n')).length, 300);
+});
+
+test('[REPEAT n] and [COUNT a-b] expand into separate messages, capped at 300', () => {
+  const { expandDirectives } = require('../services/humanizeService');
+  assert.deepEqual(splitIntoBubbles('10000 is crazy, here is 3\n[REPEAT 3] i love you'), ['10000 is crazy, here is 3', 'i love you', 'i love you', 'i love you']);
+  assert.equal(splitIntoBubbles('[REPEAT 10000] hi').length, 300);
+  assert.deepEqual(splitIntoBubbles('[COUNT 53-56]'), ['53', '54', '55', '56']);
+  assert.deepEqual(splitIntoBubbles('[COUNT 5 to 3]'), ['5', '4', '3']);
+  assert.equal(splitIntoBubbles('[COUNT 1-1000]').length, 300);
+  assert.deepEqual(expandDirectives(['hello']), ['hello']);
+});
+
+test('photo and video descriptions replace the placeholder', () => {
+  const { withDescription } = require('../services/mediaService');
+  assert.match(withDescription('[Sent a Photo]', 'photo', 'a snow leopard'), /Sent a photo: a snow leopard/);
+  assert.match(withDescription('[Sent a Video]', 'video', null), /can't open right now/);
 });

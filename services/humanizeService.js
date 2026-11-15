@@ -83,13 +83,45 @@ function humanizeReply(text, { isBusiness = false } = {}) {
  * Split a reply holding two or more distinct thoughts into 2-3 short bubbles.
  * Explicit line breaks win; otherwise split on sentence boundaries when long enough.
  */
-function splitIntoBubbles(text, { maxBubbles = 25, minLength = 60 } = {}) {
+// Most messages in one reply (a "say it 300 times" or a long count)
+const MAX_BUBBLES = 300;
+
+/**
+ * Expands the AI's shorthand for long bursts, so it never has to type 300 lines itself:
+ *   [REPEAT 300] i love you   -> "i love you" as 300 separate messages
+ *   [COUNT 53-67]             -> 53, 54, ... 67 as separate messages (also counts down)
+ */
+function expandDirectives(lines, cap = MAX_BUBBLES) {
+  const out = [];
+  for (const line of lines) {
+    if (out.length >= cap) break;
+    const rep = line.match(/^\[REPEAT\s+(\d{1,6})\]\s*(.+)$/i);
+    const cnt = line.match(/^\[COUNT\s+(-?\d{1,7})\s*(?:-|to)\s*(-?\d{1,7})\]$/i);
+    if (rep) {
+      const n = Math.min(Number(rep[1]), cap - out.length);
+      for (let i = 0; i < n; i++) out.push(rep[2].trim());
+    } else if (cnt) {
+      const a = Number(cnt[1]);
+      const b = Number(cnt[2]);
+      const step = a <= b ? 1 : -1;
+      for (let v = a; out.length < cap; v += step) {
+        out.push(String(v));
+        if (v === b) break;
+      }
+    } else {
+      out.push(line);
+    }
+  }
+  return out;
+}
+
+function splitIntoBubbles(text, { maxBubbles = MAX_BUBBLES, minLength = 60 } = {}) {
   const clean = (text || '').trim();
   if (!clean) return [];
 
   // The AI decides how the reply is sent: every line it writes goes out as its own message,
   // exactly like a person tapping send (a count, a burst of short reactions, one long line...)
-  let parts = clean.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  let parts = expandDirectives(clean.split(/\n+/).map(s => s.trim()).filter(Boolean), maxBubbles);
 
   // One long line with two clear sentences reads like two texts
   if (parts.length === 1 && clean.length >= minLength) {
@@ -114,4 +146,4 @@ function reelReactionEmoji(roastiness) {
   return Number.isFinite(roastiness) && roastiness < 20 ? '❤️' : '😂';
 }
 
-module.exports = { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji };
+module.exports = { humanizeReply, splitIntoBubbles, expandDirectives, bubbleGapMs, reelReactionEmoji, MAX_BUBBLES };

@@ -18,6 +18,7 @@ const MediaVault = require('./models/MediaVault');
 // Services
 const instagramService = require('./services/instagramService');
 const transcribeService = require('./services/transcribeService');
+const mediaService = require('./services/mediaService');
 const azureOpenAI = require('./services/azureOpenAI');
 const { creatorIdentity } = require('./services/creatorIdentity');
 const { aiTask } = require('./services/langfuse');
@@ -728,6 +729,12 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   if (event.message.audioUrl) {
     const transcript = await transcribeService.transcribeUrl(event.message.audioUrl);
     event.message.text = transcribeService.withTranscript(event.message.text, transcript);
+  }
+  // Photos and videos: the AI looks at them (video: a few frames) and answers what it sees
+  for (const att of (event.message.attachmentList || []).filter(a => a.type === 'image' || a.type === 'video').slice(0, 3)) {
+    const kind = att.type === 'video' ? 'video' : 'photo';
+    const description = await mediaService.describeUrl(att.url, kind);
+    event.message.text = mediaService.withDescription(event.message.text, kind, description);
   }
   const messageText = event.message.text;
   const mid = event.message.mid;
