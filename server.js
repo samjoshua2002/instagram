@@ -26,6 +26,7 @@ const celRuleEngine = require('./services/celRuleEngine');
 const analyticsService = require('./services/analyticsService');
 const memoryService = require('./services/memoryService');
 const reminderService = require('./services/reminderService');
+const checkInService = require('./services/checkInService');
 const stickerService = require('./services/stickerService');
 const socialGraphService = require('./services/socialGraphService');
 const { humanizeReply, splitIntoBubbles, bubbleGapMs, reelReactionEmoji } = require('./services/humanizeService');
@@ -1704,6 +1705,44 @@ async function accountIdsForToken(token) {
 }
 
 // Update Persona Configuration
+// Check-ins the AI starts itself (Chat Rules page): on/off, who (friend or close), quiet time before one
+app.get('/api/checkins', async (req, res) => {
+  try {
+    const c = await findOwnPersona(req);
+    const recent = await Message.find({ ownerId: req.user._id, isCheckIn: true }).sort({ createdAt: -1 }).limit(10)
+      .select('recipientId text createdAt').lean();
+    res.json({
+      enabled: c?.checkInsEnabled !== false,
+      minLevel: c?.checkInMinLevel || 'close',
+      idleHours: c?.checkInIdleHours || 4,
+      dailyLimit: c?.checkInDailyLimit || 6,
+      recent,
+    });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+app.put('/api/checkins', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const set = {};
+    if (b.enabled !== undefined) set.checkInsEnabled = !!b.enabled;
+    if (b.minLevel !== undefined) {
+      if (!['friend', 'close'].includes(b.minLevel)) return res.status(400).json({ error: 'minLevel must be friend or close.' });
+      set.checkInMinLevel = b.minLevel;
+    }
+    if (b.idleHours !== undefined) set.checkInIdleHours = Math.min(20, Math.max(2, Math.round(Number(b.idleHours) || 4)));
+    if (b.dailyLimit !== undefined) set.checkInDailyLimit = Math.min(30, Math.max(1, Math.round(Number(b.dailyLimit) || 6)));
+    const c = await findOwnPersona(req);
+    if (!c) return res.status(404).json({ error: 'Set up your persona first.' });
+    await PersonaConfig.updateOne({ _id: c._id }, { $set: set });
+    res.json({ success: true });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 app.put('/api/persona', async (req, res) => {
   try {
     const body = req.body || {};
@@ -3387,6 +3426,7 @@ app.listen(PORT, '0.0.0.0', () => {
 
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
+  checkInService.startScheduler(20);
 
   // Safe chat retention & daily maintenance scheduler (keeps full 1-month chat history)
   if (memoryService && typeof memoryService.startDailyCleanup === 'function') {

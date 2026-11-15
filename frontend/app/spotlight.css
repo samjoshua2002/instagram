@@ -817,3 +817,12 @@ a.bn-card:hover { transform: translateY(-2px); }
 
 /* Phones: favourite bubbles' ring was clipped by the scrolling row */
 @media (max-width: 768px) { .sh-v2 .sh-fav-row { padding-top: 6px; padding-bottom: 6px; } }
+
+/* Chat Rules > AI starts chats */
+.ci-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.ci-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.85rem; color: var(--color-text-secondary); }
+.ci-row select { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--color-border); background: transparent; color: var(--color-text-primary); font: inherit; }
+.ci-seg { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--color-border); }
+.ci-seg button { border: 0; background: transparent; color: var(--color-text-secondary); padding: 5px 12px; border-radius: 999px; font: 600 0.78rem var(--font-sans); cursor: pointer; }
+.ci-seg button.on { background: color-mix(in srgb, var(--ambient-dominant, #888) 22%, transparent); color: var(--color-text-primary); }
+.ci-note { margin: 4px 0 0; font-size: 0.74rem; color: var(--color-text-muted, var(--color-text-secondary)); line-height: 1.4; }

@@ -1,0 +1,42 @@
+/** Pure rules for AI-started check-ins (no DB, no network), used by checkInService. */
+const { atLeast } = require('./closeness');
+
+const HOUR = 3600 * 1000;
+const WINDOW_HOURS = 22;      // Instagram allows replies up to 24h after their last message; 2h margin
+const MAX_PER_RUN = 3;
+
+/**
+ * Should this contact get a check-in now? Pure, so it is unit tested.
+ * @returns {{ ok: boolean, reason: string }}
+ */
+function checkInDecision({ enabled = true, level, minLevel = 'close', lastTheirsAt, lastAnyAt, lastAnyRole,
+  lastAnyWasCheckIn = false, lastCheckInAt = null, idleHours = 4, quiet = false, sentToday = 0, dailyLimit = 6, now = Date.now() }) {
+  if (!enabled) return { ok: false, reason: 'check-ins are off' };
+  if (!atLeast(level || 'stranger', minLevel)) return { ok: false, reason: `not ${minLevel} enough (${level})` };
+  if (quiet) return { ok: false, reason: 'quiet hours' };
+  if (sentToday >= dailyLimit) return { ok: false, reason: 'daily limit reached' };
+  if (!lastTheirsAt) return { ok: false, reason: 'they never messaged' };
+  const sinceTheirs = now - new Date(lastTheirsAt).getTime();
+  if (sinceTheirs > WINDOW_HOURS * HOUR) return { ok: false, reason: "outside Instagram's 24h window" };
+  if (now - new Date(lastAnyAt || lastTheirsAt).getTime() < idleHours * HOUR) return { ok: false, reason: 'chat still active' };
+  // Their message still waiting is the reply's job; our unanswered check-in means don't double-text
+  if (lastAnyRole !== 'assistant') return { ok: false, reason: 'their message is unanswered' };
+  if (lastAnyWasCheckIn) return { ok: false, reason: 'last check-in not answered yet' };
+  if (lastCheckInAt && now - new Date(lastCheckInAt).getTime() < 24 * HOUR) return { ok: false, reason: 'already checked in today' };
+  return { ok: true, reason: 'quiet chat with someone close' };
+}
+
+/** What the AI should try to learn next: the biggest gap in what it knows about them. */
+function nextQuestionTopic(mem) {
+  const has = arr => Array.isArray(arr) && arr.length > 0;
+  const dob = mem.dob || (mem.importantDates || []).some(d => /birth|bday/i.test(d?.title || ''));
+  const events = (mem.lifeEvents || []).filter(e => e && e.title);
+  const recent = events[events.length - 1];
+  if (recent) return { topic: 'life event follow-up', hint: `how "${recent.title}" is going (${recent.details || recent.dateOrTime || ''})` };
+  if (!has(mem.lifeEvents)) return { topic: 'what they are up to', hint: 'what they are busy with these days (studies, work, a project)' };
+  if (!has(mem.favoriteThings)) return { topic: 'interests', hint: 'something they are watching, playing or listening to lately' };
+  if (!dob) return { topic: 'birthday', hint: 'when their birthday is, only if it fits naturally' };
+  return { topic: 'how they are', hint: 'how their day or week is really going' };
+}
+
+module.exports = { checkInDecision, nextQuestionTopic, WINDOW_HOURS, HOUR, MAX_PER_RUN };

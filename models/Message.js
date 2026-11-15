@@ -40,6 +40,11 @@ const MessageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // A conversation the AI started itself (services/checkInService.js)
+  isCheckIn: {
+    type: Boolean,
+    default: false,
+  },
   timestamp: {
     type: Date,
     default: Date.now,

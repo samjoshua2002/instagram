@@ -428,11 +428,15 @@ TEXTING STYLE RULES:
 - NEVER SOUND LIKE AN AI ASSISTANT: Strictly forbidden to use assistant-like talk ("how can i help you", "that sounds great", "certainly", "i understand", "delighted to help"). Never sound overly formal, polite, or sycophantic. Talk like a real, witty friend texting back on their phone while chilling.
 - ANSWER EVERY QUESTION: Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If the PRIVACY rules for this chat allow it and the detail is in your bio or uploaded documents, use it exactly; if the privacy rules don't allow it, dodge it casually (still reply to it). Never make up personal details.
 - KEEP IT CONCISE: 1–2 short lines max (one short line per question when they asked several). Quick, natural, immediate DM replies.
+- QUICK TESTS (people check if you're a bot): tiny tasks like "count from one to five", "what's 2+2", "say banana", "spell your name backwards", "what day is it", "reply with just ok". Do them correctly, casually, in your own style, never refuse, never explain. Counting or a short list: put each item on its own line (each line is sent as its own message, like a real person tapping them out).
+- RIGHT NOW: it is ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })} (India time). Use this for "what day/time is it", "good morning" etc.
 - DYNAMIC & VARIED: Never repeat the same opener or phrase from recent messages. Mix reply lengths: sometimes 1 word, sometimes a one-liner. Keep it unpredictable.
 ${knowsThem
   ? '- TALK LIKE THEY ALREADY KNOW YOU: Act like you already know each other. Reference things they have told you before naturally like a close friend would.'
   : '- YOU DON\'T KNOW THEM WELL YET: be friendly and easy-going, but don\'t act like an old friend. Only bring up things they told you themselves.'}
-- INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}
+- INTEL GATHERING (AUTO-PROFILE): ${knowledgeGapDirective}${userMemory.pendingQuestion?.text && userMemory.pendingQuestion.askedAt && Date.now() - new Date(userMemory.pendingQuestion.askedAt).getTime() < 48 * 3600 * 1000
+  ? `\n- YOU ASKED THEM EARLIER: "${c(userMemory.pendingQuestion.text, 160)}". If this message answers it, react to the answer like a friend who cares (don't ask it again). If it doesn't, don't push.`
+  : ''}
 ${socialTreeContext}
 
 REEL & SHARED MEDIA REACTIONS:
@@ -746,6 +750,58 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
   /**
    * Generates a natural, friendly follow-up check-in when a conversation has been inactive for 5-6 hours
    */
+  /**
+   * A check-in the AI starts itself with someone close: warm, about their real life, in the owner's
+   * own voice, with ONE question it wants answered (`ask` = the biggest gap in what it knows).
+   * Returns { message, question } or null.
+   */
+  async generateCheckIn({ userMemory, messageHistory, config: passedConfig = null, closeness, ask, node = null }) {
+    const config = passedConfig || await this.loadPersonaConfig(userMemory?.ownerId || null);
+    const c = (v, n = 200) => sanitizeLearnedText(v, n).replace(/\n/g, ' ');
+    const facts = (userMemory.facts || []).slice(-15).map(f => `- ${c(f.fact)}`).join('\n');
+    const events = (userMemory.lifeEvents || []).slice(-5).map(e => `- ${c(e.title, 80)}: ${c(e.details)}`).join('\n');
+    const voice = await voiceService.getVoiceBlock({ ownerId: userMemory.ownerId, contactId: userMemory.senderId, creatorName: config.creatorName })
+      .catch(() => null);
+    const name = userMemory.nickname || userMemory.name || userMemory.username || 'them';
+    const systemPrompt = `You are ${config.creatorName}. You are texting ${name} first, on Instagram DM, because your chat went quiet and you care about them.
+They are ${closeness?.level === 'close' ? 'one of your closest people' : 'a good friend'}. Be like a caring friend or sibling: warm, a little playful, genuinely interested. Never needy, never guilt-trippy, never "why didn't you reply".
+
+WHAT YOU KNOW ABOUT THEM:
+${facts || '- not much yet'}
+${events ? `WHAT'S GOING ON IN THEIR LIFE:\n${events}` : ''}
+${userMemory.personalNotes ? `MY NOTES: ${c(userMemory.personalNotes, 400)}` : ''}
+
+${[
+  (node?.gender || userMemory.gender) && !/unknown/.test(node?.gender || userMemory.gender) ? `- They are ${node?.gender || userMemory.gender}. Use words that fit (never "bro" for a girl, never "girl" for a guy).` : '- Their gender is unknown: no gendered words like bro, dude, girl, sis.',
+  node?.relationshipToSam ? `- What they are to you: ${c(node.relationshipToSam, 80)}.` : '',
+  node?.greetingStyle ? `- How you greet them: "${c(node.greetingStyle, 60)}".` : '',
+  Array.isArray(node?.avoidWords) && node.avoidWords.length ? `- NEVER call them or say: ${node.avoidWords.slice(0, 20).map(w => `"${c(w, 30)}"`).join(', ')}.` : '',
+].filter(Boolean).join('\n')}
+
+GOAL: one short check-in that picks up something real from above or from the chat, and asks ONE question about: ${ask?.hint || 'how they are doing'}. Ask it the way a friend would, not like a survey. Only one question.
+
+${voice?.block ? `HOW YOU REALLY TEXT (copy this, not generic slang):\n${voice.block}\n` : ''}
+${HUMAN_CHAT_RULES}
+- 1 or 2 short lines. Each line is sent as its own message.
+- Never mention AI, settings, reminders or that time has passed in hours.
+Return JSON only: {"message": "<the text>", "question": "<the one question you asked, in plain words>"}`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+    for (const msg of messageHistory || []) {
+      messages.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: maskForFilter(msg.text, 1) });
+    }
+    messages.push({ role: 'user', content: '[Write the check-in now as JSON.]' });
+    try {
+      const out = await this.jsonWithFallback(TOP_MODEL, messages);
+      const message = toHumanText(String(out?.message || '')).trim();
+      if (!message) return null;
+      return { message, question: String(out?.question || '').slice(0, 200) };
+    } catch (err) {
+      console.warn('⚠️ [Check-in] Could not write a check-in:', err.message);
+      return null;
+    }
+  }
+
   async generateFollowUpReminder({ userMemory, messageHistory, config: passedConfig = null }) {
     const config = passedConfig || await this.loadPersonaConfig(userMemory?.ownerId || null);
 

@@ -7,6 +7,7 @@ import { useApp } from '../context/AppContext';
 import ContactAvatar from '../components/ContactAvatar';
 import SuperadminWorkspacePrompt from '../components/SuperadminWorkspacePrompt';
 import BusinessPolicyCard from '../components/BusinessPolicyCard';
+import CheckInsCard from '../components/CheckInsCard';
 import { motion } from 'framer-motion';
 import { enterMotion } from '../lib/motion';
 import PageHero from '../components/PageHero';
@@ -312,6 +313,8 @@ function ControlsPageContent() {
           })}
         </div>
       </section>
+
+      {user?.accountType !== 'business' && <CheckInsCard />}
 
       <section className="split-card">
         <h2>Overview</h2>

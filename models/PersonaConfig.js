@@ -120,6 +120,12 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
     type: Number,
     default: 5,
   },
+  // The AI starts a caring check-in itself when a chat with someone close has gone quiet
+  // (services/checkInService.js). Only inside Instagram's 24-hour window after their last message.
+  checkInsEnabled: { type: Boolean, default: true },
+  checkInMinLevel: { type: String, enum: ['friend', 'close'], default: 'close' },
+  checkInIdleHours: { type: Number, default: 4, min: 2, max: 20 },
+  checkInDailyLimit: { type: Number, default: 6, min: 1, max: 30 },
   customReactionCategories: [{
     type: String,
     trim: true,

@@ -89,6 +89,20 @@ function splitIntoBubbles(text, { maxBubbles = 3, minLength = 60 } = {}) {
 
   let parts = clean.split(/\n+/).map(s => s.trim()).filter(Boolean);
 
+  // Counting or a quick list on one line ("1 2 3 4 5", "one, two, three"): one item per message,
+  // the way a person answers "count from one to five"
+  if (parts.length === 1) {
+    const items = clean.split(/\s*(?:,|\s)\s*/).filter(Boolean);
+    const isNum = w => /^\d{1,3}$/.test(w);
+    const WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    const isWordNum = w => WORDS.includes(w.toLowerCase().replace(/[.!]$/, ''));
+    if (items.length >= 3 && items.length <= 10 && (items.every(isNum) || items.every(isWordNum))) parts = items;
+  }
+
+  // Short items (a count, a list, "wait" / "what" / "no way") each go out on their own, up to 10
+  const allShort = parts.length > maxBubbles && parts.every(p => p.split(/\s+/).length <= 4);
+  if (allShort) return parts.slice(0, 10);
+
   if (parts.length === 1 && clean.length >= minLength) {
     const sentences = (clean.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [clean])
       .map(s => s.trim())
