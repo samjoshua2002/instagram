@@ -3,6 +3,8 @@
 // Home's dashboard grid: a wide 14-day reply chart beside the AI-share ring, then top people, the circle's mix
 // and AI coverage. Everything is drawn from data Home already has (GET /api/home/summary + the people list).
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useApp } from '../context/AppContext';
 import { ChevronRight } from 'lucide-react';
 import { isAiOnFor } from '../lib/aiReply';
 
@@ -201,12 +203,58 @@ function Coverage({ people, routingConfig, summary, loading }) {
   );
 }
 
+/**
+ * The AI's memory across everyone: people indexed, share of all messages read and the average
+ * brain score (weighted by chat size). Indexing runs on its own in the background; while it is
+ * still going this refreshes every 15 seconds.
+ */
+function MemoryStatus() {
+  const { API_BASE } = useApp();
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    let t = null;
+    const load = () => fetch(`${API_BASE}/api/memory-index`).then(r => (r.ok ? r.json() : null)).then(x => {
+      setD(x);
+      clearTimeout(t);
+      t = setTimeout(load, x && x.overall && x.overall.ready < x.overall.people ? 15000 : 120000);
+    }).catch(() => {});
+    load();
+    return () => clearTimeout(t);
+  }, [API_BASE]);
+  const o = d?.overall;
+  const busy = o && o.ready < o.people;
+  const top = (d?.people || []).filter(p => p.status === 'ready').sort((a, b) => (b.brainScore || 0) - (a.brainScore || 0)).slice(0, 3);
+  return (
+    <section className="bn-card bn-memory" aria-label="AI memory">
+      <div className="bn-head">
+        <div>
+          <h3 className="bn-title">AI memory</h3>
+          <p className="bn-sub">{!o ? 'Loading' : busy ? 'Reading your chats in the background' : 'Up to date'}</p>
+        </div>
+        {busy && <span className="bn-state on"><i /> Indexing</span>}
+      </div>
+      {!o ? <div className="bn-skeleton" aria-hidden="true" /> : (
+        <>
+          <div className="bn-mem-nums">
+            <div><b>{o.ready}<small>/{o.people}</small></b><span>people known</span></div>
+            <div><b>{o.indexedPct}%</b><span>messages read</span></div>
+            <div><b>{o.brain}</b><span>avg brain score</span></div>
+          </div>
+          <div className="bn-mem-bar" aria-hidden="true"><span style={{ width: `${Math.max(3, o.indexedPct)}%` }} /></div>
+          {top.length > 0 && <p className="bn-mem-top">Knows best: {top.map(p => `${p.name} ${p.brainScore}`).join(' · ')}</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function HomeBento({ summary, people, routingConfig, botOn, personHref, Photo, labels, kpis, loading = false }) {
   return (
     <div className="bn-grid">
       <ReplyChart summary={summary} />
       <ShareRing summary={summary} botOn={botOn} />
       <div className="bn-kpis">{kpis}</div>
+      <MemoryStatus />
       <TopPeople people={people} personHref={personHref} Photo={Photo} loading={loading} />
       <CircleMix people={people} labels={labels} loading={loading} />
       <Coverage people={people} routingConfig={routingConfig} summary={summary} loading={loading} />

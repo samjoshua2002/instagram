@@ -924,3 +924,15 @@ a.bn-card:hover { transform: translateY(-2px); }
 .pm-ul { margin: 0 0 6px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
 .pm-note { margin: 0; font-size: 0.72rem; color: var(--color-text-secondary); }
 @media (prefers-reduced-motion: reduce) { .pm-spin { animation: none; } }
+
+/* Home > AI memory (overall index status) */
+.bn-memory { grid-column: 1 / -1; }
+.bn-mem-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bn-mem-nums div { display: flex; flex-direction: column; gap: 2px; }
+.bn-mem-nums b { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+.bn-mem-nums b small { font-size: 0.9rem; font-weight: 600; color: var(--sh-text-2); }
+.bn-mem-nums span { font-size: 0.74rem; color: var(--sh-text-2); }
+.bn-mem-bar { margin-top: 14px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--sh-text) 8%, transparent); overflow: hidden; }
+.bn-mem-bar span { display: block; height: 100%; border-radius: 999px; background: var(--sh-action); transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+.bn-mem-top { margin: 10px 0 0; font-size: 0.78rem; color: var(--sh-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 768px) { .sh-v2 .bn-memory { order: 2; } .bn-mem-nums b { font-size: 1.2rem; } }
