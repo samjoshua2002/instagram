@@ -98,9 +98,14 @@ async function healthCheck() {
     await AgentAction.create({ ownerId: ownerId || null, senderId: senderId || '', name: name || '', kind: 'cleanup', summary, details }).catch(() => {});
   };
 
+  // Every card with a chat, loaded once for the steps below
+  let cards = [];
+  await step('load cards', async () => {
+    cards = await SocialGraph.find({ senderId: { $nin: [null, ''] } }, { ownerId: 1, senderId: 1, name: 1, instagramHandle: 1, aliases: 1 }).lean();
+  }, fixes);
+
   // 1. Names: your card name is the truth; the AI's records and facts follow it
   await step('names', async () => {
-    const cards = await SocialGraph.find({ senderId: { $nin: [null, ''] } }, { ownerId: 1, senderId: 1, name: 1 }).lean();
     for (const card of cards) {
       if (!card.name || /^User_/.test(card.name)) continue;
       const mem = await UserMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { name: 1, facts: 1 }).lean();
@@ -201,6 +206,43 @@ async function healthCheck() {
   
   }, fixes);
 
+  // 6a. Ask Instagram for the current username of people you chatted with lately (once a day each, max 30
+  //     per run): someone who changed it and hasn't messaged since is picked up too
+  await step('refresh profiles', async () => {
+    const { getOwnerSendToken } = require('./instagramTokenService');
+    const instagramService = require('./instagramService');
+    const memoryService = require('./memoryService');
+    const due = await UserMemory.find({
+      senderId: { $not: /^test_/ }, lastInteraction: { $gte: new Date(Date.now() - 14 * 86400000) },
+      $or: [{ profileCheckedAt: null }, { profileCheckedAt: { $lte: new Date(Date.now() - 86400000) } }],
+    }, { ownerId: 1, senderId: 1 }).sort({ lastInteraction: -1 }).limit(30).lean();
+    const tokens = new Map();
+    for (const m of due) {
+      const key = String(m.ownerId || '');
+      if (!tokens.has(key)) tokens.set(key, await getOwnerSendToken(m.ownerId).catch(() => ''));
+      const token = tokens.get(key);
+      await UserMemory.updateOne({ _id: m._id }, { $set: { profileCheckedAt: new Date() } });
+      if (!token) continue;
+      const profile = await instagramService.getUserProfile(m.senderId, token).catch(() => null);
+      if (profile?.username) await memoryService.getOrCreateUserMemory(m.senderId, profile, { ownerId: m.ownerId || null, onlyExisting: true });
+    }
+  }, fixes);
+
+  // 6b. Instagram username changed: the card follows the latest one from Instagram (old one kept as an alias)
+  await step('usernames', async () => {
+    for (const card of cards) {
+      const mem = await UserMemory.findOne({ ownerId: card.ownerId || null, senderId: card.senderId }, { username: 1 }).lean();
+      const latest = String(mem?.username || '').replace(/^@/, '');
+      const current = String(card.instagramHandle || '').replace(/^@/, '');
+      if (!latest || /^User_/.test(latest) || latest.toLowerCase() === current.toLowerCase()) continue;
+      await SocialGraph.updateOne({ _id: card._id }, {
+        $set: { instagramHandle: latest },
+        ...(current ? { $addToSet: { aliases: current.toLowerCase() } } : {}),
+      });
+      await log(card.ownerId, card.senderId, card.name, `Instagram username updated: @${current || '?'} -> @${latest}`);
+    }
+  }, fixes);
+
   // 7. Duplicate "people in their life" (same name several times) merged into one
   await step('duplicate connections', async () => {
     for (const card of await SocialGraph.find({ 'connections.1': { $exists: true } }, { name: 1, ownerId: 1, senderId: 1, connections: 1 })) {
@@ -268,7 +310,7 @@ async function healthCheck() {
   // 11. Memories written under older rules are rebuilt (old records upgrade themselves)
   await step('old memory rules', async () => {
     const { RULES_VERSION } = require('./memoryIndexService');
-    const r = await PersonMemory.updateMany({ doc: { $ne: '' }, rulesVersion: { $lt: RULES_VERSION }, status: { $ne: 'indexing' } }, { $set: { rebuildDoc: true, dirty: true } });
+    const r = await PersonMemory.updateMany({ doc: { $ne: '' }, rulesVersion: { $not: { $gte: RULES_VERSION } }, status: { $ne: 'indexing' } }, { $set: { rebuildDoc: true, dirty: true } });
     if (r.modifiedCount) await log(null, '', '', `${r.modifiedCount} memory document(s) from older rules will be rewritten`);
   }, fixes);
 

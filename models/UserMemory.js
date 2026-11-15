@@ -40,6 +40,10 @@ const UserMemorySchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Their usernames before (they changed it on Instagram) and their current Instagram display name
+  previousUsernames: { type: [String], default: [] },
+  instagramName: { type: String, default: '' },
+  profileCheckedAt: { type: Date, default: null },
   gender: {
     type: String,
     enum: ['female', 'male', 'neutral', 'unknown'],

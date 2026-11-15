@@ -170,11 +170,26 @@ class MemoryService {
         memory = await find();
       }
     } else if (profileData) {
-      if (profileData.username && memory.username.startsWith('User_')) {
+      // Instagram is the truth for the username: when they change it, follow (old one kept below)
+      if (profileData.username && profileData.username !== memory.username) {
+        if (memory.username && !memory.username.startsWith('User_')) {
+          memory.previousUsernames = [...new Set([...(memory.previousUsernames || []), memory.username])].slice(-10);
+        }
         memory.username = profileData.username;
+        // The People card follows too (old handle kept as an alias so mentions still match)
+        try {
+          const SocialGraph = require('../models/SocialGraph');
+          const card = await SocialGraph.findOne({ ...(scoped ? { ownerId } : {}), senderId }, { instagramHandle: 1 });
+          if (card && String(card.instagramHandle || '').replace(/^@/, '') !== profileData.username) {
+            const old = String(card.instagramHandle || '').replace(/^@/, '').toLowerCase();
+            await SocialGraph.updateOne({ _id: card._id }, { $set: { instagramHandle: profileData.username }, ...(old ? { $addToSet: { aliases: old } } : {}) });
+          }
+        } catch (e) { /* the health check catches anything missed */ }
       }
-      if (profileData.name && !memory.name) {
-        memory.name = profileData.name;
+      // Their Instagram display name, kept separately; your own name for them is never overwritten
+      if (profileData.name) {
+        if (!memory.name) memory.name = profileData.name;
+        memory.instagramName = profileData.name;
       }
       if (profileData.profile_pic) {
         memory.profilePic = profileData.profile_pic;
