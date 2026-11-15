@@ -36,8 +36,14 @@ class CheckInService {
 
   startScheduler(minutes = 20) {
     if (this.timer) return;
-    this.timer = setInterval(() => this.run().catch(err => console.error('❌ [Check-in]', err.message)), minutes * 60 * 1000);
+    const tick = () => this.run()
+      .then(sent => console.log(`💬 [Check-in] Pass done: ${sent || 0} sent`))
+      .catch(err => console.error('❌ [Check-in]', err.message));
+    this.timer = setInterval(tick, minutes * 60 * 1000);
     if (this.timer.unref) this.timer.unref();
+    // First pass 2 minutes after start: a restart or deploy must not push check-ins back 20 minutes
+    const first = setTimeout(tick, 2 * 60 * 1000);
+    if (first.unref) first.unref();
     console.log(`💬 [Check-in] Scheduler every ${minutes} min`);
   }
 
