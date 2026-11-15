@@ -32,6 +32,7 @@ const importantService = require('./services/importantService');
 const memoryIndexService = require('./services/memoryIndexService');
 const { overallScore } = require('./services/memoryIndexRules');
 const PersonMemory = require('./models/PersonMemory');
+const Reminder = require('./models/Reminder');
 const { commitsOwner, holdingReply, asksForCommitment } = require('./services/importantRules');
 const SharedItem = require('./models/SharedItem');
 const stickerService = require('./services/stickerService');
@@ -334,6 +335,7 @@ app.use('/api/memory', requireAuth);
 app.use('/api/contacts', requireAuth);
 app.use('/api/people', requireAuth);
 app.use('/api/memory-index', requireAuth);
+app.use('/api/reminders', requireAuth);
 app.use('/api/shared', requireAuth);
 app.use('/api/checkins', requireAuth);
 app.use('/api/giphy', requireAuth);
@@ -1784,6 +1786,27 @@ app.get('/api/memory-index', async (req, res) => {
   }
 });
 
+// Reminders this person asked for (People page > Shared > Reminders); cancel one
+app.get('/api/people/:senderId/reminders', async (req, res) => {
+  try {
+    const items = await Reminder.find({ ownerId: req.user._id, senderId: String(req.params.senderId) })
+      .sort({ dueAt: -1 }).limit(100).lean();
+    res.json({ items });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+app.post('/api/reminders/:id/cancel', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+    const r = await Reminder.updateOne({ _id: req.params.id, ownerId: req.user._id, status: 'pending' }, { $set: { status: 'cancelled', note: 'cancelled by you' } });
+    res.json({ success: r.modifiedCount > 0 });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
 // Things a contact shared (People page > Shared) and messages that need the owner
 app.get('/api/people/:senderId/shared', async (req, res) => {
   try {
@@ -2956,6 +2979,12 @@ app.post('/api/social-graph/node', async (req, res) => {
 
     // If this node was renamed, clean up any old name documents in SocialGraph
     if (cleanOldName && cleanOldName.toLowerCase() !== cleanName.toLowerCase()) {
+      // Everything the AI learned under the old name now says the new one (facts, notes, memory)
+      if (updated?.senderId) {
+        await require('./services/renameService').renameEverywhere({
+          ownerId: req.user?._id || null, senderId: updated.senderId, oldName: cleanOldName, newName: cleanName,
+        }).catch(err => console.warn('⚠️ [Rename]', err.message));
+      }
       await SocialGraph.deleteMany(inGraph(req, {
         name: new RegExp(`^${escapeRegex(cleanOldName)}$`, 'i'),
         _id: { $ne: updated._id }

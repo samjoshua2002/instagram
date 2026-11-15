@@ -216,6 +216,12 @@ class AzureOpenAIService {
       // The AI's memory of this person (from all your real chats) and old chat moments matching this message
       require('./memoryIndexService').contextFor(conversationOwnerId, userMemory.senderId, incomingText).catch(() => ({})),
     ]);
+    // Reminders already set for them, so the reply can confirm them ("ok will ping u at 5 and 8")
+    const pendingReminders = await require('../models/Reminder').find({ ownerId: conversationOwnerId || null, senderId: userMemory.senderId, status: 'pending' })
+      .sort({ dueAt: 1 }).limit(10).lean().catch(() => []);
+    const remindersLine = pendingReminders.length
+      ? `- REMINDERS SET FOR THEM (sent automatically at these times, India time): ${pendingReminders.map(r => `${new Date(r.dueAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', hour: 'numeric', minute: '2-digit' })} ${r.what}`).join('; ')}. If they just asked for one, confirm it casually with the time.`
+      : '';
     const memDoc = personMemory?.mem?.doc ? String(personMemory.mem.doc).slice(0, 4000) : '';
     const memMoments = (personMemory?.moments || []).map(m =>
       `[${new Date(m.startAt).toISOString().slice(0, 10)}]\n${String(m.text).slice(0, 600)}`).join('\n\n');
@@ -413,6 +419,8 @@ You are texting directly on your phone in Instagram Direct Messages (DMs).
 CORE PERSONA & BIO:
 ${config.personaBio}
 
+THEIR NAME: ${userMemory.name || contactNode?.name || 'unknown'}${contactNode?.name && userMemory.name && contactNode.name !== userMemory.name ? ` (saved as "${contactNode.name}")` : ''}. Call them only by this name or the nicknames you really use; older notes may use an old name for the same person.
+
 ${privacyRules(closeness, userMemory.name && !String(userMemory.name).startsWith('User_') ? userMemory.name : 'they')}
 
 ${config.aboutMe ? `ABOUT ME & PERSONAL DETAILS (MY LIFE, WORK, BACKGROUND; SHARE ONLY WHAT THE PRIVACY RULES ALLOW):\n${isClose ? config.aboutMe : redactContactDetails(config.aboutMe, { keepEmail: knowsThem })}\n` : ''}
@@ -439,6 +447,7 @@ TEXTING STYLE RULES:
 - ANSWER EVERY QUESTION: Their latest message(s) may hold several questions (e.g. "whats ur name / how old are u / where do u study"). Answer EACH one, briefly, in the same order. Never skip one. If the PRIVACY rules for this chat allow it and the detail is in your bio or uploaded documents, use it exactly; if the privacy rules don't allow it, dodge it casually (still reply to it). Never make up personal details.
 - KEEP IT CONCISE: 1–2 short lines max (one short line per question when they asked several). Quick, natural, immediate DM replies.
 - REMINDERS: if they ask you to remind or ping them at some time, just say ok casually ("ok will ping u at 5"): the reminder is set and sent automatically at that time.
+${remindersLine}
 - NEVER COMMIT FOR ME: never say yes to a plan, game, call, meeting, trip, payment, loan or favour on my behalf ("sure", "let's go", "send the link", "ok I'll pay"). Sound interested but keep it open like a busy person would: "wait lemme see", "maybe in a bit", "will tell u", "hmm lemme check". I get told and decide myself.
 - QUICK TESTS (people check if you're a bot): tiny tasks like "count from one to five", "what's 2+2", "say banana", "spell your name backwards", "what day is it", "reply with just ok". Do them correctly, casually, in your own style, never refuse, never explain. How you send it is your choice, like on a phone: EVERY LINE YOU WRITE IS SENT AS ITS OWN MESSAGE. So decide naturally: counting is one number per line; a quick burst of reactions can be a few short lines; a normal reply is one line.
 - SAYING SOMETHING MANY TIMES / LONG COUNTS: if they ask you to say something N times or count a long range, do it, up to 300 messages. Don't type it out: write ONE line "[REPEAT N] the words" (e.g. "[REPEAT 50] i love you") or "[COUNT A-B]" (e.g. "[COUNT 1-300]"); each becomes its own message. Over 300 is too much: say so in your own way on the line before (e.g. "10000 is crazy, here's 300"), then use 300. Any words they ask are fine, except slurs or hurting someone.

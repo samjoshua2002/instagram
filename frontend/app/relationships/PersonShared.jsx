@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link2, FileText, Mic, Bell, Check, Download, X, Play } from 'lucide-react';
+import { Link2, FileText, Mic, Bell, Check, Download, X, Play, AlarmClock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 /**
@@ -85,14 +85,25 @@ export default function PersonShared({ senderId }) {
   const [items, setItems] = useState(null);
   const [tab, setTab] = useState(null);
   const [open, setOpen] = useState(null);
+  const [reminders, setReminders] = useState([]);
   useEffect(() => {
     if (!senderId) return;
     fetch(`${API_BASE}/api/people/${encodeURIComponent(senderId)}/shared`)
       .then(r => (r.ok ? r.json() : { items: [] })).then(d => setItems(d.items || [])).catch(() => setItems([]));
+    fetch(`${API_BASE}/api/people/${encodeURIComponent(senderId)}/reminders`)
+      .then(r => (r.ok ? r.json() : { items: [] })).then(d => setReminders(d.items || [])).catch(() => {});
   }, [API_BASE, senderId]);
   if (!senderId || !items) return null;
 
-  const tabs = TABS.map(t => ({ ...t, items: items.filter(t.match) })).filter(t => t.items.length);
+  const tabs = [
+    ...(reminders.length ? [{ id: 'reminders', label: 'Reminders', items: reminders }] : []),
+    ...TABS.map(t => ({ ...t, items: items.filter(t.match) })),
+  ].filter(t => t.items.length);
+  const cancelReminder = async r => {
+    setReminders(list => list.map(x => (x._id === r._id ? { ...x, status: 'cancelled' } : x)));
+    const res = await fetch(`${API_BASE}/api/reminders/${r._id}/cancel`, { method: 'POST' }).catch(() => null);
+    if (!res?.ok) showToast?.('Could not cancel the reminder', 'error');
+  };
   const current = tabs.find(t => t.id === tab) || tabs[0];
   const done = async it => {
     setItems(list => list.map(x => (x._id === it._id ? { ...x, status: 'done' } : x)));
@@ -117,6 +128,25 @@ export default function PersonShared({ senderId }) {
             </button>
           ))}
         </div>
+      )}
+
+      {current?.id === 'reminders' && (
+        <ul className="shared-list">
+          {current.items.map(r => (
+            <li key={r._id} className={`shared-item${r.status === 'pending' ? ' shared-needs' : ''}`}>
+              <span className="shared-icon"><AlarmClock size={15} /></span>
+              <span className="shared-main">
+                <b>{r.what}</b>
+                <small>
+                  {new Date(r.dueAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                  {' · '}{r.forWhom === 'owner' ? 'for you (email)' : 'DM to them'}
+                  {' · '}{{ pending: 'upcoming', sent: 'sent', emailed: 'emailed you', failed: 'not sent', cancelled: 'cancelled' }[r.status] || r.status}
+                </small>
+              </span>
+              {r.status === 'pending' && <button type="button" className="person-light-btn" onClick={() => cancelReminder(r)}><X size={14} /> Cancel</button>}
+            </li>
+          ))}
+        </ul>
       )}
 
       {current?.id === 'needs' && (

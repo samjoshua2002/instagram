@@ -86,11 +86,11 @@ async function judge(text, name) {
       { role: 'system', content: `You read Instagram DMs sent to the owner and catch what matters. Now: ${now} India time (+05:30).
 1) needsYou: true if the message needs the owner personally: an invite or challenge (game, call, meet, party, trip, "can we play chess now"), a plan with a time, a question or request only the owner can answer or decide, money, a deadline, something urgent or emotional (bad news, they need help). false for small talk, jokes, reactions, memes, greetings.
 3) away: if they say they are leaving or getting busy ("gtg", "going to study", "going out", "sleeping", "brb", "in class"), give the reason in 1-3 words and when they'll be back if they said (ISO, India time) else null. back: true if they say they're back / free now.
-2) reminder: if they ask to be reminded or pinged ("remind me at 5", "ping me tomorrow morning", "tell me in 20 mins"), or ask the owner to remember to do something at a time ("remind sam to send notes tonight"). Work out the exact date-time in India time. forWhom "them" when they want a reminder sent to them, "owner" when the owner must do it.
-Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urgent"|"plan"|"info", "summary": "<one short line for the owner, e.g. 'Fami wants to play chess now (chess.com link)'>", "reminder": null or {"dueAt": "<ISO 8601 with +05:30>", "what": "<what to remind, short>", "forWhom": "them"|"owner"}, "away": null or {"reason": "<1-3 words>", "until": "<ISO or null>"}, "back": bool}` },
+2) reminders: EVERY reminder in the message, as a list (one message can hold several: "remind me at 5 to call mom and at 8 to study" -> two). A reminder is when they ask to be reminded or pinged ("remind me at 5", "ping me tomorrow morning", "tell me in 20 mins", "every day at 7" -> just the next one), or ask the owner to remember to do something at a time ("remind sam to send notes tonight"). Work out each exact date-time in India time. forWhom "them" when the reminder goes to them, "owner" when the owner must do it. Cancel: if they say a reminder is not needed any more, add {"cancel": "<what>"}.
+Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urgent"|"plan"|"info", "summary": "<one short line for the owner, e.g. 'Fami wants to play chess now (chess.com link)'>", "reminders": [{"dueAt": "<ISO 8601 with +05:30>", "what": "<what to remind, short>", "forWhom": "them"|"owner"} or {"cancel": "<what>"}], "away": null or {"reason": "<1-3 words>", "until": "<ISO or null>"}, "back": bool}` },
       { role: 'user', content: `From ${name || 'a contact'}: ${String(text || '').slice(0, 1500)}` },
     ]);
-    const r = out?.reminder;
+    const list = Array.isArray(out?.reminders) ? out.reminders : (out?.reminder ? [out.reminder] : []);
     const away = out?.away && out.away.reason ? { reason: String(out.away.reason).slice(0, 40), until: out.away.until || null } : null;
     return {
       away,
@@ -98,7 +98,9 @@ Return JSON only: {"needsYou": bool, "category": "invite"|"request"|"money"|"urg
       needsYou: !!out?.needsYou,
       category: ['invite', 'request', 'money', 'urgent', 'plan', 'info'].includes(out?.category) ? out.category : 'info',
       summary: String(out?.summary || '').slice(0, 200),
-      reminder: r && r.dueAt && r.what ? { dueAt: r.dueAt, what: String(r.what).slice(0, 200), forWhom: r.forWhom === 'owner' ? 'owner' : 'them' } : null,
+      reminders: list.slice(0, 10).map(r => (r && r.cancel
+        ? { cancel: String(r.cancel).slice(0, 200) }
+        : r && r.dueAt && r.what ? { dueAt: r.dueAt, what: String(r.what).slice(0, 200), forWhom: r.forWhom === 'owner' ? 'owner' : 'them' } : null)).filter(Boolean),
     };
   } catch (err) {
     console.warn('⚠️ [Shared] Importance check failed:', err.message);
@@ -184,12 +186,28 @@ async function capture({ ownerId = null, senderId, name = '', text = '', attachm
     } else if (verdict?.back) {
       await UserMemory.updateOne({ ownerId, senderId, 'away.since': { $ne: null }, 'away.endedAt': null }, { $set: { 'away.endedAt': new Date() } }).catch(() => {});
     }
-    if (verdict?.reminder) {
-      const dueAt = validDue(verdict.reminder.dueAt);
-      if (dueAt) {
-        const Reminder = require('../models/Reminder');
-        await Reminder.create({ ownerId, senderId, name, what: verdict.reminder.what, forWhom: verdict.reminder.forWhom, dueAt, sourceText: clean.slice(0, 500) });
-        console.log(`⏰ [Reminder] Set for ${name || senderId} at ${dueAt.toISOString()}: ${verdict.reminder.what}`);
+    if (verdict?.reminders?.length) {
+      const Reminder = require('../models/Reminder');
+      for (const r of verdict.reminders) {
+        if (r.cancel) {
+          // "no need to remind me" -> cancel their pending reminder that matches best (by words)
+          const pending = await Reminder.find({ ownerId, senderId, status: 'pending' }).lean();
+          const words = new Set(String(r.cancel).toLowerCase().split(/\W+/).filter(w => w.length > 2));
+          const best = pending.map(p => ({ p, n: String(p.what).toLowerCase().split(/\W+/).filter(w => words.has(w)).length }))
+            .sort((a, b) => b.n - a.n)[0];
+          if (best && (best.n > 0 || pending.length === 1)) {
+            await Reminder.updateOne({ _id: best.p._id }, { $set: { status: 'cancelled', note: 'they said no need' } });
+            console.log(`⏰ [Reminder] Cancelled for ${name || senderId}: ${best.p.what}`);
+          }
+          continue;
+        }
+        const dueAt = validDue(r.dueAt);
+        if (!dueAt) continue;
+        // The same reminder said twice (they repeat themselves) is kept once
+        const dup = await Reminder.exists({ ownerId, senderId, status: 'pending', what: r.what, dueAt: { $gte: new Date(dueAt - 5 * 60000), $lte: new Date(+dueAt + 5 * 60000) } });
+        if (dup) continue;
+        await Reminder.create({ ownerId, senderId, name, what: r.what, forWhom: r.forWhom, dueAt, sourceText: clean.slice(0, 500) });
+        console.log(`⏰ [Reminder] Set for ${name || senderId} at ${dueAt.toISOString()}: ${r.what}`);
       }
     }
     if (!verdict?.needsYou) return verdict;
