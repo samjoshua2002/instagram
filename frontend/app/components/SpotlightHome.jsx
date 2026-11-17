@@ -772,9 +772,9 @@ export default function SpotlightHome() {
 
   return (
     <div className={`sh-home sh-v2${coverPhoto ? ' sh-tinted' : ''}`}>
-      {/* Hero card: the cover photo sits inside it under a shade, so the text always reads */}
-      <section className="sh-hero">
+      {/* Full-width cover photo behind the top of the page, fading into it (same as the other pages) */}
       <PageCover seed="home-cover" photo={coverPhoto} />
+      <section className="sh-hero">
       <header className="sh-top">
         <div className="sh-hello-wrap">
           <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>

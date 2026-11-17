@@ -3,6 +3,7 @@ const { traceOpenAI, instrument, annotate } = require('./langfuse');
 const { TOP_MODEL, FALLBACK_MODEL } = require('./models');
 const repeatGuard = require('./repeatGuard');
 const voiceCheck = require('./voiceCheck');
+const correctionLearning = require('./correctionLearning');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -408,6 +409,9 @@ Rule: Chat naturally about their current message. Do NOT prove you have a databa
       ['Conversation summary so far', userMemory.rollingSummary],
     ]);
 
+    // Rules learned from the owner's own takeovers (only confirmed ones: 3+ agreeing, none against)
+    const learnedRules = await correctionLearning.activeBlock(conversationOwnerId, userMemory.senderId).catch(() => '');
+
     // 7. Construct Full, Deeply Structured System Prompt
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}). 
 You are texting directly on your phone in Instagram Direct Messages (DMs).
@@ -538,7 +542,7 @@ HUMAN TEXTING & AUTHENTIC TONE RULES:
 - STRICTLY FORBIDDEN: NEVER USE THE WORD "baddu" OR ANY VARIANT UNDER ANY CIRCUMSTANCES.
 ${(config.forbiddenWords && config.forbiddenWords.length > 0) ? `- FORBIDDEN WORDS/PHRASES (NEVER SAY THESE): ${config.forbiddenWords.map(w => `"${w}"`).join(', ')}` : ''}
 
-${realVoice ? `HOW YOU REALLY TEXT (LEARNED FROM YOUR OWN CHAT HISTORY; THIS BEATS EVERY STYLE RULE ABOVE):\n${realVoice.block}\n` : ''}
+${realVoice ? `HOW YOU REALLY TEXT (LEARNED FROM YOUR OWN CHAT HISTORY; THIS BEATS EVERY STYLE RULE ABOVE):\n${realVoice.block}\n` : ''}${learnedRules}
 ${humanChatRules({ allowEmoji, allowTanglish })}
 - Only return the raw message text. No quotation marks, no name prefix.${realVoice ? ' Several short messages go on separate lines.' : ''}`;
 
@@ -617,9 +621,10 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       // that compares it with their real messages: written again once (services/voiceCheck.js)
       let voiceVerdict = null;
       if (usedPlatformModel && reply && !/^\[(?:STICKER|ATTACHMENT)/i.test(reply)) {
+        const draftBeforeCheck = reply;
         voiceVerdict = await voiceCheck.gate({
           draft: reply, incoming: incomingText, style: realVoice?.block || '', fp: realVoice?.fingerprint || null,
-          creatorName: config.creatorName, ai: this,
+          creatorName: config.creatorName, ai: this, ownerId: conversationOwnerId,
           rewrite: note => this.completeWithFilterRetry(selectedModel, [
             ...messages.slice(0, -1),
             { role: 'system', content: `${note}\nYour draft was: "${reply.slice(0, 400)}"` },
@@ -628,6 +633,11 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         }).catch(() => null);
         if (voiceVerdict?.text) reply = String(voiceVerdict.text).trim();
         if (voiceVerdict?.rewritten) console.log(`🗣️ [Voice check] Rewrote a reply (${voiceVerdict.score ?? 'rules'}): ${voiceVerdict.issues.join('; ')}`);
+        // Logged for the Voice Check page (the test chat and the voice test are not real replies)
+        if (voiceVerdict && !asOf && !/^test_/.test(String(userMemory.senderId || ''))) {
+          voiceCheck.logCheck({ ownerId: conversationOwnerId, senderId: userMemory.senderId, contactName: userMemory.name || userMemory.username,
+            kind: 'reply', incoming: incomingText, draft: draftBeforeCheck, verdict: voiceVerdict }).catch(() => {});
+        }
       }
 
       annotate({
@@ -646,6 +656,11 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         voiceScore: voiceVerdict?.score ?? null,
         voiceIssues: voiceVerdict?.issues?.length ? voiceVerdict.issues : null,
         voiceRewritten: Boolean(voiceVerdict?.rewritten),
+        voiceCheckStatus: voiceVerdict?.status || null,
+        voiceCheckMode: voiceVerdict?.mode || null,
+        voiceJudgeMs: voiceVerdict?.judgeMs ?? null,
+        languageDetected: voiceVerdict?.language || null,
+        learnedRulesUsed: Boolean(learnedRules),
       });
 
       // Post-process to remove unwanted quotes or prefixes
@@ -818,6 +833,7 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     const voice = await voiceService.getVoiceBlock({ ownerId: userMemory.ownerId, contactId: userMemory.senderId, creatorName: config.creatorName })
       .catch(() => null);
     const name = userMemory.nickname || userMemory.name || userMemory.username || 'them';
+    const learnedRules = await correctionLearning.activeBlock(userMemory.ownerId || null, userMemory.senderId).catch(() => '');
     const quote = list => list.map(t => `- "${c(t, 160).replace(/"/g, "'")}"`).join('\n');
     const nicknames = [userMemory.nickname, node?.greetingStyle, ...(Array.isArray(node?.greetingOptions) ? node.greetingOptions.slice(-5) : [])]
       .filter(Boolean).map(x => c(x, 40));
@@ -836,7 +852,7 @@ WRITE IT EXACTLY LIKE THOSE OPENERS:
 - Never sound like a customer-service bot or a therapist: no "just checking in", "hope you're doing well", "how have you been holding up", "I was thinking about you".
 - Never needy or guilt-tripping, never "why didn't you reply".
 
-${memoryDoc ? `WHAT YOU KNOW ABOUT THEM (use at most one real thing, only if natural):
+${learnedRules}${memoryDoc ? `WHAT YOU KNOW ABOUT THEM (use at most one real thing, only if natural):
 ${String(memoryDoc).slice(0, 2500)}
 ` : ''}${facts ? `FACTS:
 ${facts}
@@ -871,8 +887,9 @@ Return JSON only: {"message": "<the text>", "question": "<the one question you a
       // Same "sounds like you" check as replies, compared with how you really open chats
       const style = [openers.length && `How you open chats with ${name}:\n${openers.map(t => `- ${t}`).join('\n')}`,
         openersElse.length && `How you open chats with others:\n${openersElse.map(t => `- ${t}`).join('\n')}`, voice?.block].filter(Boolean).join('\n\n');
+      const draftBeforeCheck = message;
       const verdict = await voiceCheck.gate({
-        draft: message, style, fp: voice?.fingerprint || null, creatorName: config.creatorName, ai: this,
+        draft: message, style, fp: voice?.fingerprint || null, creatorName: config.creatorName, ai: this, ownerId: userMemory.ownerId || null,
         rewrite: async note => {
           const again = await this.jsonWithFallback(TOP_MODEL, [...messages.slice(0, -1),
             { role: 'system', content: `${note}\nYour draft was: "${message.slice(0, 300)}"` }, messages[messages.length - 1]]);
@@ -882,6 +899,10 @@ Return JSON only: {"message": "<the text>", "question": "<the one question you a
       }).catch(() => null);
       if (verdict?.text) message = verdict.text;
       if (verdict?.rewritten) console.log(`🗣️ [Voice check] Rewrote a check-in for ${name}: ${verdict.issues.join('; ')}`);
+      if (verdict) {
+        voiceCheck.logCheck({ ownerId: userMemory.ownerId, senderId: userMemory.senderId, contactName: name, kind: 'checkin',
+          incoming: '', draft: draftBeforeCheck, verdict }).catch(() => {});
+      }
       return { message, question, voiceScore: verdict?.score ?? null };
     } catch (err) {
       console.warn('⚠️ [Check-in] Could not write a check-in:', err.message);

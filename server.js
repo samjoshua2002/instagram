@@ -339,6 +339,7 @@ app.use('/api/reminders', requireAuth);
 app.use('/api/quiz', requireAuth);
 app.use('/api/shared', requireAuth);
 app.use('/api/checkins', requireAuth);
+app.use('/api/voice', requireAuth, require('./routes/voice'));
 app.use('/api/priorities', requireAuth);
 app.use('/api/giphy', requireAuth);
 app.use('/api/analytics', requireAuth, require('./routes/analytics'));
@@ -459,10 +460,32 @@ const DEBOUNCE_WAIT_MS = 1000; // Hold on for 1s to group quick back-to-back mes
 // Replies already past the debounce (AI call + typing delay). A newer reply, a creator echo or a
 // manual send marks the older one cancelled so it never goes out as a second answer.
 const inFlightReplies = new Map();
-const cancelInFlightReply = (contactId) => {
+const cancelInFlightReply = (contactId, takeover = null) => {
   const flight = inFlightReplies.get(contactId);
-  if (flight) flight.cancelled = true;
+  if (!flight) return;
+  flight.cancelled = true;
+  // The owner typed their own reply while the AI had one coming: kept to learn from (correctionLearning)
+  if (takeover && !flight.takeover) flight.takeover = takeover;
 };
+
+/**
+ * The AI's reply was dropped because the owner typed their own: their message is marked as a
+ * takeover, and the (their message, AI draft, owner's reply) trio is learned from. Never throws.
+ */
+function learnFromTakeover(flight, { ownerUser, senderId, userMemory, incoming, draft }) {
+  const t = flight?.takeover;
+  if (!t || !draft || !ownerUser?._id) return;
+  // The echo is saved a moment after the cancel: mark it once it is there
+  setTimeout(() => {
+    Message.updateOne({ mid: t.mid }, { $set: { origin: 'human_after_draft' } }).catch(() => {});
+  }, 3000).unref?.();
+  require('./services/correctionLearning').record({
+    ownerId: ownerUser._id, senderId, contactName: userMemory?.name || userMemory?.username || '',
+    incoming, draft, human: t.text,
+  }).then(r => {
+    if (r?.rule) console.log(`📚 [Learning] Takeover on ${senderId}: rule "${r.rule.text}" (${r.rule.status}, ${r.rule.support}/3)`);
+  }).catch(() => {});
+}
 
 /**
  * ---------------------------------------------------------------------
@@ -627,7 +650,7 @@ function handleCreatorEcho(event, accountId) {
       const key = contactKey(ownerUser?._id, contactId);
 
       // Cancel any active AI debounce queue so the bot doesn't reply over the creator
-      cancelInFlightReply(key);
+      cancelInFlightReply(key, { text, mid, at: Date.now() });
       if (userDebounceQueues.has(key)) {
         clearTimeout(userDebounceQueues.get(key).timer);
         userDebounceQueues.delete(key);
@@ -1237,6 +1260,7 @@ async function writeAndSendReply(queueEntry, flight) {
     // The wait above can be up to ~34s: drop this reply if it was replaced, or AI was switched off meanwhile
     if (flight.cancelled) {
       console.log(`🛑 [Reply Superseded]: A newer reply or the creator took over for ${senderId}; not sending.`);
+      learnFromTakeover(flight, { ownerUser, senderId, userMemory, incoming: combinedText, draft: replyText });
       await afterTurn('');
       return;
     }
@@ -1277,6 +1301,7 @@ async function writeAndSendReply(queueEntry, flight) {
       // The database checks above take time too: the creator may have taken over meanwhile
       if (flight.cancelled) {
         console.log(`🛑 [Reply Superseded]: The creator took over ${senderId} just before sending; not sending.`);
+        learnFromTakeover(flight, { ownerUser, senderId, userMemory, incoming: combinedText, draft: replyText });
         await afterTurn('');
         return;
       }

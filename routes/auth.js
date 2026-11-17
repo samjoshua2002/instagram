@@ -2425,7 +2425,9 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
     }
 
     // Delete the account and everything it owns
-    const ownedModels = { Message, UserMemory, Lead, Booking, PersonaConfig, KnowledgeDoc, Storyboard, WorkspaceFeatures, MediaVault, SocialGraph };
+    const VoiceCheckLog = require('../models/VoiceCheckLog');
+    const StylePreference = require('../models/StylePreference');
+    const ownedModels = { Message, UserMemory, Lead, Booking, PersonaConfig, KnowledgeDoc, Storyboard, WorkspaceFeatures, MediaVault, SocialGraph, VoiceCheckLog, StylePreference };
     const cleanup = {};
     for (const [name, Model] of Object.entries(ownedModels)) {
       try {

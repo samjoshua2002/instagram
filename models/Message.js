@@ -49,7 +49,30 @@ const MessageSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  // Who really wrote it, recorded when it is saved (detectors can't tell on short texts later):
+  //  contact            their message
+  //  human              the owner typed it
+  //  human_after_draft  the owner typed it while the AI had a reply ready (a takeover: strongest signal)
+  //  ai_auto / ai_checkin / ai_reminder   written by the AI
+  // Only human and human_after_draft may ever teach the AI how the owner texts.
+  origin: {
+    type: String,
+    enum: ['', 'contact', 'human', 'human_after_draft', 'ai_auto', 'ai_checkin', 'ai_reminder'],
+    default: '',
+  },
 }, { timestamps: true });
+
+/** Pure: who wrote this message, from what is known when it is saved. */
+function originOf(m) {
+  if (m.role === 'user') return 'contact';
+  if (m.sentByAI) return m.isCheckIn ? 'ai_checkin' : m.isReminder ? 'ai_reminder' : 'ai_auto';
+  return 'human';
+}
+MessageSchema.pre('save', function setOrigin() {
+  if (!this.origin) this.origin = originOf(this);
+});
+MessageSchema.statics.originOf = originOf;
+MessageSchema.statics.HUMAN_ORIGINS = ['human', 'human_after_draft'];
 
 // One person's chat in time order (replies, memory index, voice): both directions, by owner
 MessageSchema.index({ ownerId: 1, senderId: 1, timestamp: -1 });

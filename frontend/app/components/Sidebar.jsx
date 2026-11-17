@@ -32,7 +32,8 @@ import {
   Moon,
   LayoutGrid,
   Home as HomeIcon,
-  BarChart3
+  BarChart3,
+  AudioLines
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import MobileFeatureSheet from './MobileFeatureSheet';
@@ -154,6 +155,7 @@ export default function Sidebar() {
       { href: '/relationships', label: 'People Directory', icon: Users },
       { href: '/controls', label: 'Chat Rules', icon: Sliders },
       { href: '/settings', label: 'Persona & AI Model', icon: UserCheck },
+      { href: '/voice', label: 'Voice Check', icon: AudioLines },
       on('ragKnowledgeBase') && { href: '/documents', label: 'Document Vault (RAG)', icon: FileText },
       on('mediaStickerVault') && { href: '/vault', label: 'Media Vault', icon: ImageIcon },
     ],
