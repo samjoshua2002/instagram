@@ -28,6 +28,22 @@ const ALL_CATEGORIES = ['pricing', 'policy', 'faq', 'hours_location', 'services'
 // Contact questions ("ur number?", "mail id", "where do u live") rarely share words with the
 // answer (a resume header like "+91 98... | me@gmail.com | Chennai"), so they match by pattern
 const CONTACT_INTENT = /\b(phone|mobile|cell|number|contact|whatsapp|e-?mail|mail|gmail|mail ?id|address|where (do|d|r|are)? ?(you|u) (live|stay|from)|(you|u)r? from where|which (city|place|area)|location|reach (you|u))\b/i;
+// "ur github?", "share ur linkedin", "portfolio link": the answer is a URL in the owner's documents,
+// found by the site's name in the text even when the words don't match
+const LINK_SITES = {
+  github: /github\.com|\bgithub\b/i, linkedin: /linkedin\.com|\blinkedin\b/i, behance: /behance\.net|\bbehance\b/i,
+  dribbble: /dribbble\.com|\bdribbble\b/i, youtube: /youtube\.com|youtu\.be|\byoutube\b/i, leetcode: /leetcode\.com|\bleetcode\b/i,
+  twitter: /twitter\.com|x\.com\//i, portfolio: /\bportfolio\b|https?:\/\/[^\s]+/i, website: /https?:\/\/[^\s]+/i,
+  resume: /\b(resume|cv)\b|\.pdf\b/i, cv: /\b(resume|cv)\b|\.pdf\b/i,
+};
+const LINK_INTENT = new RegExp(`\\b(${Object.keys(LINK_SITES).join('|')}|git ?hub|linked ?in|site|link)\\b`, 'i');
+/** Pure: which link the message asks for ('github', 'linkedin', ..., 'link' for any), or null. */
+function linkAsked(text) {
+  const m = String(text || '').toLowerCase().match(LINK_INTENT);
+  if (!m) return null;
+  const w = m[1].replace(/\s+/g, '');
+  return LINK_SITES[w] ? w : 'link';
+}
 const PHONE_RE = /\+?\d[\d\s-]{8,}\d/;
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]+/;
 
@@ -147,9 +163,11 @@ async function retrieve({ ownerId, incomingText, limit = 4 }) {
   const wantsContact = CONTACT_INTENT.test(incomingText);
   const allowedCategories = intent && !wantsContact ? intent.categories : ALL_CATEGORIES;
   const wantsDocument = /\b(brochure|pdf|catalog(ue)?|price ?list|menu|document|docs|link|details|send (me|it|the))\b/i.test(incomingText);
-  if (!keywords.length && !wantsDocument && !wantsContact) return empty;
+  const wantsLink = linkAsked(incomingText);
+  const siteRe = wantsLink ? (LINK_SITES[wantsLink] || /https?:\/\/[^\s]+/i) : null;
+  if (!keywords.length && !wantsDocument && !wantsContact && !wantsLink) return empty;
 
-  const [byKeyword, byContact] = await Promise.all([
+  const [byKeyword, byContact, byLink] = await Promise.all([
     keywords.length || wantsDocument
       ? KnowledgeDoc.find({
           ownerId,
@@ -161,10 +179,12 @@ async function retrieve({ ownerId, incomingText, limit = 4 }) {
     wantsContact
       ? KnowledgeDoc.find({ ownerId, textContent: { $regex: '(\\+?\\d[\\d\\s-]{8,}\\d)|([\\w.+-]+@[\\w-]+\\.[\\w.]+)' } }).limit(20).lean()
       : [],
+    // Chunks holding the asked-for link (any category)
+    siteRe ? KnowledgeDoc.find({ ownerId, textContent: { $regex: siteRe.source, $options: 'i' } }).limit(20).lean() : [],
   ]);
 
   const byId = new Map();
-  for (const doc of [...byContact, ...byKeyword]) byId.set(String(doc._id), doc);
+  for (const doc of [...byLink, ...byContact, ...byKeyword]) byId.set(String(doc._id), doc);
 
   const scored = [...byId.values()].map(doc => {
     const kw = new Set(doc.keywords || []);
@@ -176,6 +196,7 @@ async function retrieve({ ownerId, incomingText, limit = 4 }) {
       const hits = (PHONE_RE.test(doc.textContent) ? 1 : 0) + (EMAIL_RE.test(doc.textContent) ? 1 : 0);
       score += hits * 5;
     }
+    if (siteRe && siteRe.test(doc.textContent)) score += 6; // the link they asked for is in it
     return { doc, score };
   }).filter(s => s.score > 0).sort((a, b) => b.score - a.score);
 
@@ -195,4 +216,4 @@ async function retrieve({ ownerId, incomingText, limit = 4 }) {
   return { chunks, wantsDocument, context };
 }
 
-module.exports = { chunkText, tagCategory, extractKeywords, ingestDocument, listDocuments, deleteDocument, retrieve };
+module.exports = { chunkText, tagCategory, extractKeywords, ingestDocument, listDocuments, deleteDocument, retrieve, linkAsked };

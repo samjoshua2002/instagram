@@ -55,3 +55,20 @@ test('your "follower" label wins over the AI reading the chats as close', () => 
   assert.notEqual(labelled.level, 'close');
   assert.ok(labelled.score < 75);
 });
+
+test('link requests find the right link in your documents', () => {
+  const { linkAsked } = require('../services/ragService');
+  assert.equal(linkAsked('Can u share ur GitHub account'), 'github');
+  assert.equal(linkAsked('send ur linkedin'), 'linkedin');
+  assert.equal(linkAsked('drop ur portfolio link'), 'portfolio');
+  assert.equal(linkAsked('whats ur site'), 'link');
+  assert.equal(linkAsked('how was ur day'), null);
+});
+
+test('every reply prompt forbids claiming something that did not happen', () => {
+  const { HUMAN_CHAT_RULES, humanChatRules } = require('../services/replyStyle');
+  assert.match(HUMAN_CHAT_RULES, /NEVER CLAIM SOMETHING THAT DID NOT HAPPEN/);
+  assert.match(humanChatRules({ allowEmoji: true, allowTanglish: true }), /NEVER CLAIM SOMETHING THAT DID NOT HAPPEN/);
+  assert.match(humanChatRules({ allowTanglish: true }), /Tanglish/);
+  assert.doesNotMatch(humanChatRules({ allowEmoji: true }), /NO EMOJI/);
+});

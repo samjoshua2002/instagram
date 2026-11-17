@@ -834,6 +834,12 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
       .catch(() => null);
     const name = userMemory.nickname || userMemory.name || userMemory.username || 'them';
     const learnedRules = await correctionLearning.activeBlock(userMemory.ownerId || null, userMemory.senderId).catch(() => '');
+    // Same style rules as normal replies: the owner's own Tanglish and emoji are allowed when their
+    // real openers / texting use them (the strict English-only, no-emoji rules are for business)
+    const { isTanglish } = require('./voiceService');
+    const checkInEmoji = !!(voice?.fingerprint && voice.fingerprint.emojiShare >= 3);
+    const checkInTanglish = [...openers, ...openersElse].some(t => isTanglish(t));
+    const checkInRules = humanChatRules({ allowEmoji: checkInEmoji, allowTanglish: checkInTanglish });
     const quote = list => list.map(t => `- "${c(t, 160).replace(/"/g, "'")}"`).join('\n');
     const nicknames = [userMemory.nickname, node?.greetingStyle, ...(Array.isArray(node?.greetingOptions) ? node.greetingOptions.slice(-5) : [])]
       .filter(Boolean).map(x => c(x, 40));
@@ -869,7 +875,7 @@ ${[
 ${voice?.block ? `HOW YOU TEXT IN GENERAL:
 ${voice.block}
 ` : ''}
-${HUMAN_CHAT_RULES}
+${checkInRules}
 - 1 or 2 short lines. Each line is sent as its own message.
 - Never mention AI, settings, reminders or that time has passed in hours.
 Return JSON only: {"message": "<the text>", "question": "<the one question you asked, in plain words, or empty>"}`;
@@ -889,7 +895,7 @@ ${transcript}
     ];
     try {
       const out = await this.jsonWithFallback(TOP_MODEL, messages);
-      let message = toHumanText(String(out?.message || '')).trim();
+      let message = toHumanText(String(out?.message || ''), { keepEmoji: checkInEmoji }).trim();
       let question = String(out?.question || '').slice(0, 200);
       if (!message) return null;
       // Same "sounds like you" check as replies, compared with how you really open chats
@@ -902,7 +908,7 @@ ${transcript}
           const again = await this.jsonWithFallback(TOP_MODEL, [...messages.slice(0, -1),
             { role: 'system', content: `${note}\nYour draft was: "${message.slice(0, 300)}"` }, messages[messages.length - 1]]);
           if (again?.question) question = String(again.question).slice(0, 200);
-          return toHumanText(String(again?.message || '')).trim();
+          return toHumanText(String(again?.message || ''), { keepEmoji: checkInEmoji }).trim();
         },
       }).catch(() => null);
       if (verdict?.text) message = verdict.text;

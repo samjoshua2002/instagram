@@ -16,7 +16,7 @@ import '../split.css';
  *  - Learned: rules learned from times you replied yourself instead of the AI. A rule is used only
  *    after 3 of your takeovers agree.
  */
-const STATUS = { pass: 'Passed', would_rewrite: 'Judge would rewrite', rewritten: 'Rewritten', timeout: 'Judge too slow', error: 'Judge failed', skipped: 'Skipped' };
+const STATUS = { pass: 'Passed', would_rewrite: 'Checker would rewrite', rewritten: 'Rewritten', blocked: 'Stopped by a safety rule', timeout: 'Checker too slow', error: 'Checker failed', skipped: 'Skipped' };
 const MODE = { shadow: 'Watching only (shadow)', enforce: 'Rewriting (enforce)', off: 'Off' };
 const pct = v => (v == null ? '–' : `${Math.round(v * 100)}%`);
 
@@ -134,7 +134,11 @@ export default function VoicePage() {
                       ? <div className="vc-in"><span>They sent</span>{item.incoming}</div>
                       : <div className="vc-in"><span>Check-in</span>The chat was quiet, so the AI texted them first</div>}
                     <div className="vc-out"><span>AI replied as you</span>{item.draft}</div>
-                    {item.final && item.final !== item.draft && <div className="vc-out sent"><span>Sent after the rule fix</span>{item.final}</div>}
+                    {item.final && item.final !== item.draft && (
+                      <div className="vc-out sent">
+                        <span>{item.status === 'blocked' ? 'Not sent: a safety rule replaced it with' : 'What was actually sent'}</span>{item.final}
+                      </div>
+                    )}
                     {done ? (
                       <p className="vc-reveal">
                         You said <b>{done.label === 'send' ? 'Yes' : 'No'}</b>. The checker gave it <b>{done.score ?? '–'}/100</b>

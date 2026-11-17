@@ -1291,6 +1291,13 @@ async function writeAndSendReply(queueEntry, flight) {
          await importantService.recentNeedsYou(userMemory.ownerId || null, senderId).catch(() => false))) {
       console.log(`🛑 [No commitment] Reply "${replyText.slice(0, 60)}" would agree for the owner; sending a holding reply.`);
       replyText = holdingReply();
+      // The Voice Check page shows what really went out, not the draft that was stopped
+      if (ownerUser?._id) {
+        require('./models/VoiceCheckLog').findOneAndUpdate(
+          { ownerId: ownerUser._id, senderId: String(senderId), createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) } },
+          { $set: { final: replyText, status: 'blocked' } }, { sort: { createdAt: -1 } },
+        ).catch(() => {});
+      }
     }
 
     const hasText = !!(replyText && replyText.trim().length > 0);

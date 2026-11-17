@@ -72,6 +72,16 @@ should it be enforced.
 Each check is saved (`VoiceCheckLog`, 60 days) and attached to the reply's Langfuse trace:
 status, mode, score, judge time, detected language.
 
+### Safety rules on every reply
+- Shared writing rules (`services/replyStyle.js`) for every prompt: no bot phrases, and **never
+  claim something that did not happen** ("already sent you", "check above") or invent a link,
+  account or number; if it isn't known, say it will be sent later. Personal replies and check-ins
+  may use the owner's Tanglish and emoji (at their real rate); business replies stay plain English.
+- No agreeing for the owner: a reply that commits the owner to something is replaced by a holding
+  line before sending (the Voice Check page shows what was really sent).
+- Links: asking for a GitHub, LinkedIn, portfolio, resume or website searches the owner's
+  documents for that link directly (`ragService.linkAsked`), not just by matching words.
+
 ### Learning engine (background)
 - **Only the owner's own typing teaches the AI.** Every message records who wrote it
   (`Message.origin`: `contact`, `human`, `human_after_draft`, `ai_auto`, `ai_checkin`,
@@ -140,7 +150,7 @@ reports/, research_notes/ local research (not in git)
 | --- | --- |
 | Backend | Node.js 18+, Express 5, Mongoose 9 (MongoDB Atlas), ioredis |
 | Frontend | Next.js 14 (App Router), React 18, Framer Motion, CSS |
-| AI | Azure OpenAI: `TOP_MODEL` (default `gpt-5.6-luna`), `FALLBACK_MODEL`, `FAST_MODEL` for judges, a speech-to-text deployment for voice notes; optional bring-your-own models |
+| AI | Azure OpenAI: `TOP_MODEL` for every reply (code default `gpt-5.6-luna`; production sets it on Render, currently `gpt-4o`), `FALLBACK_MODEL`, `FAST_MODEL` for judges, a speech-to-text deployment for voice notes; optional bring-your-own models |
 | Tracing | Langfuse (OpenTelemetry) |
 | Rules | Google CEL (`@marcbachmann/cel-js`) |
 | Email | Brevo / Resend HTTPS APIs |
