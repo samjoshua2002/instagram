@@ -72,3 +72,26 @@ test('every reply prompt forbids claiming something that did not happen', () => 
   assert.match(humanChatRules({ allowTanglish: true }), /Tanglish/);
   assert.doesNotMatch(humanChatRules({ allowEmoji: true }), /NO EMOJI/);
 });
+
+test('automatic style check: finds how the AI differs from your own messages', () => {
+  const { profile, compare } = require('../services/styleCompare');
+  const you = profile([...Array(40)].map((_, i) => (i % 2 ? 'enna da panra' : 'seri machi') + (i % 5 ? '' : ' 😂')));
+  const ai = profile([...Array(40)].map(() => 'Hey! That sounds really great, tell me more about how your day went.'));
+  const out = compare(you, ai);
+  const keys = out.diffs.map(d => d.key);
+  assert.ok(keys.includes('longer'));
+  assert.ok(keys.includes('tanglish'));
+  assert.ok(keys.includes('case'));
+  assert.ok(out.match < 60);
+  const same = compare(you, you);
+  assert.equal(same.diffs.length, 0);
+  assert.equal(same.match, 100);
+});
+
+test('checker self-test: trusted only if it passes your own messages and scores the AI lower', () => {
+  const { verdictOf } = require('../services/voiceAudit');
+  assert.equal(verdictOf({ realCount: 12, realPass: 92, realAvg: 84, aiCount: 12, aiAvg: 61 }).trusted, true);
+  assert.equal(verdictOf({ realCount: 12, realPass: 60, realAvg: 70, aiCount: 12, aiAvg: 50 }).trusted, false);
+  assert.equal(verdictOf({ realCount: 12, realPass: 95, realAvg: 80, aiCount: 12, aiAvg: 78 }).trusted, false);
+  assert.equal(verdictOf({ realCount: 3, realPass: 100, realAvg: 90, aiCount: 3, aiAvg: 40 }).trusted, false);
+});

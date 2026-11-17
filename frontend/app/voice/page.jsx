@@ -2,38 +2,48 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AudioLines, Check, X, Trash2, BookOpen, ListChecks } from 'lucide-react';
+import { AudioLines, Check, X, Trash2, BookOpen, ListChecks, Sparkles, RefreshCw, ShieldCheck, Eye } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { enterMotion } from '../lib/motion';
 import PageHero from '../components/PageHero';
 import '../split.css';
 
 /**
- * Voice Check: does the AI sound like you?
- *  - Review: real AI drafts, one at a time. You say "I'd send this" or not, without seeing the judge's
- *    score (so it can't sway you). Your labels show whether the judge agrees with you and where its
- *    threshold should be; until then it only watches (shadow mode).
- *  - Learned: rules learned from times you replied yourself instead of the AI. A rule is used only
- *    after 3 of your takeovers agree.
+ * Voice Check: does the AI text like you? It runs by itself:
+ *  - Summary: your own typed messages (with everyone, AI on or off) vs the AI's, last 30 days.
+ *    Every difference becomes a rule the AI follows automatically.
+ *  - The checker tests itself on your real messages once a day; if it can be trusted it fixes
+ *    replies by itself, otherwise it only watches.
+ *  - Learned from you: rules from the times you replied yourself instead of the AI.
+ *  - Rate replies: optional, if you want to say yes / no to single replies.
  */
-const STATUS = { pass: 'Passed', would_rewrite: 'Checker would rewrite', rewritten: 'Rewritten', blocked: 'Stopped by a safety rule', timeout: 'Checker too slow', error: 'Checker failed', skipped: 'Skipped' };
-const MODE = { shadow: 'Watching only (shadow)', enforce: 'Rewriting (enforce)', off: 'Off' };
 const pct = v => (v == null ? '–' : `${Math.round(v * 100)}%`);
+const when = d => (d ? new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '');
 
 export default function VoicePage() {
   const { API_BASE, showToast } = useApp();
-  const [tab, setTab] = useState('review');
+  const [tab, setTab] = useState('summary');
+  const [summary, setSummary] = useState(null);
   const [overview, setOverview] = useState(null);
   const [review, setReview] = useState(null);
   const [learned, setLearned] = useState(null);
   const [notes, setNotes] = useState({});
   const [revealed, setRevealed] = useState({});
+  const [testing, setTesting] = useState(false);
 
+  const loadSummary = useCallback((fresh = false) => fetch(`${API_BASE}/api/voice/summary${fresh ? '?fresh=1' : ''}`).then(r => (r.ok ? r.json() : null)).then(setSummary).catch(() => setSummary({})), [API_BASE]);
   const loadOverview = useCallback(() => fetch(`${API_BASE}/api/voice/overview`).then(r => (r.ok ? r.json() : null)).then(setOverview).catch(() => {}), [API_BASE]);
   const loadReview = useCallback(() => fetch(`${API_BASE}/api/voice/review?limit=20`).then(r => (r.ok ? r.json() : { items: [], waiting: 0 })).then(setReview).catch(() => setReview({ items: [], waiting: 0 })), [API_BASE]);
   const loadLearned = useCallback(() => fetch(`${API_BASE}/api/voice/learned`).then(r => (r.ok ? r.json() : { rules: [] })).then(setLearned).catch(() => setLearned({ rules: [] })), [API_BASE]);
-  useEffect(() => { loadOverview(); loadReview(); loadLearned(); }, [loadOverview, loadReview, loadLearned]);
+  useEffect(() => { loadSummary(); loadOverview(); loadReview(); loadLearned(); }, [loadSummary, loadOverview, loadReview, loadLearned]);
 
+  const runTest = async () => {
+    setTesting(true);
+    const res = await fetch(`${API_BASE}/api/voice/audit`, { method: 'POST' }).catch(() => null);
+    setTesting(false);
+    if (!res?.ok) { showToast?.('Could not run the test', 'error'); return; }
+    loadSummary();
+  };
   const label = async (item, value) => {
     const res = await fetch(`${API_BASE}/api/voice/logs/${item._id}/label`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: value, note: notes[item._id] || '' }),
@@ -42,7 +52,6 @@ export default function VoicePage() {
     const out = await res.json();
     setRevealed(r => ({ ...r, [item._id]: { ...out, label: value } }));
     loadOverview();
-    // Drop it from the list a moment later, after you've seen what the judge said
     setTimeout(() => setReview(rv => rv && ({ ...rv, items: rv.items.filter(i => i._id !== item._id), waiting: Math.max(0, rv.waiting - 1) })), 2200);
   };
   const forget = async rule => {
@@ -51,14 +60,11 @@ export default function VoicePage() {
     setLearned(l => ({ ...l, rules: l.rules.filter(r => r._id !== rule._id) }));
   };
 
+  const st = summary?.style;
+  const audit = summary?.audit;
+  const mode = summary?.mode;
+  const active = (learned?.rules || []).filter(r => r.status === 'active').length;
   const s = overview?.stats;
-  const week = overview?.week || {};
-  const checked = Object.values(week).reduce((a, b) => a + b, 0);
-  const verdict = !s ? '' : !s.enough
-    ? `Not enough ratings yet. Rate at least 10 replies you'd send and 10 you wouldn't (${s.send}/10 and ${s.nosend}/10 so far). Then this says whether the checker can be trusted.`
-    : s.kappa >= 0.6 ? `The checker agrees with you. It can be allowed to fix replies (pass mark ${s.best?.threshold}).`
-      : s.kappa >= 0.4 ? 'The checker partly agrees with you. It keeps watching only for now; rate a few more.'
-        : 'The checker does not agree with you. It stays watching only and never changes your replies.';
 
   return (
     <motion.div {...enterMotion} className="page-container split-page spx-page has-hero vc">
@@ -67,34 +73,30 @@ export default function VoicePage() {
         icon={<AudioLines size={96} strokeWidth={2} />}
         eyebrow="Persona"
         title="Voice check"
-        desc="Does the AI sound like you? Rate its real replies: would you have sent it? One tap each."
-        meta={overview ? `${MODE[overview.mode] || overview.mode}${overview.wouldSendRate != null ? ` · you'd send ${overview.wouldSendRate}%` : ''}` : 'Loading'}
+        desc="Does the AI text like you? It compares its replies with the messages you type yourself, fixes the differences on its own, and tests itself every day. Nothing to do here; just look."
+        meta={st?.match != null ? `Sounds like you: ${st.match}/100` : 'Learning from your messages'}
       />
 
       <div className="split-body">
         <aside className="split-side">
           <section className="split-card vc-stats">
-            <h2 className="ctl-title">Your ratings</h2>
-            {!overview ? <p className="vc-muted">Loading…</p> : (
+            <h2 className="ctl-title">At a glance</h2>
+            {!summary ? <p className="vc-muted">Loading…</p> : (
               <>
-                <div className="vc-nums">
-                  <div><b>{s?.labelled ?? 0}</b><span>replies rated</span></div>
-                  <div><b>{overview.wouldSendRate != null ? `${overview.wouldSendRate}%` : '–'}</b><span>sound like you</span></div>
+                <div className="vc-score">
+                  <b>{st?.match ?? '–'}</b><span>/100</span>
+                  <p>{st?.match == null ? 'Not enough messages yet to compare.' : st.match >= 80 ? 'The AI texts a lot like you.' : st.match >= 60 ? 'Close, with a few differences it is fixing.' : 'Quite different from you; it is fixing that now.'}</p>
                 </div>
-                <h3 className="vc-sub">Can the automatic checker be trusted?</h3>
-                <p className="vc-muted">Before a reply goes out, a checker scores how much it sounds like you. Your ratings test it.</p>
                 <div className="vc-nums">
-                  <div><b>{pct(s?.tpr)}</b><span>of your Yes replies it also passed</span></div>
-                  <div><b>{pct(s?.tnr)}</b><span>of your No replies it also caught</span></div>
-                  <div><b>{s?.kappa ?? '–'}</b><span>agreement (1 = always agrees)</span></div>
+                  <div><b>{st?.yourMessages ?? 0}</b><span>messages you typed (last {st?.days || 30} days)</span></div>
+                  <div><b>{st?.aiMessages ?? 0}</b><span>replies the AI sent</span></div>
+                  <div><b>{st?.takeovers ?? 0}</b><span>times you replied instead of the AI</span></div>
+                  <div><b>{active}</b><span>rules learned from that</span></div>
                 </div>
-                <p className="vc-verdict">{verdict}</p>
-                <h3 className="vc-sub">Last 7 days · {checked} checked</h3>
-                <ul className="vc-week">
-                  {Object.entries(STATUS).filter(([k]) => week[k]).map(([k, label]) => <li key={k}><span>{label}</span><b>{week[k]}</b></li>)}
-                  {!checked && <li><span>No AI replies checked yet</span></li>}
-                </ul>
-                {overview.judgeMs?.p95 != null && <p className="vc-muted">Judge time: {overview.judgeMs.p50} ms typical, {overview.judgeMs.p95} ms slowest 5%.</p>}
+                <div className={`vc-mode ${mode || ''}`}>
+                  {mode === 'enforce' ? <ShieldCheck size={16} /> : <Eye size={16} />}
+                  <span>{mode === 'enforce' ? 'The checker fixes replies that do not sound like you.' : mode === 'off' ? 'The checker is switched off.' : 'The checker only watches for now (it has not proven it agrees with you yet).'}</span>
+                </div>
               </>
             )}
           </section>
@@ -102,61 +104,70 @@ export default function VoicePage() {
 
         <main className="split-main">
           <div className="vc-tabs" role="tablist">
-            <button type="button" role="tab" aria-selected={tab === 'review'} className={tab === 'review' ? 'on' : ''} onClick={() => setTab('review')}>
-              <ListChecks size={15} /> Review{review?.waiting ? <span className="vc-count">{review.waiting}</span> : null}
+            <button type="button" role="tab" aria-selected={tab === 'summary'} className={tab === 'summary' ? 'on' : ''} onClick={() => setTab('summary')}>
+              <Sparkles size={15} /> Summary
             </button>
             <button type="button" role="tab" aria-selected={tab === 'learned'} className={tab === 'learned' ? 'on' : ''} onClick={() => setTab('learned')}>
               <BookOpen size={15} /> Learned from you{learned?.rules?.length ? <span className="vc-count soft">{learned.rules.length}</span> : null}
             </button>
+            <button type="button" role="tab" aria-selected={tab === 'review'} className={tab === 'review' ? 'on' : ''} onClick={() => setTab('review')}>
+              <ListChecks size={15} /> Rate replies <small className="vc-optional">optional</small>
+            </button>
           </div>
 
-          {tab === 'review' && (
+          {tab === 'summary' && (
             <div className="vc-list">
-              {!review && <section className="split-card"><p className="vc-muted">Loading…</p></section>}
-              {review && review.items.length === 0 && (
-                <section className="split-card"><p className="vc-muted">Nothing to review. New AI replies show up here as the AI answers your DMs.</p></section>
-              )}
-              {review && review.items.length > 0 && (
-                <section className="split-card vc-help">
-                  <b>Would you have sent it?</b> Tap <b>Yes</b> if the reply sounds like you, <b>No</b> if it does not (too formal, wrong slang,
-                  something you would never say). Your answers show how often the AI sounds like you, and test the checker before it may fix replies by itself.
-                </section>
-              )}
-              {review?.items.map(item => {
-                const done = revealed[item._id];
-                return (
-                  <section key={item._id} className={`split-card vc-item${done ? ` done ${done.label}` : ''}`}>
-                    <div className="vc-item-head">
-                      <b>{item.contactName || 'Someone'}</b>
-                      <small>{item.kind === 'checkin' ? 'Check-in · ' : ''}{new Date(item.createdAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</small>
+              <section className="split-card">
+                <div className="vc-head-row">
+                  <h2 className="ctl-title">How the AI differs from you</h2>
+                  <button type="button" className="vc-icon" onClick={() => loadSummary(true)} title="Check again now" aria-label="Check again now"><RefreshCw size={15} /></button>
+                </div>
+                {!summary && <p className="vc-muted">Loading…</p>}
+                {summary && !st?.enough && (
+                  <p className="vc-muted">Not enough yet: it needs at least 30 messages you typed and 30 the AI sent in the last 30 days ({st?.yourMessages || 0} and {st?.aiMessages || 0} so far). It fills in by itself as you chat.</p>
+                )}
+                {st?.enough && st.diffs.length === 0 && <p className="vc-muted"><Check size={14} /> No real differences: the AI's length, language mix, emoji and words match yours.</p>}
+                {st?.enough && st.diffs.length > 0 && (
+                  <ul className="vc-diffs">
+                    {st.diffs.map(d => (
+                      <li key={d.key}>
+                        <span>{d.text}</span>
+                        <small><Sparkles size={11} /> Fixing automatically: {d.fix.charAt(0).toLowerCase() + d.fix.slice(1)}</small>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {st?.enough && (
+                  <table className="vc-compare">
+                    <thead><tr><th /><th>You</th><th>AI</th></tr></thead>
+                    <tbody>
+                      <tr><td>Words per message</td><td>{st.you.avgWords}</td><td>{st.ai.avgWords}</td></tr>
+                      <tr><td>Tanglish</td><td>{st.you.tanglish}%</td><td>{st.ai.tanglish}%</td></tr>
+                      <tr><td>Emoji</td><td>{st.you.emoji}%</td><td>{st.ai.emoji}%</td></tr>
+                      <tr><td>Starts lowercase</td><td>{st.you.lowercase}%</td><td>{st.ai.lowercase}%</td></tr>
+                      <tr><td>Asks a question</td><td>{st.you.questions}%</td><td>{st.ai.questions}%</td></tr>
+                    </tbody>
+                  </table>
+                )}
+                <p className="vc-muted vc-foot">From every chat, AI on or off, including when you reply in between. Updated every few hours{st?.at ? `, last ${when(st.at)}` : ''}.</p>
+              </section>
+
+              <section className="split-card">
+                <div className="vc-head-row">
+                  <h2 className="ctl-title">Checker self-test</h2>
+                  <button type="button" className="vc-btn" onClick={runTest} disabled={testing}><RefreshCw size={14} className={testing ? 'pm-spin' : ''} /> {testing ? 'Testing…' : 'Test now'}</button>
+                </div>
+                <p className="vc-muted">Every day the checker scores a sample of your own real messages (they must pass: they are you) and of the AI's. It is only allowed to fix replies when it passes yours reliably.</p>
+                {!audit ? <p className="vc-muted">Not tested yet. It runs by itself once the AI has replied for a day, or press Test now.</p> : (
+                  <>
+                    <div className="vc-nums">
+                      <div><b>{audit.realPass}%</b><span>of your real messages it passed (needs 85%+)</span></div>
+                      <div><b>{audit.realAvg} vs {audit.aiAvg}</b><span>average score: you vs the AI</span></div>
                     </div>
-                    {item.incoming
-                      ? <div className="vc-in"><span>They sent</span>{item.incoming}</div>
-                      : <div className="vc-in"><span>Check-in</span>The chat was quiet, so the AI texted them first</div>}
-                    <div className="vc-out"><span>AI replied as you</span>{item.draft}</div>
-                    {item.final && item.final !== item.draft && (
-                      <div className="vc-out sent">
-                        <span>{item.status === 'blocked' ? 'Not sent: a safety rule replaced it with' : 'What was actually sent'}</span>{item.final}
-                      </div>
-                    )}
-                    {done ? (
-                      <p className="vc-reveal">
-                        You said <b>{done.label === 'send' ? 'Yes' : 'No'}</b>. The checker gave it <b>{done.score ?? '–'}/100</b>
-                        {done.score != null ? ` (it ${done.score >= (overview?.threshold || 65) ? 'would let it through' : 'would rewrite it'})` : ''}
-                        {done.issues?.length ? `: ${done.issues.join('; ')}` : ''}.
-                      </p>
-                    ) : (
-                      <div className="vc-actions">
-                        <span className="vc-ask">Would you have sent this?</span>
-                        <button type="button" className="vc-btn no" onClick={() => label(item, 'nosend')}><X size={15} /> No, not me</button>
-                        <button type="button" className="vc-btn yes" onClick={() => label(item, 'send')}><Check size={15} /> Yes</button>
-                        <input className="bare-input vc-why" value={notes[item._id] || ''} onChange={e => setNotes(n => ({ ...n, [item._id]: e.target.value }))}
-                          placeholder="What is off? (optional, e.g. too formal, I would say da)" aria-label="What is off" maxLength={300} />
-                      </div>
-                    )}
-                  </section>
-                );
-              })}
+                    <p className={`vc-verdict ${audit.trusted ? 'ok' : ''}`}>{audit.trusted ? 'Trusted: ' : 'Not trusted yet: '}{audit.reason}. Tested {when(audit.at)}.</p>
+                  </>
+                )}
+              </section>
             </div>
           )}
 
@@ -164,8 +175,8 @@ export default function VoicePage() {
             <div className="vc-list">
               <section className="split-card">
                 <p className="vc-muted">
-                  When the AI has a reply ready and you type your own instead, the AI works out what you did differently.
-                  A rule is used in replies only after {learned?.promoteAt || 3} of your takeovers agree, and dropped if later ones go against it.
+                  When the AI has a reply ready and you type your own instead, it works out what you did differently.
+                  A rule is used only after {learned?.promoteAt || 3} of your takeovers agree, and dropped if later ones go against it.
                 </p>
               </section>
               {learned?.rules?.length === 0 && <section className="split-card"><p className="vc-muted">Nothing learned yet. Reply yourself sometimes while the AI is on, and it learns from the difference.</p></section>}
@@ -191,6 +202,51 @@ export default function VoicePage() {
                   )}
                 </section>
               ))}
+            </div>
+          )}
+
+          {tab === 'review' && (
+            <div className="vc-list">
+              <section className="split-card vc-help">
+                <b>Optional.</b> The AI already learns from your own messages by itself. If you want, say whether you would have sent a reply;
+                {s?.labelled ? ` you have rated ${s.labelled} (you would send ${overview?.wouldSendRate ?? '–'}%; the checker agreed on ${pct(s.tpr)} of your yes and ${pct(s.tnr)} of your no).` : ' it is another check on the checker.'}
+              </section>
+              {!review && <section className="split-card"><p className="vc-muted">Loading…</p></section>}
+              {review && review.items.length === 0 && <section className="split-card"><p className="vc-muted">Nothing to rate right now.</p></section>}
+              {review?.items.map(item => {
+                const done = revealed[item._id];
+                return (
+                  <section key={item._id} className={`split-card vc-item${done ? ` done ${done.label}` : ''}`}>
+                    <div className="vc-item-head">
+                      <b>{item.contactName || 'Someone'}</b>
+                      <small>{item.kind === 'checkin' ? 'Check-in · ' : ''}{when(item.createdAt)}</small>
+                    </div>
+                    {item.incoming
+                      ? <div className="vc-in"><span>They sent</span>{item.incoming}</div>
+                      : <div className="vc-in"><span>Check-in</span>The chat was quiet, so the AI texted them first</div>}
+                    <div className="vc-out"><span>AI replied as you</span>{item.draft}</div>
+                    {item.final && item.final !== item.draft && (
+                      <div className="vc-out sent">
+                        <span>{item.status === 'blocked' ? 'Not sent: a safety rule replaced it with' : 'What was actually sent'}</span>{item.final}
+                      </div>
+                    )}
+                    {done ? (
+                      <p className="vc-reveal">
+                        You said <b>{done.label === 'send' ? 'Yes' : 'No'}</b>. The checker gave it <b>{done.score ?? '–'}/100</b>
+                        {done.issues?.length ? `: ${done.issues.join('; ')}` : ''}.
+                      </p>
+                    ) : (
+                      <div className="vc-actions">
+                        <span className="vc-ask">Would you have sent this?</span>
+                        <button type="button" className="vc-btn no" onClick={() => label(item, 'nosend')}><X size={15} /> No, not me</button>
+                        <button type="button" className="vc-btn yes" onClick={() => label(item, 'send')}><Check size={15} /> Yes</button>
+                        <input className="bare-input vc-why" value={notes[item._id] || ''} onChange={e => setNotes(n => ({ ...n, [item._id]: e.target.value }))}
+                          placeholder="What is off? (optional)" aria-label="What is off" maxLength={300} />
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           )}
         </main>

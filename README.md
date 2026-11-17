@@ -55,19 +55,29 @@ Every AI draft is checked before it is sent:
 2. **Judge** (fast model): scores 0-100 how much the draft sounds like the owner, compared with
    their real messages.
 
-Small judges are unreliable on short chat style (see `reports/`), so the judge starts in
-**shadow mode**: it only records what it would rewrite. Owners label real drafts on the
-**Voice Check** page ("I'd send this" / "I wouldn't"), which shows whether the judge agrees with
-them (true-positive and true-negative rates, Cohen's kappa) and the best threshold. Only then
-should it be enforced.
+It runs by itself; nobody has to label anything:
+- **Automatic comparison** (`services/styleCompare.js`): the owner's own typed messages from the
+  last 30 days (every chat, AI on or off, including when they reply in between) are compared with
+  the AI's replies: length, Tanglish, emoji, lowercase, full stops, questions, favourite words. Each
+  difference becomes a rule in every reply and check-in prompt ("keep it short, about 4 words, like
+  you"), refreshed every 6 hours.
+- **Checker self-test** (`services/voiceAudit.js`): once a day the judge scores a sample of the
+  owner's real messages (ground truth: they must pass) and of the AI's. Small judges are unreliable
+  on short chat style (see `reports/`), so it may rewrite replies for that account only when it
+  passes 85%+ of the owner's real messages and scores the AI clearly lower; otherwise it only
+  watches (shadow).
+- The **Voice Check** page shows the summary, the self-test and the rules learned from takeovers.
+  Rating single replies by hand is optional.
 
 | Setting | Effect |
 | --- | --- |
-| `VOICE_CHECK=shadow` (default) | rules fix drafts; the judge only logs |
+| unset (default) | automatic: shadow until the daily self-test trusts the checker for that account, then enforce |
+| `VOICE_CHECK=shadow` | rules fix drafts; the judge only logs |
 | `VOICE_CHECK=enforce` | a low judge score also triggers the rewrite |
 | `VOICE_CHECK_ENFORCE_PERCENT=10` | enforce for a stable 10% of accounts, shadow for the rest |
 | `VOICE_CHECK_THRESHOLD=65` | judge pass mark |
 | `VOICE_CHECK=off` | nothing runs |
+| `VOICE_CHECK_AUTO=off` | never switch to enforce by the self-test |
 
 Each check is saved (`VoiceCheckLog`, 60 days) and attached to the reply's Langfuse trace:
 status, mode, score, judge time, detected language.

@@ -42,6 +42,33 @@ router.get('/overview', async (req, res) => {
   } catch (err) { fail(res, err); }
 });
 
+// The automatic summary: your own messages vs the AI's (no labels needed) and the checker's self-test
+router.get('/summary', async (req, res) => {
+  try {
+    const voiceAudit = require('../services/voiceAudit');
+    const [style, audit, trusted] = await Promise.all([
+      require('../services/styleCompare').summaryFor(req.user._id, { fresh: req.query.fresh === '1' }),
+      voiceAudit.latest(req.user._id),
+      voiceAudit.trusted(req.user._id),
+    ]);
+    const forced = (process.env.VOICE_CHECK || '').toLowerCase();
+    res.json({
+      style,
+      audit: audit && { at: audit.createdAt, realPass: audit.realPass, realAvg: audit.realAvg, aiPass: audit.aiPass, aiAvg: audit.aiAvg, trusted: audit.trusted, reason: audit.reason },
+      // What the checker does for this account right now
+      mode: forced === 'off' ? 'off' : forced === 'enforce' ? 'enforce' : forced === 'shadow' ? 'shadow' : (trusted ? 'enforce' : 'shadow'),
+    });
+  } catch (err) { fail(res, err); }
+});
+
+// Run the checker's self-test now (otherwise it runs once a day by itself)
+router.post('/audit', async (req, res) => {
+  try {
+    const a = await require('../services/voiceAudit').audit(req.user._id);
+    res.json({ success: true, audit: { at: a.createdAt, realPass: a.realPass, realAvg: a.realAvg, aiPass: a.aiPass, aiAvg: a.aiAvg, trusted: a.trusted, reason: a.reason } });
+  } catch (err) { fail(res, err); }
+});
+
 router.get('/review', async (req, res) => {
   try {
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));

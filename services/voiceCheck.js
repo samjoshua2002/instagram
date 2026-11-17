@@ -4,8 +4,9 @@
  *  2. A small, fast model scores 0-100 how believable the draft is as the owner's own text, compared
  *     with the owner's real messages.
  *
- * Modes (VOICE_CHECK):
- *  - shadow (default): rule failures are fixed (one rewrite); the judge only scores and logs
+ * Modes (VOICE_CHECK; unset = automatic: shadow until the checker's daily self-test on the owner's
+ * own messages shows it can be trusted for that account, then enforce, see voiceAudit.js):
+ *  - shadow: rule failures are fixed (one rewrite); the judge only scores and logs
  *    "would_rewrite", the draft goes out as written. Research shows small judges are unreliable on
  *    short chat style, so the judge must be checked against the owner's own labels first.
  *  - enforce: a low judge score also triggers the rewrite.
@@ -125,7 +126,12 @@ JSON only: {"score": n, "issues": ["..."]}` },
  * @returns {{ text, score, issues, ruleIssues, rewritten, status, mode, judgeMs, language }}
  */
 async function gate({ draft, incoming = '', style = '', fp = null, creatorName, ai, rewrite, ownerId = null }) {
-  const mode = modeFor(ownerId);
+  let mode = modeFor(ownerId);
+  // Self-tested and trusted for this account (services/voiceAudit.js): it may rewrite by itself.
+  // VOICE_CHECK=shadow|enforce|off set on purpose always wins; VOICE_CHECK_AUTO=off turns this off.
+  if (mode === 'shadow' && !process.env.VOICE_CHECK && String(process.env.VOICE_CHECK_AUTO || 'on') !== 'off' && ownerId) {
+    if (await require('./voiceAudit').trusted(ownerId).catch(() => false)) mode = 'enforce';
+  }
   const base = { text: draft, score: null, issues: [], ruleIssues: [], rewritten: false, mode, judgeMs: null, language: languageOf(draft) };
   if (mode === 'off' || !draft) return { ...base, status: mode === 'off' ? 'off' : 'skipped' };
   const rules = ruleIssues(draft, fp);

@@ -4,6 +4,7 @@ const { TOP_MODEL, FALLBACK_MODEL } = require('./models');
 const repeatGuard = require('./repeatGuard');
 const voiceCheck = require('./voiceCheck');
 const correctionLearning = require('./correctionLearning');
+const styleCompare = require('./styleCompare');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -410,7 +411,9 @@ Rule: Chat naturally about their current message. Do NOT prove you have a databa
     ]);
 
     // Rules learned from the owner's own takeovers (only confirmed ones: 3+ agreeing, none against)
-    const learnedRules = await correctionLearning.activeBlock(conversationOwnerId, userMemory.senderId).catch(() => '');
+    // ...and the automatic comparison of the owner's own messages with the AI's (styleCompare)
+    const learnedRules = (await correctionLearning.activeBlock(conversationOwnerId, userMemory.senderId).catch(() => ''))
+      + (await styleCompare.autoBlock(conversationOwnerId).catch(() => ''));
 
     // 7. Construct Full, Deeply Structured System Prompt
     const systemPrompt = `You are ${config.creatorName} (${config.instagramHandle}). 
@@ -833,7 +836,8 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     const voice = await voiceService.getVoiceBlock({ ownerId: userMemory.ownerId, contactId: userMemory.senderId, creatorName: config.creatorName })
       .catch(() => null);
     const name = userMemory.nickname || userMemory.name || userMemory.username || 'them';
-    const learnedRules = await correctionLearning.activeBlock(userMemory.ownerId || null, userMemory.senderId).catch(() => '');
+    const learnedRules = (await correctionLearning.activeBlock(userMemory.ownerId || null, userMemory.senderId).catch(() => ''))
+      + (await styleCompare.autoBlock(userMemory.ownerId || null).catch(() => ''));
     // Same style rules as normal replies: the owner's own Tanglish and emoji are allowed when their
     // real openers / texting use them (the strict English-only, no-emoji rules are for business)
     const { isTanglish } = require('./voiceService');

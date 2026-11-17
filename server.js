@@ -3858,6 +3858,7 @@ app.listen(PORT, '0.0.0.0', () => {
   // Start 5-6 hr follow-up reminder scheduler
   reminderService.startScheduler(15);
   checkInService.startScheduler(20);
+  require('./services/voiceAudit').startScheduler(6);
   memoryIndexService.startScheduler();
   require('./services/memoryAgent').startScheduler();
   require('./services/scheduledReminders').startScheduler();
