@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Wand2, X, Send, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import MentionInput from '../components/MentionInput';
 
 /**
  * "Fix with AI": a floating button on a person's page that opens a chat. Tell it what's wrong
@@ -89,8 +90,8 @@ export default function FixWithAI({ senderId, name }) {
             <div ref={endRef} />
           </div>
           <form className="fx-compose" onSubmit={send}>
-            <input autoFocus value={text} onChange={e => setText(e.target.value)} maxLength={1500} disabled={busy}
-              placeholder={`What should I fix about ${name}?`} aria-label="Your correction" />
+            <MentionInput autoFocus value={text} onChange={e => setText(e.target.value)} maxLength={1500} disabled={busy}
+              placeholder={`What should I fix about ${name}? @ to tag someone`} aria-label="Your correction" exclude={senderId} />
             <button type="submit" disabled={busy || !text.trim()} aria-label="Send"><Send size={16} /></button>
           </form>
         </div>,

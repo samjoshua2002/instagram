@@ -21,12 +21,11 @@ async function creatorIdentity(ownerId) {
 // Rewrites prompt text written for the original single owner so it names this creator instead
 function personalize(text, name) {
   const n = name || 'the creator';
+  // One pass: replacing "Sam Joshua" and then "Sam" separately turned the new name "Sam Joshua"
+  // into "Sam Joshua Joshua"
   return String(text)
     .replace(/ \(@catovidz\)/g, '')
-    .replace(/Sam Joshua's/g, `${n}'s`)
-    .replace(/Sam Joshua/g, n)
-    .replace(/\bSam's\b/g, `${n}'s`)
-    .replace(/\bSam\b/g, n)
+    .replace(/\bSam Joshua's|\bSam Joshua\b|\bSam's\b|\bSam\b/g, m => (m.endsWith("'s") ? `${n}'s` : n))
     .replace(/\bhis (personal|signature)\b/g, 'their $1');
 }
 

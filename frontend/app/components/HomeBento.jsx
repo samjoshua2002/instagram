@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ChevronRight } from 'lucide-react';
 import { isAiOnFor } from '../lib/aiReply';
+import MentionInput from './MentionInput';
 
 const fmt = n => (n === null || n === undefined ? '-' : Number(n).toLocaleString());
 const sum = a => (a || []).reduce((x, y) => x + y, 0);
@@ -209,7 +210,7 @@ function Coverage({ people, routingConfig, summary, loading }) {
  * still going this refreshes every 15 seconds.
  */
 function MemoryStatus() {
-  const { API_BASE } = useApp();
+  const { API_BASE, showToast } = useApp();
   const [d, setD] = useState(null);
   const [agent, setAgent] = useState(null);
   const [questions, setQuestions] = useState(null);
@@ -223,9 +224,12 @@ function MemoryStatus() {
     const answer = dismiss ? '' : String(answers[q._id] || '').trim();
     if (!dismiss && !answer) return;
     setQuestions(x => x && ({ ...x, items: x.items.filter(i => i._id !== q._id), total: x.total - 1 }));
-    await fetch(`${API_BASE}/api/people/${encodeURIComponent(q.senderId)}/memory/doubts/${q._id}`, {
+    const res = await fetch(`${API_BASE}/api/people/${encodeURIComponent(q.senderId)}/memory/doubts/${q._id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer }),
-    }).catch(() => {});
+    }).catch(() => null);
+    // Applied to their records at once: say what changed
+    const out = res?.ok ? await res.json().catch(() => ({})) : {};
+    if (!dismiss && Array.isArray(out.changes) && out.changes.length) showToast?.(`${q.name}: ${out.changes.slice(0, 3).join(' · ')}`);
   };
   useEffect(() => {
     let t = null;
@@ -265,7 +269,7 @@ function MemoryStatus() {
                 <form key={q._id} className="bn-review-row" onSubmit={e => { e.preventDefault(); reply(q); }}>
                   <span className="bn-review-q"><b>{q.name}</b>: {q.question}</span>
                   <span className="bn-review-a">
-                    <input value={answers[q._id] || ''} onChange={e => setAnswers(a => ({ ...a, [q._id]: e.target.value }))} placeholder="Answer" aria-label={`Answer: ${q.question}`} />
+                    <MentionInput value={answers[q._id] || ''} onChange={e => setAnswers(a => ({ ...a, [q._id]: e.target.value }))} placeholder="Answer · @ to tag" aria-label={`Answer: ${q.question}`} exclude={q.senderId} />
                     <button type="submit" disabled={!String(answers[q._id] || '').trim()}>Send</button>
                     <button type="button" onClick={() => reply(q, true)} aria-label="Dismiss" title="Not important">✕</button>
                   </span>

@@ -18,6 +18,7 @@ const MediaVault = require('./models/MediaVault');
 // Services
 const instagramService = require('./services/instagramService');
 const transcribeService = require('./services/transcribeService');
+const { expandMentions } = require('./lib/mentions');
 const mediaService = require('./services/mediaService');
 const azureOpenAI = require('./services/azureOpenAI');
 const { creatorIdentity } = require('./services/creatorIdentity');
@@ -1813,7 +1814,8 @@ app.post('/api/people/:senderId/memory/doubts/:doubtId', async (req, res) => {
     const mem = await PersonMemory.findOne({ ownerId: req.user._id, senderId });
     const d = mem?.doubts?.id(req.params.doubtId);
     if (!d) return res.status(404).json({ error: 'Question not found.' });
-    const answer = String(req.body?.answer || '').trim().slice(0, 400);
+    // "@handle" tags become "Name (@handle)", so the right person is linked
+    const answer = await expandMentions(req.user._id, String(req.body?.answer || '').trim().slice(0, 400));
     if (answer) {
       d.status = 'answered';
       d.answer = answer;
@@ -1823,17 +1825,39 @@ app.post('/api/people/:senderId/memory/doubts/:doubtId', async (req, res) => {
     }
     Object.assign(mem, { rebuildDoc: true, dirty: true, priority: Date.now() });
     await mem.save();
-    res.json({ success: true });
+    // Fixed right away, not at the next health check: the answer goes through "Fix with AI",
+    // which updates their records (birthday, people in their life, notes...) and says what changed
+    const changes = answer ? await autoFixFromAnswer(req, senderId, `The AI asked me: "${d.question}"
+My answer: ${answer}`) : [];
+    res.json({ success: true, changes });
   } catch (err) {
     sendServerError(res, err);
   }
 });
 
+/**
+ * Applies an answer or correction to the person's records at once ("Fix with AI" engine: only its
+ * checked actions, only this owner's data). Returns the list of changes; never throws.
+ */
+async function autoFixFromAnswer(req, senderId, content) {
+  try {
+    const out = await require('./services/fixChatService').chat({
+      ownerId: req.user._id, senderId, mq: ownedMemoryQuery(req, senderId), gq: inGraph(req, { senderId }),
+      messages: [{ role: 'user', content: `${content}
+Update their records from this if it adds or changes something (people in their life, birthday, notes, facts). Do not ask questions.` }],
+    });
+    return Array.isArray(out?.changes) ? out.changes : [];
+  } catch (err) {
+    console.warn('⚠️ [Auto fix] answer not applied:', err.message);
+    return [];
+  }
+}
+
 // "Something's wrong? Tell the AI": a correction or fact from you, always true from now on
 app.post('/api/people/:senderId/memory/correct', async (req, res) => {
   try {
     const senderId = String(req.params.senderId);
-    const text = String(req.body?.text || '').trim().slice(0, 500);
+    const text = await expandMentions(req.user._id, String(req.body?.text || '').trim().slice(0, 500));
     if (!text) return res.status(400).json({ error: 'Write what the AI should know.' });
     if (!(await UserMemory.exists(ownedMemoryQuery(req, senderId)))) return res.status(404).json({ error: 'User not found' });
     await PersonMemory.updateOne(
@@ -1841,7 +1865,8 @@ app.post('/api/people/:senderId/memory/correct', async (req, res) => {
       { $push: { ownerFacts: { text, at: new Date() } }, $set: { rebuildDoc: true, dirty: true, priority: Date.now() }, $setOnInsert: { ownerId: req.user._id, senderId } },
       { upsert: true },
     );
-    res.json({ success: true });
+    const changes = await autoFixFromAnswer(req, senderId, `Correction about them: ${text}`);
+    res.json({ success: true, changes });
   } catch (err) {
     sendServerError(res, err);
   }
@@ -1851,9 +1876,12 @@ app.post('/api/people/:senderId/memory/correct', async (req, res) => {
 app.post('/api/people/:senderId/fix-chat', async (req, res) => {
   try {
     const senderId = String(req.params.senderId);
+    const messages = Array.isArray(req.body?.messages) ? [...req.body.messages] : [];
+    const last = messages[messages.length - 1];
+    if (last?.role === 'user') messages[messages.length - 1] = { ...last, content: await expandMentions(req.user._id, String(last.content || '')) };
     const out = await require('./services/fixChatService').chat({
       ownerId: req.user._id, senderId, mq: ownedMemoryQuery(req, senderId), gq: inGraph(req, { senderId }),
-      messages: req.body?.messages,
+      messages,
     });
     res.json(out);
   } catch (err) {
@@ -3722,7 +3750,8 @@ app.post('/api/social-graph/ai-interview', async (req, res) => {
     if (!userInput?.trim() && !conversationHistory?.length) return res.status(400).json({ error: 'Say something about the person first.' });
     const interviewResult = await azureOpenAI.interviewPersonForSocialTree({
       conversationHistory,
-      userInput,
+      // "@handle" tags become "Name (@handle)" so the right person is linked as a connection
+      userInput: userInput ? await expandMentions(req.user._id, userInput) : userInput,
       existingNode,
       ownerId: req.user._id,
     });

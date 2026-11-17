@@ -1,14 +1,19 @@
 /**
  * Voice notes -> text, so the AI answers what they actually said instead of "can't hear".
- * Uses an Azure OpenAI speech-to-text deployment (AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT, default
- * gpt-4o-mini-transcribe; whisper works too). If it is missing or fails, returns null and the
- * reply falls back to a natural "can't listen right now" line.
+ * Uses an Azure OpenAI speech-to-text deployment: AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT if set, else
+ * the usual names are tried in turn (gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper, whisper-1)
+ * and the first that exists is remembered. If none exists or it fails, returns null and the reply
+ * falls back to a natural "can't listen right now" line.
  */
 const MAX_BYTES = 25 * 1024 * 1024;
 const UNAVAILABLE_MS = 10 * 60 * 1000;
 let unavailableUntil = 0;
 
-const deployment = () => process.env.AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT || 'gpt-4o-mini-transcribe';
+const CANDIDATES = ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper', 'whisper-1'];
+let found = null; // the deployment that answered last time
+const candidates = () => (process.env.AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT
+  ? [process.env.AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT]
+  : (found ? [found] : CANDIDATES));
 
 function extOf(type, url) {
   const t = String(type || '').toLowerCase();
@@ -32,16 +37,22 @@ async function transcribeUrl(url) {
     const buf = Buffer.from(await audio.arrayBuffer());
     if (!buf.length || buf.length > MAX_BYTES) throw new Error(`size ${buf.length}`);
     const type = audio.headers.get('content-type') || 'audio/mp4';
-    const form = new FormData();
-    form.append('file', new Blob([buf], { type }), `voice.${extOf(type, url)}`);
-    form.append('response_format', 'json');
-    const res = await fetch(
-      `${endpoint}/openai/deployments/${encodeURIComponent(deployment())}/audio/transcriptions?api-version=2025-03-01-preview`,
-      { method: 'POST', headers: { 'api-key': key }, body: form, signal: AbortSignal.timeout(45000) },
-    );
-    if (res.status === 404) {
+    // Same upload to each deployment name until one exists (404 = no such deployment)
+    let res = null;
+    for (const name of candidates()) {
+      const form = new FormData();
+      form.append('file', new Blob([buf], { type }), `voice.${extOf(type, url)}`);
+      form.append('response_format', 'json');
+      res = await fetch(
+        `${endpoint}/openai/deployments/${encodeURIComponent(name)}/audio/transcriptions?api-version=2025-03-01-preview`,
+        { method: 'POST', headers: { 'api-key': key }, body: form, signal: AbortSignal.timeout(45000) },
+      );
+      if (res.status !== 404) { found = name; break; }
+    }
+    if (!res || res.status === 404) {
+      found = null;
       unavailableUntil = Date.now() + UNAVAILABLE_MS;
-      console.warn(`⚠️ [Voice note] No "${deployment()}" deployment in Azure; add one to transcribe voice notes.`);
+      console.warn(`⚠️ [Voice note] No speech-to-text deployment in Azure (tried ${candidates().join(', ')}). Deploy gpt-4o-mini-transcribe or whisper to transcribe voice notes.`);
       return null;
     }
     if (!res.ok) throw new Error(`transcribe ${res.status}`);
@@ -66,4 +77,4 @@ function withTranscript(text, transcript) {
   return t.includes('[Sent a Voice message]') ? t.replace('[Sent a Voice message]', said) : `${t} ${said}`.trim();
 }
 
-module.exports = { transcribeUrl, withTranscript, extOf, _reset: () => { unavailableUntil = 0; } };
+module.exports = { transcribeUrl, withTranscript, extOf, _reset: () => { unavailableUntil = 0; found = null; } };

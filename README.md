@@ -1,250 +1,206 @@
-# Chatter AI — Multi-Tenant Instagram DM Intelligence & Auto-Reply Engine
+# Chatter OS — Instagram DMs, answered in your own voice
 
-[![Meta Graph API](https://img.shields.io/badge/Meta_Graph_API-v19.0%20%2F%20v26.0-0081FB?logo=meta&logoColor=white)](https://developers.facebook.com)
-[![Next.js 14](https://img.shields.io/badge/Frontend-Next.js%2014%20App%20Router-black?logo=next.js&logoColor=white)](https://nextjs.org)
-[![Express Backend](https://img.shields.io/badge/Backend-Node.js%20%2F%20Express-339933?logo=node.js&logoColor=white)](https://expressjs.com)
-[![MongoDB Atlas](https://img.shields.io/badge/Database-MongoDB%20Atlas-47A248?logo=mongodb&logoColor=white)](https://mongodb.com)
-[![Azure OpenAI](https://img.shields.io/badge/AI_Engine-Azure_OpenAI_gpt--4o-0078D4?logo=microsoftazure&logoColor=white)](https://azure.microsoft.com)
-[![Brevo](https://img.shields.io/badge/Email_Delivery-Brevo_HTTPS_API-0092FF?logo=brevo&logoColor=white)](https://brevo.com)
-[![Resend](https://img.shields.io/badge/Email_Delivery-Resend_HTTPS_API-black?logo=resend&logoColor=white)](https://resend.com)
-[![CEL Engine](https://img.shields.io/badge/Rules-Google_CEL-4285F4?logo=google&logoColor=white)](https://github.com/google/cel-spec)
-[![Tauri 2.0](https://img.shields.io/badge/Desktop-Tauri%202.0%20(macOS%20%26%20Win)-24C8D8?logo=tauri&logoColor=white)](https://tauri.app)
+Chatter OS connects to an Instagram professional account and replies to DMs the way the owner
+really texts. It reads the owner's own past messages and each person's chat history, keeps a
+memory per contact, and checks every draft before it goes out. It's multi-tenant: every account
+has its own data, voice and settings.
 
-Chatter AI is an autonomous, context-aware Instagram Direct Message platform engineered for **Personal Creators** and **Business Workspaces**. It blends deterministic policy enforcement via Google Common Expression Language (CEL), dynamic Retrieval-Augmented Generation (RAG) for enterprise runbooks, authentic human-mimicry styling for creators, and seamless OAuth connection through Meta's Graph API.
+Two account types:
+- **Personal**: replies in the owner's voice (slang, Tanglish, length, emoji), starts check-ins
+  when chats go quiet, remembers people and what matters to them.
+- **Business**: brand voice grounded in the business's own documents, with rules for hours,
+  escalations and refunds, lead and booking capture, and human handoff.
 
----
-
-## 📸 Live Dashboard Preview
-
-![Chatter OS Analytics Overview Dashboard](./image.png)
+![Chatter OS dashboard](./image.png)
 
 ---
 
-## 🏛️ System Architecture Overview
+## How a reply is made
 
 ```mermaid
 flowchart TD
-    %% External Clients & Actors
-    IGUser([Instagram Contact / Customer]) -->|Sends DM / Shares Reel| MetaPlatform[Meta Graph API Platform]
-    AdminUser([Creator / Workspace Admin]) -->|Login / Signup / Password Reset| WebClient[Next.js 14 Dashboard / Tauri App]
+    IG([Contact sends a DM]) -->|webhook, HMAC-SHA256 checked| WH[server.js /webhook]
+    WH --> Echo{Owner's own message?}
+    Echo -->|yes: an echo| Own[Saved as the owner's message\norigin = human / human_after_draft]
+    Own --> Cancel[Cancels any AI reply being written\nand learns from it if a draft was ready]
+    Echo -->|no| Tenant[Find the account it belongs to]
+    Tenant --> Voice[Voice note? Transcribe it\n(transcribeService)]
+    Voice --> Debounce[Wait 1 s to group quick messages]
+    Debounce --> Rules{Should the AI reply?\nglobal switch, chat mode, per person}
+    Rules -->|no| Stop[Learn from it, no reply]
+    Rules -->|yes| Context
 
-    %% Authentication & Identity Flow (Brevo & Resend Mail Engine)
-    subgraph Auth_Identity["Authentication & Identity Security"]
-        WebClient -->|POST /api/auth/register or reset| AuthRoutes[Auth Service Router]
-        AuthRoutes --> AuthType{Auth Factor}
-        AuthType -->|OTP / Email Verification| BrevoEngine["Brevo HTTPS REST API Engine (Port 443)"]
-        AuthType -->|Biometric Passkeys| WebAuthn["WebAuthn FIDO2 / Touch ID"]
-        AuthType -->|Time-based MFA| TOTP["Zoho OneAuth / Authenticator TOTP"]
-        BrevoEngine -->|Delivers Code from guidetalk.app@gmail.com| UserInbox([User Recipient Inbox])
+    subgraph Context [Context, fetched in parallel]
+      C1[Closeness: how much personal\ninfo this person may get]
+      C2[Memory document about them]
+      C3[Owner's real voice: past exchanges\nwith them + how they answered similar messages]
+      C4[Learned rules from takeovers]
+      C5[Documents (RAG), people map,\nshared media, reminders]
     end
 
-    %% Webhook Ingestion & Security
-    MetaPlatform -->|POST /webhook with HMAC-SHA256| ExpressBE[Express Backend Router]
-    
-    subgraph Ingestion_Security["Ingestion & Security"]
-        ExpressBE --> HMAC{Validate X-Hub-Signature-256}
-        HMAC -->|Invalid| Reject[401 Unauthorized]
-        HMAC -->|Valid| Ack[200 OK EVENT_RECEIVED]
-        Ack --> Dedupe{Redis Deduplication Lock}
-        Dedupe -->|Duplicate mid| Drop[Drop Duplicate]
-        Dedupe -->|New Message| TenantResolver[Resolve Tenant via recipient.id]
-    end
-    
-    subgraph MultiTenant_Core["Multi-Tenant Core Dispatcher"]
-        TenantResolver --> TenantCheck{Account Resolved?}
-        TenantCheck -->|No| SafeDrop[Safe Failure: Log & Terminate]
-        TenantCheck -->|Yes| DecryptCredentials[Decrypt Meta Token via AES-256-GCM]
-        DecryptCredentials --> AccountMode{Account Type}
-    end
-    
-    subgraph Personal_Pipeline["Personal Creator Pipeline"]
-        AccountMode -->|Personal| PersonalCEL[Personal CEL Rules: Dialects, Length, Lore Gating]
-        PersonalCEL --> HumanMimicryPrompt[Human Mimicry: Lowercase, Slang, Anti-AI Filter]
-        HumanMimicryPrompt --> StickerEngine[Media Vault & GIPHY Sticker Dispatch]
-    end
-    
-    subgraph Business_Pipeline["Business Enterprise Pipeline"]
-        AccountMode -->|Business| BusinessCEL[Business CEL Rules: Hours, Escalations, Refunds]
-        BusinessCEL --> RAGDocEngine[RAG Engine: Runbooks, FAQs, Service URLs]
-        RAGDocEngine --> GroundedBrandPrompt[Brand Compliance & Document Link Delivery]
-        GroundedBrandPrompt --> LeadBookingTracker[Analytics Hook: Capture Leads & Bookings]
-    end
-    
-    subgraph Modular_AI["Modular AI Factory"]
-        HumanMimicryPrompt --> LLMFactory{Select AI Model}
-        GroundedBrandPrompt --> LLMFactory
-        LLMFactory -->|Managed Cloud| AzureOpenAI[Azure OpenAI gpt-4o]
-        LLMFactory -->|BYO-Key| CustomCloud[OpenAI / Anthropic / Groq / OpenRouter]
-        LLMFactory -->|Self-Hosted| LocalOllama[Local LLM: Ollama / vLLM / LMStudio]
-        LLMFactory -->|Agent-to-Agent| MCPAgent[A2A MCP Protocol Connector]
-    end
-    
-    LLMFactory --> SendService[instagramService.sendTextMessage]
-    SendService -->|POST graph.instagram.com| MetaPlatform
-    MetaPlatform -->|Delivers Tailored Reply| IGUser
+    Context --> Gen[Azure OpenAI writes the reply\nTOP_MODEL, fallback model]
+    Gen --> Repeat[Repeat guard: rewrite if it\nalmost repeats an earlier reply]
+    Repeat --> Check[Voice check\nrules + judge]
+    Check --> Human[Human pacing: typing delay,\nsplit into bubbles]
+    Human --> Last{Owner took over meanwhile?}
+    Last -->|yes| Learn[Draft dropped, takeover learned]
+    Last -->|no| Send[Sent via Instagram Graph API\norigin = ai_auto]
 ```
 
+### Voice check (`services/voiceCheck.js`)
+Every AI draft is checked before it is sent:
+1. **Rules** (instant): bot phrases like "just checking in" or "hope you're doing well", lines far
+   longer than the owner writes, full stops or capitals the owner never uses. A failing draft is
+   rewritten once, and the rewrite is used only if it's better.
+2. **Judge** (fast model): scores 0-100 how much the draft sounds like the owner, compared with
+   their real messages.
+
+Small judges are unreliable on short chat style (see `reports/`), so the judge starts in
+**shadow mode**: it only records what it would rewrite. Owners label real drafts on the
+**Voice Check** page ("I'd send this" / "I wouldn't"), which shows whether the judge agrees with
+them (true-positive and true-negative rates, Cohen's kappa) and the best threshold. Only then
+should it be enforced.
+
+| Setting | Effect |
+| --- | --- |
+| `VOICE_CHECK=shadow` (default) | rules fix drafts; the judge only logs |
+| `VOICE_CHECK=enforce` | a low judge score also triggers the rewrite |
+| `VOICE_CHECK_ENFORCE_PERCENT=10` | enforce for a stable 10% of accounts, shadow for the rest |
+| `VOICE_CHECK_THRESHOLD=65` | judge pass mark |
+| `VOICE_CHECK=off` | nothing runs |
+
+Each check is saved (`VoiceCheckLog`, 60 days) and attached to the reply's Langfuse trace:
+status, mode, score, judge time, detected language.
+
+### Learning engine (background)
+- **Only the owner's own typing teaches the AI.** Every message records who wrote it
+  (`Message.origin`: `contact`, `human`, `human_after_draft`, `ai_auto`, `ai_checkin`,
+  `ai_reminder`). AI messages are never used as the owner's voice.
+- **Takeovers** (`services/correctionLearning.js`): when the owner types while the AI had a reply
+  ready, the dropped draft and the owner's message are compared. A real style difference becomes a
+  candidate rule; it's used in replies only after 3 takeovers agree and none contradict it.
+  Rules can be seen and removed on the Voice Check page.
+- **Per-person memory** (`memoryIndexService`): real messages (never the AI's) are grouped into
+  chat moments, summarised, and folded into one memory document per person, with a brain score
+  and the bond read from the chats.
+- **Memory agent** (`memoryAgent`): every 30 minutes it repairs People data (health check),
+  merges duplicate facts, and turns real doubts into questions for the owner. Answering a question
+  applies the change at once (through the "Fix with AI" engine) and shows what changed.
+- **Quiz**: the owner answers real and AI-written messages from their people, and a "How you check
+  in" section. Answers become persona fields and check-in examples.
+- **Priorities and closeness**: who's top / normal / not important is ranked automatically and
+  can be reordered by dragging. The closeness score decides how much personal information a reply
+  may share; the owner's own labels always win over what the AI read from the chats.
+
+### Check-ins (`services/checkInService.js`)
+When a chat goes quiet, the AI texts first, for everyone the AI is on for or only picked people.
+It copies how the owner really opens chats with that person (their greeting and nickname, read
+from their past messages and quiz answers). Only inside Instagram's 24-hour window, never twice
+without an answer, with a daily cap.
+
+### Tagging people
+In any answer box (AI questions, "Something wrong?", Fix with AI, Add / Update person), typing
+`@` lets you pick one of your people. The server turns `@handle` into "Name (@handle)"
+(`lib/mentions.js`) so the AI links the right person.
+
 ---
 
-## 🚀 Key Platform Features
-
-### 1. Personal Creator Tier (Human Mimicry & Social Connection)
-- **Zero Robotic Tone:** Strictly eliminates robotic AI artifacts (*"How can I help you today?"*, *"As an AI model"*, *"Certainly!"*). Texting mimics real smartphone habits (all lowercase, no stiff periods, relaxed abbreviations like `rn`, `tbh`, `fr`, `ngl`).
-- **Interactive Reel Reactions:** Automatically responds to shared Reels and Posts with contextual emoji reactions (e.g. laughing reaction `😂`), animated GIPHY stickers, or meme image drops from the Media Vault.
-- **Dialect & Slang Adaptation:** Evaluates incoming language phonetics (e.g., Tanglish, Hinglish, Spanglish) and mirrors the user's conversational energy naturally.
-- **Anti-Dossier Lore Gating:** Remembers personal details (birthdays, hobbies, life events) in MongoDB without awkwardly reciting facts out of context.
-
-### 2. Business Workspace Tier (RAG Knowledge & Conversion Engine)
-- **Grounded Document RAG:** Businesses upload PDF runbooks, price lists, brochures, and support FAQs into the Document Vault. Customer inquiries receive precise, grounded responses with official download links.
-- **Conversational Sales Analytics:**
-  - **Lead Capture:** Automatically detects customer phone numbers, emails, and quote inquiries, logging them in real time to `models/Lead.js`.
-  - **Booking Confirmations:** Tracks appointment scheduling agreements and Calendly link clicks in `models/Booking.js`.
-- **Zero Stickers / Brand Prestige:** Media stickers, slang, and meme reactions are strictly disabled for business accounts.
-- **Human Handoff Queue:** Automatically routes customer complaints or sensitive requests to human support staff via Slack/Zendesk webhooks or the dashboard inbox.
-
-### 3. Modular AI Architecture (Managed, BYO-LLM, Local & MCP)
-- **Managed Platform Model:** Default Azure OpenAI `gpt-4o` (`2024-08-01-preview`).
-- **Bring Your Own Key (BYO-LLM):** Connect custom OpenAI (`gpt-4o-mini`), Anthropic (`claude-3-5-sonnet`), Groq (Llama 3 70B), or OpenRouter keys (encrypted at rest using AES-256-GCM).
-- **Local Self-Hosted AI:** Point to local models via **Ollama** (`http://localhost:11434/v1`), **vLLM**, or **LM Studio** for complete privacy.
-- **Agent-to-Agent (A2A) MCP Connectors:** Full Model Context Protocol (MCP) support to route Instagram events to external multi-agent systems (LangChain, CrewAI, n8n).
-
-### 4. Cross-Platform Desktop Client (Tauri 2.0)
-- **Native OS Compilations:**
-  - **macOS Apple Silicon:** Native `.dmg` for Apple M1, M2, M3, and M4 processors (`aarch64-apple-darwin`).
-  - **macOS Intel:** Native `.dmg` for x86_64 Intel Macs (`x86_64-apple-darwin`).
-  - **Windows 64-bit & 32-bit:** Native `.msi` and `.exe` installers for Windows 10/11.
-- **Native OS Push Notifications:** Background notifications via `@tauri-apps/plugin-notification` for urgent human handoffs, new leads, and booking alerts.
-- **System Tray Mode:** Runs unobtrusively in the menu bar with status badges.
-
----
-
-## 📂 Repository Structure
+## Repository layout
 
 ```
-instagram/
-├── start.md                  # Developer kickoff guide & onboarding instructions
-├── checklist.md              # Phased implementation tracker & acceptance criteria
-├── PLAN.md                   # Comprehensive architectural specification
-├── project.md                # System audit & baseline inspection report
-├── server.js                 # Express server, webhook receiver, dynamic tenant router
-├── package.json              # Backend dependencies and run scripts
-├── models/
-│   ├── User.js               # Multi-tenant user schema, roles, encrypted IG tokens
-│   ├── PersonaConfig.js      # AI persona directives, tone, CEL rule sets
-│   ├── UserMemory.js         # Per-sender extracted facts, lore, relationship standings
-│   ├── SocialGraph.js        # Interactive relationship network graph (scoped by ownerId)
-│   ├── Message.js            # Message history between bot and external sender
-│   ├── MediaVault.js         # Creator meme assets, GIFs, and sticker configurations
-│   ├── KnowledgeDoc.js       # Business RAG document chunks, runbooks, service URLs
-│   ├── Lead.js               # Conversational leads captured (phone, email, intent)
-│   └── Booking.js            # Booking confirmations & reservation tracking
-├── services/
-│   ├── azureOpenAI.js        # Azure OpenAI gpt-4o chat completion engine
-│   ├── llmAdapter.js         # Unified AI factory (Azure, BYO-LLM, Local Ollama, MCP)
-│   ├── celRuleEngine.js      # Dual CEL rule engine (Personal vs. Business)
-│   ├── ragService.js         # Business document chunking and retrieval
-│   ├── analyticsService.js   # Lead extraction and booking intent parser
-│   ├── cryptoService.js      # AES-256-GCM token & API key encryption at rest
-│   ├── instagramService.js   # Meta Graph API sender, typing indicators, reactions
-│   ├── memoryService.js      # Automated background fact and lore extraction
-│   ├── socialGraphService.js # Relationship network queries
-│   ├── authService.js        # Brevo & Resend HTTPS REST APIs, OTP verification, WebAuthn Passkeys
-│   └── redisService.js       # Distributed deduplication locks and rate limiting
-├── routes/
-│   └── auth.js               # Auth, WebAuthn passkeys, Facebook Login for Business OAuth
-└── frontend/                 # Next.js 14 App Router dashboard
-    ├── app/
-    │   ├── page.jsx          # Dynamic Dashboard (Creator metrics vs. Business KPIs)
-    │   ├── download/page.jsx # Auto-detecting desktop download portal (macOS/Win)
-    │   ├── admin/page.jsx    # Superadmin workspace inspector & token health radar
-    │   ├── controls/page.jsx # Visual CEL chat rules, killswitches, routing modes
-    │   ├── settings/page.jsx # Persona editor, BYO-LLM settings, IG connection
-    │   ├── vault/page.jsx    # Creator Media Vault (Personal) / Document Vault (Business)
-    │   └── context/
-    │       └── AppContext.jsx # Global state management & real-time API client
-    └── components/
-        ├── Sidebar.jsx       # Dynamic role/tier-aware navigation drawer
-        └── AuthGate.jsx      # Session & passkey route guard
+server.js                 Express app: webhook, reply pipeline, most API routes, schedulers
+routes/                   auth (login, passkeys, Instagram OAuth), analytics, knowledge (RAG),
+                          workspace features, AI provider settings, alerts, voice (Voice Check)
+services/
+  azureOpenAI.js          reply, check-in, interview and extraction prompts; model fallback
+  voiceService.js         owner's real voice: fingerprint, past exchanges, similar answers, Tanglish
+  voiceCheck.js           "sounds like you" check (rules + judge, shadow / enforce, logging)
+  correctionLearning.js   rules learned from takeovers
+  checkInService.js       AI-started check-ins; checkInVoice.js: the owner's real openers
+  memoryIndexService.js   per-person memory documents; memoryAgent.js: health check and doubts
+  quizService.js          quiz; quizRealItems.js: real + AI-written questions
+  closeness.js            closeness score and privacy level
+  transcribeService.js    voice notes to text
+  repeatGuard.js, humanizeService.js, replyStyle.js   human-looking output
+  celRuleEngine.js, ragService.js, analyticsService.js business rules, documents, leads
+  llmAdapter.js           bring-your-own model (OpenAI, Anthropic, Groq, Ollama, MCP)
+  langfuse.js             tracing for every AI call
+models/                   Mongoose schemas (Message, UserMemory, SocialGraph, PersonMemory,
+                          PersonaConfig, VoiceCheckLog, StylePreference, QuizSession, ...)
+lib/                      small shared helpers (reply policy, security checks, mentions)
+tests/                    node:test unit tests (npm test)
+frontend/                 Next.js app (App Router): Home, People, Chat Rules, Persona, Quiz,
+                          Voice Check, Documents, Media Vault, admin pages
+reports/, research_notes/ local research (not in git)
 ```
 
----
+## Stack
 
-## 🛠️ Technology Stack
-
-| Layer | Technologies |
-| :--- | :--- |
-| **Backend Runtime** | Node.js (v18+) & Express 4.18.2 |
-| **Frontend Framework** | Next.js 14.2.3 (App Router), React 18, TailwindCSS, Framer Motion |
-| **Desktop Framework** | Tauri 2.0 (Rust core + WKWebView / WebView2) |
-| **Database & Cache** | MongoDB Atlas (Mongoose 8.3.1), Upstash Redis (`ioredis`) |
-| **AI Providers** | Azure OpenAI (`gpt-4o`), Custom OpenAI, Anthropic, Groq, Ollama, MCP |
-| **Rule Engine** | Google Common Expression Language (`@marcbachmann/cel-js`) |
-| **Email Delivery** | Brevo & Resend REST APIs (HTTPS port 443 — delivers directly from guidetalk.app@gmail.com to requesting users) |
-| **Security & Auth** | Brevo/Resend HTTPS OTPs, WebAuthn / Passkeys (`@simplewebauthn`), JWT, BCrypt, AES-256-GCM, HMAC-SHA256 |
-| **External APIs** | Meta Instagram Graph API (v19.0 / v26.0), GIPHY API |
+| Layer | Used |
+| --- | --- |
+| Backend | Node.js 18+, Express 5, Mongoose 9 (MongoDB Atlas), ioredis |
+| Frontend | Next.js 14 (App Router), React 18, Framer Motion, CSS |
+| AI | Azure OpenAI: `TOP_MODEL` (default `gpt-5.6-luna`), `FALLBACK_MODEL`, `FAST_MODEL` for judges, a speech-to-text deployment for voice notes; optional bring-your-own models |
+| Tracing | Langfuse (OpenTelemetry) |
+| Rules | Google CEL (`@marcbachmann/cel-js`) |
+| Email | Brevo / Resend HTTPS APIs |
+| Auth | JWT, bcrypt, passkeys (`@simplewebauthn/server`), TOTP |
+| Hosting | Backend on Render, frontend on Vercel |
 
 ---
 
-## 🔐 Security & Multi-Tenant Isolation
+## Running it locally
 
-1. **Webhook Integrity:** All incoming POST events are verified against `X-Hub-Signature-256` using the Meta App Secret before processing.
-2. **Dynamic Tenant Dispatch:** Incoming DMs are matched against `recipient.id` (`User.findOne({ 'instagram.accountId': recipientId })`).
-3. **Safe Failure:** If an incoming message cannot be mapped to a registered tenant, it drops safely without executing replies. **The platform never falls back to admin credentials for external accounts.**
-4. **Token Encryption at Rest:** Every Meta Page Access Token and custom AI API key is encrypted using AES-256-GCM before saving to MongoDB.
-5. **Prompt Injection Guardrails:** User messages are isolated inside strict `<incoming_message>` XML boundaries to prevent prompt hijacking.
-6. **Transactional Email Hardening:** Email OTPs and password resets utilize Brevo and Resend REST APIs over HTTPS (port 443) rather than raw SMTP (ports 25/465/587), guaranteeing 100% deliverability on cloud hosting providers like Render without connection timeouts or IP locks.
+```bash
+npm install
+cd frontend && npm install && cd ..
+cp .env.example .env            # fill it in (see below)
+```
+
+```bash
+# Backend (set PORT=5001 in .env so it doesn't clash with Next.js)
+npm start
+
+# Frontend, in another terminal (frontend/.env.local: NEXT_PUBLIC_API_URL=http://localhost:5001)
+cd frontend && npm run dev      # http://localhost:3000
+```
+
+Tests: `npm test` (all backend logic: reply rules, voice check, learning, quiz, check-ins,
+closeness, security).
+
+### Environment
+Required: `MONGODB_URI`, `JWT_SECRET`, `ENCRYPTION_KEY`, `AZURE_OPENAI_ENDPOINT`,
+`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION`, `META_APP_ID`, `META_APP_SECRET`,
+`INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `WEBHOOK_VERIFY_TOKEN`.
+
+Models: `TOP_MODEL`, `FALLBACK_MODEL`, `FAST_MODEL`, `MEMORY_MODEL`,
+`AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT` (if unset, `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`,
+`whisper` and `whisper-1` are tried; with none deployed, voice notes get a "can't listen right now"
+reply).
+
+Voice check: `VOICE_CHECK`, `VOICE_CHECK_ENFORCE_PERCENT`, `VOICE_CHECK_THRESHOLD`.
+
+Optional: `REDIS_URL`, `LANGFUSE_*`, `BREVO_API_KEY` / `RESEND_API_KEY`, `GIPHY_API_KEY`,
+`UNSPLASH_ACCESS_KEY`. See `.env.example` for the full list.
 
 ---
 
-## 🚦 Getting Started
+## Deploying
 
-### Prerequisites
-- Node.js v18+ and npm
-- Running MongoDB instance (Atlas or local)
-- Running Redis instance (Upstash or local)
-- Meta Developer Account with an active Instagram Professional account
-- Azure OpenAI endpoint or custom OpenAI/Ollama API credentials
-- Brevo Account & API Key (or Resend API Key) for transactional OTP & verification emails
+- Push to `main`: Vercel builds the frontend and Render builds the backend automatically.
+- `main` is protected: no force pushes, no deletion, changes come in through a pull request with
+  one approval (the owner can push directly).
+- Rollback: Vercel and Render can both roll back to an earlier deploy in seconds. A rollback turns
+  their auto-deploy off; turn it back on afterwards.
 
-### Installation & Local Setup
+## Security and isolation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/samjoshua/instagram.git
-   cd instagram
-   ```
+- Webhooks are checked against `X-Hub-Signature-256` before anything runs.
+- Every query is scoped to the signed-in owner (`ownerId`); one account can never read another's
+  people, messages or memory.
+- Instagram tokens and custom AI keys are encrypted at rest (AES-256-GCM).
+- Messages from contacts are fenced off in prompts so they can't give the AI instructions.
+- Deleting an account deletes everything it owns, including voice logs and learned rules.
 
-2. **Install backend and frontend dependencies:**
-   ```bash
-   npm install
-   cd frontend && npm install && cd ..
-   ```
-
-3. **Configure environment variables:**
-   ```bash
-   cp .env.example .env
-   ```
-   Fill in your credentials:
-   - `MONGODB_URI`: MongoDB connection string.
-   - `ENCRYPTION_KEY`: 32-byte secret for AES-256 token encryption.
-   - `META_APP_ID` & `META_APP_SECRET`: Credentials from Meta App Dashboard.
-   - `WEBHOOK_VERIFY_TOKEN`: Verification secret for webhook challenge.
-   - `AZURE_OPENAI_ENDPOINT` & `AZURE_OPENAI_KEY`: Default AI provider credentials.
-   - `BREVO_API_KEY`: Brevo REST API key for instant OTP emails sent directly from `guidetalk.app@gmail.com`.
-   - `RESEND_API_KEY`: Optional Resend API key fallback.
-
-4. **Start the development servers:**
-   ```bash
-   # Start Express backend (port 5001)
-   npm run dev
-
-   # In a separate terminal, start Next.js frontend (port 3000)
-   cd frontend && npm run dev
-   ```
-
-5. **Access the dashboard:**
-   Navigate to `http://localhost:3000` to register your account, connect Instagram, and configure your AI assistant.
-
-
-## 📄 License
-Private & Proprietary — All rights reserved.
+## License
+Private and proprietary. All rights reserved.

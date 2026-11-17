@@ -1415,3 +1415,38 @@ img.qz2-dm-av { object-fit: cover; }
 .vc-example { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border); }
 .vc-example > div { padding: 6px 10px; background: color-mix(in srgb, var(--color-text-primary) 4%, transparent); font-size: 0.85rem; }
 @media (max-width: 640px) { .vc-nums b { font-size: 1.05rem; } .vc-btn { flex: 1; justify-content: center; } }
+
+/* People grid: "Open Details" is a soft tinted button, not a heavy black bar (the card opens too) */
+.people-open-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--ambient-dominant, #888) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--ambient-dominant, #888) 12%, transparent);
+  color: var(--color-text-primary); font: 700 0.78rem var(--font-sans);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.people-open-btn:hover {
+  background: color-mix(in srgb, var(--ambient-dominant, #888) 22%, transparent);
+  border-color: color-mix(in srgb, var(--ambient-dominant, #888) 45%, var(--color-border));
+}
+
+/* "@" tagging in answers (components/MentionInput.jsx) */
+.mention-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+.mention-wrap > input { flex: 1; min-width: 0; width: 100%; }
+.mention-menu {
+  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 12000; width: min(320px, 100%); min-width: 220px;
+  margin: 0; padding: 4px; list-style: none; border-radius: 14px;
+  background: var(--color-surface, #18181b); color: var(--color-text-primary);
+  border: 1px solid var(--color-border); box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.45);
+}
+.mention-menu button {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 8px; min-height: 0;
+  border: 0; border-radius: 10px; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.mention-menu button.on { background: color-mix(in srgb, var(--ambient-dominant, #888) 18%, transparent); }
+.mention-menu img, .mention-av { width: 28px; height: 28px; flex: none; border-radius: 50%; object-fit: cover; }
+.mention-av { display: grid; place-items: center; font-size: 0.78rem; font-weight: 700; background: color-mix(in srgb, var(--ambient-dominant, #888) 25%, transparent); }
+.mention-name { min-width: 0; display: flex; flex-direction: column; }
+.mention-name b, .mention-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mention-name b { font-size: 0.84rem; font-weight: 600; }
+.mention-name small { font-size: 0.72rem; color: var(--color-text-secondary); }

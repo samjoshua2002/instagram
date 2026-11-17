@@ -1923,22 +1923,9 @@ function RelationshipsPageContent() {
 
                   <div className="people-grid-actions" style={{ display: 'flex', gap: '6px', paddingTop: '4px' }} onClick={(e) => e.stopPropagation()}>
                     <button
+                      type="button"
+                      className="people-open-btn"
                       onClick={() => setSelectedPerson(person)}
-                      style={{
-                        flex: 1,
-                        background: 'var(--color-text-primary)',
-                        color: 'var(--color-surface)',
-                        border: 'none',
-                        padding: '7px 12px',
-                        borderRadius: '6px',
-                        fontSize: '0.76rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px'
-                      }}
                     >
                       <span>Open Details</span>
                       <ArrowRight size={12} />

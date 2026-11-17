@@ -29,6 +29,9 @@ const CIRCLE_FLOOR = { family: 85, close: 75, offline: 50 };
 // Work contacts never get your private life, however much you chat
 const CATEGORY_CAP = { professional: 49, business: 24 };
 const LEVEL_SCORE = { stranger: 10, acquaintance: 35, friend: 60, close: 85 };
+const LEVEL_MIN = { stranger: 0, acquaintance: 25, friend: 50, close: 75 };
+// Labels that say "not close" in the owner's own words
+const WEAK_LABEL = /\b(follower|online contact|fan|acquaintance|stranger|random|client|customer)\b/i;
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
@@ -105,6 +108,12 @@ function computeCloseness(p = {}, now = Date.now()) {
   // Thousands of DMs and still talking: that is a close person, whatever the label says
   const recent = Number.isFinite(last) && (now - last) / DAY <= 30;
   if (chats >= 5000 && recent) labelFloor = Math.max(labelFloor, 78);
+  // Your own word wins over the AI's reading: someone you call a follower / online contact / fan
+  // is never lifted above friend by the chat reading or the DM count
+  if (WEAK_LABEL.test(String(p.relationshipToSam || '')) && labelFloor > LEVEL_MIN.friend) {
+    labelFloor = LEVEL_MIN.friend;
+    reasons.push(`you call them "${String(p.relationshipToSam).slice(0, 30)}"`);
+  }
 
   const floor = Math.max(CATEGORY_FLOOR[category] || 0, CIRCLE_FLOOR[p.circle] || 0, labelFloor);
   if (CIRCLE_FLOOR[p.circle]) reasons.push(`in your ${p.circle} circle`);

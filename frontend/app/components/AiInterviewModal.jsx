@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { backdropMotion, popFromTrigger } from '../lib/motion';
 import { Sparkles, X, Send, Check, User, Link2, Calendar, FileText } from 'lucide-react';
 import ContactAvatar from './ContactAvatar';
+import MentionInput from './MentionInput';
 
 export default function AiInterviewModal() {
   // Pops out of the button that opened it and shrinks back into it on close
@@ -23,7 +24,7 @@ export default function AiInterviewModal() {
   useEffect(() => {
     if (isAiModalOpen) {
       const greeting = editingNode
-        ? `Hey! Let's update intel for ${editingNode.name}. What new life updates, inside jokes, exam dates, or relationship changes happened?`
+        ? `What's new with ${editingNode.name}? Tell me anything to add or change. Type @ to tag someone they know.`
         : `Hey! Who is this new person? Tell me their name, Instagram @username, relation to you (sister, homie, medicine friend), and what they're like!`;
 
       setAiChat([{ role: 'assistant', content: greeting }]);
@@ -184,7 +185,7 @@ export default function AiInterviewModal() {
                 <Sparkles size={14} />
               </div>
               <span style={{ fontWeight: '800', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}>
-                Add Person (AI Interview)
+                {editingNode ? `Update ${editingNode.name}` : 'Add a person'}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -246,12 +247,13 @@ export default function AiInterviewModal() {
 
           {/* Input */}
           <form onSubmit={handleSendAiMessage} style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '8px', background: 'var(--color-surface)' }}>
-            <input
+            <MentionInput
               type="text"
-              placeholder="Answer AI (e.g. She studies medicine, @handle, loves hamsters)..."
+              placeholder="e.g. she studies medicine, her brother is @handle"
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
-              style={{ flex: 1, background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)', padding: '10px 14px', fontSize: '0.84rem', outline: 'none' }}
+              exclude={editingNode?.senderId}
+              style={{ flex: 1, width: '100%', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)', padding: '10px 14px', fontSize: '0.84rem', outline: 'none' }}
             />
             <button
               type="submit"
@@ -331,7 +333,7 @@ export default function AiInterviewModal() {
               }}
             >
               <Check size={14} />
-              <span>Save Person to Directory</span>
+              <span>{editingNode ? 'Save changes' : 'Save to People'}</span>
             </button>
             <button
               onClick={() => setIsAiModalOpen(false)}

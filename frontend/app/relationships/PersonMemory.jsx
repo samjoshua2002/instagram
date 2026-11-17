@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Brain, RefreshCw, HelpCircle, X, Send, FileText } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import MentionInput from '../components/MentionInput';
 
 /**
  * The AI's memory of this person (read only): a document written from all your real chats
@@ -79,8 +80,11 @@ export default function PersonMemory({ senderId, name }) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }).catch(() => null);
     if (!res?.ok) { showToast?.('Could not save that', 'error'); return false; }
-    showToast?.(okText);
+    // Applied at once: say what changed on their records
+    const out = await res.json().catch(() => ({}));
+    showToast?.(Array.isArray(out.changes) && out.changes.length ? `Updated: ${out.changes.slice(0, 3).join(' · ')}` : okText);
     load();
+    window.dispatchEvent(new CustomEvent('person-updated', { detail: { senderId } }));
     return true;
   };
   const answer = async (d, dismiss = false) => {
@@ -160,7 +164,7 @@ export default function PersonMemory({ senderId, name }) {
                       <form key={d._id} className="pm-doubt" onSubmit={e => { e.preventDefault(); answer(d); }}>
                         <span className="pm-doubt-q">{d.question}</span>
                         <div className="pm-doubt-row">
-                          <input value={answers[d._id] || ''} onChange={e => setAnswers(x => ({ ...x, [d._id]: e.target.value }))} placeholder="Your answer" aria-label={`Answer: ${d.question}`} />
+                          <MentionInput value={answers[d._id] || ''} onChange={e => setAnswers(x => ({ ...x, [d._id]: e.target.value }))} placeholder="Your answer · @ to tag someone" aria-label={`Answer: ${d.question}`} exclude={senderId} />
                           <button type="submit" className="person-light-btn" disabled={!String(answers[d._id] || '').trim()}><Send size={13} /></button>
                           <button type="button" className="pm-doubt-x" onClick={() => answer(d, true)} aria-label="Dismiss" title="Not important"><X size={14} /></button>
                         </div>
@@ -176,8 +180,8 @@ export default function PersonMemory({ senderId, name }) {
               )}
             </div>
             <form className="pm-correct" onSubmit={sendCorrection}>
-              <input value={correction} onChange={e => setCorrection(e.target.value)} maxLength={500}
-                placeholder="Something wrong? Tell the AI" aria-label="Correct the AI's memory" />
+              <MentionInput value={correction} onChange={e => setCorrection(e.target.value)} maxLength={500} exclude={senderId}
+                placeholder="Something wrong? Tell the AI · @ to tag someone" aria-label="Correct the AI's memory" />
               <button type="submit" className="person-light-btn" disabled={!correction.trim()}>Fix</button>
             </form>
           </div>
