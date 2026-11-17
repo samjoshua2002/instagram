@@ -1466,3 +1466,20 @@ body.qz2-dragging, body.qz2-dragging * { cursor: grabbing !important; -webkit-us
 .qz2-building { display: flex; align-items: flex-start; gap: 14px; }
 .qz2-building b { font-size: 1rem; }
 .qz2-building p { margin: 4px 0 0; }
+
+/* Ranking as one list (PriorityRanker): tier headings are dividers inside it */
+.qz2-board { margin-top: 4px; position: relative; }
+.qz2-rank li.qz2-tier-row {
+  display: flex; align-items: baseline; gap: 10px; margin: 10px 0 2px; padding: 12px 2px 4px;
+  background: none; border: 0; border-top: 1px solid var(--qz-line); border-radius: 0; cursor: default;
+}
+.qz2-rank li.qz2-tier-row:first-child { border-top: 0; margin-top: 0; padding-top: 4px; }
+.qz2-tier-row b { font-size: 1.05rem; }
+.qz2-tier-row.top b { color: var(--qz-acc); }
+.qz2-tier-row small { color: var(--color-text-secondary); font-size: .76rem; }
+.qz2-rank li.qz2-row { position: relative; background: var(--qz-raise); touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.qz2-rank li.qz2-row img { -webkit-user-drag: none; }
+.qz2-grip:focus-visible { outline: 2px solid var(--qz-acc); outline-offset: 2px; }
+/* The row you hold is solid (rows behind it must not show through) */
+.qz2-rank li.qz2-row.is-held { background: var(--color-surface, #18181b); border-color: var(--qz-acc); cursor: grabbing; }
+:root[data-theme="light"] .qz2-rank li.qz2-row.is-held { background: #fff; }
