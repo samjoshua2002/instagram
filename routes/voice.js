@@ -85,14 +85,27 @@ router.post('/logs/:id/label', async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid id.' });
     const label = req.body?.label;
     if (!['send', 'nosend'].includes(label)) return res.status(400).json({ error: 'label must be send or nosend.' });
+    // "Not me" comes with how you would really reply (one message per line, as you send them)
+    const mine = label === 'nosend'
+      ? String(req.body?.mine || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, 5).join('\n').slice(0, 600)
+      : '';
     const doc = await VoiceCheckLog.findOneAndUpdate(
       { _id: req.params.id, ownerId: req.user._id },
-      { $set: { label, labelNote: String(req.body?.note || '').slice(0, 300), labelledAt: new Date() } },
+      { $set: { label, mine, labelNote: String(req.body?.note || '').slice(0, 300), labelledAt: new Date() } },
       { returnDocument: 'after' },
-    ).select('score status issues label').lean();
+    ).select('score status issues label senderId contactName incoming draft').lean();
     if (!doc) return res.status(404).json({ error: 'Not found.' });
+    // Your version teaches it like a takeover: the difference becomes a rule once 3 agree
+    let rule = null;
+    if (mine) {
+      const out = await require('../services/correctionLearning').record({
+        ownerId: req.user._id, senderId: doc.senderId, contactName: doc.contactName,
+        incoming: doc.incoming, draft: doc.draft, human: mine,
+      });
+      rule = out?.rule ? { text: out.rule.text, status: out.rule.status, support: out.rule.support } : null;
+    }
     // The judge's score is shown only now, after you decided (so it can't sway you)
-    res.json({ success: true, score: doc.score, status: doc.status, issues: doc.issues });
+    res.json({ success: true, score: doc.score, status: doc.status, issues: doc.issues, rule });
   } catch (err) { fail(res, err); }
 });
 

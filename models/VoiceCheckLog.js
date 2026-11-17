@@ -24,6 +24,8 @@ const voiceCheckLogSchema = new mongoose.Schema({
   // The owner's verdict on the draft, from the Voice Check page
   label: { type: String, enum: ['send', 'nosend', null], default: null },
   labelNote: { type: String, default: '' },
+  // "Not me": how the owner would really have replied (each line its own message); learned from
+  mine: { type: String, default: '' },
   labelledAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now, expires: 60 * 24 * 3600 },
 }, { versionKey: false });

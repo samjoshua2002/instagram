@@ -17,7 +17,6 @@ import '../split.css';
  *  - Learned from you: rules from the times you replied yourself instead of the AI.
  *  - Rate replies: optional, if you want to say yes / no to single replies.
  */
-const pct = v => (v == null ? '–' : `${Math.round(v * 100)}%`);
 const when = d => (d ? new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '');
 
 export default function VoicePage() {
@@ -27,7 +26,8 @@ export default function VoicePage() {
   const [overview, setOverview] = useState(null);
   const [review, setReview] = useState(null);
   const [learned, setLearned] = useState(null);
-  const [notes, setNotes] = useState({});
+  // "Not me" open on a reply: your own version being typed
+  const [fixing, setFixing] = useState({});
   const [revealed, setRevealed] = useState({});
   const [testing, setTesting] = useState(false);
 
@@ -44,9 +44,9 @@ export default function VoicePage() {
     if (!res?.ok) { showToast?.('Could not run the test', 'error'); return; }
     loadSummary();
   };
-  const label = async (item, value) => {
+  const label = async (item, value, mine = '') => {
     const res = await fetch(`${API_BASE}/api/voice/logs/${item._id}/label`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: value, note: notes[item._id] || '' }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: value, mine }),
     }).catch(() => null);
     if (!res?.ok) { showToast?.('Could not save that', 'error'); return; }
     const out = await res.json();
@@ -208,8 +208,9 @@ export default function VoicePage() {
           {tab === 'review' && (
             <div className="vc-list">
               <section className="split-card vc-help">
-                <b>Optional.</b> The AI already learns from your own messages by itself. If you want, say whether you would have sent a reply;
-                {s?.labelled ? ` you have rated ${s.labelled} (you would send ${overview?.wouldSendRate ?? '–'}%; the checker agreed on ${pct(s.tpr)} of your yes and ${pct(s.tnr)} of your no).` : ' it is another check on the checker.'}
+                <b>Optional.</b> The AI already learns from your own messages by itself. Here you can confirm its replies: <b>Looks right</b>, or
+                <b> Not me</b> and type how you would really reply (several lines if you send several messages). Your version teaches it like when you reply yourself.
+                {s?.labelled ? ` You have checked ${s.labelled} so far.` : ''}
               </section>
               {!review && <section className="split-card"><p className="vc-muted">Loading…</p></section>}
               {review && review.items.length === 0 && <section className="split-card"><p className="vc-muted">Nothing to rate right now.</p></section>}
@@ -232,16 +233,25 @@ export default function VoicePage() {
                     )}
                     {done ? (
                       <p className="vc-reveal">
-                        You said <b>{done.label === 'send' ? 'Yes' : 'No'}</b>. The checker gave it <b>{done.score ?? '–'}/100</b>
-                        {done.issues?.length ? `: ${done.issues.join('; ')}` : ''}.
+                        {done.label === 'send' ? <>Marked <b>looks right</b>.</> : <>Saved <b>your version</b>{done.rule ? `: it noticed "${done.rule.text}" (${done.rule.status === 'active' ? 'now in use' : `seen ${done.rule.support} of 3`})` : ''}.</>}
+                        {' '}The checker gave the AI's reply <b>{done.score ?? '–'}/100</b>.
                       </p>
+                    ) : fixing[item._id] !== undefined ? (
+                      <form className="vc-mine" onSubmit={e => { e.preventDefault(); label(item, 'nosend', fixing[item._id]); }}>
+                        <label htmlFor={`mine-${item._id}`}>How would you reply? <small>One message per line, like you send them</small></label>
+                        <textarea id={`mine-${item._id}`} autoFocus rows={3} value={fixing[item._id]} maxLength={600}
+                          onChange={e => setFixing(f => ({ ...f, [item._id]: e.target.value }))}
+                          placeholder={'e.g.\nnot yet da\nwill send tonight'} />
+                        <div className="vc-actions">
+                          <button type="button" className="vc-btn" onClick={() => setFixing(f => { const n = { ...f }; delete n[item._id]; return n; })}>Back</button>
+                          <button type="submit" className="vc-btn yes" disabled={!String(fixing[item._id] || '').trim()}><Check size={15} /> Save my reply</button>
+                        </div>
+                      </form>
                     ) : (
                       <div className="vc-actions">
-                        <span className="vc-ask">Would you have sent this?</span>
-                        <button type="button" className="vc-btn no" onClick={() => label(item, 'nosend')}><X size={15} /> No, not me</button>
-                        <button type="button" className="vc-btn yes" onClick={() => label(item, 'send')}><Check size={15} /> Yes</button>
-                        <input className="bare-input vc-why" value={notes[item._id] || ''} onChange={e => setNotes(n => ({ ...n, [item._id]: e.target.value }))}
-                          placeholder="What is off? (optional)" aria-label="What is off" maxLength={300} />
+                        <span className="vc-ask">Is this OK?</span>
+                        <button type="button" className="vc-btn no" onClick={() => setFixing(f => ({ ...f, [item._id]: '' }))}><X size={15} /> Not me</button>
+                        <button type="button" className="vc-btn yes" onClick={() => label(item, 'send')}><Check size={15} /> Looks right</button>
                       </div>
                     )}
                   </section>

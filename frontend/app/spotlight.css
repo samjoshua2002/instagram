@@ -1506,3 +1506,9 @@ body.qz2-dragging, body.qz2-dragging * { cursor: grabbing !important; -webkit-us
 .vc-foot { margin-top: 12px; font-size: 0.76rem; }
 .vc-verdict.ok { background: color-mix(in srgb, #22c55e 14%, transparent); }
 .vc-optional { font-size: 0.68rem; font-weight: 600; opacity: 0.7; }
+/* Voice Check > Rate replies: "Not me" -> your own version */
+.vc-mine { display: flex; flex-direction: column; gap: 8px; }
+.vc-mine label { font-weight: 700; font-size: 0.9rem; }
+.vc-mine label small { font-weight: 500; color: var(--color-text-secondary); margin-left: 6px; }
+.vc-mine textarea { width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; font: inherit; font-size: 0.92rem; line-height: 1.45; }
+.vc-mine .vc-actions { justify-content: flex-end; }
