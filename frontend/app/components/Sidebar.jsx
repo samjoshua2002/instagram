@@ -28,7 +28,6 @@ import {
   Activity,
   FileText,
   Inbox,
-  Workflow,
   Sun,
   Moon,
   LayoutGrid,
@@ -169,7 +168,6 @@ export default function Sidebar() {
     ]
     : [
       ...workspaceNav[mode],
-      { href: mode === 'business' ? '/storyboard/business' : '/storyboard/personal', label: 'Storyboard', icon: Workflow },
       { href: '/settings/features', label: 'Feature Store', icon: Layers },
       // Admin pages check the signed-in role, so while viewing a workspace they would only say "access required";
       // the Exit workspace button is the way back
@@ -405,7 +403,7 @@ export default function Sidebar() {
             >
               {navItems.map(item => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href || (item.href.startsWith('/storyboard/') && pathname.startsWith('/storyboard/'));
+                const isActive = pathname === item.href;
                 return (
                   <motion.div key={item.href} variants={navItemVariants}>
                     <Link

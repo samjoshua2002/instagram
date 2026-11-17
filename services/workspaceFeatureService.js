@@ -58,7 +58,6 @@ function toView(doc) {
     customBranding: {
       accentColor: doc.customBranding?.accentColor || '#ffffff',
       theme: doc.customBranding?.theme || 'dark',
-      storyboardView: doc.customBranding?.storyboardView || 'node_canvas',
     },
   };
 }
@@ -147,9 +146,6 @@ async function updateFeatures(user, { activeMode, enabledFeatures, customBrandin
       doc.set('customBranding.accentColor', customBranding.accentColor);
     }
     if (['dark', 'light', 'oled'].includes(customBranding.theme)) doc.set('customBranding.theme', customBranding.theme);
-    if (['timeline', 'node_canvas', 'cards'].includes(customBranding.storyboardView)) {
-      doc.set('customBranding.storyboardView', customBranding.storyboardView);
-    }
   }
 
   await doc.save();

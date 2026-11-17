@@ -2401,7 +2401,8 @@ router.delete('/admin/accounts/:userId', requireAuth, async (req, res) => {
     const Booking = require('../models/Booking');
     const PersonaConfig = require('../models/PersonaConfig');
     const KnowledgeDoc = require('../models/KnowledgeDoc');
-    const Storyboard = require('../models/Storyboard');
+    // Storyboard was removed; any canvases saved before are still deleted with the account
+    const Storyboard = { deleteMany: q => mongoose.connection.collection('storyboards').deleteMany(q) };
     const WorkspaceFeatures = require('../models/WorkspaceFeatures');
     const MediaVault = require('../models/MediaVault');
     const SocialGraph = require('../models/SocialGraph');

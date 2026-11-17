@@ -4,7 +4,10 @@
  * voice that picks up something real from their life and asks one question it doesn't know yet.
  * Their answer is learned into memory like any reply, so the People page updates by itself.
  *
- * Limits: only friend/close contacts (your setting), only within Instagram's 24-hour window after
+ * Who: everyone the AI is on for, or only the people you picked (your setting). It writes the way
+ * you really start chats (your own past openers with them, and your quiz answers), not like a bot.
+ *
+ * Limits: only within Instagram's 24-hour window after
  * THEIR last message (Instagram blocks messages after that), never two in a row without an answer,
  * and a daily cap per account (your setting). Any hour of the day.
  */
@@ -14,7 +17,6 @@ const Message = require('../models/Message');
 const instagramService = require('./instagramService');
 const azureOpenAI = require('./azureOpenAI');
 const socialGraphService = require('./socialGraphService');
-const storyboardService = require('./storyboardService');
 const { computeCloseness } = require('./closeness');
 const { splitIntoBubbles, bubbleGapMs } = require('./humanizeService');
 const { aiRepliesTo } = require('../frontend/app/lib/aiReplyRules');
@@ -83,28 +85,24 @@ class CheckInService {
     if (!aiRepliesTo({ senderId: mem.senderId, handle: mem.username, name: mem.name, aiEnabled: mem.aiEnabled, replyToMessages: mem.replyToMessages }, config, { includeGlobal: true })) return false;
 
     const convo = { ownerId: mem.ownerId || null, $or: [{ senderId: mem.senderId }, { recipientId: mem.senderId }] };
-    const [lastAny, lastTheirs, sentToday, node, circle] = await Promise.all([
+    const [lastAny, lastTheirs, sentToday, node] = await Promise.all([
       Message.findOne(convo).sort({ createdAt: -1 }).lean(),
       Message.findOne({ ownerId: mem.ownerId || null, senderId: mem.senderId, role: 'user' }).sort({ createdAt: -1 }).lean(),
       Message.countDocuments({ ownerId: mem.ownerId || null, isCheckIn: true, createdAt: { $gte: new Date(now - 24 * HOUR) } }),
       socialGraphService.getNode(mem.ownerId || null, mem.senderId),
-      storyboardService.getContactCircle(mem.ownerId, mem),
     ]);
     const closeness = computeCloseness({
-      category: node?.category, relationshipToSam: node?.relationshipToSam, circle,
+      category: node?.category, relationshipToSam: node?.relationshipToSam,
       relationshipType: mem.relationshipType, chatsCount: node?.chatsCount || mem.messageCount,
       firstSeen: mem.createdAt, lastSeen: mem.lastInteraction, override: node?.closenessOverride || '',
       familyRole: socialGraphService.familyRole,
     }, now);
-    // Your ranking: never start chats with people you marked not important; top people always qualify
-    if (node?.priority === 'low') return false;
-    if (node?.priority === 'top') closeness.level = config.checkInMinLevel || 'close';
     const away = awayState(mem.away, now);
     const decision = checkInDecision({
       away: away.state,
       enabled: config.checkInsEnabled !== false,
-      level: closeness.level,
-      minLevel: config.checkInMinLevel || 'close',
+      who: config.checkInWho || 'all',
+      picked: (config.checkInPeople || []).map(String).includes(String(mem.senderId)),
       lastTheirsAt: lastTheirs?.createdAt,
       lastAnyAt: lastAny?.createdAt,
       lastAnyRole: lastAny?.role,
@@ -126,7 +124,18 @@ class CheckInService {
       ? { topic: 'back from being busy', hint: `how their ${away.reason} went (they said earlier they were going for ${away.reason}); welcome them back` }
       : nextQuestionTopic(mem);
     const memoryDoc = (await require('../models/PersonMemory').findOne({ ownerId: mem.ownerId || null, senderId: mem.senderId }, { doc: 1 }).lean().catch(() => null))?.doc || '';
-    const out = await azureOpenAI.generateCheckIn({ userMemory: mem, messageHistory: history, config, closeness, ask, node, memoryDoc });
+    // How you really start chats: with them, with your other people, and your quiz answers
+    const voice = require('./checkInVoice');
+    const [openers, openersElse] = await Promise.all([
+      voice.openersWith(mem.ownerId || null, mem.senderId).catch(() => []),
+      voice.openersAcross(mem.ownerId || null, mem.senderId).catch(() => []),
+    ]);
+    const quizOpeners = (config.checkInExamples || []).filter(x => String(x.senderId) === String(mem.senderId)).map(x => x.text);
+    const quizElse = (config.checkInExamples || []).filter(x => String(x.senderId) !== String(mem.senderId)).slice(-6).map(x => `${x.name}: ${x.text}`);
+    const out = await azureOpenAI.generateCheckIn({
+      userMemory: mem, messageHistory: history, config, closeness, ask, node, memoryDoc,
+      openers: [...openers, ...quizOpeners].slice(-10), openersElse: [...openersElse, ...quizElse].slice(-12),
+    });
     if (!out?.message) return false;
 
     // Claim first so two servers never both write to the same person

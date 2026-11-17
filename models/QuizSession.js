@@ -5,7 +5,7 @@ const quizSessionSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   status: { type: String, enum: ['active', 'done'], default: 'active' },
   answers: [{
-    itemId: String, from: String, text: String, personId: { type: String, default: '' }, personName: { type: String, default: '' }, realReply: { type: String, default: '' }, answer: { type: String, default: '' }, skipped: { type: Boolean, default: false },
+    itemId: String, from: String, kind: { type: String, default: '' }, text: String, personId: { type: String, default: '' }, personName: { type: String, default: '' }, realReply: { type: String, default: '' }, answer: { type: String, default: '' }, skipped: { type: Boolean, default: false },
     aiGuess: { type: String, default: '' }, style: Number, meaning: Number, score: Number, note: { type: String, default: '' },
     at: { type: Date, default: Date.now },
   }],

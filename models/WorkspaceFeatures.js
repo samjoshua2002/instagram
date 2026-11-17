@@ -22,7 +22,6 @@ const workspaceFeaturesSchema = new mongoose.Schema({
   customBranding: {
     accentColor: { type: String, default: '#ffffff' },
     theme: { type: String, enum: ['dark', 'light', 'oled'], default: 'dark' },
-    storyboardView: { type: String, enum: ['timeline', 'node_canvas', 'cards'], default: 'node_canvas' },
   },
 }, { timestamps: true });
 

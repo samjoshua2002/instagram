@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Users, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock, Pause, Play, Check, KeyRound } from 'lucide-react';
+import { Bell, Cake, PauseCircle, BotOff, ChevronRight, Heart, HeartOff, Clock, User, Sparkles, Shuffle, ExternalLink, MessageCircle, Send, Hand, AlarmClock, Pause, Play, Check, KeyRound } from 'lucide-react';
 import { SegIndicator } from './ui/motion';
 import { useApp } from '../context/AppContext';
 import { prefetchAmbientImages } from './AmbientBackground';
@@ -772,13 +772,18 @@ export default function SpotlightHome() {
 
   return (
     <div className={`sh-home sh-v2${coverPhoto ? ' sh-tinted' : ''}`}>
+      {/* Hero card: the cover photo sits inside it under a shade, so the text always reads */}
+      <section className="sh-hero">
       <PageCover seed="home-cover" photo={coverPhoto} />
       <header className="sh-top">
-        {/* Two parts so a narrow phone breaks only after the comma, never inside "Good afternoon" */}
-        <h1 className="sh-hello">
-          <span className="sh-hello-greet">{hour === null ? 'Hello' : greeting(hour)},</span>{' '}
-          <span className="sh-hello-name">{firstName || 'there'}!</span>
-        </h1>
+        <div className="sh-hello-wrap">
+          <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          {/* Two parts so a narrow phone breaks only after the comma, never inside "Good afternoon" */}
+          <h1 className="sh-hello">
+            <span className="sh-hello-greet">{hour === null ? 'Hello' : greeting(hour)},</span>{' '}
+            <span className="sh-hello-name">{firstName || 'there'}!</span>
+          </h1>
+        </div>
         <div className="sh-top-actions">
         {routingConfig && (
           <button
@@ -809,7 +814,6 @@ export default function SpotlightHome() {
       {/* Today's line sits on the cover photo itself (no second photo, no card) */}
       <section className="sh-banner" aria-label="Today">
         <div className="sh-banner-text">
-          <span className="sh-banner-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           <h2 className="sh-banner-title">{people.length > 0 ? story.title : 'Your circle today'}</h2>
           {people.length > 0 ? (
             <>
@@ -827,6 +831,7 @@ export default function SpotlightHome() {
         <Link href={people.length > 0 ? story.href : '/relationships'} className="sh-banner-btn" aria-label={`Open ${people.length > 0 ? story.cta : 'People'}`}>
           <span>{people.length > 0 ? story.cta : 'People'}</span><ChevronRight size={18} />
         </Link>
+      </section>
       </section>
 
       <NeedsAttention summary={summary} people={people} onDone={doneHandoff} />
@@ -933,7 +938,6 @@ export default function SpotlightHome() {
 
           <nav className="sh-quicknav" aria-label="Shortcuts">
             <Link href="/relationships"><User size={22} /><span>People</span></Link>
-            <Link href="/storyboard"><Users size={22} /><span>Circle</span></Link>
             <Link href="/memories"><Heart size={22} /><span>Memories</span></Link>
             <Link href="/analytics"><Clock size={22} /><span>Activity</span></Link>
           </nav>

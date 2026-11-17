@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronUp, ChevronDown, Search, Check, Sparkles, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronUp, ChevronDown, Search, Check, Sparkles, RotateCcw, GripVertical } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 /**
@@ -55,6 +55,73 @@ export default function PriorityRanker({ onSaved }) {
     });
     setDirty(true);
   };
+  // Drag to rank: grab the handle and drop anywhere, also into another tier (works with mouse and touch)
+  const [dragId, setDragId] = useState(null);
+  const drag = useRef(null);
+  const placeAt = (id, targetId, after, tier) => setPeople(list => {
+    const p = list.find(x => x.senderId === id);
+    if (!p) return list;
+    const rest = list.filter(x => x.senderId !== id);
+    let at;
+    if (targetId) {
+      at = rest.findIndex(x => x.senderId === targetId);
+      if (at < 0) return list;
+      if (after) at += 1;
+    } else {
+      if (p.priority === tier) return list; // over its own tier's heading: stay put
+      at = rest.map(x => x.priority).lastIndexOf(tier) + 1 || rest.length;
+    }
+    const out = [...rest.slice(0, at), { ...p, priority: tier }, ...rest.slice(at)];
+    const same = out.length === list.length && out.every((x, i) => x.senderId === list[i].senderId && x.priority === list[i].priority);
+    return same ? list : out;
+  });
+  const scrollParent = el => {
+    for (let n = el?.parentElement; n; n = n.parentElement) {
+      const oy = getComputedStyle(n).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+    }
+    return document.scrollingElement;
+  };
+  const onGripDown = (e, id) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { id, scroller: scrollParent(e.currentTarget), y: e.clientY, x: e.clientX, raf: 0 };
+    setDragId(id);
+    touch(id);
+    const edge = () => {
+      const d = drag.current;
+      if (!d) return;
+      const zone = 70;
+      const v = d.y < zone ? -(zone - d.y) / 4 : d.y > window.innerHeight - zone ? (d.y - (window.innerHeight - zone)) / 4 : 0;
+      if (v) d.scroller.scrollTop += v;
+      d.raf = requestAnimationFrame(edge);
+    };
+    drag.current.raf = requestAnimationFrame(edge);
+  };
+  const onGripMove = e => {
+    const d = drag.current;
+    if (!d) return;
+    d.x = e.clientX;
+    d.y = e.clientY;
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const row = under?.closest('[data-rank-id]');
+    if (row) {
+      const targetId = row.getAttribute('data-rank-id');
+      if (targetId === d.id) return;
+      const r = row.getBoundingClientRect();
+      placeAt(d.id, targetId, e.clientY > r.top + r.height / 2, row.getAttribute('data-tier'));
+      setDirty(true);
+      return;
+    }
+    const zone = under?.closest('[data-tier-drop]');
+    if (zone) { placeAt(d.id, null, true, zone.getAttribute('data-tier-drop')); setDirty(true); }
+  };
+  const onGripUp = () => {
+    if (drag.current?.raf) cancelAnimationFrame(drag.current.raf);
+    drag.current = null;
+    setDragId(null);
+  };
   const save = async () => {
     setSaving(true);
     const body = tiers.flatMap(t => t.list.map((p, i) => ({ senderId: p.senderId, priority: t.id, rank: i + 1, mine: mine.has(p.senderId) })));
@@ -74,15 +141,19 @@ export default function PriorityRanker({ onSaved }) {
       </div>
       <p className="qz2-summary">Ranked automatically from what the AI knows (friendship, memory, how recently you talk) and kept up to date. Anyone you move stays where you put them.</p>
       <button type="button" className="qz2-btn ghost qz2-reset" onClick={resetAuto}><RotateCcw size={13} /> Reset all to automatic</button>
-      <label className="qz2-search"><Search size={14} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Find someone" aria-label="Find someone" /></label>
+      <label className="qz2-search"><Search size={14} /><input className="bare-input" value={q} onChange={e => setQ(e.target.value)} placeholder="Find someone · drag the handle to reorder" aria-label="Find someone" /></label>
       {!people && <div className="qz2-loading">{Array.from({ length: 5 }, (_, i) => <i key={i} />)}</div>}
       {people && tiers.map(t => (
-        <div key={t.id} className={`qz2-tier ${t.id}`}>
+        <div key={t.id} className={`qz2-tier ${t.id}${dragId ? ' dragging' : ''}`} data-tier-drop={t.id}>
           <div className="qz2-tier-head"><b>{t.label}</b><small>{t.list.length} · {t.hint}</small></div>
           {t.list.length === 0 && <p className="qz2-measures">Nobody here yet.</p>}
           <ol className="qz2-rank">
             {t.list.map((p, i) => match(p) && (
-              <li key={p.senderId}>
+              <li key={p.senderId} data-rank-id={p.senderId} data-tier={t.id} className={dragId === p.senderId ? 'is-dragging' : ''}>
+                <button type="button" className="qz2-grip" aria-label={`Drag to move ${p.name}`} title="Drag to move"
+                  onPointerDown={e => onGripDown(e, p.senderId)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}>
+                  <GripVertical size={16} />
+                </button>
                 <span className="qz2-rank-n">{i + 1}</span>
                 {p.profilePic ? <img src={p.profilePic} alt="" className="qz2-rank-av" referrerPolicy="no-referrer" /> : <span className="qz2-rank-av">{(p.name || '?')[0]}</span>}
                 <span className="qz2-rank-name"><b>{p.name}</b><small>{p.instagramHandle ? `@${String(p.instagramHandle).replace(/^@+/, '')} · ` : ''}{(p.chatsCount || 0).toLocaleString()} chats

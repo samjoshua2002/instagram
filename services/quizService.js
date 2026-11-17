@@ -64,10 +64,16 @@ async function guessReply(ownerId, item, earlier, person = null) {
   const sameSender = earlier.filter(a => a.from === item.from && a.answer).slice(-6);
   const others = earlier.filter(a => a.from !== item.from && a.answer).slice(-4);
   const ex = list => list.map(a => `${FROM_LABEL[a.from]}: "${a.text}" -> you: "${a.answer}"`).join('\n');
+  // Check-in questions: how you really opened chats with them before (except the one shown after)
+  const openers = item.kind === 'checkin' && person
+    ? (await require('./checkInVoice').openersWith(ownerId, person.senderId, 6).catch(() => [])).filter(t => t !== item.realReply).slice(-4)
+    : [];
   const text = await azureOpenAI.completeWithFallback(TOP_MODEL, [
     { role: 'system', content: `You are ${cfg.creatorName || 'the owner'}. Reply to this Instagram DM exactly the way you really would: your length, words, casing, emoji, tone. One reply, no quotes.
 ${cfg.aboutMe ? `ABOUT YOU: ${String(cfg.aboutMe).slice(0, 800)}\n` : ''}${cfg.characteristics ? `YOUR PERSONALITY: ${String(cfg.characteristics).slice(0, 800)}\n` : ''}${cfg.textingHabits ? `HOW YOU TEXT: ${String(cfg.textingHabits).slice(0, 600)}\n` : ''}${voice?.block ? `${voice.block}\n` : ''}${pm?.doc ? `WHAT YOU KNOW ABOUT ${String(person.name).toUpperCase()}:\n${String(pm.doc).slice(0, 1500)}\n` : ''}${sameSender.length ? `HOW YOU ANSWERED ${FROM_LABEL[item.from].toUpperCase()} BEFORE:\n${ex(sameSender)}\n` : ''}${others.length ? `OTHER ANSWERS (different people):\n${ex(others)}\n` : ''}` },
-    { role: 'user', content: `${(item.before || []).map(b => `${b.who === 'you' ? 'You' : who}: ${b.text}`).join('\n')}${item.before?.length ? '\n' : ''}${who} sends: ${item.text}` },
+    { role: 'user', content: item.kind === 'checkin'
+      ? `Your chat with ${who} went quiet a while ago. You text them first now, the way you always start chats with them (your greeting, your nickname for them). Write only that first message.${openers.length ? `\nHow you really opened chats with them before:\n${openers.map(t => `- ${t}`).join('\n')}` : ''}`
+      : `${(item.before || []).map(b => `${b.who === 'you' ? 'You' : who}: ${b.text}`).join('\n')}${item.before?.length ? '\n' : ''}${who} sends: ${item.text}` },
   ], { maxTokens: 120, temperature: 0.7 });
   return toHumanText(text, { keepEmoji: true }).trim();
 }
@@ -134,8 +140,14 @@ async function answer(ownerId, sessionId, { itemId, text, skip = false }) {
   const style = styleScore(real, aiGuess);
   const { meaning, note } = await judgeMeaning(item, real, aiGuess);
   const score = matchScore(style, meaning);
-  session.answers.push({ itemId, from: item.from, text: item.text, ...who, answer: real, aiGuess, style, meaning: Number.isFinite(meaning) ? meaning : null, score, note });
+  session.answers.push({ itemId, from: item.from, kind: item.kind || '', text: item.text, ...who, answer: real, aiGuess, style, meaning: Number.isFinite(meaning) ? meaning : null, score, note });
   await session.save();
+  // How you text someone first: check-ins copy this right away (newest 60 kept)
+  if (item.kind === 'checkin' && person && real) {
+    await PersonaConfig.updateOne({ ownerId }, {
+      $push: { checkInExamples: { $each: [{ senderId: String(person.senderId), name: person.name || '', text: real, at: new Date() }], $slice: -60 } },
+    }).catch(err => console.warn('⚠️ [Quiz] check-in example not saved:', err.message));
+  }
   return { result: { aiGuess, style, meaning, score, note }, next: nextItem(session), session };
 }
 

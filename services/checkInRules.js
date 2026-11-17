@@ -1,5 +1,4 @@
 /** Pure rules for AI-started check-ins (no DB, no network), used by checkInService. */
-const { atLeast } = require('./closeness');
 
 const HOUR = 3600 * 1000;
 const WINDOW_HOURS = 22;      // Instagram allows replies up to 24h after their last message; 2h margin
@@ -9,12 +8,13 @@ const MAX_PER_RUN = 3;
  * Should this contact get a check-in now? Pure, so it is unit tested.
  * @returns {{ ok: boolean, reason: string }}
  */
-function checkInDecision({ enabled = true, level, minLevel = 'close', lastTheirsAt, lastAnyAt, lastAnyRole,
+function checkInDecision({ enabled = true, who = 'all', picked = false, lastTheirsAt, lastAnyAt, lastAnyRole,
   lastAnyWasCheckIn = false, lastCheckInAt = null, idleHours = 4, quiet = false, sentToday = 0, dailyLimit = 6, away = 'none', now = Date.now() }) {
   if (!enabled) return { ok: false, reason: 'check-ins are off' };
   // They said they're busy: don't disturb until they're back
   if (away === 'away') return { ok: false, reason: 'they said they are busy' };
-  if (!atLeast(level || 'stranger', minLevel)) return { ok: false, reason: `not ${minLevel} enough (${level})` };
+  // Everyone the AI is on for (that is checked before), or only the people you picked
+  if (who === 'selected' && !picked) return { ok: false, reason: 'not one of the people you picked' };
   if (sentToday >= dailyLimit) return { ok: false, reason: 'daily limit reached' };
   if (!lastTheirsAt) return { ok: false, reason: 'they never messaged' };
   const sinceTheirs = now - new Date(lastTheirsAt).getTime();
@@ -23,7 +23,7 @@ function checkInDecision({ enabled = true, level, minLevel = 'close', lastTheirs
   // Their message still waiting is the reply's job; our unanswered check-in means don't double-text
   if (lastAnyRole !== 'assistant') return { ok: false, reason: 'their message is unanswered' };
   if (lastAnyWasCheckIn) return { ok: false, reason: 'last check-in not answered yet' };
-  return { ok: true, reason: 'quiet chat with someone close' };
+  return { ok: true, reason: 'quiet chat' };
 }
 
 /** What the AI should try to learn next: the biggest gap in what it knows about them. */

@@ -63,12 +63,12 @@ async function main() {
   const UserMemory = require('../models/UserMemory');
   const ragService = require('../services/ragService');
 
-  for (const name of ['KnowledgeDoc', 'Lead', 'Booking', 'Storyboard', 'WorkspaceFeatures', 'MediaVault', 'Message', 'UserMemory']) {
+  for (const name of ['KnowledgeDoc', 'Lead', 'Booking', 'WorkspaceFeatures', 'MediaVault', 'Message', 'UserMemory']) {
     const Model = require(`../models/${name}`);
     const total = await Model.countDocuments();
     const orphans = await Model.countDocuments({ $or: [{ ownerId: null }, { ownerId: { $exists: false } }] });
     // Old single-account records (before multi-account) may have no owner; report them, fail only on newer models
-    const strict = ['KnowledgeDoc', 'Lead', 'Booking', 'Storyboard', 'WorkspaceFeatures'].includes(name);
+    const strict = ['KnowledgeDoc', 'Lead', 'Booking', 'WorkspaceFeatures'].includes(name);
     check('isolation', `${name}: every record has an owner (${total} records)`, strict ? orphans === 0 : true, orphans ? `${orphans} without owner${strict ? '' : ' (legacy, allowed)'}` : '');
   }
 

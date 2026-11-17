@@ -345,7 +345,6 @@ app.use('/api/analytics', requireAuth, require('./routes/analytics'));
 app.use('/api/knowledge', requireAuth, require('./routes/knowledge'));
 app.use('/api/settings', requireAuth, require('./routes/aiProvider'));
 app.use('/api/workspace', requireAuth, require('./routes/workspace'));
-app.use('/api/storyboard', requireAuth, require('./routes/storyboard'));
 // Browser notification feed (new DMs, leads, bookings, handoffs)
 app.use('/api/alerts', requireAuth, require('./routes/alerts'));
 // Home dashboard summary (replies, handoffs, Instagram token health)
@@ -2064,11 +2063,17 @@ app.get('/api/checkins', async (req, res) => {
     const c = await findOwnPersona(req);
     const recent = await Message.find({ ownerId: req.user._id, isCheckIn: true }).sort({ createdAt: -1 }).limit(10)
       .select('recipientId text createdAt').lean();
+    // Everyone the AI is on for: the list to pick from when "Pick people" is chosen
+    const contacts = (await UserMemory.find({ ownerId: req.user._id, aiEnabled: true, senderId: { $not: /^test_/ } },
+      { senderId: 1, name: 1, username: 1, profilePic: 1, lastInteraction: 1 }).sort({ lastInteraction: -1 }).limit(500).lean())
+      .map(m => ({ senderId: String(m.senderId), name: m.name || m.username || 'Someone', handle: m.username || '', profilePic: m.profilePic || '' }));
     res.json({
       enabled: c?.checkInsEnabled !== false,
-      minLevel: c?.checkInMinLevel || 'close',
+      who: c?.checkInWho || 'all',
+      people: (c?.checkInPeople || []).map(String),
       idleHours: c?.checkInIdleHours || 4,
       dailyLimit: c?.checkInDailyLimit || 6,
+      contacts,
       recent,
     });
   } catch (err) {
@@ -2081,9 +2086,13 @@ app.put('/api/checkins', async (req, res) => {
     const b = req.body || {};
     const set = {};
     if (b.enabled !== undefined) set.checkInsEnabled = !!b.enabled;
-    if (b.minLevel !== undefined) {
-      if (!['friend', 'close'].includes(b.minLevel)) return res.status(400).json({ error: 'minLevel must be friend or close.' });
-      set.checkInMinLevel = b.minLevel;
+    if (b.who !== undefined) {
+      if (!['all', 'selected'].includes(b.who)) return res.status(400).json({ error: 'who must be all or selected.' });
+      set.checkInWho = b.who;
+    }
+    if (b.people !== undefined) {
+      if (!Array.isArray(b.people) || b.people.length > 500) return res.status(400).json({ error: 'people must be a list of up to 500 ids.' });
+      set.checkInPeople = [...new Set(b.people.map(x => String(x).slice(0, 64)).filter(Boolean))];
     }
     if (b.idleHours !== undefined) set.checkInIdleHours = Math.min(20, Math.max(2, Math.round(Number(b.idleHours) || 4)));
     if (b.dailyLimit !== undefined) set.checkInDailyLimit = Math.min(30, Math.max(1, Math.round(Number(b.dailyLimit) || 6)));

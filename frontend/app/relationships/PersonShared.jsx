@@ -130,99 +130,104 @@ export default function PersonShared({ senderId }) {
         </div>
       )}
 
-      {current?.id === 'reminders' && (
-        <ul className="shared-list">
-          {current.items.map(r => (
-            <li key={r._id} className={`shared-item${r.status === 'pending' ? ' shared-needs' : ''}`}>
-              <span className="shared-icon"><AlarmClock size={15} /></span>
-              <span className="shared-main">
-                <b>{r.what}</b>
-                <small>
-                  {new Date(r.dueAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
-                  {' · '}{r.forWhom === 'owner' ? 'for you (email)' : 'DM to them'}
-                  {' · '}{{ pending: 'upcoming', sent: 'sent', emailed: 'emailed you', failed: 'not sent', cancelled: 'cancelled' }[r.status] || r.status}
-                </small>
-              </span>
-              {r.status === 'pending' && <button type="button" className="person-light-btn" onClick={() => cancelReminder(r)}><X size={14} /> Cancel</button>}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {current?.id === 'needs' && (
-        <ul className="shared-list">
-          {current.items.map(it => (
-            <li key={it._id} className="shared-item shared-needs">
-              <span className="shared-icon"><Bell size={15} /></span>
-              <span className="shared-main"><b>{it.summary}</b><small>{it.category} · {when(it.createdAt)}{it.emailedAt ? ' · emailed you' : ''}</small></span>
-              <button type="button" className="person-light-btn" onClick={() => done(it)}><Check size={14} /> Done</button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {current?.id === 'media' && (
-        <div className="shared-grid">
-          {current.items.map(it => <Tile key={it._id} API_BASE={API_BASE} item={it} onOpen={setOpen} />)}
-        </div>
-      )}
-
-      {current?.id === 'reels' && (
-        <ul className="shared-list">
-          {current.items.map(it => (
-            <li key={it._id} className="shared-item">
-              <span className="shared-icon"><Play size={15} /></span>
-              <span className="shared-main">
-                <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.description || it.summary || (it.kind === 'post' ? 'Post' : 'Reel')}</a>
-                <small>{it.kind} · {when(it.createdAt)}{it.text ? ` · "${it.text.slice(0, 60)}"` : ''}</small>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {current?.id === 'links' && (
-        <div className="shared-link-groups">
-          {/* One group per site, the site with the most links first */}
-          {Object.entries(current.items.reduce((g, it) => ((g[hostOf(it.url)] = g[hostOf(it.url)] || []).push(it), g), {}))
-            .sort((a, b) => b[1].length - a[1].length)
-            .map(([host, list]) => (
-              <div key={host} className="shared-link-group">
-                <div className="shared-link-host">
-                  <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} alt="" width="16" height="16" />
-                  <span>{host}</span><small>{list.length}</small>
-                </div>
-                <ul className="shared-list">
-                  {list.map(it => (
-                    <li key={it._id} className="shared-item">
-                      <span className="shared-icon"><Link2 size={15} /></span>
-                      <span className="shared-main">
-                        <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.summary || it.url.replace(/^https?:\/\/(www\.)?/, '')}</a>
-                        <small>{when(it.createdAt)}{it.text && it.text !== it.url ? ` · "${it.text.slice(0, 60)}"` : ''}</small>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-        </div>
-      )}
-
-      {(current?.id === 'docs' || current?.id === 'voice') && (
-        <ul className="shared-list">
-          {current.items.map(it => {
-            const Icon = it.kind === 'voice' ? Mic : FileText;
-            return (
-              <li key={it._id}>
-                <button type="button" className="shared-item shared-item-btn" onClick={() => setOpen(it)}>
-                  <span className="shared-icon"><Icon size={15} /></span>
-                  <span className="shared-main"><b>{it.kind === 'voice' ? 'Voice note' : (it.summary || 'File')}</b><small>{when(it.createdAt)}</small></span>
-                  {it.kind === 'voice' && <Play size={15} />}
-                </button>
+      {/* The list scrolls inside the card, so a long history never stretches the page */}
+      {current && (
+        <div className="shared-scroll">
+        {current?.id === 'reminders' && (
+          <ul className="shared-list">
+            {current.items.map(r => (
+              <li key={r._id} className={`shared-item${r.status === 'pending' ? ' shared-needs' : ''}`}>
+                <span className="shared-icon"><AlarmClock size={15} /></span>
+                <span className="shared-main">
+                  <b>{r.what}</b>
+                  <small>
+                    {new Date(r.dueAt).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                    {' · '}{r.forWhom === 'owner' ? 'for you (email)' : 'DM to them'}
+                    {' · '}{{ pending: 'upcoming', sent: 'sent', emailed: 'emailed you', failed: 'not sent', cancelled: 'cancelled' }[r.status] || r.status}
+                  </small>
+                </span>
+                {r.status === 'pending' && <button type="button" className="person-light-btn" onClick={() => cancelReminder(r)}><X size={14} /> Cancel</button>}
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        )}
+
+        {current?.id === 'needs' && (
+          <ul className="shared-list">
+            {current.items.map(it => (
+              <li key={it._id} className="shared-item shared-needs">
+                <span className="shared-icon"><Bell size={15} /></span>
+                <span className="shared-main"><b>{it.summary}</b><small>{it.category} · {when(it.createdAt)}{it.emailedAt ? ' · emailed you' : ''}</small></span>
+                <button type="button" className="person-light-btn" onClick={() => done(it)}><Check size={14} /> Done</button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {current?.id === 'media' && (
+          <div className="shared-grid">
+            {current.items.map(it => <Tile key={it._id} API_BASE={API_BASE} item={it} onOpen={setOpen} />)}
+          </div>
+        )}
+
+        {current?.id === 'reels' && (
+          <ul className="shared-list">
+            {current.items.map(it => (
+              <li key={it._id} className="shared-item">
+                <span className="shared-icon"><Play size={15} /></span>
+                <span className="shared-main">
+                  <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.description || it.summary || (it.kind === 'post' ? 'Post' : 'Reel')}</a>
+                  <small>{it.kind} · {when(it.createdAt)}{it.text ? ` · "${it.text.slice(0, 60)}"` : ''}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {current?.id === 'links' && (
+          <div className="shared-link-groups">
+            {/* One group per site, the site with the most links first */}
+            {Object.entries(current.items.reduce((g, it) => ((g[hostOf(it.url)] = g[hostOf(it.url)] || []).push(it), g), {}))
+              .sort((a, b) => b[1].length - a[1].length)
+              .map(([host, list]) => (
+                <div key={host} className="shared-link-group">
+                  <div className="shared-link-host">
+                    <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} alt="" width="16" height="16" />
+                    <span>{host}</span><small>{list.length}</small>
+                  </div>
+                  <ul className="shared-list">
+                    {list.map(it => (
+                      <li key={it._id} className="shared-item">
+                        <span className="shared-icon"><Link2 size={15} /></span>
+                        <span className="shared-main">
+                          <a href={hrefOf(it.url)} target="_blank" rel="noreferrer">{it.summary || it.url.replace(/^https?:\/\/(www\.)?/, '')}</a>
+                          <small>{when(it.createdAt)}{it.text && it.text !== it.url ? ` · "${it.text.slice(0, 60)}"` : ''}</small>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {(current?.id === 'docs' || current?.id === 'voice') && (
+          <ul className="shared-list">
+            {current.items.map(it => {
+              const Icon = it.kind === 'voice' ? Mic : FileText;
+              return (
+                <li key={it._id}>
+                  <button type="button" className="shared-item shared-item-btn" onClick={() => setOpen(it)}>
+                    <span className="shared-icon"><Icon size={15} /></span>
+                    <span className="shared-main"><b>{it.kind === 'voice' ? 'Voice note' : (it.summary || 'File')}</b><small>{when(it.createdAt)}</small></span>
+                    {it.kind === 'voice' && <Play size={15} />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        </div>
       )}
 
       {open && <Viewer API_BASE={API_BASE} item={open} onClose={() => setOpen(null)} />}

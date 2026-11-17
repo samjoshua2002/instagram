@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Send, SkipForward, Sparkles, Check, ArrowLeft, ArrowRight, RotateCcw, User, ListOrdered } from 'lucide-react';
+import { Send, SkipForward, Sparkles, Check, ArrowLeft, ArrowRight, RotateCcw, User, ListOrdered, MessageCircleHeart } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { enterMotion } from '../lib/motion';
 import PageHero from '../components/PageHero';
@@ -254,6 +254,18 @@ export default function QuizPage() {
                     <span className="qz2-eyebrow">Question {numberOf(current.id) || '–'} of {total} · {current.roundTitle}</span>
                     <span className="qz2-pill soft"><User size={12} /> {current.person ? `${current.person.name} · ${FROM[current.from].replace('Your ', '').toLowerCase()}` : FROM[current.from]}</span>
                   </div>
+                  {current.kind === 'checkin' ? (
+                    <div className="qz2-dm qz2-checkin">
+                      {current.person?.profilePic
+                        ? <img className="qz2-dm-av" src={current.person.profilePic} alt="" referrerPolicy="no-referrer" />
+                        : <span className="qz2-dm-av">{(current.person?.name || '?')[0]}</span>}
+                      <div className="qz2-dm-col">
+                        <div className="qz2-dm-name"><MessageCircleHeart size={13} /> You text first</div>
+                        <div className="qz2-checkin-text">{current.text}</div>
+                        <small className="qz2-measures">Your greeting, your nickname for them, how you'd really start. Check-ins copy this.</small>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="qz2-dm">
                     {current.person?.profilePic
                       ? <img className="qz2-dm-av" src={current.person.profilePic} alt="" referrerPolicy="no-referrer" />
@@ -264,8 +276,10 @@ export default function QuizPage() {
                       <div className="qz2-in">{current.text}</div>
                     </div>
                   </div>
+                  )}
                   {current.measures && <p className="qz2-measures">Tests: {current.measures}</p>}
-                  {current.realReply && !done && <p className="qz2-measures">A real message {current.person?.name || 'they'} sent you. Reply like you would today; you'll see what you said back then.</p>}
+                  {current.aiWritten && !done && <p className="qz2-measures"><Sparkles size={12} /> Written by the AI from what it knows about {current.person?.name || 'them'}: something they could send you. Reply like you would.</p>}
+                  {current.kind !== 'checkin' && current.realReply && !done && <p className="qz2-measures">A real message {current.person?.name || 'they'} sent you. Reply like you would today; you'll see what you said back then.</p>}
 
                   {done ? (
                     done.skipped ? <p className="qz2-measures">You skipped this one.</p> : (
@@ -278,7 +292,7 @@ export default function QuizPage() {
                     <form className="qz2-compose" onSubmit={e => { e.preventDefault(); send(); }}>
                       <textarea autoFocus rows={2} value={text} onChange={e => setText(e.target.value)} disabled={busy}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                        placeholder="Reply like you really would…" aria-label="Your reply" />
+                        placeholder={current.kind === 'checkin' ? `Your first message to ${current.person?.name || 'them'}…` : 'Reply like you really would…'} aria-label="Your reply" />
                       <div className="qz2-compose-row">
                         <button type="button" className="qz2-btn ghost" onClick={() => send(true)} disabled={busy} title="I'd leave this on seen"><SkipForward size={14} /> Skip</button>
                         <button type="submit" className="qz2-btn" disabled={busy || !text.trim()}>
@@ -313,7 +327,7 @@ function Compare({ h }) {
     <div className="qz2-compare">
       <div className="qz2-col"><span className="qz2-label">You</span><div className="qz2-out">{h.answer}</div></div>
       <div className="qz2-col"><span className="qz2-label"><Sparkles size={12} /> AI would say</span><div className="qz2-ai">{h.aiGuess}</div></div>
-      {h.realReply && <div className="qz2-col qz2-then"><span className="qz2-label">Back then you said</span><div className="qz2-real">{h.realReply}</div></div>}
+      {h.realReply && <div className="qz2-col qz2-then"><span className="qz2-label">{h.kind === 'checkin' ? 'How you really opened last time' : 'Back then you said'}</span><div className="qz2-real">{h.realReply}</div></div>}
       {h.note && <p className="qz2-note">{h.note}</p>}
     </div>
   );

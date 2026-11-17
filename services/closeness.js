@@ -5,7 +5,7 @@
  *   acquaintance (25-49) your interests and what you're into; still no family or contact details
  *   friend (50-74)       family in general and first names, your city; never phone, email or address
  *   close (75+)          everything you've written down, phone number included
- * Your own labels count most (family / close friend on their People card or Storyboard circle);
+ * Your own labels count most (family / close friend on their People card);
  * then how much you've actually talked, for how long, and how recently. Pure, so it is unit tested.
  */
 
@@ -40,7 +40,7 @@ function levelOf(score) {
  * @param {object} p
  * @param {string} [p.category]          People card category (close_friend, family, online_friend, ...)
  * @param {string} [p.relationshipToSam] free text on the People card ("Mother", "college friend")
- * @param {string} [p.circle]            Storyboard circle (close, family, online, offline, professional)
+ * @param {string} [p.circle]            Optional circle label (close, family, online, offline, professional)
  * @param {string} [p.relationshipType]  learned from DMs (stranger, fan, client, collaborator, friend)
  * @param {number} [p.chatsCount]        DMs exchanged
  * @param {Date|string} [p.firstSeen]    first contact

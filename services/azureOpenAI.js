@@ -2,6 +2,7 @@ const { AzureOpenAI } = require('openai');
 const { traceOpenAI, instrument, annotate } = require('./langfuse');
 const { TOP_MODEL, FALLBACK_MODEL } = require('./models');
 const repeatGuard = require('./repeatGuard');
+const voiceCheck = require('./voiceCheck');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -9,7 +10,6 @@ const celRuleEngine = require('./celRuleEngine');
 const redisService = require('./redisService');
 const ragService = require('./ragService');
 const llmAdapter = require('./llmAdapter');
-const storyboardService = require('./storyboardService');
 const { computeCloseness, privacyRules, redactContactDetails } = require('./closeness');
 const voiceService = require('./voiceService');
 const { HUMAN_CHAT_RULES, humanChatRules, toHumanText } = require('./replyStyle');
@@ -171,17 +171,15 @@ class AzureOpenAIService {
 
     // Hybrid workspaces keep the personal voice but can ground replies in their documents (Feature Store)
     // All context lookups run at the same time so the reply is not held up by each one in turn
-    const storyboardOwner = tenant?._id || config.ownerId;
+    const workspaceOwner = tenant?._id || config.ownerId;
     // How close this person is decides what personal details any part of the reply may use
-    const [contactNode, contactCircle, memoryBond] = await Promise.all([
+    const [contactNode, memoryBond] = await Promise.all([
       socialGraphService.getNode(conversationOwnerId, userMemory.senderId),
-      storyboardService.getContactCircle(storyboardOwner, userMemory),
       require('../models/PersonMemory').findOne({ ownerId: conversationOwnerId || null, senderId: userMemory.senderId }, { bond: 1 }).lean().catch(() => null),
     ]);
     const closeness = computeCloseness({
       category: contactNode?.category,
       relationshipToSam: contactNode?.relationshipToSam,
-      circle: contactCircle,
       relationshipType: userMemory.relationshipType,
       chatsCount: contactNode?.chatsCount || userMemory.messageCount,
       firstSeen: userMemory.createdAt,
@@ -193,20 +191,15 @@ class AzureOpenAIService {
     });
     const isClose = closeness.level === 'close';
     const knowsThem = closeness.level === 'friend' || isClose;
-    const [knowledge, allCats, [personalStoryboard, hybridPlaybook], socialTreeContext, voice, sharedByThem, personMemory] = await Promise.all([
-      features?.ragKnowledgeBase && storyboardOwner
-        ? ragService.retrieve({ ownerId: storyboardOwner, incomingText }).catch(err => {
+    const [knowledge, allCats, socialTreeContext, voice, sharedByThem, personMemory] = await Promise.all([
+      features?.ragKnowledgeBase && workspaceOwner
+        ? ragService.retrieve({ ownerId: workspaceOwner, incomingText }).catch(err => {
             console.warn('⚠️ [RAG] Personal retrieval failed:', err.message);
             return null;
           })
         : null,
       // 1b. Active reaction categories from user's Media Vault
       Promise.resolve().then(() => stickerService.getAllCategories(tenant || (conversationOwnerId ? { _id: conversationOwnerId } : null))).catch(() => null),
-      // Storyboard canvases (PLAN.md §5): lore, Secret Vault, this contact's circle; Hybrid adds the journey playbook
-      Promise.all([
-        storyboardService.getPersonalContext(storyboardOwner, userMemory, { level: closeness.level }),
-        features?.activeMode === 'hybrid' ? storyboardService.getBusinessContext(storyboardOwner) : '',
-      ]),
       // 2. Social knowledge graph context (tree chain linking friends & lore)
       socialGraphService.getContextForConversation(userMemory.senderId, incomingText, messageHistory, { ownerId: conversationOwnerId, level: closeness.level, autoStyle: true }),
       // 2b. The owner's real voice from MongoDB: hand-typed messages only (never the AI's replies)
@@ -436,9 +429,7 @@ ${config.toneGuidelines}
 
 ${config.customKnowledge ? `KNOWLEDGE BASE ABOUT ME & FREQUENT TOPICS:\n${isClose ? config.customKnowledge : redactContactDetails(config.customKnowledge, { keepEmail: knowsThem })}\n` : ''}
 ${personalKnowledgeSection}
-${personalStoryboard}
-${hybridPlaybook ? `${hybridPlaybook}- Use this playbook only when the person is asking about your products, services or bookings; keep your personal voice.
-` : ''}
+
 ACTIVE CEL DIRECTIVE FOR THIS EXACT CONVERSATION:
 ${allowTanglish ? directives.modeInstruction.replace(/ \(IN ENGLISH\)/, '').replace(/^.*reply in casual English.*$\n?/m, '') : directives.modeInstruction}
 ${directives.lengthInstruction}
@@ -622,6 +613,23 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         reply = String((await this.completeWithFilterRetry(selectedModel, retry, { maxTokens: 220, temperature: 0.95, extra: { frequency_penalty: 0.6, presence_penalty: 0.6 } })) ?? '').trim() || reply;
       }
 
+      // Does it sound like the owner? Bot phrases, far too long, or a low score from a fast judge
+      // that compares it with their real messages: written again once (services/voiceCheck.js)
+      let voiceVerdict = null;
+      if (usedPlatformModel && reply && !/^\[(?:STICKER|ATTACHMENT)/i.test(reply)) {
+        voiceVerdict = await voiceCheck.gate({
+          draft: reply, incoming: incomingText, style: realVoice?.block || '', fp: realVoice?.fingerprint || null,
+          creatorName: config.creatorName, ai: this,
+          rewrite: note => this.completeWithFilterRetry(selectedModel, [
+            ...messages.slice(0, -1),
+            { role: 'system', content: `${note}\nYour draft was: "${reply.slice(0, 400)}"` },
+            messages[messages.length - 1],
+          ], { maxTokens: 220, temperature: 0.8 }),
+        }).catch(() => null);
+        if (voiceVerdict?.text) reply = String(voiceVerdict.text).trim();
+        if (voiceVerdict?.rewritten) console.log(`🗣️ [Voice check] Rewrote a reply (${voiceVerdict.score ?? 'rules'}): ${voiceVerdict.issues.join('; ')}`);
+      }
+
       annotate({
         model: usedPlatformModel ? selectedModel : 'tenant provider',
         chatType,
@@ -635,6 +643,9 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         socialGraphUsed: Boolean(socialTreeContext),
         antiRepeatNote: Boolean(antiRepeat),
         regeneratedBecauseRepeat: regenerated,
+        voiceScore: voiceVerdict?.score ?? null,
+        voiceIssues: voiceVerdict?.issues?.length ? voiceVerdict.issues : null,
+        voiceRewritten: Boolean(voiceVerdict?.rewritten),
       });
 
       // Post-process to remove unwanted quotes or prefixes
@@ -727,8 +738,6 @@ KNOWLEDGE RULES:
 ${knowledge.wantsDocument ? '- The customer is asking for a document or link right now: include the most relevant verified link in your reply.\n' : ''}`
       : '';
 
-    const journeySection = await storyboardService.getBusinessContext(tenant?._id || config.ownerId);
-
     const systemPrompt = `You reply to customers in Instagram Direct Messages for ${businessName}${business.category ? ` (${business.category})` : ''}, on behalf of the team. Write like a friendly person on the team texting back from their phone: warm, natural and to the point, never like a support bot.
 
 ABOUT THE BUSINESS:
@@ -736,7 +745,6 @@ ${business.description || config.aboutMe || config.personaBio || '(no descriptio
 
 ${config.customKnowledge ? `PRODUCTS, SERVICES & FAQ (THE ONLY SOURCE OF FACTS):\n${config.customKnowledge}\n` : ''}
 ${knowledgeSection}
-${journeySection}
 ${config.toneGuidelines ? `BRAND VOICE:\n${config.toneGuidelines}\n` : ''}
 BUSINESS HOURS: ${policy.openTime || '09:00'}-${policy.closeTime || '18:00'} (${policy.timezone || 'Asia/Kolkata'}).
 
@@ -802,7 +810,7 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
    * own voice, with ONE question it wants answered (`ask` = the biggest gap in what it knows).
    * Returns { message, question } or null.
    */
-  async generateCheckIn({ userMemory, messageHistory, config: passedConfig = null, closeness, ask, node = null, memoryDoc = '' }) {
+  async generateCheckIn({ userMemory, messageHistory, config: passedConfig = null, closeness, ask, node = null, memoryDoc = '', openers = [], openersElse = [] }) {
     const config = passedConfig || await this.loadPersonaConfig(userMemory?.ownerId || null);
     const c = (v, n = 200) => sanitizeLearnedText(v, n).replace(/\n/g, ' ');
     const facts = (userMemory.facts || []).slice(-15).map(f => `- ${c(f.fact)}`).join('\n');
@@ -810,29 +818,45 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
     const voice = await voiceService.getVoiceBlock({ ownerId: userMemory.ownerId, contactId: userMemory.senderId, creatorName: config.creatorName })
       .catch(() => null);
     const name = userMemory.nickname || userMemory.name || userMemory.username || 'them';
-    const systemPrompt = `You are ${config.creatorName}. You are texting ${name} first, on Instagram DM, because your chat went quiet and you care about them.
-They are ${closeness?.level === 'close' ? 'one of your closest people' : 'a good friend'}. Be like a caring friend or sibling: warm, a little playful, genuinely interested. Never needy, never guilt-trippy, never "why didn't you reply".
+    const quote = list => list.map(t => `- "${c(t, 160).replace(/"/g, "'")}"`).join('\n');
+    const nicknames = [userMemory.nickname, node?.greetingStyle, ...(Array.isArray(node?.greetingOptions) ? node.greetingOptions.slice(-5) : [])]
+      .filter(Boolean).map(x => c(x, 40));
+    const systemPrompt = `You are ${config.creatorName}. The chat with ${name} went quiet and you text them first on Instagram DM, the way YOU always do.
 
-${memoryDoc ? `YOUR MEMORY OF THEM (from all your real chats: people in their life, timeline, open threads; pick something real from here):\n${String(memoryDoc).slice(0, 3500)}\n` : ''}
-WHAT YOU KNOW ABOUT THEM:
-${facts || '- not much yet'}
-${events ? `WHAT'S GOING ON IN THEIR LIFE:\n${events}` : ''}
-${userMemory.personalNotes ? `MY NOTES: ${c(userMemory.personalNotes, 400)}` : ''}
+${openers.length ? `HOW YOU REALLY START A CHAT WITH ${String(name).toUpperCase()} (your own messages after a quiet gap; this is the most important part):
+${quote(openers)}
+` : ''}${openersElse.length ? `HOW YOU START CHATS WITH YOUR OTHER PEOPLE:
+${quote(openersElse)}
+` : ''}${nicknames.length ? `WHAT YOU CALL THEM / HOW YOU GREET THEM: ${[...new Set(nicknames)].map(x => `"${x}"`).join(', ')}
+` : ''}
+WRITE IT EXACTLY LIKE THOSE OPENERS:
+- Same greeting words, same nickname for them, same casing, spelling, language, emoji (or none) and length.
+- If your openers are short ("hi how are you", "hola shorty"), yours is short too. No long friendly paragraph.
+- Then, only if it fits naturally, one small casual question${ask?.hint ? ` (a good one: ${ask.hint})` : ''}. Ask it like you would, never like a survey or an interview.
+- Never sound like a customer-service bot or a therapist: no "just checking in", "hope you're doing well", "how have you been holding up", "I was thinking about you".
+- Never needy or guilt-tripping, never "why didn't you reply".
 
+${memoryDoc ? `WHAT YOU KNOW ABOUT THEM (use at most one real thing, only if natural):
+${String(memoryDoc).slice(0, 2500)}
+` : ''}${facts ? `FACTS:
+${facts}
+` : ''}${events ? `GOING ON IN THEIR LIFE:
+${events}
+` : ''}${userMemory.personalNotes ? `MY NOTES: ${c(userMemory.personalNotes, 400)}
+` : ''}
 ${[
-  (node?.gender || userMemory.gender) && !/unknown/.test(node?.gender || userMemory.gender) ? `- They are ${node?.gender || userMemory.gender}. Use words that fit (never "bro" for a girl, never "girl" for a guy).` : '- Their gender is unknown: no gendered words like bro, dude, girl, sis.',
+  (node?.gender || userMemory.gender) && !/unknown/.test(node?.gender || userMemory.gender) ? `- They are ${node?.gender || userMemory.gender}. Use words that fit (never "bro" for a girl, never "girl" for a guy).` : '- Their gender is unknown: no gendered words like bro, dude, girl, sis, unless your openers above use one for them.',
   node?.relationshipToSam ? `- What they are to you: ${c(node.relationshipToSam, 80)}.` : '',
-  node?.greetingStyle ? `- How you greet them: "${c(node.greetingStyle, 60)}".` : '',
   Array.isArray(node?.avoidWords) && node.avoidWords.length ? `- NEVER call them or say: ${node.avoidWords.slice(0, 20).map(w => `"${c(w, 30)}"`).join(', ')}.` : '',
 ].filter(Boolean).join('\n')}
 
-GOAL: one short check-in that picks up something real from above or from the chat, and asks ONE question about: ${ask?.hint || 'how they are doing'}. Ask it the way a friend would, not like a survey. Only one question.
-
-${voice?.block ? `HOW YOU REALLY TEXT (copy this, not generic slang):\n${voice.block}\n` : ''}
+${voice?.block ? `HOW YOU TEXT IN GENERAL:
+${voice.block}
+` : ''}
 ${HUMAN_CHAT_RULES}
 - 1 or 2 short lines. Each line is sent as its own message.
 - Never mention AI, settings, reminders or that time has passed in hours.
-Return JSON only: {"message": "<the text>", "question": "<the one question you asked, in plain words>"}`;
+Return JSON only: {"message": "<the text>", "question": "<the one question you asked, in plain words, or empty>"}`;
 
     const messages = [{ role: 'system', content: systemPrompt }];
     for (const msg of messageHistory || []) {
@@ -841,9 +865,24 @@ Return JSON only: {"message": "<the text>", "question": "<the one question you a
     messages.push({ role: 'user', content: '[Write the check-in now as JSON.]' });
     try {
       const out = await this.jsonWithFallback(TOP_MODEL, messages);
-      const message = toHumanText(String(out?.message || '')).trim();
+      let message = toHumanText(String(out?.message || '')).trim();
+      let question = String(out?.question || '').slice(0, 200);
       if (!message) return null;
-      return { message, question: String(out?.question || '').slice(0, 200) };
+      // Same "sounds like you" check as replies, compared with how you really open chats
+      const style = [openers.length && `How you open chats with ${name}:\n${openers.map(t => `- ${t}`).join('\n')}`,
+        openersElse.length && `How you open chats with others:\n${openersElse.map(t => `- ${t}`).join('\n')}`, voice?.block].filter(Boolean).join('\n\n');
+      const verdict = await voiceCheck.gate({
+        draft: message, style, fp: voice?.fingerprint || null, creatorName: config.creatorName, ai: this,
+        rewrite: async note => {
+          const again = await this.jsonWithFallback(TOP_MODEL, [...messages.slice(0, -1),
+            { role: 'system', content: `${note}\nYour draft was: "${message.slice(0, 300)}"` }, messages[messages.length - 1]]);
+          if (again?.question) question = String(again.question).slice(0, 200);
+          return toHumanText(String(again?.message || '')).trim();
+        },
+      }).catch(() => null);
+      if (verdict?.text) message = verdict.text;
+      if (verdict?.rewritten) console.log(`🗣️ [Voice check] Rewrote a check-in for ${name}: ${verdict.issues.join('; ')}`);
+      return { message, question, voiceScore: verdict?.score ?? null };
     } catch (err) {
       console.warn('⚠️ [Check-in] Could not write a check-in:', err.message);
       return null;

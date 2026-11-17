@@ -123,7 +123,15 @@ Inquiries: DMs open for cool collaborations & tech discussions`,
   // The AI starts a caring check-in itself when a chat with someone close has gone quiet
   // (services/checkInService.js). Only inside Instagram's 24-hour window after their last message.
   checkInsEnabled: { type: Boolean, default: true },
-  checkInMinLevel: { type: String, enum: ['friend', 'close'], default: 'close' },
+  checkInMinLevel: { type: String, enum: ['friend', 'close'], default: 'close' }, // old setting, no longer used
+  // Who gets check-ins: everyone the AI is on for, or only the people picked here (senderIds)
+  checkInWho: { type: String, enum: ['all', 'selected'], default: 'all' },
+  checkInPeople: { type: [String], default: [] },
+  // How you text someone first, from the quiz's "How you check in" section (newest last, capped)
+  checkInExamples: {
+    type: [{ senderId: String, name: String, text: String, at: { type: Date, default: Date.now }, _id: false }],
+    default: [],
+  },
   checkInIdleHours: { type: Number, default: 4, min: 2, max: 20 },
   checkInDailyLimit: { type: Number, default: 6, min: 1, max: 30 },
   customReactionCategories: [{

@@ -65,6 +65,9 @@ export default function PersonMemory({ senderId, name }) {
   const [answers, setAnswers] = useState({});
   const [correction, setCorrection] = useState('');
   const [open, setOpen] = useState(false);
+  // Two tabs: the memory itself, and the AI's questions for you (opens on questions when some wait)
+  const [tab, setTab] = useState('memory');
+  const openModal = () => { setTab((mem?.doubts || []).some(d => d.status === 'open') ? 'questions' : 'memory'); setOpen(true); };
   useEffect(() => {
     if (!open) return undefined;
     const onKey = e => { if (e.key === 'Escape') setOpen(false); };
@@ -120,7 +123,7 @@ export default function PersonMemory({ senderId, name }) {
           <h2 className="person-card-title"><Brain size={17} /> AI memory</h2>
           <div className="person-card-sub">{status}</div>
         </div>
-        <button type="button" className="pm-icon-btn" onClick={() => setOpen(true)} title={openDoubts.length ? `Open memory · ${openDoubts.length} question(s) for you` : 'Open memory'} aria-label="Open the AI's memory">
+        <button type="button" className="pm-icon-btn" onClick={openModal} title={openDoubts.length ? `Open memory · ${openDoubts.length} question(s) for you` : 'Open memory'} aria-label="Open the AI's memory">
           <FileText size={18} />
           {openDoubts.length > 0 && <span className="pm-icon-dot">{openDoubts.length}</span>}
         </button>
@@ -140,24 +143,37 @@ export default function PersonMemory({ senderId, name }) {
               </div>
               <button type="button" className="pm-icon-btn" onClick={() => setOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
-            <div className="pm-modal-body">
-              {openDoubts.length > 0 && (
-                <div className="pm-doubts">
-                  <div className="pm-doubts-head"><HelpCircle size={15} /> Needs your review</div>
-                  {openDoubts.map(d => (
-                    <form key={d._id} className="pm-doubt" onSubmit={e => { e.preventDefault(); answer(d); }}>
-                      <span className="pm-doubt-q">{d.question}</span>
-                      <div className="pm-doubt-row">
-                        <input value={answers[d._id] || ''} onChange={e => setAnswers(x => ({ ...x, [d._id]: e.target.value }))} placeholder="Your answer" aria-label={`Answer: ${d.question}`} />
-                        <button type="submit" className="person-light-btn" disabled={!String(answers[d._id] || '').trim()}><Send size={13} /></button>
-                        <button type="button" className="pm-doubt-x" onClick={() => answer(d, true)} aria-label="Dismiss" title="Not important"><X size={14} /></button>
-                      </div>
-                    </form>
-                  ))}
-                </div>
+            <div className="pm-tabs" role="tablist" aria-label="Memory sections">
+              <button type="button" role="tab" aria-selected={tab === 'memory'} className={tab === 'memory' ? 'on' : ''} onClick={() => setTab('memory')}>
+                <FileText size={14} /> Memory
+              </button>
+              <button type="button" role="tab" aria-selected={tab === 'questions'} className={tab === 'questions' ? 'on' : ''} onClick={() => setTab('questions')}>
+                <HelpCircle size={14} /> Questions{openDoubts.length > 0 && <span className="pm-tab-count">{openDoubts.length}</span>}
+              </button>
+            </div>
+            <div className="pm-modal-body" role="tabpanel">
+              {tab === 'questions' ? (
+                openDoubts.length > 0 ? (
+                  <div className="pm-doubts">
+                    <div className="pm-doubts-head"><HelpCircle size={15} /> The AI isn't sure about these. Your answer is saved as always true.</div>
+                    {openDoubts.map(d => (
+                      <form key={d._id} className="pm-doubt" onSubmit={e => { e.preventDefault(); answer(d); }}>
+                        <span className="pm-doubt-q">{d.question}</span>
+                        <div className="pm-doubt-row">
+                          <input value={answers[d._id] || ''} onChange={e => setAnswers(x => ({ ...x, [d._id]: e.target.value }))} placeholder="Your answer" aria-label={`Answer: ${d.question}`} />
+                          <button type="submit" className="person-light-btn" disabled={!String(answers[d._id] || '').trim()}><Send size={13} /></button>
+                          <button type="button" className="pm-doubt-x" onClick={() => answer(d, true)} aria-label="Dismiss" title="Not important"><X size={14} /></button>
+                        </div>
+                      </form>
+                    ))}
+                  </div>
+                ) : <p className="person-empty">No questions right now. The AI asks here when something in your chats is unclear.</p>
+              ) : (
+                <>
+                  {mem?.bondReason && <p className="pm-bond">{mem.bondReason}</p>}
+                  {mem?.doc ? <MemoryDoc text={mem.doc} /> : <p className="person-empty">{busy ? 'Reading their chats…' : 'Nothing learned yet.'}</p>}
+                </>
               )}
-              {mem?.bondReason && <p className="pm-bond">{mem.bondReason}</p>}
-              {mem?.doc ? <MemoryDoc text={mem.doc} /> : <p className="person-empty">{busy ? 'Reading their chats…' : 'Nothing learned yet.'}</p>}
             </div>
             <form className="pm-correct" onSubmit={sendCorrection}>
               <input value={correction} onChange={e => setCorrection(e.target.value)} maxLength={500}
