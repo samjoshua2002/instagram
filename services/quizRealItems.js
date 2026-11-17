@@ -16,6 +16,7 @@ const REAL_PER_PERSON = 4;    // the rest of each section is written by the AI
 const CANDIDATES = 14;
 const MAX_PEOPLE = 8;
 const CHECKIN_PEOPLE = 6;
+const REFINE_TIMEOUT_MS = 8000;
 const MAX_ITEMS = 60;
 
 // A message worth asking: real words, not a link, attachment, reaction or one emoji
@@ -125,10 +126,15 @@ async function buildItems(ownerId, people, used = new Set()) {
   const chosen = [...byTier('top'), ...byTier('normal')].slice(0, MAX_PEOPLE);
   const stamp = Date.now().toString(36);
   // Every person at once (each is one small AI call), kept in rank order
+  // Each person's AI step is capped at 8 s so the quiz never takes long to open; then the quick pick
+  const capped = (p, cands) => Promise.race([
+    refineForPerson(ownerId, p, cands),
+    new Promise(resolve => { const t = setTimeout(() => resolve(bestByHeuristic(cands, PER_PERSON)), REFINE_TIMEOUT_MS); t.unref?.(); }),
+  ]);
   const sections = await Promise.all(chosen.map(async p => {
     const cands = pickFromConversation(await conversation(ownerId, p.senderId), CANDIDATES, used);
     if (!cands.length) return [];
-    return refineForPerson(ownerId, p, cands);
+    return capped(p, cands);
   }));
   chosen.forEach((p, k) => sections[k].forEach((c, i) => items.push({
     id: `${p.senderId}-${stamp}-${i}`, round: `p-${p.senderId}`, roundTitle: p.name,
@@ -137,8 +143,10 @@ async function buildItems(ownerId, people, used = new Set()) {
 
   // How you check in: you text them first after a quiet spell; your last real opener is shown after
   const { openersWith } = require('./checkInVoice');
-  for (const [i, p] of (await checkInPeople(ownerId, people)).entries()) {
-    const real = await openersWith(ownerId, p.senderId, 1).catch(() => []);
+  const ciPeople = await checkInPeople(ownerId, people);
+  const ciOpeners = await Promise.all(ciPeople.map(p => openersWith(ownerId, p.senderId, 1).catch(() => [])));
+  for (const [i, p] of ciPeople.entries()) {
+    const real = ciOpeners[i];
     items.push({
       id: `checkin-${p.senderId}-${stamp}-${i}`, round: 'checkin', roundTitle: 'How you check in', kind: 'checkin',
       from: p.priority === 'top' ? 'close' : 'friend', personId: p.senderId, personName: p.name, profilePic: p.profilePic || '',

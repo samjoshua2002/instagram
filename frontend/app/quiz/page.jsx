@@ -200,6 +200,15 @@ export default function QuizPage() {
         </aside>
 
         <main className="split-main">
+          {!session && (
+            <section className="split-card qz2-card qz2-building" aria-live="polite">
+              <span className="qz2-typing"><i /><i /><i /></span>
+              <div>
+                <b>Writing your quiz from your chats</b>
+                <p className="qz2-measures">The AI picks real messages that need a real answer and writes a few of its own for each of your top people. The first time takes about 10-20 seconds; after that it opens at once.</p>
+              </div>
+            </section>
+          )}
           {view === 'rank' && (
             <>
               {session && !history.length && (

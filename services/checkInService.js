@@ -81,6 +81,8 @@ class CheckInService {
     if (!configs.has(key)) configs.set(key, await PersonaConfig.findOne({ ownerId: mem.ownerId || null }).lean());
     const config = configs.get(key);
     if (!config || config.checkInsEnabled === false || config.globalBotActive === false) return false;
+    // Instagram refused the last one: don't write and try again every 20 minutes
+    if (mem.checkInFailedAt && now - new Date(mem.checkInFailedAt).getTime() < 24 * HOUR) return false;
     if (config.accountType && config.accountType !== 'personal') return false;
     if (!aiRepliesTo({ senderId: mem.senderId, handle: mem.username, name: mem.name, aiEnabled: mem.aiEnabled, replyToMessages: mem.replyToMessages }, config, { includeGlobal: true })) return false;
 
@@ -153,7 +155,7 @@ class CheckInService {
       const res = await instagramService.sendTextMessage(mem.senderId, bubble, token).catch(err => ({ success: false, error: err.message }));
       if (!res?.success) {
         if (i === 0) {
-          await UserMemory.updateOne({ _id: mem._id }, { $set: { lastCheckInAt: mem.lastCheckInAt || null, pendingQuestion: mem.pendingQuestion || {} } }).catch(() => {});
+          await UserMemory.updateOne({ _id: mem._id }, { $set: { lastCheckInAt: mem.lastCheckInAt || null, pendingQuestion: mem.pendingQuestion || {}, checkInFailedAt: new Date() } }).catch(() => {});
           console.warn(`⚠️ [Check-in] Not delivered to ${mem.name || mem.senderId}`);
           return false;
         }

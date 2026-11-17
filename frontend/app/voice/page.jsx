@@ -55,10 +55,10 @@ export default function VoicePage() {
   const week = overview?.week || {};
   const checked = Object.values(week).reduce((a, b) => a + b, 0);
   const verdict = !s ? '' : !s.enough
-    ? `Label at least 10 drafts you'd send and 10 you wouldn't (${s.send}/10 and ${s.nosend}/10 so far) to see if the judge agrees with you.`
-    : s.kappa >= 0.6 ? `The judge agrees with you well (kappa ${s.kappa}). Best threshold: ${s.best?.threshold}.`
-      : s.kappa >= 0.4 ? `The judge partly agrees with you (kappa ${s.kappa}). Keep it watching only; best threshold so far: ${s.best?.threshold}.`
-        : `The judge does not agree with you (kappa ${s.kappa}). Keep it off rewriting; only the bot-phrase rules should act.`;
+    ? `Not enough ratings yet. Rate at least 10 replies you'd send and 10 you wouldn't (${s.send}/10 and ${s.nosend}/10 so far). Then this says whether the checker can be trusted.`
+    : s.kappa >= 0.6 ? `The checker agrees with you. It can be allowed to fix replies (pass mark ${s.best?.threshold}).`
+      : s.kappa >= 0.4 ? 'The checker partly agrees with you. It keeps watching only for now; rate a few more.'
+        : 'The checker does not agree with you. It stays watching only and never changes your replies.';
 
   return (
     <motion.div {...enterMotion} className="page-container split-page spx-page has-hero vc">
@@ -67,25 +67,26 @@ export default function VoicePage() {
         icon={<AudioLines size={96} strokeWidth={2} />}
         eyebrow="Persona"
         title="Voice check"
-        desc="Does the AI sound like you? Mark real AI drafts as ones you'd send or not. That shows whether its judge agrees with you, and teaches it from the times you replied yourself."
+        desc="Does the AI sound like you? Rate its real replies: would you have sent it? One tap each."
         meta={overview ? `${MODE[overview.mode] || overview.mode}${overview.wouldSendRate != null ? ` · you'd send ${overview.wouldSendRate}%` : ''}` : 'Loading'}
       />
 
       <div className="split-body">
         <aside className="split-side">
           <section className="split-card vc-stats">
-            <h2 className="ctl-title">How the judge does</h2>
+            <h2 className="ctl-title">Your ratings</h2>
             {!overview ? <p className="vc-muted">Loading…</p> : (
               <>
                 <div className="vc-nums">
-                  <div><b>{s?.labelled ?? 0}</b><span>labelled</span></div>
-                  <div><b>{overview.wouldSendRate != null ? `${overview.wouldSendRate}%` : '–'}</b><span>you'd send</span></div>
-                  <div><b>{s?.kappa ?? '–'}</b><span>agreement (kappa)</span></div>
+                  <div><b>{s?.labelled ?? 0}</b><span>replies rated</span></div>
+                  <div><b>{overview.wouldSendRate != null ? `${overview.wouldSendRate}%` : '–'}</b><span>sound like you</span></div>
                 </div>
+                <h3 className="vc-sub">Can the automatic checker be trusted?</h3>
+                <p className="vc-muted">Before a reply goes out, a checker scores how much it sounds like you. Your ratings test it.</p>
                 <div className="vc-nums">
-                  <div><b>{pct(s?.tpr)}</b><span>good drafts it passes</span></div>
-                  <div><b>{pct(s?.tnr)}</b><span>bad drafts it catches</span></div>
-                  <div><b>{overview.threshold}</b><span>threshold now</span></div>
+                  <div><b>{pct(s?.tpr)}</b><span>of your Yes replies it also passed</span></div>
+                  <div><b>{pct(s?.tnr)}</b><span>of your No replies it also caught</span></div>
+                  <div><b>{s?.kappa ?? '–'}</b><span>agreement (1 = always agrees)</span></div>
                 </div>
                 <p className="vc-verdict">{verdict}</p>
                 <h3 className="vc-sub">Last 7 days · {checked} checked</h3>
@@ -115,6 +116,12 @@ export default function VoicePage() {
               {review && review.items.length === 0 && (
                 <section className="split-card"><p className="vc-muted">Nothing to review. New AI replies show up here as the AI answers your DMs.</p></section>
               )}
+              {review && review.items.length > 0 && (
+                <section className="split-card vc-help">
+                  <b>Would you have sent it?</b> Tap <b>Yes</b> if the reply sounds like you, <b>No</b> if it does not (too formal, wrong slang,
+                  something you would never say). Your answers show how often the AI sounds like you, and test the checker before it may fix replies by itself.
+                </section>
+              )}
               {review?.items.map(item => {
                 const done = revealed[item._id];
                 return (
@@ -123,20 +130,24 @@ export default function VoicePage() {
                       <b>{item.contactName || 'Someone'}</b>
                       <small>{item.kind === 'checkin' ? 'Check-in · ' : ''}{new Date(item.createdAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</small>
                     </div>
-                    {item.incoming && <div className="vc-in"><span>They sent</span>{item.incoming}</div>}
-                    <div className="vc-out"><span>AI wrote</span>{item.draft}</div>
+                    {item.incoming
+                      ? <div className="vc-in"><span>They sent</span>{item.incoming}</div>
+                      : <div className="vc-in"><span>Check-in</span>The chat was quiet, so the AI texted them first</div>}
+                    <div className="vc-out"><span>AI replied as you</span>{item.draft}</div>
                     {item.final && item.final !== item.draft && <div className="vc-out sent"><span>Sent after the rule fix</span>{item.final}</div>}
                     {done ? (
                       <p className="vc-reveal">
-                        You said {done.label === 'send' ? "you'd send it" : "you wouldn't"}. The judge gave it <b>{done.score ?? '–'}</b>
-                        {done.issues?.length ? ` (${done.issues.join('; ')})` : ''}.
+                        You said <b>{done.label === 'send' ? 'Yes' : 'No'}</b>. The checker gave it <b>{done.score ?? '–'}/100</b>
+                        {done.score != null ? ` (it ${done.score >= (overview?.threshold || 65) ? 'would let it through' : 'would rewrite it'})` : ''}
+                        {done.issues?.length ? `: ${done.issues.join('; ')}` : ''}.
                       </p>
                     ) : (
                       <div className="vc-actions">
-                        <input className="bare-input" value={notes[item._id] || ''} onChange={e => setNotes(n => ({ ...n, [item._id]: e.target.value }))}
-                          placeholder="Why? (optional)" aria-label="Why" maxLength={300} />
-                        <button type="button" className="vc-btn no" onClick={() => label(item, 'nosend')}><X size={15} /> I wouldn't</button>
-                        <button type="button" className="vc-btn yes" onClick={() => label(item, 'send')}><Check size={15} /> I'd send this</button>
+                        <span className="vc-ask">Would you have sent this?</span>
+                        <button type="button" className="vc-btn no" onClick={() => label(item, 'nosend')}><X size={15} /> No, not me</button>
+                        <button type="button" className="vc-btn yes" onClick={() => label(item, 'send')}><Check size={15} /> Yes</button>
+                        <input className="bare-input vc-why" value={notes[item._id] || ''} onChange={e => setNotes(n => ({ ...n, [item._id]: e.target.value }))}
+                          placeholder="What is off? (optional, e.g. too formal, I would say da)" aria-label="What is off" maxLength={300} />
                       </div>
                     )}
                   </section>

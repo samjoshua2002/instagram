@@ -874,11 +874,19 @@ ${HUMAN_CHAT_RULES}
 - Never mention AI, settings, reminders or that time has passed in hours.
 Return JSON only: {"message": "<the text>", "question": "<the one question you asked, in plain words, or empty>"}`;
 
-    const messages = [{ role: 'system', content: systemPrompt }];
-    for (const msg of messageHistory || []) {
-      messages.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: maskForFilter(msg.text, 1) });
-    }
-    messages.push({ role: 'user', content: '[Write the check-in now as JSON.]' });
+    // The old chat is context only, given as a quoted transcript: passed as live turns, the model
+    // answered an old message instead of opening a new chat (e.g. "Yes I am going to die")
+    const transcript = (messageHistory || []).slice(-12)
+      .map(m => `${m.role === 'assistant' ? 'you' : 'them'}: ${maskForFilter(String(m.text || ''), 1).replace(/\s+/g, ' ').slice(0, 200)}`).join('\n');
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `${transcript ? `YOUR LAST CHAT WITH ${String(name).toUpperCase()} (hours ago, already finished; for context only, do NOT reply to any of it):
+<<<
+${transcript}
+>>>
+
+` : ''}Now the chat has been quiet for a while. Write a NEW message that starts a fresh conversation with them, the way you open chats. Return the JSON.` },
+    ];
     try {
       const out = await this.jsonWithFallback(TOP_MODEL, messages);
       let message = toHumanText(String(out?.message || '')).trim();

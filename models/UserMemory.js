@@ -160,6 +160,8 @@ const UserMemorySchema = new mongoose.Schema({
   },
   // Last check-in the AI started itself, and the one question it asked (answer is learned into memory)
   lastCheckInAt: { type: Date, default: null },
+  // Instagram refused the last check-in (e.g. outside its window): no new try for 24 hours
+  checkInFailedAt: { type: Date, default: null },
   pendingQuestion: {
     text: { type: String, default: '' },
     topic: { type: String, default: '' },

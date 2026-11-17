@@ -1455,3 +1455,14 @@ body.qz2-dragging, body.qz2-dragging * { cursor: grabbing !important; -webkit-us
 /* Mouse: the whole row can be dragged */
 @media (hover: hover) and (pointer: fine) { .qz2-rank li { cursor: grab; } .qz2-rank li button { cursor: pointer; } }
 .people-open-btn.compact { flex: none; padding: 4px 10px; border-radius: 8px; font-size: 0.72rem; min-height: 0; }
+
+.vc-help { font-size: 0.86rem; line-height: 1.5; color: var(--color-text-secondary); }
+.vc-help b { color: var(--color-text-primary); }
+.vc-ask { flex: 1 1 auto; font-weight: 700; font-size: 0.9rem; }
+.vc-actions .vc-why { flex: 1 1 100%; order: 3; }
+.vc-nums:has(> div:nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Quiz: shown while a new quiz is being written */
+.qz2-building { display: flex; align-items: flex-start; gap: 14px; }
+.qz2-building b { font-size: 1rem; }
+.qz2-building p { margin: 4px 0 0; }
