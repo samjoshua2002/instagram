@@ -2037,16 +2037,8 @@ function RelationshipsPageContent() {
                         e.stopPropagation();
                         setSelectedPerson(person);
                       }}
-                      style={{
-                        background: 'var(--color-text-primary)',
-                        color: 'var(--color-surface)',
-                        border: 'none',
-                        padding: '4px 9px',
-                        borderRadius: '5px',
-                        fontSize: '0.72rem',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
+                      type="button"
+                      className="people-open-btn compact"
                     >
                       Open →
                     </button>

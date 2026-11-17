@@ -1450,3 +1450,8 @@ img.qz2-dm-av { object-fit: cover; }
 .mention-name b, .mention-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mention-name b { font-size: 0.84rem; font-weight: 600; }
 .mention-name small { font-size: 0.72rem; color: var(--color-text-secondary); }
+/* While dragging a person in the ranking: no text selection, grabbing cursor everywhere */
+body.qz2-dragging, body.qz2-dragging * { cursor: grabbing !important; -webkit-user-select: none !important; user-select: none !important; }
+/* Mouse: the whole row can be dragged */
+@media (hover: hover) and (pointer: fine) { .qz2-rank li { cursor: grab; } .qz2-rank li button { cursor: pointer; } }
+.people-open-btn.compact { flex: none; padding: 4px 10px; border-radius: 8px; font-size: 0.72rem; min-height: 0; }

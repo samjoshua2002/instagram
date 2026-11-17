@@ -82,26 +82,13 @@ export default function PriorityRanker({ onSaved }) {
     }
     return document.scrollingElement;
   };
-  const onGripDown = (e, id) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { id, scroller: scrollParent(e.currentTarget), y: e.clientY, x: e.clientX, raf: 0 };
-    setDragId(id);
-    touch(id);
-    const edge = () => {
-      const d = drag.current;
-      if (!d) return;
-      const zone = 70;
-      const v = d.y < zone ? -(zone - d.y) / 4 : d.y > window.innerHeight - zone ? (d.y - (window.innerHeight - zone)) / 4 : 0;
-      if (v) d.scroller.scrollTop += v;
-      d.raf = requestAnimationFrame(edge);
-    };
-    drag.current.raf = requestAnimationFrame(edge);
-  };
+  // Pointer moves are followed on the whole window, not the handle: the dragged row is moved in the
+  // page as you drag, and moving an element drops the browser's pointer capture on it (that is
+  // why dragging used to stop after the first step)
   const onGripMove = e => {
     const d = drag.current;
     if (!d) return;
+    if (e.cancelable) e.preventDefault();
     d.x = e.clientX;
     d.y = e.clientY;
     const under = document.elementFromPoint(e.clientX, e.clientY);
@@ -118,10 +105,69 @@ export default function PriorityRanker({ onSaved }) {
     if (zone) { placeAt(d.id, null, true, zone.getAttribute('data-tier-drop')); setDirty(true); }
   };
   const onGripUp = () => {
-    if (drag.current?.raf) cancelAnimationFrame(drag.current.raf);
+    const d = drag.current;
+    if (!d) return;
+    cancelAnimationFrame(d.raf);
+    window.removeEventListener('pointermove', onGripMove);
+    window.removeEventListener('pointerup', onGripUp);
+    window.removeEventListener('pointercancel', onGripUp);
+    document.body.classList.remove('qz2-dragging');
     drag.current = null;
     setDragId(null);
   };
+  const startDrag = (id, scroller, x, y) => {
+    if (drag.current) onGripUp();
+    drag.current = { id, scroller, y, x, raf: 0 };
+    setDragId(id);
+    touch(id);
+    document.body.classList.add('qz2-dragging');
+    window.addEventListener('pointermove', onGripMove, { passive: false });
+    window.addEventListener('pointerup', onGripUp);
+    window.addEventListener('pointercancel', onGripUp);
+    // Near the top or bottom of the screen the list scrolls by itself
+    const edge = () => {
+      const d = drag.current;
+      if (!d) return;
+      const zone = 70;
+      const v = d.y < zone ? -(zone - d.y) / 4 : d.y > window.innerHeight - zone ? (d.y - (window.innerHeight - zone)) / 4 : 0;
+      if (v) d.scroller.scrollTop += v;
+      d.raf = requestAnimationFrame(edge);
+    };
+    drag.current.raf = requestAnimationFrame(edge);
+  };
+  // The handle: drag at once (mouse and touch; it takes the touch, so the page doesn't scroll)
+  const onGripDown = (e, id) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startDrag(id, scrollParent(e.currentTarget), e.clientX, e.clientY);
+  };
+  // The whole row, with a mouse or pen: the drag starts once it moves 5px, so clicks still work.
+  // On touch the row scrolls the page as usual; the handle is the way to drag.
+  const onRowDown = (e, id) => {
+    if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0)) return;
+    if (e.target.closest('button, input, a, select')) return;
+    e.preventDefault();
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const scroller = scrollParent(e.currentTarget);
+    const stop = () => {
+      window.removeEventListener('pointermove', pre);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+    const pre = ev => {
+      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      stop();
+      startDrag(id, scroller, ev.clientX, ev.clientY);
+      onGripMove(ev);
+    };
+    window.addEventListener('pointermove', pre);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  };
+  // Leaving the page mid-drag must not leave the listeners behind
+  useEffect(() => () => { if (drag.current) onGripUp(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const save = async () => {
     setSaving(true);
     const body = tiers.flatMap(t => t.list.map((p, i) => ({ senderId: p.senderId, priority: t.id, rank: i + 1, mine: mine.has(p.senderId) })));
@@ -149,9 +195,10 @@ export default function PriorityRanker({ onSaved }) {
           {t.list.length === 0 && <p className="qz2-measures">Nobody here yet.</p>}
           <ol className="qz2-rank">
             {t.list.map((p, i) => match(p) && (
-              <li key={p.senderId} data-rank-id={p.senderId} data-tier={t.id} className={dragId === p.senderId ? 'is-dragging' : ''}>
+              <li key={p.senderId} data-rank-id={p.senderId} data-tier={t.id} className={dragId === p.senderId ? 'is-dragging' : ''}
+                onPointerDown={e => onRowDown(e, p.senderId)} title="Drag to move">
                 <button type="button" className="qz2-grip" aria-label={`Drag to move ${p.name}`} title="Drag to move"
-                  onPointerDown={e => onGripDown(e, p.senderId)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}>
+                  onPointerDown={e => onGripDown(e, p.senderId)}>
                   <GripVertical size={16} />
                 </button>
                 <span className="qz2-rank-n">{i + 1}</span>
