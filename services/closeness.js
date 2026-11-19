@@ -125,8 +125,6 @@ function computeCloseness(p = {}, now = Date.now()) {
   return { score, level: levelOf(score), reasons };
 }
 
-const atLeast = (level, wanted) => (RANK[level] ?? 0) >= RANK[wanted];
-
 // Contact details that only close people get
 const PHONE_RE = /(?:\+?\d[\d\s().-]{7,}\d)/g;
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -181,6 +179,6 @@ function privacyRules(c, name = 'them') {
 }
 
 module.exports = {
-  computeCloseness, levelOf, atLeast, privacyRules, redactContactDetails, hasContactDetails,
+  computeCloseness, levelOf, privacyRules, redactContactDetails, hasContactDetails,
   PERSONAL_ASK_RE, RANK, LEVEL_SCORE,
 };

@@ -263,4 +263,4 @@ async function getVoiceBlock({ ownerId, contactId, creatorName = 'You', asOf = n
   }
 }
 
-module.exports = { getVoiceBlock, fingerprint, extractExchanges, describeFingerprint, tanglishHabit, isTanglish, rankSimilar, tokens, _cache: cache, _exchangeCache: exchangeCache };
+module.exports = { getVoiceBlock, fingerprint, extractExchanges, describeFingerprint, tanglishHabit, isTanglish, rankSimilar, tokens, _cache: cache };

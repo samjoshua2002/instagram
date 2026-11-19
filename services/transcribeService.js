@@ -77,4 +77,4 @@ function withTranscript(text, transcript) {
   return t.includes('[Sent a Voice message]') ? t.replace('[Sent a Voice message]', said) : `${t} ${said}`.trim();
 }
 
-module.exports = { transcribeUrl, withTranscript, extOf, _reset: () => { unavailableUntil = 0; found = null; } };
+module.exports = { transcribeUrl, withTranscript, extOf };

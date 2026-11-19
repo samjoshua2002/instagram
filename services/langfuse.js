@@ -161,4 +161,4 @@ async function flushLangfuse() {
   if (processor) await processor.forceFlush().catch(() => {});
 }
 
-module.exports = { traceOpenAI, traceGeneration, aiTask, instrument, annotate, flushLangfuse, scrub, langfuseEnabled: enabled };
+module.exports = { traceOpenAI, traceGeneration, aiTask, instrument, annotate, flushLangfuse, scrub };
