@@ -68,13 +68,56 @@ function similarity(a, b) {
   return both / Math.max(A.size, B.size);
 }
 
+// Words that carry no topic: greetings, "nothing much", "you tell", "hmm", "ok" (English + Tanglish)
+const FILLER_WORDS = new Set(('wassup wasup wsp sup whats what\'s wats wat wht up nothing nthg nthn nm nmu much same here ' +
+  'just chilling chillin chill you u ur tell me sollu nee neenga enna ena yenna da di bro dude machi macha machan mchn ' +
+  'ok okay k kk ya yeah yea yep yes no fine good gud too also what about wbu hbu hru how are r doing doin going on ' +
+  'hi hii hey heyy hello yo all set seri sari apdiya and then so lol').split(' '));
+const FILLER_SHAPES = /^(h+m+|a*ha(ha)+h?|he(he)+|lo+l|o+k+|y+a+|ye+a*h*|hi+|he+y+|su+p+|bro+|da+|hm+)$/;
+const LAUGH = /^(lo+l|a*ha(ha)+h?|he(he)+|lmao+|rofl|lmfao)$/;
+
+/** Pure: a message that says nothing new ("wassup", "nothing u tell", "hmm ok"). */
+function isFiller(text) {
+  const w = words(text);
+  return w.length > 0 && w.length <= 6 && w.every(x => FILLER_WORDS.has(x) || FILLER_SHAPES.test(x));
+}
+
+/**
+ * Pure: is the chat going nowhere? The last `n` messages (both sides) are all fillers.
+ * Two quiet people, or two AIs, then trade "wassup" / "nothing u tell" forever unless someone leads.
+ */
+function isStalled(history, n = 4) {
+  const last = (history || []).filter(m => m && String(m.text || '').trim()).slice(-n);
+  return last.length >= n
+    && last.some(m => m.role === 'assistant') && last.some(m => m.role !== 'assistant')
+    && last.every(m => isFiller(m.text));
+}
+
+/** System note for a stalled chat: stop trading fillers and lead with one real thing. '' when not stalled. */
+function stalledBlock(history) {
+  if (!isStalled(history)) return '';
+  return [
+    'THE CHAT IS GOING NOWHERE: the last few messages on both sides are only fillers ("wassup", "nothing u tell", "hmm").',
+    'Do NOT send another filler, and do not ask "wassup" / "what\'s up" / "you tell" / "wbu" again.',
+    'Lead like a friend who remembers: bring up ONE specific real thing, a thing from your earlier chats with them that was left open, something going on in their life from what you know about them, or something real from your own day (from your bio and chats only; never invent an event).',
+    'Say it in your own usual short style, for example a quick question about it ("did u finish that drawing?").',
+    'This overrides the rule to stop asking when their replies are short: their replies are short because nobody is bringing anything up.',
+  ].join('\n');
+}
+
 /**
  * Is this reply a near copy of one of the recent replies? Returns the copied reply, or null.
- * Very short replies ("lol", "fr") are allowed to recur; anything longer must not echo a recent one.
+ * A short reply may not be sent again word for word within the last few replies ("wassup" twice),
+ * except plain laughs ("lol", "haha"); anything longer must not echo a recent one.
  */
 function findRepeat(reply, history) {
   const w = words(reply);
-  if (w.length < 4) return null;
+  if (!w.length) return null;
+  if (w.length < 4) {
+    if (w.every(x => LAUGH.test(x))) return null;
+    const key = w.join(' ');
+    return recentReplies(history, 4).find(p => words(p).join(' ') === key) || null;
+  }
   const opener = w.slice(0, 3).join(' ');
   for (const prev of recentReplies(history, 12)) {
     const pw = words(prev);
@@ -85,4 +128,4 @@ function findRepeat(reply, history) {
   return null;
 }
 
-module.exports = { antiRepeatBlock, findRepeat, recentReplies, overused, similarity, words };
+module.exports = { antiRepeatBlock, findRepeat, isFiller, isStalled, stalledBlock, recentReplies, overused, similarity, words };

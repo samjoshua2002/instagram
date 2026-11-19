@@ -39,18 +39,24 @@ async function storeFile(url, filename, meta) {
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length || buf.length > MAX_FILE_BYTES) throw new Error(`size ${buf.length}`);
     const contentType = res.headers.get('content-type') || 'application/octet-stream';
-    const id = await new Promise((resolve, reject) => {
-      const up = bucket().openUploadStream(filename, { contentType, metadata: meta });
-      up.on('error', reject);
-      up.on('finish', () => resolve(up.id));
-      up.end(buf);
-    });
-    usage.bytes += buf.length;
-    return { fileId: id, contentType, bytes: buf.length };
+    return await storeBuffer(buf, filename, contentType, meta);
   } catch (err) {
     console.warn('⚠️ [Shared] Could not keep a file:', err.message);
     return null;
   }
+}
+
+/** Saves bytes we already have into GridFS. Returns { fileId, contentType, bytes }; throws on failure. */
+async function storeBuffer(buf, filename, contentType, meta) {
+  if (await storedBytes() >= MAX_TOTAL_BYTES) throw new Error('storage cap reached (200 MB)');
+  const id = await new Promise((resolve, reject) => {
+    const up = bucket().openUploadStream(filename, { contentType, metadata: meta });
+    up.on('error', reject);
+    up.on('finish', () => resolve(up.id));
+    up.end(buf);
+  });
+  usage.bytes += buf.length;
+  return { fileId: id, contentType, bytes: buf.length };
 }
 
 /** The page title of a link (og:title, then <title>), or ''. Small and quick: 5 s, first 300 KB. */
@@ -157,6 +163,12 @@ async function capture({ ownerId = null, senderId, name = '', text = '', attachm
         Object.assign(doc, await storeFile(att.url, `${senderId}-${mid || Date.now()}-${i}.${ext}`, { ownerId: String(ownerId || ''), senderId }) || {});
       }
       await SharedItem.create(doc);
+      // A sticker / meme / reaction GIF they sent may be worth reusing: offered to the vault (pending)
+      if (kind === 'photo' && doc.fileId && doc.description) {
+        require('./chatMediaVault').consider({
+          ownerId, senderId, name, fileId: doc.fileId, contentType: doc.contentType || '', description: doc.description,
+        }).catch(() => {});
+      }
     }
     // Words right after a photo / video / file belong to it ("this is my cat", "rate my drawing")
     if (clean && !(attachments || []).length) {
@@ -279,4 +291,4 @@ async function backfillDescriptions(limit = 20) {
   return done;
 }
 
-module.exports = { capture, openFile, storeFile, recentNeedsYou, recentSharedForPrompt, backfillDescriptions };
+module.exports = { capture, openFile, storeFile, storeBuffer, recentNeedsYou, recentSharedForPrompt, backfillDescriptions };

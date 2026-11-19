@@ -5,6 +5,9 @@ const repeatGuard = require('./repeatGuard');
 const voiceCheck = require('./voiceCheck');
 const correctionLearning = require('./correctionLearning');
 const styleCompare = require('./styleCompare');
+const { checkInGuide } = require('./checkInVoice');
+const songService = require('./songService');
+const humanPacing = require('../lib/humanPacing');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -227,6 +230,8 @@ class AzureOpenAIService {
     // Real texting data wins over generic style rules (emoji rate, capitals, length)
     const realVoice = voice?.fingerprint ? voice : null;
     const allowEmoji = !!(realVoice && realVoice.fingerprint.emojiShare >= 3);
+    // Which reactions are "you": from the emoji you type most (Instagram never reports your own taps)
+    const reactionHabitsLine = humanPacing.reactionHabits(realVoice?.fingerprint?.topEmoji || []).line;
     // They wrote Tanglish: answer in Tanglish only as often as the owner really did with them
     const tanglishHabit = realVoice?.tanglish;
     const allowTanglish = !!(tanglishHabit && tanglishHabit.rate > 0 && voiceService.isTanglish(incomingText) &&
@@ -533,6 +538,16 @@ REACTION GIFS & MEDIA ATTACHMENTS (SPARSE & OCCASIONAL — RATE LIMITED & PACED 
 - DASHBOARD CATEGORIES & HOW THEY CONNECT TO THE HUMAN'S CHAT:
 ${categoriesMappingPrompt || availableCategoriesStr}
 - SYNTAX: Append [ATTACHMENT: <category>] at the very end of your message when the human's message calls for it.
+
+REACTIONS (like long-pressing their message and picking an emoji):
+- When there's nothing to add, a real person just reacts instead of answering: an "ok", "gn", "hmm", a laugh, a thanks, a meme or reel that needs no words, or the natural end of a chat. Then reply with only [REACT: <reaction>].
+- Pick the reaction that fits what they sent: laugh 😂 (something funny), love ❤️ (sweet, thanks, gn, good news), wow 😮 (surprising), sad 😢 (bad news, said lightly), like 👍 (ok / done / plans confirmed), angry 😡 (only playful, for banter).
+${reactionHabitsLine ? `- ${reactionHabitsLine}\n` : ''}- You can also react and still reply: put the tag before your words ("[REACT: laugh] bro what 💀").
+- Never only react when they asked something, are telling you something real, or are upset: answer in words. Now and then, not on every message.
+
+SONGS (sent as a link that opens in Spotify / YouTube / Apple Music):
+- Only when they ask for a song or what you're listening to, or you're really recommending one in the chat: add [SONG: artist - title] at the end of your message (e.g. "this one's on repeat [SONG: Anirudh - Arabic Kuthu]").
+- A real song you'd actually like (from your bio and chats). At most one, and not in every chat. Never just to fill a quiet chat.
 - REACTION MEDIA STYLE: Real-life pop-culture memes & funny GIFs (e.g. Leonardo DiCaprio laughing, Chloe side-eye, The Rock, El Risitas) from GIPHY/vault.
 ${ORIGINAL_OWNER_HANDLES.includes(String(config.instagramHandle || '').toLowerCase()) ? `
 ${ORIGINAL_OWNER_KNOWLEDGE}
@@ -583,6 +598,13 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
     const antiRepeat = repeatGuard.antiRepeatBlock(effectiveHistory);
     if (antiRepeat) messages.splice(1, 0, { role: 'system', content: antiRepeat });
 
+    // Both sides only trading fillers ("wassup" / "nothing u tell"): lead with one real thing.
+    // Placed right before their message so it outweighs the "keep it short, ask little" style rules.
+    const lastSaved = (effectiveHistory || []).slice(-1)[0];
+    const incomingSaved = lastSaved && lastSaved.role !== 'assistant' && incomingLines.has(String(lastSaved.text || '').trim());
+    const stalled = repeatGuard.stalledBlock(incomingSaved ? effectiveHistory : [...(effectiveHistory || []), { role: 'user', text: incomingText }]);
+    if (stalled) messages.push({ role: 'system', content: stalled });
+
     // Add current incoming message
     messages.push({
       role: 'user',
@@ -606,6 +628,26 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       }
 
       reply = String(reply ?? '').trim();
+
+      // A reaction instead of (or before) words: [REACT: laugh]. Taken out here and put back at the very
+      // end, so the repeat and voice checks only see the words. Only a reaction is refused when they
+      // asked something, wrote a lot, or the last turn was already only a reaction: then it writes words.
+      const reaction = humanPacing.reactionOf(reply);
+      let reactToo = !!reaction;
+      reply = humanPacing.stripReactTag(reply);
+      if (reactToo && !reply && !humanPacing.mayReactOnly({ incomingText, history: effectiveHistory })) {
+        const words = [
+          ...messages.slice(0, -1),
+          { role: 'system', content: 'Do not only react this time (they asked something, said a lot, or you only reacted last time). Reply to their latest message in words, in your usual style.' },
+          messages[messages.length - 1],
+        ];
+        reply = humanPacing.stripReactTag(String((await this.completeWithFilterRetry(selectedModel, words, { maxTokens: 220, temperature: 0.9 })) ?? ''));
+        reactToo = false;
+      }
+      if (reactToo && !reply) {
+        console.log(`${humanPacing.REACTIONS[reaction]} [React] Nothing to add for ${userMemory.username || userMemory.senderId}: only a reaction.`);
+        return `[REACT: ${reaction}]`;
+      }
 
       // A near copy of something already said to them: write it again, differently (once)
       let regenerated = false;
@@ -655,6 +697,7 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         documentsUsed: Boolean(knowledge?.context),
         socialGraphUsed: Boolean(socialTreeContext),
         antiRepeatNote: Boolean(antiRepeat),
+        stalledChatNote: Boolean(stalled),
         regeneratedBecauseRepeat: regenerated,
         voiceScore: voiceVerdict?.score ?? null,
         voiceIssues: voiceVerdict?.issues?.length ? voiceVerdict.issues : null,
@@ -671,6 +714,10 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       if (reply.startsWith(`${config.creatorName}:`)) {
         reply = reply.replace(`${config.creatorName}:`, '').trim();
       }
+
+      // A song the AI wants to send ([SONG: artist - title]): taken out now, sent as a link at the end
+      const song = songService.takeSongTag(reply);
+      reply = song.text;
 
       // Preserve attachment tag if present
       const attachmentMatch = reply.match(/(\[(?:STICKER|ATTACHMENT):\s*[a-zA-Z0-9_-]+\])/i);
@@ -710,7 +757,10 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
       const body = tag ? reply.slice(0, -tag.length) : reply;
       const keepEmoji = allowEmoji && (!/[\p{L}\p{N}]/u.test(body) ||
         this.random() < Math.min(1, realVoice.fingerprint.emojiShare / 100));
-      reply = toHumanText(body, { keepEmoji }) + tag;
+      reply = toHumanText(body, { keepEmoji });
+      if (song.query) reply = await songService.withSongLink(`${reply} [SONG: ${song.query}]`);
+      reply += tag;
+      if (reactToo) reply = `[REACT: ${reaction}] ${reply}`;
 
       return reply;
     } catch (err) {
@@ -837,7 +887,7 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
       .catch(() => null);
     const name = userMemory.nickname || userMemory.name || userMemory.username || 'them';
     const learnedRules = (await correctionLearning.activeBlock(userMemory.ownerId || null, userMemory.senderId).catch(() => ''))
-      + (await styleCompare.autoBlock(userMemory.ownerId || null).catch(() => ''));
+      + (await styleCompare.autoBlock(userMemory.ownerId || null, { checkIn: true }).catch(() => ''));
     // Same style rules as normal replies: the owner's own Tanglish and emoji are allowed when their
     // real openers / texting use them (the strict English-only, no-emoji rules are for business)
     const { isTanglish } = require('./voiceService');
@@ -849,20 +899,15 @@ Only return the message text. No quotation marks, no name prefix, no attachment 
       .filter(Boolean).map(x => c(x, 40));
     const systemPrompt = `You are ${config.creatorName}. The chat with ${name} went quiet and you text them first on Instagram DM, the way YOU always do.
 
-${openers.length ? `HOW YOU REALLY START A CHAT WITH ${String(name).toUpperCase()} (your own messages after a quiet gap; this is the most important part):
+${openers.length ? `HOW YOU REALLY START A CHAT WITH ${String(name).toUpperCase()} (your own messages after a quiet gap; copy how they are written):
 ${quote(openers)}
 ` : ''}${openersElse.length ? `HOW YOU START CHATS WITH YOUR OTHER PEOPLE:
 ${quote(openersElse)}
 ` : ''}${nicknames.length ? `WHAT YOU CALL THEM / HOW YOU GREET THEM: ${[...new Set(nicknames)].map(x => `"${x}"`).join(', ')}
 ` : ''}
-WRITE IT EXACTLY LIKE THOSE OPENERS:
-- Same greeting words, same nickname for them, same casing, spelling, language, emoji (or none) and length.
-- If your openers are short ("hi how are you", "hola shorty"), yours is short too. No long friendly paragraph.
-- Then, only if it fits naturally, one small casual question${ask?.hint ? ` (a good one: ${ask.hint})` : ''}. Ask it like you would, never like a survey or an interview.
-- Never sound like a customer-service bot or a therapist: no "just checking in", "hope you're doing well", "how have you been holding up", "I was thinking about you".
-- Never needy or guilt-tripping, never "why didn't you reply".
+${checkInGuide({ askHint: ask?.hint || '' })}
 
-${learnedRules}${memoryDoc ? `WHAT YOU KNOW ABOUT THEM (use at most one real thing, only if natural):
+${learnedRules}${memoryDoc ? `WHAT YOU KNOW ABOUT THEM (pick at most one thing to follow up on):
 ${String(memoryDoc).slice(0, 2500)}
 ` : ''}${facts ? `FACTS:
 ${facts}
@@ -890,12 +935,12 @@ Return JSON only: {"message": "<the text>", "question": "<the one question you a
       .map(m => `${m.role === 'assistant' ? 'you' : 'them'}: ${maskForFilter(String(m.text || ''), 1).replace(/\s+/g, ' ').slice(0, 200)}`).join('\n');
     const messages = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: `${transcript ? `YOUR LAST CHAT WITH ${String(name).toUpperCase()} (hours ago, already finished; for context only, do NOT reply to any of it):
+      { role: 'user', content: `${transcript ? `YOUR LAST CHAT WITH ${String(name).toUpperCase()} (hours ago, already finished; don't reply to it as if it were new, but look in it for something to follow up on):
 <<<
 ${transcript}
 >>>
 
-` : ''}Now the chat has been quiet for a while. Write a NEW message that starts a fresh conversation with them, the way you open chats. Return the JSON.` },
+` : ''}Now the chat has been quiet for a while. Write a NEW message that starts a fresh conversation with them: follow up on something from that chat or their life if there is something, written the way you open chats. Return the JSON.` },
     ];
     try {
       const out = await this.jsonWithFallback(TOP_MODEL, messages);

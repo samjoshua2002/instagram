@@ -7,8 +7,8 @@
  * - Small differences are ignored (content-only or near-identical: weak evidence).
  * - A bigger one is explained by a fast model as one short style rule, matched against the rules
  *   already seen, so repeats count up instead of piling up.
- * - A rule becomes active (used in replies and check-ins) only after 3 takeovers agree and no
- *   later one contradicts it; contradicted rules are retired.
+ * - A rule becomes active (used in replies and check-ins) once agreeing takeovers outnumber
+ *   contradicting ones by 3; rules contradicted as often as they are confirmed are retired.
  * Only the owner's own typed messages are learned from, never the AI's.
  */
 const StylePreference = require('../models/StylePreference');
@@ -39,8 +39,19 @@ function editRatio(a, b) {
 /** Pure: the new state of a rule after one more agreeing or contradicting takeover. */
 function nextStatus({ support = 0, contradictions = 0, status = 'candidate' }) {
   if (contradictions > 0 && contradictions >= support) return 'retired';
-  if (support >= PROMOTE_AT && contradictions === 0) return 'active';
-  return status === 'active' && contradictions > 0 ? 'candidate' : (status === 'retired' ? 'retired' : 'candidate');
+  // Active once agreeing takeovers outnumber contradicting ones by PROMOTE_AT (3-0, 4-1, 7-1...):
+  // one odd takeover can't block a rule you keep confirming, and can't push in a new one either
+  if (support - contradictions >= PROMOTE_AT) return 'active';
+  return status === 'retired' ? 'retired' : 'candidate';
+}
+
+/** Re-applies nextStatus to the owner's saved rules (rules saved under an older promotion rule). */
+async function refreshStatuses(ownerId) {
+  const rules = await StylePreference.find({ ownerId, status: { $ne: 'retired' } })
+    .select('support contradictions status').lean();
+  const changed = rules.filter(r => nextStatus(r) !== r.status);
+  await Promise.all(changed.map(r => StylePreference.updateOne({ _id: r._id }, { $set: { status: nextStatus(r) } })));
+  return changed.length;
 }
 
 async function bump(id, field, example) {
@@ -102,4 +113,4 @@ async function activeBlock(ownerId, senderId = '') {
   return `YOUR CONFIRMED TEXTING RULES (learned from times you replied yourself instead of the AI; follow them):\n${rules.map(r => `- ${r.text}`).join('\n')}\n`;
 }
 
-module.exports = { record, activeBlock, editRatio, nextStatus, MIN_EDIT_RATIO, PROMOTE_AT };
+module.exports = { record, activeBlock, editRatio, nextStatus, refreshStatuses, MIN_EDIT_RATIO, PROMOTE_AT };

@@ -19,6 +19,8 @@ const MediaVault = require('./models/MediaVault');
 const instagramService = require('./services/instagramService');
 const transcribeService = require('./services/transcribeService');
 const { expandMentions } = require('./lib/mentions');
+const incomingMedia = require('./lib/incomingMedia');
+const humanPacing = require('./lib/humanPacing');
 const mediaService = require('./services/mediaService');
 const azureOpenAI = require('./services/azureOpenAI');
 const { creatorIdentity } = require('./services/creatorIdentity');
@@ -297,6 +299,25 @@ app.use('/uploads', express.static(uploadsDir, {
   },
 }));
 
+// Reaction images saved from chats (services/chatMediaVault.js): public, because Instagram fetches the
+// image from this link when the AI sends it. Only vault items saved from chats, found by their
+// unguessable token; only image types are ever served.
+app.get('/vault-media/:token', async (req, res) => {
+  try {
+    const token = String(req.params.token || '');
+    if (!/^[a-f0-9]{36}$/.test(token)) return res.sendStatus(404);
+    const item = await MediaVault.findOne({ publicToken: token, source: 'chat' }, { fileId: 1, contentType: 1 }).lean();
+    if (!item?.fileId) return res.sendStatus(404);
+    const type = /^image\/(png|jpe?g|gif|webp)$/i.test(item.contentType || '') ? item.contentType : 'image/jpeg';
+    res.setHeader('Content-Type', type);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    importantService.openFile(item.fileId).on('error', () => { if (!res.headersSent) res.sendStatus(404); else res.end(); }).pipe(res);
+  } catch (_) {
+    res.sendStatus(404);
+  }
+});
+
 // Authentication & Passkey Endpoints
 app.use('/api/auth', authRouter);
 
@@ -544,7 +565,7 @@ function parseIncomingEventMessage(msg) {
       const type = (att.type || '').toLowerCase();
       const url = att.payload?.url || '';
       const title = att.payload?.title || att.payload?.caption || att.payload?.name || '';
-      if (url) attachmentList.push({ type, url, title });
+      if (url) attachmentList.push({ type, url, title, isSticker: incomingMedia.isSticker(att) });
 
       if (type === 'ig_reel' || type === 'reel' || url.includes('/reel/') || url.includes('/reels/')) {
         isReelOrShare = true;
@@ -566,7 +587,7 @@ function parseIncomingEventMessage(msg) {
         mediaTitle = 'Mentioned you in their Story';
       } else if (type === 'image') {
         isMedia = true;
-        mediaTitle = 'Photo';
+        mediaTitle = incomingMedia.isSticker(att) ? 'Sticker' : 'Photo';
       } else if (type === 'video') {
         isMedia = true;
         mediaTitle = 'Video';
@@ -595,8 +616,17 @@ function parseIncomingEventMessage(msg) {
     text = text ? `${text} [Sent a ${mediaTitle}]` : `[Sent a ${mediaTitle}]`;
   }
 
-  // If there's neither text nor post/reel/story, skip
-  if (!text) return null;
+  // Attachments with no rule (stickers, hearts, new types): log their shape (never content or links)
+  // so they can be supported, and keep the message instead of dropping it silently
+  const unknown = incomingMedia.unknownAttachments(msg);
+  if (unknown.length) console.log(`🧩 [Unknown attachment]: ${JSON.stringify(unknown.map(incomingMedia.shapeOf))}`);
+  if (!text) text = incomingMedia.placeholderFor(msg);
+
+  // Nothing at all to show: log which fields the message had (names only), then skip
+  if (!text) {
+    console.log(`🧩 [Empty message skipped]: fields=${Object.keys(msg).sort().join(',')}`);
+    return null;
+  }
 
   return { text, isReelOrShare, reelTitle: mediaTitle, isStoryReply, isNoteReply, audioUrl, attachments: attachmentList };
 }
@@ -762,8 +792,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     event.message.text = transcribeService.withTranscript(event.message.text, transcript);
   }
   // Photos and videos: the AI looks at them (video: a few frames) and answers what it sees
-  for (const att of (event.message.attachmentList || []).filter(a => a.type === 'image' || a.type === 'video').slice(0, 3)) {
-    const kind = att.type === 'video' ? 'video' : 'photo';
+  // Stickers too (some arrive as their own type), so the AI knows what the sticker shows
+  for (const att of (event.message.attachmentList || []).filter(a => ['image', 'video', 'sticker', 'animated_image'].includes(a.type)).slice(0, 3)) {
+    const kind = att.type === 'video' ? 'video' : (att.type === 'image' && !att.isSticker ? 'photo' : 'sticker');
     const description = await mediaService.describeUrl(att.url, kind);
     att.description = description || '';
     event.message.text = mediaService.withDescription(event.message.text, kind, description);
@@ -1002,16 +1033,26 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     existing.messages.push({ text: messageText, mid });
     existing.lastMid = mid;
 
-    console.log(`⏳ [Anti-Spam / Debounce]: User ${senderId} sent another message (${existing.messages.length} queued). Holding on for ${DEBOUNCE_WAIT_MS / 1000}s...`);
+    // Back-to-back messages wait the quick 1 s; a burst being answered "later" keeps its deadline
+    const waitMs = humanPacing.joinWaitMs(existing.holdUntil);
+    console.log(`⏳ [Anti-Spam / Debounce]: User ${senderId} sent another message (${existing.messages.length} queued). Holding on for ${Math.round(waitMs / 1000)}s...`);
 
     existing.timer = setTimeout(() => {
       userDebounceQueues.delete(queueKey);
       dispatchDebouncedReply(existing).catch(err => {
         console.error('❌ Error dispatching debounced reply:', err);
       });
-    }, DEBOUNCE_WAIT_MS);
+    }, waitMs);
     return;
   }
+
+  // Now and then a personal chat is answered later, in one go, like someone who checks their phone
+  // after a while (BATCH_REPLY_CHANCE, default 0.2; 0 turns it off)
+  const holdMs = humanPacing.clusterHoldMs({
+    chance: humanPacing.laterChance(),
+    isBusiness: celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType),
+  });
+  if (holdMs > DEBOUNCE_WAIT_MS) console.log(`📦 [Answer Later]: Replying to ${senderId} in ${Math.round(holdMs / 1000)}s, together with anything else they send.`);
 
   // First message in a potential cluster: start debounce window
   const queueEntry = {
@@ -1025,6 +1066,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     config,
     messages: [{ text: messageText, mid }],
     lastMid: mid,
+    holdUntil: Date.now() + holdMs,
     timer: null,
   };
 
@@ -1034,7 +1076,7 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     dispatchDebouncedReply(queueEntry).catch(err => {
       console.error('❌ Error dispatching debounced reply:', err);
     });
-  }, DEBOUNCE_WAIT_MS);
+  }, holdMs);
 }
 
 /**
@@ -1156,8 +1198,15 @@ async function writeAndSendReply(queueEntry, flight) {
       replyText = fallbackReply;
       aiFailed = true;
     }
+    if (!String(replyText || '').trim()) aiFailed = true;
 
-    if (!replyText || replyText.trim().length === 0) {
+    // ❤️ their message, like a double tap: the AI chose it ([REACT], alone or with words), or in a
+    // personal chat the AI failed (a heart beats a canned "yoo wassup!" in the middle of a chat)
+    const reactPlan = humanPacing.planReaction({ replyText, aiFailed, isBusiness: isBusinessTenant, lastMid });
+    const reactOnly = reactPlan.reactOnly;
+    replyText = reactPlan.text;
+
+    if (!reactOnly && (!replyText || replyText.trim().length === 0)) {
       replyText = fallbackReply;
       aiFailed = true;
     }
@@ -1196,7 +1245,7 @@ async function writeAndSendReply(queueEntry, flight) {
 
     // 3. SPORADIC MEDIA DISPATCH (Only when Governor permits):
     // Cadence: Reply 2 or 3 text messages in a row, then ~1 in 6 random chance ("bullet in trigger out of 6") or high-confidence reaction
-    if (!isBusinessTenant && enabledFeatures.mediaStickerVault && !stickerType && canSendMedia(mediaKey, isExplicitMediaRequest)) {
+    if (!reactOnly && !isBusinessTenant && enabledFeatures.mediaStickerVault && !stickerType && canSendMedia(mediaKey, isExplicitMediaRequest)) {
       let detectedCat = null;
       if (isExplicitMediaRequest) {
         detectedCat = 'joy';
@@ -1222,7 +1271,7 @@ async function writeAndSendReply(queueEntry, flight) {
     if (isBusinessTenant || !enabledFeatures.mediaStickerVault) stickerType = null;
     if (stickerType && !stickerService.hasSticker(stickerType)) stickerType = null;
     // A reply that was only a sticker tag, with the sticker then held back, must still say something
-    if (!stickerType && !String(replyText || '').trim()) replyText = fallbackReply;
+    if (!reactOnly && !stickerType && !String(replyText || '').trim()) replyText = fallbackReply;
 
     // Fast replies (2026-11-05): the AI call is already the wait, so only a tiny typing pause is added.
     // - Emojis / reactions (<= 4 chars or pure emoji): 300ms
@@ -1281,6 +1330,23 @@ async function writeAndSendReply(queueEntry, flight) {
       console.log(`⏸️ AI was switched off for ${senderId} while typing; not sending.`);
       await afterTurn('');
       return;
+    }
+
+    // The reaction goes on their latest message first (before any words, like a person would)
+    if (reactPlan.react && !flight.cancelled) {
+      const reacted = await instagramService.sendMessageReaction(senderId, lastMid, reactPlan.reaction || 'love', creatorAccessToken);
+      if (reactOnly) {
+        if (reacted) {
+          console.log(`${humanPacing.REACTIONS[reacted] || '❤️'} [React Only]: Reacted to ${senderId}'s message instead of replying${aiFailed ? ' (the AI could not write a reply)' : ''}.`);
+          // Kept in the history so the AI knows it already reacted (and won't only react twice in a row)
+          await Message.create({
+            ownerId: ownerUser?._id || null, senderId: recipientId, recipientId: senderId, role: 'assistant',
+            text: humanPacing.reactRecord(reacted), mid: `react_${Date.now()}`, sentByAI: true, timestamp: new Date(),
+          }).catch(err => console.warn('⚠️ [React Only] Could not save the reaction:', err.message));
+        }
+        await afterTurn('');
+        return;
+      }
     }
 
     // Never agree for the owner: if they just asked for something that needs the owner and the
@@ -2648,6 +2714,21 @@ app.put('/api/media-vault/:id', async (req, res) => {
     const updated = await MediaVault.findOneAndUpdate(query, update, { returnDocument: 'after' });
     if (!updated) return res.status(404).json({ error: 'Media not found or unauthorized' });
     res.json({ success: true, item: updated });
+  } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+// Keep a reaction image saved from a chat: from now on the AI may send it
+app.post('/api/media-vault/:id/keep', async (req, res) => {
+  try {
+    const item = await MediaVault.findOneAndUpdate(
+      { _id: req.params.id, ...ownedBy(req), reviewStatus: 'pending' },
+      { $set: { reviewStatus: 'approved' } },
+      { returnDocument: 'after' },
+    );
+    if (!item) return res.status(404).json({ error: 'Media not found or already kept' });
+    res.json({ success: true, item });
   } catch (err) {
     sendServerError(res, err);
   }

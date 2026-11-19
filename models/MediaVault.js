@@ -54,6 +54,25 @@ const mediaVaultSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Saved from a chat (a sticker / meme / reaction GIF someone sent): waits for the owner's Keep
+  // before the AI may send it. Uploads are approved as before.
+  reviewStatus: {
+    type: String,
+    enum: ['approved', 'pending'],
+    default: 'approved',
+    index: true,
+  },
+  source: {
+    type: String,
+    enum: ['upload', 'chat'],
+    default: 'upload',
+  },
+  fileId: { type: mongoose.Schema.Types.ObjectId, default: null },   // our permanent copy (GridFS 'shared')
+  contentType: { type: String, default: '' },
+  contentHash: { type: String, default: '', index: true },          // the same sticker is saved once
+  publicToken: { type: String, default: '', index: true },          // unguessable id in its public link
+  fromSenderId: { type: String, default: '' },
+  fromName: { type: String, default: '' },
   createdAt: {
     type: Date,
     default: Date.now

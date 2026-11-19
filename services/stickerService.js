@@ -450,7 +450,8 @@ class StickerService {
 
     // 1. FIRST PRIORITY: User's custom uploaded media in MongoDB MediaVault
     try {
-      const ownerQuery = vaultOwnerQuery(user);
+      // Images saved from chats are only used after the owner tapped Keep
+      const ownerQuery = { ...vaultOwnerQuery(user), reviewStatus: { $ne: 'pending' } };
       let allVaultItems = await MediaVault.find(ownerQuery);
       const isStock = it => /(^|\.)(giphy|tenor)\.com\//i.test(String(it?.url || '').replace(/^https?:\/\//, ''));
       // Auto-seed predefined catalog if vault is empty for system

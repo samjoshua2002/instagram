@@ -79,4 +79,22 @@ async function openersAcross(ownerId, exceptId = '', limit = 10) {
   return list.filter(x => x.senderId !== String(exceptId)).slice(-limit).map(x => x.text);
 }
 
-module.exports = { pickOpeners, openersWith, openersAcross, GAP_HOURS };
+/**
+ * Pure: what a check-in should say. A friend who texts first follows up on something real ("did u
+ * finish the drawing?") before falling back to a plain greeting; the owner's openers decide only
+ * HOW it is written (words, casing, language, length), not that it must be a bare "wassup".
+ */
+function checkInGuide({ askHint = '' } = {}) {
+  return `WHAT TO SAY (like a friend who remembers what you talked about):
+1. First look for something to follow up on: something from your last chat that was left open (a thing they were about to do, were doing, worried about or planned, like an exam, a drawing, a trip, an interview, a match), or something going on in their life from what you know below. If there is one, the message is about THAT: ask how it went or how it's going, the way you would ("did u finish the drawing?", "how was the exam da").
+2. Only if there is nothing worth following up, open the way your openers do${askHint ? `, and if it fits ask one small casual thing (a good one: ${askHint})` : ''}.
+- Follow up only on things that are really in the chat or in what you know. Never invent an event.
+- Don't answer an old message as if they just sent it: follow up on it as something from before ("how did it go", not "all the best").
+- Ask it like you would, never like a survey or an interview. One question at most.
+
+HOW TO WRITE IT: exactly like your openers above. Same greeting words, same nickname for them, same casing, spelling, language, emoji (or none) and length. If your openers are short, yours is short too. No long friendly paragraph.
+- Never sound like a customer-service bot or a therapist: no "just checking in", "hope you're doing well", "how have you been holding up", "I was thinking about you".
+- Never needy or guilt-tripping, never "why didn't you reply".`;
+}
+
+module.exports = { pickOpeners, openersWith, openersAcross, checkInGuide, GAP_HOURS };

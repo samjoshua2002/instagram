@@ -19,6 +19,21 @@ import '../split.css';
  */
 const when = d => (d ? new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '');
 
+// You vs the AI table: [label, field, unit]
+const COMPARE_ROWS = [
+  ['Words per message', 'avgWords', ''],
+  ['Tanglish', 'tanglish', '%'],
+  ['Emoji', 'emoji', '%'],
+  ['Starts lowercase', 'lowercase', '%'],
+  ['Asks a question', 'questions', '%'],
+];
+
+// Instagram reaction names -> the emoji shown
+const REACTION_EMOJI = { love: '❤️', laugh: '😂', wow: '😮', sad: '😢', angry: '😡', like: '👍' };
+
+// A learned rule that is not in use yet: how your takeovers voted on it
+const votes = rule => `${rule.support} agree${rule.contradictions ? `, ${rule.contradictions} against` : ''}`;
+
 export default function VoicePage() {
   const { API_BASE, showToast } = useApp();
   const [tab, setTab] = useState('summary');
@@ -137,17 +152,32 @@ export default function VoicePage() {
                     ))}
                   </ul>
                 )}
-                {st?.enough && (
+                {st?.enough && st.you && (
+                  <div className="vc-compare-wrap">
                   <table className="vc-compare">
-                    <thead><tr><th /><th>You</th><th>AI</th></tr></thead>
+                    <thead>
+                      <tr>
+                        <th /><th>You</th><th>AI replies</th>
+                        {st.checkIns && <><th>How you start chats</th><th>AI check-ins</th></>}
+                      </tr>
+                    </thead>
                     <tbody>
-                      <tr><td>Words per message</td><td>{st.you.avgWords}</td><td>{st.ai.avgWords}</td></tr>
-                      <tr><td>Tanglish</td><td>{st.you.tanglish}%</td><td>{st.ai.tanglish}%</td></tr>
-                      <tr><td>Emoji</td><td>{st.you.emoji}%</td><td>{st.ai.emoji}%</td></tr>
-                      <tr><td>Starts lowercase</td><td>{st.you.lowercase}%</td><td>{st.ai.lowercase}%</td></tr>
-                      <tr><td>Asks a question</td><td>{st.you.questions}%</td><td>{st.ai.questions}%</td></tr>
+                      {COMPARE_ROWS.map(([label, key, unit]) => (
+                        <tr key={key}>
+                          <td>{label}</td>
+                          <td>{st.you[key]}{unit}</td>
+                          <td>{st.ai ? `${st.ai[key]}${unit}` : '–'}</td>
+                          {st.checkIns && <><td>{st.openers ? `${st.openers[key]}${unit}` : '–'}</td><td>{st.checkIns[key]}{unit}</td></>}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
+                  </div>
+                )}
+                {st?.reactions?.length > 0 && (
+                  <p className="vc-muted vc-foot">
+                    Reactions the AI uses for you: <b>{st.reactions.map(r => REACTION_EMOJI[r] || '').join(' ')}</b>, from the emoji you type most (Instagram doesn&apos;t tell apps which reactions you tap yourself).
+                  </p>
                 )}
                 <p className="vc-muted vc-foot">From every chat, AI on or off, including when you reply in between. Updated every few hours{st?.at ? `, last ${when(st.at)}` : ''}.</p>
               </section>
@@ -176,14 +206,14 @@ export default function VoicePage() {
               <section className="split-card">
                 <p className="vc-muted">
                   When the AI has a reply ready and you type your own instead, it works out what you did differently.
-                  A rule is used only after {learned?.promoteAt || 3} of your takeovers agree, and dropped if later ones go against it.
+                  A rule is used once {learned?.promoteAt || 3} more of your takeovers agree with it than go against it, and dropped if as many go against it as agree.
                 </p>
               </section>
               {learned?.rules?.length === 0 && <section className="split-card"><p className="vc-muted">Nothing learned yet. Reply yourself sometimes while the AI is on, and it learns from the difference.</p></section>}
               {learned?.rules?.map(rule => (
                 <section key={rule._id} className={`split-card vc-rule ${rule.status}`}>
                   <div className="vc-rule-head">
-                    <span className={`vc-chip ${rule.status}`}>{rule.status === 'active' ? 'In use' : `Seen ${rule.support} of ${learned.promoteAt}`}</span>
+                    <span className={`vc-chip ${rule.status}`}>{rule.status === 'active' ? 'In use' : votes(rule)}</span>
                     <small>{rule.senderId ? `Only with ${rule.contactName || 'one person'}` : 'With everyone'}</small>
                     <button type="button" className="vc-icon" onClick={() => forget(rule)} aria-label="Forget this rule" title="Forget this rule"><Trash2 size={15} /></button>
                   </div>
@@ -233,7 +263,7 @@ export default function VoicePage() {
                     )}
                     {done ? (
                       <p className="vc-reveal">
-                        {done.label === 'send' ? <>Marked <b>looks right</b>.</> : <>Saved <b>your version</b>{done.rule ? `: it noticed "${done.rule.text}" (${done.rule.status === 'active' ? 'now in use' : `seen ${done.rule.support} of 3`})` : ''}.</>}
+                        {done.label === 'send' ? <>Marked <b>looks right</b>.</> : <>Saved <b>your version</b>{done.rule ? `: it noticed "${done.rule.text}" (${done.rule.status === 'active' ? 'now in use' : votes(done.rule)})` : ''}.</>}
                         {' '}The checker gave the AI's reply <b>{done.score ?? '–'}/100</b>.
                       </p>
                     ) : fixing[item._id] !== undefined ? (

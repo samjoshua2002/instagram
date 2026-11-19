@@ -162,3 +162,20 @@ test('cleanPhotoIds keeps real ids only, once each, at most 25', () => {
   assert.deepStrictEqual(cleanPhotoIds(undefined), []);
   assert.strictEqual(cleanPhotoIds(Array.from({ length: 40 }, (_, i) => `id${1000 + i}`)).length, 25);
 });
+
+test('incoming stickers and unknown attachments are kept with a placeholder, never dropped', () => {
+  const { placeholderFor, unknownAttachments, shapeOf, isSticker } = require('../lib/incomingMedia');
+  assert.strictEqual(placeholderFor({ attachments: [{ type: 'sticker', payload: { url: 'https://x/y.webp' } }] }), '[Sent a Sticker]');
+  assert.strictEqual(placeholderFor({ attachments: [{ type: 'image', payload: { url: 'u', sticker_id: 369239263222822 } }] }), '[Sent a Sticker]');
+  assert.strictEqual(placeholderFor({ attachments: [{ type: 'like_heart' }] }), '[Sent a ❤️]');
+  assert.strictEqual(placeholderFor({ attachments: [{ type: 'animated_thing', payload: {} }] }), '[Sent an attachment]');
+  assert.strictEqual(placeholderFor({ text: 'hi' }), '');
+  assert.strictEqual(isSticker({ type: 'image', payload: { url: 'u' } }), false);
+  // Known types are not reported; stickers and new types are
+  assert.deepStrictEqual(unknownAttachments({ attachments: [{ type: 'image', payload: { url: 'u' } }, { type: 'ig_reel' }] }), []);
+  assert.strictEqual(unknownAttachments({ attachments: [{ type: 'sticker' }, { type: 'image', payload: { sticker_id: 1 } }] }).length, 2);
+  // The log shows field names only, never links or values
+  const shape = shapeOf({ type: 'sticker', payload: { url: 'https://secret.cdn/abc', sticker_id: 5 } });
+  assert.deepStrictEqual(shape, { type: 'sticker', payloadKeys: ['sticker_id', 'url'], hasUrl: true });
+  assert.doesNotMatch(JSON.stringify(shape), /secret|abc/);
+});

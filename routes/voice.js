@@ -102,7 +102,7 @@ router.post('/logs/:id/label', async (req, res) => {
         ownerId: req.user._id, senderId: doc.senderId, contactName: doc.contactName,
         incoming: doc.incoming, draft: doc.draft, human: mine,
       });
-      rule = out?.rule ? { text: out.rule.text, status: out.rule.status, support: out.rule.support } : null;
+      rule = out?.rule ? { text: out.rule.text, status: out.rule.status, support: out.rule.support, contradictions: out.rule.contradictions || 0 } : null;
     }
     // The judge's score is shown only now, after you decided (so it can't sway you)
     res.json({ success: true, score: doc.score, status: doc.status, issues: doc.issues, rule });
@@ -111,6 +111,7 @@ router.post('/logs/:id/label', async (req, res) => {
 
 router.get('/learned', async (req, res) => {
   try {
+    await require('../services/correctionLearning').refreshStatuses(req.user._id).catch(() => 0);
     const rules = await StylePreference.find({ ownerId: req.user._id, status: { $ne: 'retired' } })
       .sort({ status: 1, support: -1, updatedAt: -1 }).limit(100).lean();
     res.json({ rules, promoteAt: require('../services/correctionLearning').PROMOTE_AT });

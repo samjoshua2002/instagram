@@ -1499,6 +1499,7 @@ body.qz2-dragging, body.qz2-dragging * { cursor: grabbing !important; -webkit-us
 .vc-diffs { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .vc-diffs li { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--vc-acc) 9%, transparent); font-size: 0.9rem; line-height: 1.4; }
 .vc-diffs small { display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem; color: var(--color-text-secondary); }
+.vc-compare-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .vc-compare { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 .vc-compare th, .vc-compare td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--color-border); }
 .vc-compare th:first-child, .vc-compare td:first-child { text-align: left; color: var(--color-text-secondary); }

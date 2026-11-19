@@ -74,7 +74,7 @@ async function describeUrl(url, kind = 'photo') {
 
 /** "[Sent a Photo]" / "[Sent a Video]" -> what it shows, or a natural fallback hint. */
 function withDescription(text, kind, description) {
-  const label = kind === 'video' ? 'Video' : 'Photo';
+  const label = kind === 'video' ? 'Video' : kind === 'sticker' ? 'Sticker' : 'Photo';
   const placeholder = `[Sent a ${label}]`;
   const said = description
     ? `[Sent a ${kind}: ${description.replace(/[[\]]/g, '').slice(0, 600)}]`
@@ -97,4 +97,31 @@ async function describeBuffer(buf, contentType = 'image/jpeg', kind = 'photo') {
   }
 }
 
-module.exports = { describeUrl, describeBuffer, withDescription, videoFrames };
+/**
+ * An image Instagram may not accept for sending (WebP, HEIC...) as a PNG, using the ffmpeg that is
+ * already installed for video frames. Animated images keep only their first frame. Returns a Buffer
+ * or null.
+ */
+async function toPng(buf, ext = 'webp') {
+  let ffmpeg;
+  try { ffmpeg = require('ffmpeg-static'); } catch { return null; }
+  if (!ffmpeg || !buf?.length) return null;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dmimg-'));
+  const input = path.join(dir, `in.${String(ext).replace(/[^a-z0-9]/gi, '') || 'img'}`);
+  const output = path.join(dir, 'out.png');
+  fs.writeFileSync(input, buf);
+  try {
+    await new Promise((resolve, reject) => execFile(ffmpeg, [
+      '-hide_banner', '-loglevel', 'error', '-i', input, '-frames:v', '1', '-y', output,
+    ], { timeout: 20000 }, err => (err ? reject(err) : resolve())));
+    const png = fs.readFileSync(output);
+    return png.length ? png : null;
+  } catch (err) {
+    console.warn('⚠️ [Media] Could not convert an image to PNG:', err.message);
+    return null;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+module.exports = { describeUrl, describeBuffer, withDescription, videoFrames, toPng };

@@ -32,6 +32,9 @@ function MediaVaultPageContent() {
 
 
   const [items, setItems] = useState([]);
+  // Saved from chats and not kept yet vs everything the AI may send
+  const savedFromChats = items.filter(item => item.reviewStatus === 'pending');
+  const keptItems = items.filter(item => item.reviewStatus !== 'pending');
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -316,6 +319,33 @@ function MediaVaultPageContent() {
       }
     } catch (err) {
       showToast('Delete error', 'error');
+    }
+  };
+
+  // A reaction image saved from a chat: Keep lets the AI send it; Remove deletes it without asking
+  const handleKeepMedia = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/media-vault/${id}/keep`, { method: 'POST', headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setItems(prev => prev.map(item => (item._id === id ? data.item : item)));
+        showToast('Kept: the AI can send it now', 'success');
+      } else {
+        showToast(data.error || 'Could not keep it', 'error');
+      }
+    } catch (err) {
+      showToast('Could not keep it', 'error');
+    }
+  };
+
+  const handleRemoveSaved = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/media-vault/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.success) setItems(prev => prev.filter(item => item._id !== id));
+      else showToast(data.error || 'Could not remove it', 'error');
+    } catch (err) {
+      showToast('Could not remove it', 'error');
     }
   };
 
@@ -787,7 +817,36 @@ function MediaVaultPageContent() {
             </div>
           ))}
         </div>
-      ) : items.length === 0 ? (
+      ) : (
+        <>
+        {savedFromChats.length > 0 && (
+          <div className="vx-saved">
+            <div className="vx-saved-head">
+              <div className="vx-empty-title">Saved from your chats</div>
+              <p>Stickers and memes people sent you. The AI only sends one after you tap Keep.</p>
+            </div>
+            <div className="vx-grid">
+              {savedFromChats.map(item => renderCard({
+                key: item._id,
+                url: item.url,
+                name: item.name,
+                category: item.category,
+                badge: 'NEW',
+                keywords: item.keywords,
+                date: item.createdAt,
+                footer: (
+                  <>
+                    <small className="vx-from">{item.fromName ? `from ${item.fromName}` : 'from a chat'}</small>
+                    <span className="vx-foot-gap" />
+                    <button type="button" className="spx-icon-btn" onClick={() => handleKeepMedia(item._id)} title="Keep: the AI may send it" aria-label="Keep"><Check size={15} /></button>
+                    <button type="button" className="spx-icon-btn vx-danger" onClick={() => handleRemoveSaved(item._id)} title="Remove" aria-label="Remove"><Trash2 size={15} /></button>
+                  </>
+                ),
+              }))}
+            </div>
+          </div>
+        )}
+        {keptItems.length === 0 ? (
         <div className="spx-empty-card vx-empty">
           <ImageIcon className="icon-keep" size={32} />
           <div className="vx-empty-title">No reactions in {activeCategory === 'all' ? 'your vault' : categoryLabel(activeCategory)} yet</div>
@@ -805,7 +864,7 @@ function MediaVaultPageContent() {
         </div>
       ) : (
         <div className="vx-grid stagger-in">
-          {items.map(item => renderCard({
+          {keptItems.map(item => renderCard({
             key: item._id,
             url: item.url,
             name: item.name,
@@ -823,6 +882,8 @@ function MediaVaultPageContent() {
             ),
           }))}
         </div>
+        )}
+        </>
       )}
 
       </section>

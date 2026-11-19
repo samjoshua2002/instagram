@@ -4,6 +4,8 @@ const { graphBaseUrl } = require('./graphApi');
 
 // ── Shared axios config ────────────────────────────────────────────────────
 const TIMEOUT_MS = 12000; // 12 seconds max per request
+// Reaction names Instagram refused for this server (they fall back to ❤️)
+const unsupportedReactions = new Set();
 
 // The request never left this machine (no connection was made), so retrying cannot double-send
 const PRE_SEND_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH']);
@@ -358,37 +360,48 @@ class InstagramService {
   }
 
   /**
-   * React to a message with an emoji (e.g. '😂', '❤️', '🔥')
+   * React to a message (like a double tap). Meta's documented shape is sender_action "react" with
+   * payload { message_id, reaction }. Meta's example only shows "love"; laugh / wow / sad / angry /
+   * like are the names its webhooks use, so they are tried, and if Instagram refuses one it is sent
+   * as ❤️ instead and not tried again. Takes a reaction name or an emoji.
+   * Returns the reaction that was sent ('love', 'laugh', ...) or false.
    */
-  async sendMessageReaction(recipientId, messageId, emoji = '😂', customToken = null) {
+  async sendMessageReaction(recipientId, messageId, reaction = 'love', customToken = null) {
     const token = customToken || await this.getAccessToken();
-    if (!token || !messageId) return;
+    if (!token || !messageId) return false;
+    const { toReaction } = require('../lib/humanPacing');
+    let wanted = toReaction(reaction) || 'love';
+    if (unsupportedReactions.has(wanted)) wanted = 'love';
+    const target = (token.startsWith('IG') || customToken) ? 'me' : await this.getAccountId();
+    const result = await this.postReaction(recipientId, messageId, wanted, token, target);
+    if (result === 'ok') return wanted;
+    if (result !== 'refused' || wanted === 'love') return false;
+    // Instagram answered "no" to this reaction name (not a network problem): ❤️ from now on
+    unsupportedReactions.add(wanted);
+    console.warn(`⚠️ [Reaction] Instagram refused "${wanted}"; sending ❤️ instead (and from now on).`);
+    return (await this.postReaction(recipientId, messageId, 'love', token, target)) === 'ok' ? 'love' : false;
+  }
 
-    const isInstagramToken = token.startsWith('IG');
-    const baseUrl = graphBaseUrl(token);
-    const accountId = (isInstagramToken || customToken) ? 'me' : await this.getAccountId();
-    const url = `${baseUrl}/${accountId}/messages`;
-
+  /** One reaction request: 'ok', 'refused' (Instagram said 400 / bad request) or 'failed'. */
+  async postReaction(recipientId, messageId, reaction, token, target = 'me') {
+    const url = `${graphBaseUrl(token)}/${target}/messages`;
     try {
       await withRetry(
         () => axios.post(
           url,
-          {
-            recipient: { id: recipientId },
-            sender_action: 'react',
-            reaction: { message_id: messageId, reaction: emoji },
-          },
-          {
-            headers: authHeaders(token),
-            timeout: TIMEOUT_MS,
-          }
+          { recipient: { id: recipientId }, sender_action: 'react', payload: { message_id: messageId, reaction } },
+          { headers: authHeaders(token), timeout: TIMEOUT_MS },
         ),
         2,
-        `sendMessageReaction → ${recipientId}`
+        `sendMessageReaction → ${recipientId}`,
       );
-      console.log(`❤️ [Reaction Sent] ${emoji} to message ${messageId}`);
+      console.log(`❤️ [Reaction Sent] ${reaction} to message ${messageId}`);
+      return 'ok';
     } catch (err) {
-      // Catch silently if reaction endpoint has scope restrictions
+      // Logged (not swallowed) so a permission or format problem shows up instead of failing quietly
+      const apiErr = err.response?.data?.error;
+      console.warn(`⚠️ [Reaction Failed] ${reaction}: ${err.response?.status || ''} ${apiErr?.message || err.message}`.trim());
+      return err.response?.status === 400 ? 'refused' : 'failed';
     }
   }
 

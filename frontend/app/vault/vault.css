@@ -396,3 +396,9 @@
 @media (max-width: 360px) {
   .vx-modes .spx-pill svg { display: none; }
 }
+
+/* Reaction images saved from chats, waiting for Keep */
+.vx-saved { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--color-border); }
+.vx-saved-head { margin-bottom: 12px; }
+.vx-saved-head p { margin: 4px 0 0; font-size: 13px; color: var(--sp-text-2); }
+.vx-from { font-size: 12px; color: var(--sp-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
