@@ -174,6 +174,11 @@ export default function VoicePage() {
                   </table>
                   </div>
                 )}
+                {summary?.pace && (
+                  <p className="vc-muted vc-foot">
+                    Your reply speed: usually <b>{summary.pace.medianSeconds}s</b> ({summary.pace.within10s}% within 10 seconds, {summary.pace.withinMinute}% within a minute). The AI waits the same way before replying.
+                  </p>
+                )}
                 {st?.reactions?.length > 0 && (
                   <p className="vc-muted vc-foot">
                     Reactions the AI uses for you: <b>{st.reactions.map(r => REACTION_EMOJI[r] || '').join(' ')}</b>, from the emoji you type most (Instagram doesn&apos;t tell apps which reactions you tap yourself).

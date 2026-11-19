@@ -21,6 +21,7 @@ const transcribeService = require('./services/transcribeService');
 const { expandMentions } = require('./lib/mentions');
 const incomingMedia = require('./lib/incomingMedia');
 const humanPacing = require('./lib/humanPacing');
+const replyTiming = require('./services/replyTiming');
 const mediaService = require('./services/mediaService');
 const azureOpenAI = require('./services/azureOpenAI');
 const { creatorIdentity } = require('./services/creatorIdentity');
@@ -1026,6 +1027,13 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
   // 6. Anti-Spam / Debounce Logic:
   // If the user is rapid-firing messages or spamming, hold on until they stop typing!
   // This aggregates their messages, saves tokens, and replies once naturally like a human.
+  // Personal chats wait the way the owner really does: a delay drawn from their own reply times with
+  // this person (or across their chats), learned from the timestamps (services/replyTiming.js).
+  // Without enough history: quick, and now and then a bit later (BATCH_REPLY_CHANCE, default 0.08).
+  // Business chats always answer quickly. Looked up BEFORE the queue check, so checking and
+  // creating the queue entry below happen without a wait in between (no double replies).
+  const isBusinessChat = celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType);
+  const learnedHold = isBusinessChat ? null : await replyTiming.holdMs(ownerUser?._id || null, senderId);
   const queueKey = contactKey(ownerUser?._id, senderId);
   if (userDebounceQueues.has(queueKey)) {
     const existing = userDebounceQueues.get(queueKey);
@@ -1034,7 +1042,9 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     existing.lastMid = mid;
 
     // Back-to-back messages wait the quick 1 s; a burst being answered "later" keeps its deadline
-    const waitMs = humanPacing.joinWaitMs(existing.holdUntil);
+    const waitMs = humanPacing.joinWaitMs(existing.holdUntil, Date.now(), existing.messages.length);
+    // They kept texting while we waited: that's them waiting for an answer, so it goes out soon
+    if (waitMs < existing.holdUntil - Date.now()) existing.holdUntil = Date.now() + waitMs;
     console.log(`⏳ [Anti-Spam / Debounce]: User ${senderId} sent another message (${existing.messages.length} queued). Holding on for ${Math.round(waitMs / 1000)}s...`);
 
     existing.timer = setTimeout(() => {
@@ -1046,13 +1056,10 @@ async function handleIncomingInstagramMessage(event, accountId = null) {
     return;
   }
 
-  // Now and then a personal chat is answered later, in one go, like someone who checks their phone
-  // after a while (BATCH_REPLY_CHANCE, default 0.2; 0 turns it off)
-  const holdMs = humanPacing.clusterHoldMs({
-    chance: humanPacing.laterChance(),
-    isBusiness: celRuleEngine.isBusinessAccount(ownerUser?.accountType || config?.accountType),
-  });
-  if (holdMs > DEBOUNCE_WAIT_MS) console.log(`📦 [Answer Later]: Replying to ${senderId} in ${Math.round(holdMs / 1000)}s, together with anything else they send.`);
+  const holdMs = learnedHold != null
+    ? Math.max(DEBOUNCE_WAIT_MS, learnedHold)
+    : humanPacing.clusterHoldMs({ chance: humanPacing.laterChance(), isBusiness: isBusinessChat });
+  if (holdMs > DEBOUNCE_WAIT_MS) console.log(`⏱️ [Your Pace]: Replying to ${senderId} in ~${Math.round(holdMs / 1000)}s${learnedHold != null ? ' (learned from how fast you reply)' : ''}, together with anything else they send.`);
 
   // First message in a potential cluster: start debounce window
   const queueEntry = {

@@ -46,14 +46,16 @@ router.get('/overview', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try {
     const voiceAudit = require('../services/voiceAudit');
-    const [style, audit, trusted] = await Promise.all([
+    const [style, audit, trusted, pace] = await Promise.all([
       require('../services/styleCompare').summaryFor(req.user._id, { fresh: req.query.fresh === '1' }),
       voiceAudit.latest(req.user._id),
       voiceAudit.trusted(req.user._id),
+      require('../services/replyTiming').paceFor(req.user._id),
     ]);
     const forced = (process.env.VOICE_CHECK || '').toLowerCase();
     res.json({
       style,
+      pace,
       audit: audit && { at: audit.createdAt, realPass: audit.realPass, realAvg: audit.realAvg, aiPass: audit.aiPass, aiAvg: audit.aiAvg, trusted: audit.trusted, reason: audit.reason },
       // What the checker does for this account right now
       mode: forced === 'off' ? 'off' : forced === 'enforce' ? 'enforce' : forced === 'shadow' ? 'shadow' : (trusted ? 'enforce' : 'shadow'),

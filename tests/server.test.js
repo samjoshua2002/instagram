@@ -168,7 +168,7 @@ test('incoming stickers and unknown attachments are kept with a placeholder, nev
   assert.strictEqual(placeholderFor({ attachments: [{ type: 'sticker', payload: { url: 'https://x/y.webp' } }] }), '[Sent a Sticker]');
   assert.strictEqual(placeholderFor({ attachments: [{ type: 'image', payload: { url: 'u', sticker_id: 369239263222822 } }] }), '[Sent a Sticker]');
   assert.strictEqual(placeholderFor({ attachments: [{ type: 'like_heart' }] }), '[Sent a ❤️]');
-  assert.strictEqual(placeholderFor({ attachments: [{ type: 'animated_thing', payload: {} }] }), '[Sent an attachment]');
+  assert.strictEqual(placeholderFor({ attachments: [{ type: 'animated_thing', payload: {} }] }), '[Sent a Sticker]', 'unknown types are stickers in practice');
   assert.strictEqual(placeholderFor({ text: 'hi' }), '');
   assert.strictEqual(isSticker({ type: 'image', payload: { url: 'u' } }), false);
   // Known types are not reported; stickers and new types are

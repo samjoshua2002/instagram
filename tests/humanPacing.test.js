@@ -4,7 +4,7 @@ const pacing = require('../lib/humanPacing');
 
 const seq = (...values) => { let i = 0; return () => values[Math.min(i++, values.length - 1)]; };
 
-test('answer later: most chats are quick; about 1 in 5 wait 45 s to 2.5 min; business never waits', () => {
+test('answer later: rare (about 1 in 12) and short (15 to 45 s); business never waits', () => {
   assert.equal(pacing.clusterHoldMs({ random: seq(0.5), chance: 0.2 }), pacing.QUICK_GROUP_MS);
   assert.equal(pacing.clusterHoldMs({ random: seq(0.1, 0), chance: 0.2 }), pacing.LATER_MIN_MS);
   assert.equal(pacing.clusterHoldMs({ random: seq(0.1, 1), chance: 0.2 }), pacing.LATER_MAX_MS);
@@ -18,17 +18,19 @@ test('answer later: most chats are quick; about 1 in 5 wait 45 s to 2.5 min; bus
 
 test('answer later: messages that arrive meanwhile join the same reply, without pushing it later', () => {
   const now = 1_000_000;
-  assert.equal(pacing.joinWaitMs(now + 90_000, now), 90_000, 'keeps the original deadline');
+  assert.equal(pacing.joinWaitMs(now + 30_000, now), 30_000, 'keeps the original deadline');
   assert.equal(pacing.joinWaitMs(now + 200, now), pacing.QUICK_GROUP_MS, 'a quick burst still waits 1 s for the next line');
   assert.equal(pacing.joinWaitMs(undefined, now), pacing.QUICK_GROUP_MS);
 });
 
-test('BATCH_REPLY_CHANCE sets the share; bad values fall back to 20%', () => {
+test('BATCH_REPLY_CHANCE sets the share; bad values fall back to 8%', () => {
   assert.equal(pacing.laterChance({ BATCH_REPLY_CHANCE: '0.5' }), 0.5);
   assert.equal(pacing.laterChance({ BATCH_REPLY_CHANCE: '0' }), 0);
-  assert.equal(pacing.laterChance({ BATCH_REPLY_CHANCE: 'lots' }), 0.2);
-  assert.equal(pacing.laterChance({ BATCH_REPLY_CHANCE: '3' }), 0.2);
-  assert.equal(pacing.laterChance({}), 0.2);
+  assert.equal(pacing.laterChance({ BATCH_REPLY_CHANCE: 'lots' }), 0.08);
+  assert.equal(pacing.laterChance({ BATCH_REPLY_CHANCE: '3' }), 0.08);
+  assert.equal(pacing.laterChance({}), 0.08);
+  assert.equal(pacing.LATER_MIN_MS, 15000);
+  assert.equal(pacing.LATER_MAX_MS, 45000);
 });
 
 test('only a ❤️ is fine for "ok", "gn", laughs; not for questions, long messages, or twice in a row', () => {
@@ -107,4 +109,12 @@ test('the reaction request uses Meta\'s documented shape; a refused reaction fal
   } finally {
     axios.post = realPost;
   }
+});
+
+test('answer later: if they keep texting while we wait (4+ messages), the reply goes out within 5 s', () => {
+  const now = 1_000_000;
+  assert.equal(pacing.joinWaitMs(now + 40_000, now, 2), 40_000, 'a couple of messages: keeps waiting');
+  assert.equal(pacing.joinWaitMs(now + 40_000, now, 4), 5000, '4 waiting: answer soon');
+  assert.equal(pacing.joinWaitMs(now + 2000, now, 6), 2000, 'never later than the original deadline');
+  assert.equal(pacing.joinWaitMs(now + 200, now, 6), pacing.QUICK_GROUP_MS);
 });

@@ -8,6 +8,7 @@ const styleCompare = require('./styleCompare');
 const { checkInGuide } = require('./checkInVoice');
 const songService = require('./songService');
 const humanPacing = require('../lib/humanPacing');
+const ownWords = require('./ownWords');
 const PersonaConfig = require('../models/PersonaConfig');
 const socialGraphService = require('./socialGraphService');
 const stickerService = require('./stickerService');
@@ -497,9 +498,8 @@ ${memoryFactsSection}
 
 GENDER & ADDRESSING (CRITICAL):
 - This person's gender: ${userMemory.gender || 'unknown'}
-- FEMALE: Never call her bro/da/man/machan. Speak warmly, use her name or nickname, gentle teasing.
-- MALE: Chill bro-style banter is fine if natural.
-- UNKNOWN: Use their name or neutral terms. Do NOT assume gender.
+- Call them only what YOU call them in your real messages with them (your past exchanges above). Never add a nickname or address word you don't use with them.
+- UNKNOWN or no past messages: use their name or nothing. Do NOT assume gender.
 
 BANTER & ROASTING (CRITICAL — STRICTLY PER PERSON):
 - This person's specific banter/roast style: see "Banter / roast style" in the contact data above (style only), otherwise match their energy naturally
@@ -527,6 +527,11 @@ LEARN AND SOUND EXACTLY LIKE THE CREATOR:
 - Continuously learn from the real conversation samples and speech style of the creator.
 - Text in their exact ${realVoice ? '' : 'lowercase, '}rhythm, vocabulary, and chill cadence.
 - Sound like a real person texting from their phone, never an AI assistant.
+
+STICKERS, REELS AND SEVERAL MESSAGES AT ONCE:
+- "[Sent a Sticker]" means they sent a sticker (you may not see which one; if it says what it shows, react to that). React like a person: a laugh, an emoji back, or a reaction. Never say "attachment(s)", "media" or "sticker(s)" like a system would.
+- When they sent several messages, answer what they SAID first (how are you, missing you, please reply, a question), in your usual short style. Shared reels and stickers get one quick reaction at most. Never list, count or comment on how many things they sent.
+- Never make up slang or phrases you don't use ("turbo mode"): use your own words from your real messages.
 
 STORY / NOTE REPLIES:
 - Story reply: React casually like a creator — short, genuine, related to the story content.
@@ -605,6 +610,11 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
     const stalled = repeatGuard.stalledBlock(incomingSaved ? effectiveHistory : [...(effectiveHistory || []), { role: 'user', text: incomingText }]);
     if (stalled) messages.push({ role: 'system', content: stalled });
 
+    // Words the AI keeps using with this person that aren't how the two of them talk: avoided up front
+    const vocabForChat = await ownWords.forPerson(conversationOwnerId, userMemory.senderId);
+    const avoid = ownWords.avoidBlock(await ownWords.aiHabitsToAvoid(conversationOwnerId, userMemory.senderId, vocabForChat).catch(() => []));
+    if (avoid) messages.push({ role: 'system', content: avoid });
+
     // Add current incoming message
     messages.push({
       role: 'user',
@@ -662,6 +672,27 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         reply = String((await this.completeWithFilterRetry(selectedModel, retry, { maxTokens: 220, temperature: 0.95, extra: { frequency_penalty: 0.6, presence_penalty: 0.6 } })) ?? '').trim() || reply;
       }
 
+      // Words that aren't part of how these two talk (never typed by the owner to them, never by them,
+      // not common for the owner): written again once. Learned from each chat, no word lists.
+      let foreignRewrite = null;
+      if (usedPlatformModel && reply) {
+        const vocab = vocabForChat;
+        const chatTexts = [incomingText, ...(effectiveHistory || []).slice(-20).filter(m => m.role !== 'assistant' || !m.sentByAI).map(m => m.text), userMemory.name, userMemory.nickname, userMemory.username];
+        const foreign = vocab ? ownWords.foreignWords(humanPacing.stripReactTag(reply), { ...vocab, chatTexts }) : [];
+        if (foreign.length) {
+          const again = String((await this.completeWithFilterRetry(selectedModel, [
+            ...messages.slice(0, -1),
+            { role: 'system', content: ownWords.rewriteNote(reply, foreign) },
+            messages[messages.length - 1],
+          ], { maxTokens: 220, temperature: 0.8 })) ?? '').trim();
+          const left = again ? ownWords.foreignWords(humanPacing.stripReactTag(again), { ...vocab, chatTexts }) : foreign;
+          // Keep the rewrite only if it really uses fewer words that aren't yours
+          if (again && left.length < foreign.length) reply = again;
+          foreignRewrite = { foreign, left: left.length < foreign.length ? left : foreign };
+          console.log(`🗣️ [Own words] Not yours: ${foreign.join(', ')}${left.length < foreign.length ? ` -> rewritten${left.length ? ` (still: ${left.join(', ')})` : ''}` : ' (rewrite was no better)'}`);
+        }
+      }
+
       // Does it sound like the owner? Bot phrases, far too long, or a low score from a fast judge
       // that compares it with their real messages: written again once (services/voiceCheck.js)
       let voiceVerdict = null;
@@ -698,6 +729,7 @@ ${humanChatRules({ allowEmoji, allowTanglish })}
         socialGraphUsed: Boolean(socialTreeContext),
         antiRepeatNote: Boolean(antiRepeat),
         stalledChatNote: Boolean(stalled),
+        notYourWords: foreignRewrite,
         regeneratedBecauseRepeat: regenerated,
         voiceScore: voiceVerdict?.score ?? null,
         voiceIssues: voiceVerdict?.issues?.length ? voiceVerdict.issues : null,
@@ -942,6 +974,10 @@ ${transcript}
 
 ` : ''}Now the chat has been quiet for a while. Write a NEW message that starts a fresh conversation with them: follow up on something from that chat or their life if there is something, written the way you open chats. Return the JSON.` },
     ];
+    // Words the AI keeps using with them that aren't how the two of them talk: avoided up front
+    const checkInVocab = await ownWords.forPerson(userMemory.ownerId || null, userMemory.senderId);
+    const avoid = ownWords.avoidBlock(await ownWords.aiHabitsToAvoid(userMemory.ownerId || null, userMemory.senderId, checkInVocab).catch(() => []));
+    if (avoid) messages.splice(1, 0, { role: 'system', content: avoid });
     try {
       const out = await this.jsonWithFallback(TOP_MODEL, messages);
       let message = toHumanText(String(out?.message || ''), { keepEmoji: checkInEmoji }).trim();
@@ -961,6 +997,19 @@ ${transcript}
         },
       }).catch(() => null);
       if (verdict?.text) message = verdict.text;
+      // Words that aren't part of how these two talk: written again once (as for replies)
+      const vocab = checkInVocab;
+      const chatTexts = [...(messageHistory || []).slice(-12).filter(m => m.role !== 'assistant' || !m.sentByAI).map(m => m.text), ...openers, name, ...nicknames];
+      const foreign = vocab ? ownWords.foreignWords(message, { ...vocab, chatTexts }) : [];
+      if (foreign.length) {
+        const again = await this.jsonWithFallback(TOP_MODEL, [...messages.slice(0, -1),
+          { role: 'system', content: ownWords.rewriteNote(message, foreign) }, messages[messages.length - 1]]).catch(() => null);
+        const text = toHumanText(String(again?.message || ''), { keepEmoji: checkInEmoji }).trim();
+        if (text && ownWords.foreignWords(text, { ...vocab, chatTexts }).length < foreign.length) {
+          message = text;
+          if (again?.question) question = String(again.question).slice(0, 200);
+        }
+      }
       if (verdict?.rewritten) console.log(`🗣️ [Voice check] Rewrote a check-in for ${name}: ${verdict.issues.join('; ')}`);
       if (verdict) {
         voiceCheck.logCheck({ ownerId: userMemory.ownerId, senderId: userMemory.senderId, contactName: name, kind: 'checkin',
